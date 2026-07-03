@@ -646,8 +646,10 @@ const CRUD = {
       '<td style="white-space:nowrap">' +
         (moduleId === 'students' ? '<a class="btn btn-sm btn-primary" href="student-profile.html?student=' + row.id + '">Dashboard</a> ' : '') +
         (moduleId === 'staff' ? '<a class="btn btn-sm btn-primary" href="teacher-overview.html?staff=' + row.id + '">Teacher overview</a> ' : '') +
+        (moduleId === 'parent_child' ? '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'parent_child\',\'' + row.id + '\')">Unlink</button> ' : '') +
         ((moduleId === 'payroll' || moduleId === 'hr') ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printPayslip(\'' + row.id + '\')">Payslip</button> ' : '') +
         (moduleId === 'fees' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printReceipt(\'' + row.id + '\')">Print E-Receipt</button> ' : '') +
+        (moduleId === 'admissions' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.previewAdmission(\'' + row.id + '\')">Preview</button> ' : '') +
         '<button class="btn btn-sm btn-outline" onclick="CRUD.openForm(\'' + moduleId + '\',\'' + row.id + '\')">Edit</button> ' +
         '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'' + moduleId + '\',\'' + row.id + '\')">Delete</button>' +
       '</td>') + '</tr>').join('');
@@ -852,6 +854,15 @@ const CRUD = {
       } else toast('✅ Saved. Add an email to generate login invitation details.', 'success', 6000);
     } else toast('✅ Saved.', 'success');
     this.renderList(moduleId);
+  },
+
+  async previewAdmission(id) {
+    if (!this.sb) return;
+    const { data: a } = await this.sb.from('admissions').select('*').eq('id', id).maybeSingle();
+    if (!a) { toast('Application not found', 'warning'); return; }
+    const d = a.data || {};
+    const rows = Object.entries(Object.assign({}, d, a)).filter(([k])=>!['data'].includes(k)).map(([k,v]) => '<tr><th style="text-align:left;padding:6px;border:1px solid #e2e8f0">'+esc(k.replace(/_/g,' '))+'</th><td style="padding:6px;border:1px solid #e2e8f0">'+esc(v==null?'':String(v))+'</td></tr>').join('');
+    openModal('Admission Application Preview', '<div class="table-wrap"><table style="width:100%;border-collapse:collapse">'+rows+'</table></div>', '<button class="btn btn-outline" onclick="window.print()">Print</button><button class="btn btn-primary" onclick="closeModal()">Close</button>');
   },
 
   async printReceipt(id) {

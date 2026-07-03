@@ -527,7 +527,7 @@ const Super = {
             <div>Session: <strong>${Super.esc(session)}</strong></div>
             <div style="margin-top:10px;border-top:1px solid #cbd5e1;width:90px;text-align:center;font-size:.58rem;padding-top:1px">Signature</div>
           </div>
-          <img src="${qr}" style="width:64px;height:64px" alt="QR">
+          <div style="text-align:center"><img src="${qr}" style="width:78px;height:78px" alt="QR"><div style="font-size:.55rem;font-weight:800;color:#0f172a">SCAN TO VERIFY</div><div style="height:18px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px);margin-top:3px"></div></div>
         </div>
         ${contactFooter}${credit}
       </div>`;
@@ -550,7 +550,7 @@ const Super = {
         <img src="assets/img/logo.${(s.logoExt || 'svg')}" style="width:70px;height:70px;border-radius:12px;object-fit:contain" alt="">
         <h1 style="margin:10px 0 4px">${Super.esc(s.name || 'School')}</h1>
         <p style="color:#64748b;margin:0 0 20px">${Super.esc(s.motto || '')}</p>
-        <h2 style="letter-spacing:2px;color:var(--primary,#4f46e5)">${Super.esc(opts.title || 'CERTIFICATE OF ACHIEVEMENT')}</h2>
+        <div style="letter-spacing:6px;color:#b8860b;font-size:3rem;font-weight:700;margin:16px 0 0">CERTIFICATE</div><h2 style="letter-spacing:3px;color:#0f172a;margin:0 0 18px">${Super.esc(opts.title || 'OF COMPLETION')}</h2>
         <p style="margin:18px 0 6px">This is to certify that</p>
         <h2 style="margin:0;border-bottom:2px solid #e2e8f0;display:inline-block;padding:0 30px 6px">${Super.esc(opts.name || '')}</h2>
         <p style="max-width:560px;margin:18px auto;line-height:1.6">${Super.esc(opts.body || 'has successfully met the requirements and is hereby recognised for outstanding achievement.')}</p>
