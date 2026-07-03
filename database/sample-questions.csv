@@ -1,0 +1,6 @@
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+"What is 5 + 7?",10,11,12,13,C,"Simple addition.",mcq,,,,,,,Easy,Arithmetic,Numbers
+"Water boils at 100 degrees Celsius at sea level.",,,,,A,"True at standard atmospheric pressure.",truefalse,,,,,,,Easy,Science,Heat
+"Solve for x: 3x = 21",,,,,7,"Divide both sides by 3.",numeric,0.01,,,,,,Medium,Algebra,Equations
+"Name the capital of Nigeria.",,,,,Abuja,"Abuja became the capital in 1991.",short,,,FCT|Abuja City,,,,Easy,Geography,Nigeria
+"Choose the prime numbers.",2,3,4,9,A|B,"2 and 3 are prime; 4 and 9 are composite.",mrq,,,,,,,Medium,Numbers,Primes
