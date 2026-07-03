@@ -59,7 +59,7 @@ create table if not exists public.school_settings (
   current_term text default 'First Term',
   sessions text[] default array['2024/2025','2025/2026','2026/2027'],
   terms text[] default array['First Term','Second Term','Third Term'],
-  admission_prefix text default 'SCH', -- generator rewrites SCH to the school acronym
+  admission_prefix text default 'GOSA', -- generator rewrites SCH to the school acronym
   admission_next int default 1,
   parent_prefix text default 'PAR',
   parent_next int default 1,
@@ -102,9 +102,9 @@ begin
       where id = 1 returning * into s;
     if s.id is null then
       insert into public.school_settings(id, admission_next) values (1, 2) returning * into s;
-      s.admission_prefix := 'STD'; s.admission_next := 1;
+      s.admission_prefix := 'GOSA'; s.admission_next := 1;
     end if;
-    new.admission_no := coalesce(s.admission_prefix,'STD') || '/' || yr || '/' || lpad((s.admission_next-1)::text, 4, '0');
+    new.admission_no := coalesce(s.admission_prefix,'GOSA') || '/' || yr || '/' || lpad((s.admission_next-1)::text, 4, '0');
   end if;
   return new;
 end; $$;
