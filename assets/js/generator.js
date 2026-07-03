@@ -70,7 +70,7 @@ const Generator = {
       timetable_generator: 'timetable-generator.html',
       student_profile: 'student-profile.html',
       verify_certificate: 'verify-certificate.html',
-      feature_guide: 'feature-guide.html', profile: 'profile.html', 'change-password': 'change-password.html'
+      feature_guide: 'feature-guide.html', profile:'profile.html', change_password:'change-password.html', cbt_multi:'cbt-multi.html', profile: 'profile.html', 'change-password': 'change-password.html'
     };
     return map[id] || (id + '.html');
   },

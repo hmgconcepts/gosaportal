@@ -215,7 +215,7 @@ ${T.modal()}
       timetable_generator: 'timetable-generator.html',
       student_profile: 'student-profile.html',
       verify_certificate: 'verify-certificate.html',
-      feature_guide: 'feature-guide.html'
+      feature_guide: 'feature-guide.html', profile:'profile.html', change_password:'change-password.html', cbt_multi:'cbt-multi.html'
     };
     return map[id] || (id + '.html');
   },
@@ -329,7 +329,7 @@ ${T.setupRequiredBanner()}
     const canonical = (x) => {
       const map = {
         'academic-records':'academic_records', 'admin-data':'admin_data', 'report-cards':'report_cards',
-        'cbt-prompts':'cbt_prompts', 'cbt-exam':'cbt_exam', 'timetable-generator':'timetable_generator',
+        'cbt-prompts':'cbt_prompts', 'cbt-exam':'cbt_exam', 'cbt-multi':'cbt_multi', 'change-password':'change_password', 'timetable-generator':'timetable_generator',
         'student-profile':'student_profile', 'profile':'profile', 'change-password':'change_password', 'cbt-multi':'cbt_multi', 'feature-guide':'feature_guide', 'verify-certificate':'verify_certificate'
       };
       return map[x] || String(x || '').replace(/-/g, '_');
@@ -341,7 +341,7 @@ ${T.setupRequiredBanner()}
     // Default role menus are intentionally lean. Admin can later override this from
     // Dashboard → Page Access Manager without removing any feature from the system.
     const staffSet = new Set([
-      'dashboard','notifications','profile','change_password','feature_guide','teacher_overview',
+      'dashboard','profile','change_password','notifications','feature_guide','teacher_overview',
       'students','classes','subjects','attendance','results','report_cards','academic_records',
       'cbt','cbt_prompts','entrance','assignments','timetable','timetable_generator','sow',
       'lesson_plans','library','digital_library','eresources','announcements','events','messages','inbox',
@@ -349,12 +349,12 @@ ${T.setupRequiredBanner()}
       'certificates','reports','directory','rubrics','counselling','substitutions','helpdesk','book_request'
     ]);
     const parentSet = new Set([
-      'dashboard','notifications','profile','change_password','feature_guide','student_profile','fees','payments_online','results',
+      'dashboard','profile','change_password','notifications','feature_guide','student_profile','fees','payments_online','results',
       'report_cards','attendance','assignments','diary','timetable','announcements','events','messages','inbox',
       'complaints','eresources','certificates','school_calendar'
     ]);
     const studentSet = new Set([
-      'dashboard','notifications','profile','change_password','feature_guide','student_profile','cbt_exam','assignments','digital_library',
+      'dashboard','profile','change_password','notifications','feature_guide','student_profile','cbt_exam','assignments','digital_library',
       'eresources','timetable','results','report_cards','attendance','announcements','events','messages','inbox',
       'complaints','certificates','diary','school_calendar'
     ]);
