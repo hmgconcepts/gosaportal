@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Take Exam • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — Take Exam. Free school management platform by HMG Concepts.">
+<meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+<meta name="theme-color" content="#1c72e7">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<meta property="og:title" content="Take Exam • God of Seed Academy">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:image" content="assets/img/og-cover.svg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) ===
+   Guarantees the logged-in dashboard layout renders correctly even if the
+   external stylesheet is cached/blocked/fails to load. Mirrors style.css. */
+:root{--sc-primary:#1c72e7;--sc-accent:#5e2174}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc}
+.app-sidebar{width:250px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:40}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px;border-bottom:1px solid #e2e8f0}
+.app-brand img{width:40px;height:40px;border-radius:10px;object-fit:contain;flex-shrink:0;background:#f8fafc}
+.app-brand strong{display:block;font-size:.95rem;font-weight:800;color:#0f172a;line-height:1.2}
+.app-nav{display:flex;flex-direction:column;gap:2px;padding:12px 10px;flex:1}
+.app-nav a{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;color:#475569;text-decoration:none;font-size:.9rem;font-weight:600;line-height:1;white-space:nowrap}
+.app-nav a:hover{background:#f1f5f9;color:#1c72e7}
+.app-nav a.active{background:#1c72e7;color:#fff}
+.app-nav-icon{width:24px;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:14px 24px;background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30}
+.app-page-title{font-size:1.25rem;font-weight:800;color:#0f172a;margin:0}
+.app-content{padding:24px;flex:1;max-width:1280px;width:100%}
+.app-layout.topnav{flex-direction:column}
+.app-layout.topnav .app-sidebar{width:100%;height:auto;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-nav{flex-direction:row;flex:1;padding:8px;gap:4px}
+.app-layout.topnav .app-nav a{flex-direction:column;gap:4px;font-size:.7rem;padding:8px 12px;text-align:center}
+@media(max-width:900px){.app-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 25px -5px rgba(0,0,0,.2)}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar{position:sticky;transform:none}.app-content{padding:16px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+</head>
+<body data-theme="theme2" data-school="God of Seed Academy" data-font="raleway">
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div><div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="login-shell" style="min-height:100vh;background:var(--gray-100);padding:24px">
+  <div style="max-width:840px;margin:0 auto">
+    <div class="card" style="text-align:center;margin-bottom:16px">
+      <img src="assets/img/logo.png" alt="" style="width:54px;height:54px;border-radius:12px;object-fit:contain">
+      <h1 style="margin:8px 0 0;font-size:1.4rem">God of Seed Academy — Online Exam</h1>
+    </div>
+    <div id="exam-root"><div class="card"><span class="pulse">Loading…</span></div></div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/cbt-engine.js"></script>
+<script>
+CBT.init(sb);
+const Exam = {
+  data:null, answers:[], idx:0, timer:null, remaining:0, monitor:null, flags:{}, startTs:0,
+  qs(){ return (this.data && (this.data._questions || this.data.questions || this.data.csv_data)) || []; },
+  param(){ const u=new URLSearchParams(location.search); return (u.get('code')||u.get('exam')||u.get('c')||'').toUpperCase().trim(); },
+  root(){ return document.getElementById('exam-root'); },
+  async start(){
+    const code=this.param();
+    if(code){ this.codeEntry(code); } else { this.codeEntry(''); }
+  },
+  codeEntry(prefill){
+    this.root().innerHTML = '<div class="card"><h3>Enter exam details</h3>'+
+      '<div class="form-group"><label>Exam code</label><input class="form-input" id="e-code" value="'+(prefill||'')+'" placeholder="ABC123"></div>'+
+      '<div class="form-group"><label>Your full name <span style="color:var(--gray-500);font-weight:400">(optional for anonymous exams)</span></label><input class="form-input" id="e-name" placeholder="Surname First-name"></div>'+
+      '<div class="form-group"><label>Your student ID / admission no (if registered)</label><input class="form-input" id="e-id" placeholder="optional for open exams"></div>'+
+      '<div class="form-group"><label>Class</label><input class="form-input" id="e-class" placeholder="e.g. JSS1"></div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        '<button class="btn btn-primary" onclick="Exam.load(false)">Start exam</button>'+
+        '<button class="btn btn-outline" onclick="Exam.load(true)">👤 Continue as Guest (anonymous)</button>'+
+      '</div>'+
+      '<p style="color:var(--gray-500);font-size:.82rem;margin-top:10px">No account needed for open exams. Guests can take the exam anonymously.</p></div>';
+  },
+  async load(anon){
+    if(!sb){ toast('Database not configured.','warning'); return; }
+    const code=document.getElementById('e-code').value.toUpperCase().trim();
+    let nm=document.getElementById('e-name').value.trim();
+    if(anon && !nm) nm='Anonymous-'+Math.random().toString(36).slice(2,7).toUpperCase();
+    this.student={ name:nm, id_ref:document.getElementById('e-id').value.trim(), class:document.getElementById('e-class').value.trim(), anonymous:!!anon };
+    if(!code){ toast('Enter the exam code.','warning'); return; }
+    if(!this.student.name){ this.student.name='Anonymous-'+Math.random().toString(36).slice(2,7).toUpperCase(); }
+    const { data, error } = await sb.rpc('cbt_get_public_exam', { p_code: code });
+    if(error || !data){ toast('Exam not found or not open.','danger'); return; }
+    if(data.wait){ this.root().innerHTML='<div class="card"><h3>⏳ Please wait</h3><p>This exam opens at '+new Date(data.start_at).toLocaleString()+'.</p></div>'; return; }
+    if(data.closed){ this.root().innerHTML='<div class="card"><h3>🚫 Closed</h3><p>This exam is no longer accepting submissions.</p></div>'; return; }
+    this.data=data; CBT.prepareForStudent(this.data); if(!this.qs().length){ this.root().innerHTML='<div class="card"><h3>No questions found</h3><p>This CBT exam has no valid questions. Ask the teacher to re-upload the CSV question bank.</p></div>'; return; }
+    this.answers=new Array(this.qs().length).fill(null);
+    this.remaining=(data.duration||45)*60; this.startTs=Date.now();
+    if(data.instructions){ if(!confirm('Instructions:\n\n'+data.instructions+'\n\nClick OK to begin.')) { this.codeEntry(code); return; } }
+    this.beginMonitor(); this.tick(); this.render();
+  },
+  beginMonitor(){
+    let viol=0; const cfg=this.data.anti_cheat_config||{};
+    this.monitor=CBT.startAntiCheat(cfg,(type,n)=>{ viol=n; this.violations=n; this.violationLog=this.monitor.log; const w=document.getElementById('viol'); if(w) w.textContent='⚠ '+n+' integrity flag(s)'; if((cfg.max_violations||5) && n>=cfg.max_violations){ toast('Too many integrity violations — submitting.','danger'); this.submit(); } });
+  },
+  tick(){ this.timer=setInterval(()=>{ this.remaining--; const t=document.getElementById('clock'); if(t){ const m=Math.floor(this.remaining/60),s=this.remaining%60; t.textContent=m+':'+String(s).padStart(2,'0'); if(this.remaining<=60)t.style.color='#dc2626'; } if(this.remaining<=0){ clearInterval(this.timer); toast('Time up — submitting.','warning'); this.submit(); } },1000); },
+  render(){
+    const q=this.qs()[this.idx]; if(!q){ return; }
+    const opts=(q.options||[]).map((o,i)=>{ const L=String.fromCharCode(65+i); const checked=this.answers[this.idx]===L?'checked':''; return '<label style="display:block;padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin:6px 0;cursor:pointer"><input type="radio" name="opt" value="'+L+'" '+checked+' onchange="Exam.answer(\''+L+'\')"> '+L+'. '+esc(o)+'</label>'; }).join('');
+    const free=(['short','numeric','essay','code','cloze','multinumeric'].includes(q.type))?'<textarea class="form-input" rows="3" oninput="Exam.answer(this.value)" placeholder="Type your answer">'+esc(this.answers[this.idx]||'')+'</textarea>':'';
+    this.root().innerHTML='<div class="card">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong>Q '+(this.idx+1)+' / '+this.qs().length+'</strong>'+
+      '<div>⏱ <span id="clock">'+Math.floor(this.remaining/60)+':'+String(this.remaining%60).padStart(2,'0')+'</span> <span id="viol" style="color:#dc2626;margin-left:10px"></span></div></div>'+
+      '<p style="font-size:1.05rem;margin-bottom:10px">'+esc(q.question)+'</p>'+ opts + free +
+      '<div style="display:flex;justify-content:space-between;margin-top:14px;gap:8px;flex-wrap:wrap">'+
+        '<button class="btn btn-outline" onclick="Exam.prev()" '+(this.idx===0?'disabled':'')+'>← Prev</button>'+
+        '<button class="btn btn-outline" onclick="Exam.flag()">🚩 Flag</button>'+
+        (this.idx<this.qs().length-1?'<button class="btn btn-primary" onclick="Exam.next()">Next →</button>':'<button class="btn btn-primary" onclick="Exam.confirmSubmit()">Submit ✓</button>')+
+      '</div>'+
+      '<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px">'+this.qs().map((_,i)=>'<button onclick="Exam.go('+i+')" style="width:34px;height:34px;border-radius:6px;border:1px solid var(--gray-300);background:'+(i===this.idx?'var(--primary);color:#fff':(this.answers[i]!=null?'#dcfce7':(this.flags[i]?'#fef08a':'#fff')))+'">'+(i+1)+'</button>').join('')+'</div>'+
+    '</div>';
+  },
+  answer(v){ this.answers[this.idx]=v; this.saveDraft(); },
+  saveDraft(){ try{ localStorage.setItem('cbt-draft-'+this.data.code, JSON.stringify({a:this.answers,i:this.idx})); }catch(e){} },
+  flag(){ this.flags[this.idx]=!this.flags[this.idx]; this.render(); },
+  go(i){ this.idx=i; this.render(); }, next(){ if(this.idx<this.qs().length-1){this.idx++;this.render();} }, prev(){ if(this.idx>0){this.idx--;this.render();} },
+  confirmSubmit(){ const un=this.answers.filter(a=>a==null).length; if(un && !confirm(un+' question(s) unanswered. Submit anyway?'))return; this.submit(); },
+  async submit(){
+    if(this._done)return; this._done=true; clearInterval(this.timer); if(this.monitor)this.monitor.stop();
+    const graded=CBT.gradeSubmission(this.data,this.answers);
+    const timeTaken=Math.round((Date.now()-this.startTs)/1000);
+    const payload={ exam_id:this.data.id, student_name:this.student.name, student_class:this.student.class, student_id_ref:this.student.id_ref, student_type:this.data.exam_mode,
+      score:graded.score, total:graded.total, percent:graded.percent, correct_count:graded.correct, wrong_count:graded.wrong, skipped_count:graded.skipped,
+      time_taken:timeTaken, violations:this.violations||0, violation_log:this.violationLog||[], answers_data:this.answers };
+    let resp; try{ resp=await sb.rpc('cbt_submit',{ p_payload: payload }); }catch(e){ resp={error:e}; }
+    try{ localStorage.removeItem('cbt-draft-'+this.data.code); }catch(e){}
+    if(!resp || resp.error || !resp.data || !resp.data.saved){
+      // Emergency backup
+      const blob=new Blob([JSON.stringify({payload,graded},null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      this.root().innerHTML='<div class="card"><h3>⚠️ Could not save online</h3><p>Please download your result and send it to your teacher.</p><a class="btn btn-primary" href="'+url+'" download="exam-backup.json">Download backup</a></div>';
+      return;
+    }
+    const d=resp.data;
+    if(d.release_results===false){
+      this.root().innerHTML='<div class="card" style="text-align:center"><h2>✅ Submission Received</h2><p>Your answers were recorded. Results will be released by your teacher.</p></div>';
+    } else {
+      this.root().innerHTML='<div class="card" style="text-align:center"><h2>🎉 Score: '+(d.score ?? graded.score)+' / '+(d.total ?? graded.total)+' ('+(d.percent ?? graded.percent)+'%)</h2>'+
+        '<p>Grade: <strong>'+graded.grade+'</strong> · Correct: '+(d.correct_count ?? graded.correct)+' · Wrong: '+(d.wrong_count ?? graded.wrong)+' · Skipped: '+(d.skipped_count ?? graded.skipped)+'</p>'+
+        (d.cert_code?'<p>Certificate code: <strong>'+esc(d.cert_code)+'</strong></p>':'')+
+        (d.report_column?'<p style="color:var(--gray-500)">This result was added to the <strong>'+esc(d.report_column)+'</strong> column of the report card.</p>':'')+
+      '</div>';
+    }
+  }
+};
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(m,t){ alert(m); }
+function openModal(){} function closeModal(){}
+Exam.start();
+</script>
+<script>
+// School Connect v5: subject tabs for multi-subject/UTME packages.
+(function(){
+ if(!window.Exam) return;
+ Exam.sections=function(){ return [...new Set(this.qs().map(q=>q.section||q.subject||'General'))]; };
+ Exam.goSubject=function(sec){ const i=this.qs().findIndex(q=>(q.section||q.subject||'General')===sec); if(i>=0){this.idx=i;this.render();} };
+ Exam._oldRender=Exam.render;
+ Exam.render=function(){
+  const q=this.qs()[this.idx]; if(!q) return;
+  const secs=this.sections(); const current=q.section||q.subject||'General';
+  const tabs=secs.length>1?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+secs.map(sec=>'<button class="btn btn-sm '+(sec===current?'btn-primary':'btn-outline')+'" onclick="Exam.goSubject(\''+esc(sec)+'\')">'+esc(sec)+'</button>').join('')+'</div>':'';
+  this._oldRender();
+  const root=this.root(); const card=root.querySelector('.card'); if(card) card.insertAdjacentHTML('afterbegin',tabs);
+ };
+})();
+</script>
+</body></html>
