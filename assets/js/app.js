@@ -198,7 +198,7 @@ const App = {
   },
 
   isAdminRole(role) {
-    return ['super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(String(role || '').toLowerCase());
+    return ['super_admin','superadmin','admin','administrator','owner','director','principal','proprietor','head_teacher','headteacher','bursar'].includes(String(role || '').toLowerCase().replace(/\s+/g,'_'));
   },
 
   roleSet(role) {
@@ -390,6 +390,17 @@ const App = {
     App.applyVisibilityTokens(role);
     App.ensureNavNotBlank(role);
     App.enforceCurrentPageAccess(role);
+    App.refreshCurrentCrudAfterRole(role);
+  },
+
+  refreshCurrentCrudAfterRole(role) {
+    try {
+      const page = currentPage();
+      if (window.CRUD && CRUD.def && CRUD.def(page)) {
+        clearTimeout(App._crudRoleTimer);
+        App._crudRoleTimer = setTimeout(() => CRUD.renderList(page, { roleRefresh: true }), 150);
+      }
+    } catch(e) {}
   },
 
   applyVisibilityTokens(role) {
@@ -463,9 +474,11 @@ const App = {
   /* ----- Auth ----- */
   async handleSignIn(e) {
     e.preventDefault();
+    if (e.target.dataset.signingIn === '1') return;
+    e.target.dataset.signingIn = '1';
     const fd = new FormData(e.target);
-    const email = (fd.get('email') || '').trim();
-    const password = fd.get('password') || '';
+    const email = (fd.get('email') || '').trim().toLowerCase();
+    const password = String(fd.get('password') || '').trim();
     
     const supabase = window.sb || this.sb || null;
     if (!supabase) { 
@@ -483,13 +496,27 @@ const App = {
     if (error) {
       console.error('[App.handleSignIn] Error:', error.message);
       if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || 'Sign in'; }
+      e.target.dataset.signingIn = '0';
       alert('Sign-in failed: ' + (error.message || 'Check your email and password.'));
       return;
     }
     
     console.log('[App.handleSignIn] Success!');
+    try { await App.ensureProfileAfterLogin(data && data.user, email); } catch(e) { console.warn('Profile bootstrap skipped:', e.message || e); }
     App.logActivity('login', 'auth', email);
     location.href = 'dashboard.html';
+  },
+
+
+  async ensureProfileAfterLogin(user, email) {
+    const supabase = window.sb || this.sb || null;
+    if (!supabase || !user) return;
+    try {
+      const { data: existing } = await supabase.from('profiles').select('id,role,status').eq('id', user.id).maybeSingle();
+      if (!existing) {
+        await supabase.from('profiles').insert({ id: user.id, email: email || user.email, full_name: user.user_metadata?.full_name || '', role: user.user_metadata?.role || 'student', status: 'active' });
+      }
+    } catch(e) { /* RLS may prevent insert; login still continues and normal profile loader handles it */ }
   },
 
   async handleSignUp(e) {

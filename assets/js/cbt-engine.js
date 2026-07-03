@@ -38,9 +38,10 @@ const CBT = {
       correct: answer,
       explanation: q.explanation || '',
       mark: Number(q.mark || q.score || 1) || 1,
-      section: q.section || q.subject_section || q.subject || q.tags || '',
+      section: q.section || q.subject_section || q.subject || '',
+      subject: q.subject || q.section || q.subject_section || '',
       difficulty: q.difficulty || '',
-      tags: q.tags || ''
+      tolerance: q.tolerance || q.accept || ''
     };
   },
 
@@ -105,7 +106,7 @@ const CBT = {
 
   advancedPromptTemplate(subject, klass, topic, count) {
     subject = subject || 'Mathematics'; klass = klass || 'SSS 1'; topic = topic || 'Selected topic'; count = count || 40;
-    return `You are an expert examination setter. Generate ${count} high-quality CBT questions for ${subject}, ${klass}, topic: ${topic}.\n\nReturn ONLY a CSV with these headers exactly:\nquestion,type,a,b,c,d,answer,explanation,mark,difficulty,topic,tolerance\n\nRules:\n1. Use a balanced mix of question types where appropriate: mcq, true_false, fill_blank, numeric, short_answer, multi_select, matching, ordering, comprehension.\n2. For MCQ, put four options in a,b,c,d and answer as the exact option text or letter.\n3. For numeric, put the numeric answer in answer and tolerance in tolerance.\n4. Keep explanations concise and educational.\n5. Avoid ambiguous questions.\n6. Align difficulty to the class level.\n7. Do not include markdown, numbering outside the CSV, or extra commentary.`;
+    return `You are an expert examination setter. Generate ${count} high-quality CBT questions for ${subject}, ${klass}, topic: ${topic}.\n\nReturn ONLY a CSV with these headers exactly:\nquestion,type,a,b,c,d,answer,explanation,mark,difficulty,topic,tolerance,section\n\nRules:\n1. Use a balanced mix of question types where appropriate: mcq, true_false, fill_blank, numeric, short_answer, multi_select, matching, ordering, comprehension.\n2. For MCQ, put four options in a,b,c,d and answer as the exact option text or letter.\n3. For numeric, put the numeric answer in answer and tolerance in tolerance.\n4. Keep explanations concise and educational.\n5. Avoid ambiguous questions.\n6. Align difficulty to the class level.\n7. Do not include markdown, numbering outside the CSV, or extra commentary.`;
   },
 
   parseCSV(csv) {
@@ -160,7 +161,7 @@ window.CBTUI = window.CBTUI || {
   async refresh(){ const box=document.getElementById('cbt-list'); if(!box) return; const res=await CBT.listExams(); if(res.error){box.innerHTML='<div class="card">Could not load exams: '+esc(res.error.message)+'</div>';return;} const data=res.data||[]; box.innerHTML=data.length?data.map(e=>'<div class="card"><h3>'+esc(e.title||'Untitled')+'</h3><p>'+esc(e.subject||'')+' · '+esc(e.class||'')+' · Code: <b>'+esc(e.code||'')+'</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="CBTUI.open(\''+e.code+'\')">Open exam link</button><button class="btn btn-sm btn-outline" onclick="CRUD.renderList(\'cbt\')">Manage in table</button></div></div>').join(''):'<div class="card">No CBT exams yet. Click + Add new or use the CBT manager form to create one.</div>'; },
   open(code){ location.href='cbt-exam.html?code='+encodeURIComponent(code||''); },
   newExam(){ if(window.CRUD) CRUD.openForm('cbt'); },
-  downloadTemplate(){ const csv='question,type,a,b,c,d,answer,explanation,mark,difficulty,topic,tolerance\nWhat is 2+2?,mcq,3,4,5,6,4,2+2 equals 4,1,easy,Arithmetic,\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='school-connect-cbt-template.csv'; a.click(); }
+  downloadTemplate(){ const csv='question,type,a,b,c,d,answer,explanation,mark,difficulty,topic,tolerance,section\nWhat is 2+2?,mcq,3,4,5,6,4,2+2 equals 4,1,easy,Arithmetic,\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='school-connect-cbt-template.csv'; a.click(); }
 };
 
 document.addEventListener('DOMContentLoaded' , function(){ CBT.init((typeof sb !== 'undefined' ? sb : (window.sb || null))); setTimeout(function(){ if(window.CBTUI&&CBTUI.refresh) CBTUI.refresh(); },300); });

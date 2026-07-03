@@ -307,8 +307,11 @@ const Generator = {
     const acronym = (cfg.shortName || cfg.schoolName || 'SCH').toString().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8) || 'SCH';
     return String(content || '')
       .replace(/admission_prefix text default 'STD'/g, "admission_prefix text default '" + acronym + "'")
+      .replace(/admission_prefix text default 'SCH'/g, "admission_prefix text default '" + acronym + "'")
       .replace(/s\.admission_prefix := 'STD'/g, "s.admission_prefix := '" + acronym + "'")
-      .replace(/coalesce\(s\.admission_prefix,'STD'\)/g, "coalesce(s.admission_prefix,'" + acronym + "')");
+      .replace(/s\.admission_prefix := 'SCH'/g, "s.admission_prefix := '" + acronym + "'")
+      .replace(/coalesce\(s\.admission_prefix,'STD'\)/g, "coalesce(s.admission_prefix,'" + acronym + "')")
+      .replace(/coalesce\(s\.admission_prefix,'SCH'\)/g, "coalesce(s.admission_prefix,'" + acronym + "')");
   },
 
   /** Replace demo branding in copied specialised static pages. */

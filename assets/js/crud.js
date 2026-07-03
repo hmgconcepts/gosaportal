@@ -513,13 +513,15 @@ const CRUD = {
     // Use both App.currentRole and SC_PROFILE.role as fallbacks
     // This ensures role is always available, even before async profile load
     const role = String(
-      (window.App && App.currentRole) || 
-      (window.SC_PROFILE && SC_PROFILE.role) || 
+      (window.App && App.currentRole) ||
+      (window.SC_PROFILE && SC_PROFILE.role) ||
+      document.body.dataset.currentRole ||
       ''
-    ).toLowerCase();
+    ).toLowerCase().replace(/\s+/g,'_');
     const key = this.canonicalId(moduleId);
     const allow = this.WRITE_RULES[key];
-    if (window.App && App.isAdminRole && App.isAdminRole(role)) return true;
+    const adminAliases = ['super_admin','superadmin','admin','administrator','owner','director','principal','proprietor','head_teacher','headteacher','bursar'];
+    if (adminAliases.includes(role) || (window.App && App.isAdminRole && App.isAdminRole(role))) return true;
     if (window.App && App.canWriteByAccess) { const mapped = App.canWriteByAccess(key, role); if (mapped !== null) return mapped; }
     if (!allow) return ['staff','teacher'].includes(role);
     return allow.includes(role);
