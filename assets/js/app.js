@@ -427,11 +427,13 @@ const App = {
         el.style.display = '';
         el.classList.remove('nav-locked');
       } else {
-        // ENTERPRISE V6 (issue 3): menu items are NEVER removed — a restricted
-        // page stays visible but padlocked. The menu is therefore always
-        // COMPLETE and IDENTICAL on every page, for every role.
-        el.style.display = '';
-        el.classList.toggle('nav-locked', !ok);
+        // ENTERPRISE V9 (issue 3 — policy update by client): admin-only pages
+        // must NOT appear on student/parent/staff navigation at all. Restricted
+        // links are now REMOVED from the menu for non-admin roles.
+        // Determinism is preserved by normalizeNavOrder(): for a given role the
+        // menu is always the same, complete set, in the same canonical order.
+        el.style.display = ok ? '' : 'none';
+        el.classList.remove('nav-locked');
       }
       if (!ok) {
         el.setAttribute('aria-disabled', 'true');
