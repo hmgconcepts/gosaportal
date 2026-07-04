@@ -126,7 +126,24 @@ const Exam = {
     this.student={ name:nm, id_ref:document.getElementById('e-id').value.trim(), class:document.getElementById('e-class').value.trim(), anonymous:!!anon };
     if(!code){ toast('Enter the exam code.','warning'); return; }
     if(!this.student.name){ this.student.name='Anonymous-'+Math.random().toString(36).slice(2,7).toUpperCase(); }
-    const { data, error } = await sb.rpc('cbt_get_public_exam', { p_code: code });
+    // ENTERPRISE V9 (issue 8: 400+ concurrent candidates):
+    // 1) exam-load retries with exponential backoff + jitter (absorbs the
+    //    thundering herd when a whole hall presses Start together);
+    // 2) a 10-minute local exam cache so refreshes/re-entries NEVER re-hit
+    //    the database — each candidate costs exactly ONE indexed read.
+    let data=null, error=null;
+    const cacheKey='cbt-exam-cache-'+code;
+    try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c && (Date.now()-c.at)<600000){ data=c.exam; } }catch(_){}
+    if(!data){
+      for(let attempt=0;attempt<5;attempt++){
+        try{ const r=await sb.rpc('cbt_get_public_exam', { p_code: code }); data=r.data; error=r.error; }catch(e){ error=e; }
+        if(data && !error) break;
+        const wait=Math.min(6000,(400*Math.pow(2,attempt)))+Math.floor(Math.random()*500);
+        toast('Busy server — retrying ('+(attempt+1)+'/5)…','info',1500);
+        await new Promise(r=>setTimeout(r,wait));
+      }
+      if(data && !error && !data.wait && !data.closed){ try{ localStorage.setItem(cacheKey, JSON.stringify({at:Date.now(), exam:data})); }catch(_){} }
+    }
     if(error || !data){ toast('Exam not found or not open.','danger'); return; }
     if(data.wait){ this.root().innerHTML='<div class="card"><h3>⏳ Please wait</h3><p>This exam opens at '+new Date(data.start_at).toLocaleString()+'.</p></div>'; return; }
     if(data.closed){ this.root().innerHTML='<div class="card"><h3>🚫 Closed</h3><p>This exam is no longer accepting submissions.</p></div>'; return; }
