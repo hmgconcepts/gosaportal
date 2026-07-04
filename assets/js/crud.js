@@ -674,7 +674,7 @@ const CRUD = {
   /* Open the add/edit modal with a REAL form */
   /* ---- option-source cache so dropdowns load once per form ---- */
   _optCache: {},
-  dedupeOptions(options) { const seen=new Set(); return (options||[]).filter(o=>{ const k=String(o.value||'')+'|'+String(o.label||''); if(seen.has(k)) return false; seen.add(k); return true; }); },
+  dedupeOptions(options) { const seen=new Set(); return (options||[]).filter(o=>{ const k=String(o.value==null?'':o.value).trim().toLowerCase(); const kk=k||String(o.label==null?'':o.label).trim().toLowerCase(); if(seen.has(kk)) return false; seen.add(kk); return true; }); },
 
   async loadOptions(c) {
     // c.type 'ref'    -> {refTable, refValue(col used as text), refExtra?}
@@ -938,13 +938,56 @@ const CRUD = {
     w.document.close(); w.focus();
   },
 
+  /* ENTERPRISE V8 (issue 9): letterheaded PDF export of one admission form. */
+  async printAdmissionPDF(id) {
+    if (!this.sb) return;
+    const { data: a } = await this.sb.from('admissions').select('*').eq('id', id).maybeSingle();
+    if (!a) { toast('Application not found', 'warning'); return; }
+    const sc = window.SCHOOL || {}; const d = a.data || {};
+    const rows = Object.entries(Object.assign({}, d, a)).filter(([k]) => !['data','id'].includes(k))
+      .map(([k, v]) => '<tr><th style="text-align:left;padding:7px;border:1px solid #cbd5e1;background:#f1f5f9;width:220px">' + esc(k.replace(/_/g, ' ').toUpperCase()) + '</th><td style="padding:7px;border:1px solid #cbd5e1">' + esc(v == null ? '' : (/date|dob|created/i.test(k) ? CRUD.formatDate(v) : String(v))) + '</td></tr>').join('');
+    const html = '<div style="max-width:720px;margin:0 auto;font-family:Georgia,serif;color:#111">' +
+      '<div style="display:flex;align-items:center;gap:14px;border-bottom:3px double ' + (sc.primary || '#1e2a5e') + ';padding-bottom:12px;margin-bottom:14px">' +
+      '<img src="assets/img/logo.' + (sc.logoExt || 'svg') + '" style="width:64px;height:64px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+      '<div><h1 style="margin:0;color:' + (sc.primary || '#1e2a5e') + ';font-size:1.3rem">' + esc(sc.name || 'School') + '</h1>' +
+      '<div style="font-size:.8rem;color:#334155">ADMISSION APPLICATION FORM · ' + esc(a.status || 'submitted').toUpperCase() + '</div></div></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:.9rem">' + rows + '</table>' +
+      '<p style="margin-top:24px;font-size:.7rem;color:#94a3b8;text-align:center">Generated ' + CRUD.formatDate(new Date().toISOString()) + ' · ' + esc(sc.name || '') + ' · School Connect</p></div>';
+    this._printWindow('Admission — ' + (a.full_name || ''), html);
+  },
+
+  /* ENTERPRISE V8 (issue 7): shared print-window helper — <base href> + wait-for-images
+     so any exported document prints complete with logos/photos. Browser's
+     "Save as PDF" destination turns every print into a PDF (100% free). */
+  _printWindow(title, bodyHtml) {
+    const w = window.open('', '_blank');
+    if (!w) { toast('Popup blocked! Please allow popups.', 'warning'); return; }
+    w.document.open();
+    w.document.write('<!DOCTYPE html><html><head><title>' + esc(title) + '</title><base href="' + document.baseURI.replace(/[^/]*$/, '') + '"></head><body style="padding:24px">' + bodyHtml +
+      '<script>window.onload=function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}})};<\/script></body></html>');
+    w.document.close(); w.focus();
+  },
+
+  /* ENTERPRISE V8 (issue 7): bulk-print ALL admission applications (one per page). */
+  async bulkPrintAdmissions() {
+    if (!this.sb) return;
+    const { data } = await this.sb.from('admissions').select('*').order('created_at', { ascending: false }).limit(500);
+    if (!data || !data.length) { toast('No applications to print.', 'warning'); return; }
+    const sc = window.SCHOOL || {};
+    const one = (a) => { const d = a.data || {};
+      const rows = Object.entries(Object.assign({}, d, a)).filter(([k]) => !['data','id'].includes(k))
+        .map(([k, v]) => '<tr><th style="text-align:left;padding:6px;border:1px solid #cbd5e1;background:#f1f5f9;width:200px">' + esc(k.replace(/_/g, ' ').toUpperCase()) + '</th><td style="padding:6px;border:1px solid #cbd5e1">' + esc(v == null ? '' : String(v)) + '</td></tr>').join('');
+      return '<div style="page-break-after:always;font-family:Georgia,serif"><h2 style="color:' + (sc.primary || '#1e2a5e') + '">' + esc(sc.name || 'School') + ' — Admission Form: ' + esc(a.full_name || '') + '</h2><table style="width:100%;border-collapse:collapse;font-size:.88rem">' + rows + '</table></div>'; };
+    this._printWindow('All Admission Applications', data.map(one).join(''));
+  },
+
   async previewAdmission(id) {
     if (!this.sb) return;
     const { data: a } = await this.sb.from('admissions').select('*').eq('id', id).maybeSingle();
     if (!a) { toast('Application not found', 'warning'); return; }
     const d = a.data || {};
     const rows = Object.entries(Object.assign({}, d, a)).filter(([k])=>!['data'].includes(k)).map(([k,v]) => '<tr><th style="text-align:left;padding:6px;border:1px solid #e2e8f0">'+esc(k.replace(/_/g,' '))+'</th><td style="padding:6px;border:1px solid #e2e8f0">'+esc(v==null?'':String(v))+'</td></tr>').join('');
-    openModal('Admission Application Preview', '<div class="table-wrap"><table style="width:100%;border-collapse:collapse">'+rows+'</table></div>', '<button class="btn btn-outline" onclick="window.print()">Print</button><button class="btn btn-primary" onclick="closeModal()">Close</button>');
+    openModal('Admission Application Preview', '<div class="table-wrap"><table style="width:100%;border-collapse:collapse">'+rows+'</table></div>', '<button class="btn btn-outline" onclick="CRUD.printAdmissionPDF(\''+id+'\')">📄 Export PDF</button><button class="btn btn-primary" onclick="closeModal()">Close</button>');
   },
 
   async printReceipt(id) {

@@ -532,7 +532,7 @@ const App = {
     if (e.target.dataset.signingIn === '1') return;
     e.target.dataset.signingIn = '1';
     const fd = new FormData(e.target);
-    const email = (fd.get('email') || '').trim().toLowerCase();
+    let email = (fd.get('email') || '').trim().toLowerCase();
     const password = String(fd.get('password') || '').trim();
     
     const supabase = window.sb || this.sb || null;
@@ -543,8 +543,24 @@ const App = {
     
     const btn = e.target.querySelector('button[type=submit]');
     if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = 'Signing in…'; }
+
+    // ENTERPRISE V8 (issue 20): allow sign-in with STUDENT ID / STAFF ID /
+    // admission number instead of email. If the identifier has no '@', we
+    // resolve it to the linked account email via a safe security-definer RPC.
+    if (email && email.indexOf('@') === -1) {
+      try {
+        const { data: resolved, error: rerr } = await supabase.rpc('lookup_login_email', { p_identifier: email });
+        if (!rerr && resolved) { email = String(resolved).toLowerCase(); console.log('[App.handleSignIn] ID resolved to account email.'); }
+        else {
+          if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || 'Sign in'; }
+          e.target.dataset.signingIn = '0';
+          alert('No account found for ID "' + email.toUpperCase() + '". Check the ID, or sign in with your email. (Admin: run database/update-v8-schema.sql and link the student/staff record to a login account.)');
+          return;
+        }
+      } catch(_) {}
+    }
     
-    console.log('[App.handleSignIn] Attempting login for:', email);
+    console.log('[App.handleSignIn] Attempting login…');
     
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
