@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SAMPLE — Student Report Card</title>
+<style>
+@page{size:A4 portrait;margin:8mm}
+body{font-family:Arial,Helvetica,sans-serif;color:#111;background:#f1f5f9;margin:0;padding:18px;display:flex;justify-content:center}
+.sheet{background:#fff;width:794px;max-width:100%;padding:26px;box-shadow:0 8px 30px rgba(0,0,0,.15)}
+.wm{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:9}
+.wm span{font-size:64px;font-weight:900;color:rgba(220,38,38,.08);transform:rotate(-28deg)}
+.head{display:grid;grid-template-columns:95px 1fr 95px;gap:12px;align-items:center;border-bottom:4px double #1e2a5e;padding-bottom:10px}
+.logo{width:86px;height:86px;border-radius:14px;background:linear-gradient(135deg,#1e2a5e,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:2rem}
+.school h1{margin:0;font-family:Georgia,serif;color:#1e2a5e;font-size:26px;letter-spacing:1px;text-align:center}
+.school p{margin:2px 0;font-size:11px;text-align:center;color:#334155}
+.title{text-align:center;background:#1e2a5e;color:#fff;font-weight:800;letter-spacing:2px;padding:6px;margin:10px 0;font-size:13px}
+table{width:100%;border-collapse:collapse}
+.info td{border:1px solid #222;padding:4px 6px;font-size:11px}
+.scores th,.scores td{border:1px solid #222;padding:4px;font-size:11px;text-align:center}
+.scores th{background:#1e2a5e;color:#fff}
+.scores tr:nth-child(even){background:#eef2ff}
+.left{text-align:left!important}
+.grade{color:#16a34a;font-weight:800}
+.photo{width:78px;height:96px;border:1px solid #94a3b8;display:flex;align-items:center;justify-content:center;font-size:10px;color:#64748b;background:#f8fafc}
+.traits{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.traits th,.traits td{border:1px solid #222;padding:3px 6px;font-size:10.5px}
+.traits th{background:#1e2a5e;color:#fff}
+.comments td{border:1px solid #222;padding:6px;font-size:11px}
+.comments td:first-child{width:160px;font-weight:800;background:#eef2ff}
+.sig{display:flex;justify-content:space-between;margin-top:26px;font-size:11px;text-align:center}
+.sig div{width:200px;border-top:1.5px solid #111;padding-top:4px;font-weight:700}
+.note{margin-top:14px;font-size:9.5px;color:#94a3b8;text-align:center}
+@media print{body{background:#fff;padding:0}.sheet{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wm"><span>SAMPLE</span></div>
+<div class="sheet">
+  <div class="head">
+    <div class="logo">GS</div>
+    <div class="school">
+      <h1>GREENFIELD SECONDARY SCHOOL</h1>
+      <p>📍 24 Unity Avenue, Ikeja, Lagos · 📞 +234 801 234 5678 · ✉️ info@greenfield.sch.ng</p>
+      <p style="font-style:italic;color:#7c2d12">Motto: Knowledge · Character · Service</p>
+    </div>
+    <div class="photo">Student<br>Photo</div>
+  </div>
+  <div class="title">TERMINAL REPORT SHEET — FIRST TERM, 2026/2027 SESSION</div>
+  <table class="info">
+    <tr><td><b>Name:</b> ADEBAYO, Chiamaka Grace</td><td><b>Admission No:</b> GSS/2024/0113</td><td><b>Class:</b> JSS 2A</td></tr>
+    <tr><td><b>No. in Class:</b> 32</td><td><b>Attendance:</b> 108 / 112 days</td><td><b>Position:</b> 3rd</td></tr>
+  </table>
+  <table class="scores" style="margin-top:8px">
+    <thead><tr><th class="left">SUBJECT</th><th>CA1<br>(10)</th><th>CA2<br>(10)</th><th>CA3<br>(10)</th><th>PROJECT<br>(10)</th><th>EXAM<br>(60)</th><th>TOTAL<br>(100)</th><th>GRADE</th><th>POSITION</th><th>REMARK</th></tr></thead>
+    <tbody>
+      <tr><td class="left">English Language</td><td>8</td><td>9</td><td>8</td><td>9</td><td>52</td><td><b>86</b></td><td class="grade">A</td><td>2nd</td><td>Excellent</td></tr>
+      <tr><td class="left">Mathematics</td><td>9</td><td>8</td><td>9</td><td>8</td><td>55</td><td><b>89</b></td><td class="grade">A</td><td>1st</td><td>Excellent</td></tr>
+      <tr><td class="left">Basic Science</td><td>7</td><td>8</td><td>7</td><td>8</td><td>46</td><td><b>76</b></td><td class="grade">A</td><td>4th</td><td>Very Good</td></tr>
+      <tr><td class="left">Basic Technology</td><td>8</td><td>7</td><td>7</td><td>7</td><td>44</td><td><b>73</b></td><td class="grade">B</td><td>5th</td><td>Very Good</td></tr>
+      <tr><td class="left">Civic Education</td><td>7</td><td>7</td><td>8</td><td>8</td><td>41</td><td><b>71</b></td><td class="grade">B</td><td>6th</td><td>Good</td></tr>
+      <tr><td class="left">Computer Studies</td><td>9</td><td>9</td><td>8</td><td>9</td><td>50</td><td><b>85</b></td><td class="grade">A</td><td>2nd</td><td>Excellent</td></tr>
+      <tr><td class="left">Yoruba Language</td><td>6</td><td>7</td><td>7</td><td>7</td><td>38</td><td><b>65</b></td><td class="grade">B</td><td>9th</td><td>Good</td></tr>
+      <tr><td class="left">Business Studies</td><td>8</td><td>8</td><td>7</td><td>8</td><td>45</td><td><b>76</b></td><td class="grade">A</td><td>3rd</td><td>Very Good</td></tr>
+    </tbody>
+  </table>
+  <table class="info" style="margin-top:8px">
+    <tr><td><b>Total Score:</b> 621 / 800</td><td><b>Average:</b> 77.6%</td><td><b>Class Average:</b> 68.3%</td><td><b>Grade:</b> <span class="grade">A</span></td></tr>
+  </table>
+  <div class="traits">
+    <table><tr><th colspan="2">AFFECTIVE DOMAIN</th></tr>
+      <tr><td>Punctuality</td><td>5 — Excellent</td></tr><tr><td>Neatness</td><td>4 — Very Good</td></tr>
+      <tr><td>Politeness</td><td>5 — Excellent</td></tr><tr><td>Honesty</td><td>5 — Excellent</td></tr>
+      <tr><td>Leadership</td><td>4 — Very Good</td></tr></table>
+    <table><tr><th colspan="2">PSYCHOMOTOR DOMAIN</th></tr>
+      <tr><td>Handwriting</td><td>4 — Very Good</td></tr><tr><td>Verbal Fluency</td><td>5 — Excellent</td></tr>
+      <tr><td>Sports</td><td>3 — Good</td></tr><tr><td>Creativity</td><td>4 — Very Good</td></tr>
+      <tr><td>Craft</td><td>4 — Very Good</td></tr></table>
+  </div>
+  <table class="comments" style="margin-top:10px">
+    <tr><td>Class Teacher</td><td>An outstanding term. Chiamaka is diligent and consistently tops her Mathematics class. Keep it up!</td></tr>
+    <tr><td>Principal</td><td>Excellent performance. Promoted on merit. We are proud of you.</td></tr>
+    <tr><td>Next Term Begins</td><td>07/01/2027 &nbsp;·&nbsp; <b>Fees Balance:</b> ₦0 (FULLY PAID)</td></tr>
+  </table>
+  <div class="sig">
+    <div>Class Teacher's Signature</div>
+    <div style="font-family:'Segoe Script',cursive;border-top:none;color:#1e2a5e">Adewale S.</div>
+    <div>Principal's Signature &amp; Stamp</div>
+  </div>
+  <p class="note">This is a SAMPLE of the report card the platform prints (Report Cards → pick student → Print). Real cards use your school's logo, colours, signature and dd/mm/yyyy dates. Generated by School Connect · HMG Concepts.</p>
+</div>
+</body>
+</html>
