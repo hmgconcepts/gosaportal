@@ -247,7 +247,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🛏️</span>
           <span>Hostel</span>
-        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
           <span class="app-nav-icon">🚌</span>
           <span>Transport</span>
         </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -286,7 +286,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">📐</span>
           <span>Grading Rubrics</span>
-        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
           <span class="app-nav-icon">🎓</span>
           <span>Academic Transcripts</span>
         </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -298,7 +298,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗳️</span>
           <span>Voting</span>
-        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
           <span class="app-nav-icon">🩺</span>
           <span>Health</span>
         </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
@@ -319,7 +319,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🍽️</span>
           <span>Cafeteria</span>
-        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
           <span class="app-nav-icon">🎗️</span>
           <span>Financial Aid</span>
         </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -461,5 +461,5 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
-const TT={days:['Monday','Tuesday','Wednesday','Thursday','Friday'], async init(){ try{const {data}=await sb.from('classes').select('name').order('name'); const sel=document.getElementById('tt-class'); (data||[]).forEach(c=>{var o=document.createElement('option');o.value=c.name;o.textContent=c.name;sel.appendChild(o);});}catch(e){} this.load();}, async load(){ if(!sb)return; let q=sb.from('timetable').select('*').limit(2000); const cls=document.getElementById('tt-class').value; if(cls)q=q.eq('class',cls); const {data,error}=await q; const box=document.getElementById('tt-view'); if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;} const rows=data||[]; if(!rows.length){box.innerHTML='<div class="card">No timetable has been published yet. Staff can add slots or use Auto-Timetable.</div>';return;} const periods=[...new Set(rows.map(r=>r.period||''))].sort(); let html='<div class="card"><div class="table-wrap"><table><thead><tr><th>Period</th>'+this.days.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>'; periods.forEach(p=>{html+='<tr><td><strong>'+esc(p)+'</strong></td>'+this.days.map(d=>{const cell=rows.filter(r=>(r.period||'')===p&&(r.day||'')===d).map(r=>'<div><strong>'+esc(r.class||'')+'</strong> · '+esc(r.subject||'')+'<br><small>'+esc(r.teacher||'')+' '+esc(r.room||'')+'</small></div>').join('<hr>'); return '<td>'+cell+'</td>';}).join('')+'</tr>';}); box.innerHTML=html+'</tbody></table></div></div>'; }}; document.addEventListener('DOMContentLoaded',()=>TT.init()); TT.init();
+const TT={days:['Monday','Tuesday','Wednesday','Thursday','Friday'], async init(){ try{const {data}=await sb.from('classes').select('name').order('name'); const sel=document.getElementById('tt-class'); (function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();}catch(e){} this.load();}, async load(){ if(!sb)return; let q=sb.from('timetable').select('*').limit(2000); const cls=document.getElementById('tt-class').value; if(cls)q=q.eq('class',cls); const {data,error}=await q; const box=document.getElementById('tt-view'); if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;} const rows=data||[]; if(!rows.length){box.innerHTML='<div class="card">No timetable has been published yet. Staff can add slots or use Auto-Timetable.</div>';return;} const periods=[...new Set(rows.map(r=>r.period||''))].sort(); let html='<div class="card"><div class="table-wrap"><table><thead><tr><th>Period</th>'+this.days.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>'; periods.forEach(p=>{html+='<tr><td><strong>'+esc(p)+'</strong></td>'+this.days.map(d=>{const cell=rows.filter(r=>(r.period||'')===p&&(r.day||'')===d).map(r=>'<div><strong>'+esc(r.class||'')+'</strong> · '+esc(r.subject||'')+'<br><small>'+esc(r.teacher||'')+' '+esc(r.room||'')+'</small></div>').join('<hr>'); return '<td>'+cell+'</td>';}).join('')+'</tr>';}); box.innerHTML=html+'</tbody></table></div></div>'; }}; document.addEventListener('DOMContentLoaded',()=>TT.init()); TT.init();
 </script></body></html>

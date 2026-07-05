@@ -247,7 +247,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🛏️</span>
           <span>Hostel</span>
-        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
           <span class="app-nav-icon">🚌</span>
           <span>Transport</span>
         </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -286,7 +286,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">📐</span>
           <span>Grading Rubrics</span>
-        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
           <span class="app-nav-icon">🎓</span>
           <span>Academic Transcripts</span>
         </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -298,7 +298,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗳️</span>
           <span>Voting</span>
-        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
           <span class="app-nav-icon">🩺</span>
           <span>Health</span>
         </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
@@ -319,7 +319,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🍽️</span>
           <span>Cafeteria</span>
-        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
           <span class="app-nav-icon">🎗️</span>
           <span>Financial Aid</span>
         </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -488,8 +488,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script>
 const DL={ qs:[],
   async init(){ if(!sb)return;
-    try{ const {data:subs}=await sb.from('subjects').select('name').order('name'); (subs||[]).forEach(x=>{var o=document.createElement('option');o.textContent=x.name;document.getElementById('dl-subject')&&document.getElementById('dl-subject').appendChild(o);}); }catch(e){}
-    try{ const {data:cls}=await sb.from('classes').select('name').order('name'); (cls||[]).forEach(x=>{var o=document.createElement('option');o.textContent=x.name;document.getElementById('dl-class')&&document.getElementById('dl-class').appendChild(o);}); }catch(e){}
+    try{ const {data:subs}=await sb.from('subjects').select('name').order('name'); (function(){var seen=new Set();(subs||[]).forEach(x=>{var v=String(x.name==null?'':x.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.textContent=v;var el=document.getElementById('dl-subject');el&&el.appendChild(o);});})(); }catch(e){}
+    try{ const {data:cls}=await sb.from('classes').select('name').order('name'); (function(){var seen=new Set();(cls||[]).forEach(x=>{var v=String(x.name==null?'':x.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.textContent=v;var el=document.getElementById('dl-class');el&&el.appendChild(o);});})(); }catch(e){}
     this.render(); this.list();
   },
   addQ(){ this.qs.push({q:'',options:['','','',''],answer:''}); this.render(); },

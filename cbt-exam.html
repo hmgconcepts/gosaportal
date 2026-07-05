@@ -145,7 +145,7 @@ const Exam = {
       if(data && !error && !data.wait && !data.closed){ try{ localStorage.setItem(cacheKey, JSON.stringify({at:Date.now(), exam:data})); }catch(_){} }
     }
     if(error || !data){ toast('Exam not found or not open.','danger'); return; }
-    if(data.wait){ this.root().innerHTML='<div class="card"><h3>⏳ Please wait</h3><p>This exam opens at '+new Date(data.start_at).toLocaleString()+'.</p></div>'; return; }
+    if(data.wait){ this.root().innerHTML='<div class="card"><h3>⏳ Please wait</h3><p>This exam opens at '+(window.fmtDMYT?fmtDMYT(data.start_at):new Date(data.start_at).toLocaleString())+'.</p></div>'; return; }
     if(data.closed){ this.root().innerHTML='<div class="card"><h3>🚫 Closed</h3><p>This exam is no longer accepting submissions.</p></div>'; return; }
     this.data=data; CBT.prepareForStudent(this.data); if(!this.qs().length){ this.root().innerHTML='<div class="card"><h3>No questions found</h3><p>This CBT exam has no valid questions. Ask the teacher to re-upload the CSV question bank.</p></div>'; return; }
     this.answers=new Array(this.qs().length).fill(null);

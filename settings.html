@@ -247,7 +247,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🛏️</span>
           <span>Hostel</span>
-        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
           <span class="app-nav-icon">🚌</span>
           <span>Transport</span>
         </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -286,7 +286,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">📐</span>
           <span>Grading Rubrics</span>
-        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
           <span class="app-nav-icon">🎓</span>
           <span>Academic Transcripts</span>
         </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -298,7 +298,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗳️</span>
           <span>Voting</span>
-        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
           <span class="app-nav-icon">🩺</span>
           <span>Health</span>
         </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
@@ -319,7 +319,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🍽️</span>
           <span>Cafeteria</span>
-        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
           <span class="app-nav-icon">🎗️</span>
           <span>Financial Aid</span>
         </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -495,7 +495,7 @@ const ST={
     const l=document.getElementById('st-lang'); if(l) l.value=Enterprise.i18n.lang; const sig=document.getElementById('st-signature'), pn=document.getElementById('st-principal'); if(sig) sig.value=localStorage.getItem('sc-signature-url')||''; if(pn) pn.value=localStorage.getItem('sc-principal-name')||''; ST.preview(); },
   async toggle2fa(on){ const r=await Enterprise.security.setTwoFactor(on); if(r&&r.error){toast(r.error.message||r.error,'danger');return;} toast(on?'2FA enabled':'2FA disabled','success'); },
   lang(l){ Enterprise.i18n.setLang(l); toast('Language set','success'); },
-  preview(){ const box=document.getElementById('st-sign-preview'); const url=localStorage.getItem('sc-signature-url')||''; if(box) box.innerHTML=url?'<img src="'+esc(url)+'" style="max-width:180px;max-height:80px;object-fit:contain" onerror="this.replaceWith(document.createTextNode(&quot;Signature link saved; preview unavailable.&quot;))">':''; },
+  preview(){ const box=document.getElementById('st-sign-preview'); const raw=localStorage.getItem('sc-signature-url')||''; const url=(window.Super&&Super.idcard&&Super.idcard.driveDirect)?Super.idcard.driveDirect(raw):raw; if(box) box.innerHTML=url?'<img src="'+esc(url)+'" referrerpolicy="no-referrer" style="max-width:180px;max-height:80px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)" onerror="this.replaceWith(document.createTextNode(&quot;Signature link saved; preview unavailable — check the Drive link is public.&quot;))">':''; },
   async saveSignature(){ const url=document.getElementById('st-signature').value.trim(), name=document.getElementById('st-principal').value.trim(); localStorage.setItem('sc-signature-url',url); localStorage.setItem('sc-principal-name',name); try{ if(sb) await sb.from('school_settings').upsert({id:1,signature_url:url,principal_name:name},{onConflict:'id'}); }catch(e){} ST.preview(); toast('Signature saved for exported documents','success'); }
 };
 document.addEventListener('DOMContentLoaded',ST.init); ST.init();
