@@ -1144,11 +1144,13 @@ const CRUD = {
     // ENTERPRISE V6 (issue 29): import STUDENT + STAFF + PARENT birthdays.
     // Staff DOB is stored privacy-safe as day+month only — we synthesize a
     // sortable date (year 2000) so they appear in the month groups.
-    const [studRes, staffRes, staffDm, parentRes, existingRes] = await Promise.all([
+    const [studRes, staffRes, staffDm, parentRes, adminRes, adminDm, existingRes] = await Promise.all([
       this.sb.from('students').select('full_name,class,date_of_birth').not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
       this.sb.from('staff').select('full_name,role,date_of_birth').not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
       this.sb.from('staff').select('full_name,role,dob_day,dob_month').not('dob_month', 'is', null).then(r=>r, ()=>({data:[]})),
       this.sb.from('parents').select('full_name,occupation,date_of_birth').not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('profiles').select('full_name,role,date_of_birth').in('role',['super_admin','admin','principal','proprietor','head_teacher','bursar']).not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('profiles').select('full_name,role,dob_day,dob_month').in('role',['super_admin','admin','principal','proprietor','head_teacher','bursar']).not('dob_month', 'is', null).then(r=>r, ()=>({data:[]})),
       this.sb.from('birthdays').select('person_name').then(r=>r, ()=>({data:[]}))
     ]);
     const have = new Set((existingRes.data || []).map(b => b.person_name));
@@ -1158,7 +1160,9 @@ const CRUD = {
     (staffRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'staff', date:s.date_of_birth, class:s.role||'Staff' }); have.add(s.full_name); } });
     (staffDm.data||[]).forEach(s => { const mi = months.indexOf(s.dob_month); if(!have.has(s.full_name) && mi >= 0) { rows.push({ person_name:s.full_name, type:'staff', date:'2000-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(s.dob_day)||1).padStart(2,'0'), class:s.role||'Staff' }); have.add(s.full_name); } });
     (parentRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'parent', date:s.date_of_birth, class:s.occupation||'Parent' }); have.add(s.full_name); } });
-    if (!rows.length) { toast('All available student, staff and parent birthdays are already imported.', 'info'); return; }
+    (adminRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'admin', date:s.date_of_birth, class:s.role||'Admin' }); have.add(s.full_name); } });
+    (adminDm.data||[]).forEach(s => { const mi = months.indexOf(s.dob_month); if(!have.has(s.full_name) && mi >= 0) { rows.push({ person_name:s.full_name, type:'admin', date:'2000-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(s.dob_day)||1).padStart(2,'0'), class:s.role||'Admin' }); have.add(s.full_name); } });
+    if (!rows.length) { toast('All available student, staff, parent and admin birthdays are already imported.', 'info'); return; }
     const { error } = await this.sb.from('birthdays').insert(rows);
     if (error) { toast(error.message, 'danger'); return; }
     toast('✅ Imported ' + rows.length + ' birthday record(s).', 'success'); this.renderList('birthdays');
@@ -1193,7 +1197,7 @@ const CRUD = {
     const box = document.getElementById('birthdays-bymonth'); if (!box) return;
     if (!this.sb) { box.innerHTML = '<p>Database not configured.</p>'; return; }
     const { data } = await this.sb.from('birthdays').select('person_name,class,date,type').limit(5000);
-    if (!data || !data.length) { box.innerHTML = '<div class="card"><p style="color:var(--gray-500)">No birthdays yet — click “Import student birthdays”.</p></div>'; return; }
+    if (!data || !data.length) { box.innerHTML = '<div class="card"><p style="color:var(--gray-500)">No birthdays yet — click “Import birthdays” to pull admin, staff, parent and student birth details.</p></div>'; return; }
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const byMonth = {}; months.forEach(m => byMonth[m] = []);
     data.forEach(b => {
