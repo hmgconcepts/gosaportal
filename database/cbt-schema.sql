@@ -391,3 +391,134 @@ end; $$;
 
 grant execute on function public.cbt_get_public_exam(text) to anon, authenticated;
 grant execute on function public.cbt_submit(jsonb) to anon, authenticated;
+
+-- =====================================================================
+-- ENTERPRISE V10 CBT CONCURRENCY + RANDOMISED ORDER REPAIR (2026-07-06)
+-- Supports 400+ simultaneous candidates more safely:
+-- 1. candidate fetch gets original question indexes before answer stripping;
+-- 2. submissions are graded against the exact question indexes attempted;
+-- 3. extra indexes reduce contention for busy exam halls.
+-- =====================================================================
+create index if not exists cbt_exams_code_open_idx on public.cbt_exams (code, is_open, is_archived);
+create index if not exists cbt_results_exam_student_created_idx on public.cbt_results (exam_id, student_id_ref, created_at desc);
+create index if not exists cbt_results_created_idx on public.cbt_results (created_at desc);
+
+create or replace function public.cbt_get_public_exam(p_code text)
+returns jsonb language plpgsql security definer stable as $$
+declare e public.cbt_exams; qs jsonb;
+begin
+  select * into e from public.cbt_exams
+   where code = upper(trim(p_code)) and is_open = true and is_archived = false
+   limit 1;
+  if not found then return null; end if;
+  if e.start_at is not null and now() < e.start_at then
+    return jsonb_build_object('wait', true, 'start_at', e.start_at, 'title', e.title, 'subject', e.subject);
+  end if;
+  if e.close_at is not null and now() > e.close_at then
+    return jsonb_build_object('closed', true);
+  end if;
+
+  select coalesce(jsonb_agg(
+           (q - 'correct' - 'correct_answer' - 'answer' - 'explanation' - 'accept' - 'subs')
+           || jsonb_build_object('correct', null, 'answer', null, '_orig_index', ord - 1)
+           order by ord
+         ), '[]'::jsonb)
+    into qs
+    from jsonb_array_elements(e.csv_data) with ordinality as t(q, ord);
+
+  return jsonb_build_object(
+    'id', e.id, 'code', e.code, 'title', e.title, 'subject', e.subject,
+    'class', e.class, 'term', e.term, 'session', e.session, 'topic', e.topic,
+    'duration', e.duration, 'instructions', e.instructions, 'exam_mode', e.exam_mode,
+    'select_count', e.select_count, 'randomise', e.randomise, 'negative_mark', e.negative_mark,
+    'anti_cheat_config', e.anti_cheat_config, 'release_results', e.release_results,
+    'certificate_enabled', e.certificate_enabled, 'assessment_type', e.assessment_type,
+    'report_column', e.report_column, 'max_score', e.max_score,
+    'questions', qs, '_questions', qs
+  );
+end; $$;
+
+create or replace function public.cbt_submit(p_payload jsonb)
+returns jsonb language plpgsql security definer as $$
+declare
+  e public.cbt_exams;
+  v_attempts int;
+  v_cert text;
+  v_id uuid;
+  v_release boolean;
+  ans jsonb;
+  q jsonb;
+  i int := 0;
+  qi int;
+  v_ans text;
+  v_key text;
+  v_mark numeric;
+  v_score numeric := 0;
+  v_total numeric := 0;
+  v_correct int := 0;
+  v_wrong int := 0;
+  v_skipped int := 0;
+  v_percent numeric := 0;
+begin
+  select * into e from public.cbt_exams where id = (p_payload->>'exam_id')::uuid limit 1;
+  if not found then return jsonb_build_object('saved', false, 'error', 'Exam not found'); end if;
+
+  select count(*) into v_attempts from public.cbt_results
+   where exam_id = e.id
+     and coalesce(p_payload->>'student_id_ref','') <> ''
+     and student_id_ref = p_payload->>'student_id_ref';
+  if e.attempt_limit > 0 and coalesce(p_payload->>'student_id_ref','') <> '' and v_attempts >= e.attempt_limit then
+    return jsonb_build_object('saved', false, 'error', 'Attempt limit reached');
+  end if;
+
+  -- New clients send [{index, subject, answer}]. Older clients send ["A","B"].
+  for ans in select * from jsonb_array_elements(coalesce(p_payload->'answers_data','[]'::jsonb)) loop
+    if jsonb_typeof(ans) = 'object' then
+      qi := coalesce(nullif(ans->>'index','')::int, i);
+      v_ans := coalesce(ans->>'answer','');
+    else
+      qi := i;
+      v_ans := coalesce(ans #>> '{}','');
+    end if;
+    q := e.csv_data -> qi;
+    if q is null then i := i + 1; continue; end if;
+    v_mark := coalesce(nullif(q->>'mark','')::numeric, nullif(q->>'score','')::numeric, 1);
+    v_total := v_total + v_mark;
+    v_key := coalesce(q->>'answer', q->>'correct', q->>'correct_answer', '');
+    if trim(v_ans) = '' then
+      v_skipped := v_skipped + 1;
+    elsif lower(trim(v_ans)) = lower(trim(v_key)) then
+      v_score := v_score + v_mark;
+      v_correct := v_correct + 1;
+    else
+      v_score := greatest(0, v_score - coalesce(e.negative_mark,0));
+      v_wrong := v_wrong + 1;
+    end if;
+    i := i + 1;
+  end loop;
+  if v_total > 0 then v_percent := round((v_score / v_total) * 100, 2); end if;
+
+  v_cert := case when e.certificate_enabled then 'CERT-' || upper(substr(md5(random()::text),1,4)) || '-' || upper(substr(md5(random()::text),1,4)) else '' end;
+
+  insert into public.cbt_results (
+    exam_id, student_name, student_class, student_id_ref, student_type,
+    score, total, percent, correct_count, wrong_count, skipped_count,
+    attempt_number, time_taken, answers_data, violations, violation_log, cert_code
+  ) values (
+    e.id, coalesce(p_payload->>'student_name','Anonymous'), coalesce(p_payload->>'student_class', e.class),
+    coalesce(p_payload->>'student_id_ref',''), coalesce(p_payload->>'student_type', e.exam_mode),
+    v_score, v_total::int, v_percent, v_correct, v_wrong, v_skipped, v_attempts + 1,
+    coalesce((p_payload->>'time_taken')::int,0), p_payload->'answers_data',
+    coalesce((p_payload->>'violations')::int,0), coalesce(p_payload->'violation_log','[]'::jsonb), v_cert
+  ) returning id into v_id;
+
+  v_release := e.release_results;
+  return jsonb_build_object('saved', true, 'result_id', v_id, 'cert_code', v_cert, 'release_results', v_release,
+    'report_column', e.report_column, 'subject', e.subject, 'term', e.term, 'session', e.session, 'class', e.class,
+    'title', e.title, 'score', v_score, 'total', v_total::int, 'percent', v_percent,
+    'correct_count', v_correct, 'wrong_count', v_wrong, 'skipped_count', v_skipped,
+    'student_name', coalesce(p_payload->>'student_name','Anonymous'), 'max_score', e.max_score);
+end; $$;
+
+grant execute on function public.cbt_get_public_exam(text) to anon, authenticated;
+grant execute on function public.cbt_submit(jsonb) to anon, authenticated;

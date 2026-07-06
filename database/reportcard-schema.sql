@@ -247,3 +247,27 @@ grant execute on function public.cbt_push_to_reportcard(text,text,text,text,text
 -- DONE ✅  Flexible report cards installed and wired to the CBT engine.
 -- =====================================================================
 select 'School Connect Report-Card schema v2 installed ✅' as status;
+
+-- =====================================================================
+-- ENTERPRISE V10 FAMILY-SAFE REPORT CARD POLICIES (2026-07-06)
+-- Parents/students may SELECT only their own/linked report scores; staff write.
+-- =====================================================================
+drop policy if exists "rs_read" on public.report_scores;
+drop policy if exists "rs_select_family" on public.report_scores;
+create policy "rs_select_family" on public.report_scores for select using (
+  public.is_staff(auth.uid())
+  or exists (
+    select 1 from public.students s
+    where (s.id = report_scores.student_id
+       or lower(s.full_name) = lower(report_scores.student_name)
+       or s.admission_no = report_scores.student_id_ref)
+      and (s.user_id = auth.uid() or public.is_parent_of(auth.uid(), s.id))
+  )
+);
+
+-- Make the aggregate view obey underlying table RLS in modern PostgreSQL/Supabase.
+do $$ begin
+  execute 'alter view public.report_subject_totals set (security_invoker = true)';
+exception when others then
+  raise notice 'security_invoker not supported on this Postgres version; rely on app filtering + table RLS.';
+end $$;
