@@ -269,3 +269,12 @@ Every defect above was fixed **at the source (generator)**, not just on the demo
 - Added public anonymous `exam-register.html` and fixed `exam_registrations.html` heading to “Examination”.
 - Updated birthday import logic for students, staff and parents without duplicate birthday rows in a single import run.
 - Aligned generator/runtime copies with fixed School Connect generator.
+
+---
+
+## 2026-07-06 V11 / SchoolConnect V3 fix — ID Card page repaired
+
+- Fixed ID-card preview reliability: the page now renders a visible sample/manual card even before a database record is selected.
+- Fixed empty print-page issue by hardening the ID-card print window, adding print CSS, image wait timeout and fallback person data.
+- Fixed bulk print fallback: if no list has loaded, the current/manual card prints instead of an empty page.
+- Preserved existing student/staff card templates, QR, photo, logo, signature and bulk-print features.

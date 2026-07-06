@@ -503,36 +503,52 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
-const ICUI={ cur:{}, all:[], kind:'student',
-  switchType(t){ this.kind=t; this.all=[]; const sel=document.getElementById('ic-student'); sel.innerHTML='<option value="">— choose —</option>';
+const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
+  sample(){ return this.kind==='staff'
+    ? {full_name:'Sample Staff',staff_no:'STAFF-001',role:'Teacher',department:'Academics',staff_type:'Teaching',gender:'',phone:'',type:'staff'}
+    : {full_name:'Sample Student',class:'JSS 1',arm:'A',admission_no:'STD-001',gender:'',phone:'',type:'student'}; },
+  switchType(t){ this.kind=t; this.all=[]; this.cur={}; const sel=document.getElementById('ic-student'); if(sel)sel.innerHTML='<option value="">— choose —</option>';
     document.getElementById('ic-pick-label').textContent=t; document.getElementById('ic-class-label').textContent=(t==='staff'?'Type':'Class');
     document.getElementById('ic-dept-wrap').style.display=(t==='staff'?'block':'none');
     document.getElementById('ic-all-label').textContent=(t==='staff'?'staff':'students');
     this.load(); this.render(); },
-  async load(){ const sel=document.getElementById('ic-student'); if(!sb||!sel)return;
+  async load(){ const sel=document.getElementById('ic-student'); if(!sel)return;
     while(sel.options.length>1)sel.remove(1);
-    if(this.kind==='staff'){ const {data}=await sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url').order('full_name').limit(1000); ICUI.all=data||[]; const seenA=new Set(); (data||[]).forEach(s=>{ if(seenA.has(s.id))return; seenA.add(s.id); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=s.full_name+' ('+(s.role||s.staff_type||'')+')'; sel.appendChild(o); }); }
-    else { const {data}=await sb.from('students').select('id,full_name,class,arm,admission_no,gender,photo_url,date_of_birth').order('full_name').limit(1000); ICUI.all=data||[]; const seenB=new Set(); (data||[]).forEach(s=>{ if(seenB.has(s.id))return; seenB.add(s.id); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=s.full_name+' ('+(s.class||'')+')'; sel.appendChild(o); }); } },
-  pick(v){ if(!v)return; const s=JSON.parse(v); this.cur=s;
+    if(!window.sb){ this.loaded=true; this.render(); return; }
+    try{
+      if(this.kind==='staff'){
+        const {data,error}=await sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url').order('full_name').limit(3000); if(error)throw error;
+        ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
+      } else {
+        const {data,error}=await sb.from('students').select('id,full_name,class,arm,admission_no,gender,photo_url,date_of_birth').order('full_name').limit(5000); if(error)throw error;
+        ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
+      }
+    }catch(e){ console.warn('ID-card list load failed:', e); if(typeof toast==='function')toast('Could not load list. You can still type details manually and print.', 'warning', 7000); }
+    this.loaded=true; this.render();
+  },
+  pick(v){ if(!v){this.cur={}; this.render(); return;} let s={}; try{s=JSON.parse(v);}catch(_){s={};} this.cur=s;
     document.getElementById('ic-name').value=s.full_name||'';
-    document.getElementById('ic-class').value=(this.kind==='staff'?(s.staff_type||''):(s.class||''));
-    document.getElementById('ic-id').value=(this.kind==='staff'?(s.staff_no||''):(s.admission_no||''));
+    document.getElementById('ic-class').value=(this.kind==='staff'?(s.staff_type||s.role||''):(s.class||''));
+    document.getElementById('ic-id').value=(this.kind==='staff'?(s.staff_no||s.id||''):(s.admission_no||s.id||''));
     document.getElementById('ic-gender').value=s.gender||'';
     document.getElementById('ic-phone').value=s.phone||'';
     if(document.getElementById('ic-dept')) document.getElementById('ic-dept').value=(s.department||s.role||'');
     document.getElementById('ic-photo').value=s.photo_url||''; this.render(); },
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
-  person(){ var to=this.tplOpts(); const base={ full_name:document.getElementById('ic-name').value, date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:document.getElementById('ic-photo').value||this.cur.photo_url, gender:document.getElementById('ic-gender').value, phone:document.getElementById('ic-phone').value, blood_group:document.getElementById('ic-blood').value, type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
-    if(this.kind==='staff'){ base.staff_no=document.getElementById('ic-id').value; base.staff_type=document.getElementById('ic-class').value; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role; base.department=this.cur.department; }
-    else { base.admission_no=document.getElementById('ic-id').value; base.class=document.getElementById('ic-class').value; base.arm=this.cur.arm; }
+  person(){ var to=this.tplOpts(); const typedName=(document.getElementById('ic-name').value||'').trim(); const sample=this.sample(); const base={ full_name:typedName||this.cur.full_name||sample.full_name, date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:document.getElementById('ic-photo').value||this.cur.photo_url||'', gender:document.getElementById('ic-gender').value||this.cur.gender||'', phone:document.getElementById('ic-phone').value||this.cur.phone||'', blood_group:document.getElementById('ic-blood').value||'', type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
+    if(this.kind==='staff'){ base.staff_no=document.getElementById('ic-id').value||this.cur.staff_no||sample.staff_no; base.staff_type=document.getElementById('ic-class').value||this.cur.staff_type||sample.staff_type; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role||sample.role; base.department=this.cur.department||sample.department; }
+    else { base.admission_no=document.getElementById('ic-id').value||this.cur.admission_no||sample.admission_no; base.class=document.getElementById('ic-class').value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
     return base; },
-  render(){ document.getElementById('ic-preview').innerHTML = window.Super?Super.idcard.html(this.person()):''; },
-  print(){ if(window.Super) Super.idcard.print(this.person()); },
-  printAll(){ if(!window.Super||!ICUI.all.length){toast('Nothing loaded','warning');return;} var to=this.tplOpts();
-    const cards=ICUI.all.map(s=> ICUI.kind==='staff'
-      ? '<div style="margin:8px;display:inline-block">'+Super.idcard.html({full_name:s.full_name,staff_no:s.staff_no,role:s.role,department:s.department,staff_type:s.staff_type,gender:s.gender,phone:s.phone,photo_url:s.photo_url,type:'staff',template:to.template,pc:to.pc,ac:to.ac})+'</div>'
-      : '<div style="margin:8px;display:inline-block">'+Super.idcard.html({full_name:s.full_name,class:s.class,arm:s.arm,admission_no:s.admission_no,gender:s.gender,photo_url:s.photo_url,date_of_birth:s.date_of_birth,type:'student',template:to.template,pc:to.pc,ac:to.ac})+'</div>').join('');
-    const w=window.open('','_blank'); w.document.write('<html><head><title>ID Cards</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"></head><body style="display:flex;flex-wrap:wrap;padding:10px">'+cards+'<script>window.onload=function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}})};<\/script></body></html>'); w.document.close(); }
+  fallbackHtml(p){ return '<div class="sc-idcard" style="width:340px;border:1px solid #e2e8f0;border-radius:16px;padding:18px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.12);font-family:system-ui"><h3 style="margin:0;color:#0506ae">'+(window.SCHOOL&&SCHOOL.name||'School')+'</h3><p style="font-size:.75rem;color:#64748b">'+(p.type==='staff'?'STAFF IDENTITY CARD':'STUDENT IDENTITY CARD')+'</p><div style="display:flex;gap:12px;align-items:center"><div style="width:76px;height:76px;border-radius:12px;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900">'+(p.full_name||'S').charAt(0).toUpperCase()+'</div><div><b>'+esc(p.full_name||'')+'</b><br><span>'+esc(p.admission_no||p.staff_no||'')+'</span><br><span>'+esc(p.class||p.role||'')+'</span></div></div><p style="font-size:.65rem;color:#94a3b8;margin-bottom:0">If found, please return to the school office.</p></div>'; },
+  cardHtml(p){ try{ if(window.Super&&Super.idcard&&Super.idcard.html) return Super.idcard.html(p); }catch(e){ console.error('ID-card render failed:',e); } return this.fallbackHtml(p); },
+  render(){ const box=document.getElementById('ic-preview'); if(!box)return; const html=this.cardHtml(this.person()); box.innerHTML=html||this.fallbackHtml(this.person()); },
+  print(){ const p=this.person(); if(window.Super&&Super.idcard&&Super.idcard.print) Super.idcard.print(p); else this.printHtml(this.cardHtml(p),'ID Card'); },
+  printHtml(cards,title){ const w=window.open('','_blank'); if(!w){toast('Popup blocked. Please allow popups.','warning');return;} const base=document.baseURI.replace(/[^/]*$/,''); w.document.open(); w.document.write('<!DOCTYPE html><html><head><title>'+esc(title||'ID Cards')+'</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:10px;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sc-idcard{break-inside:avoid;page-break-inside:avoid}</style></head><body>'+cards+'<script>window.onload=function(){var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.focus();window.print()},250)};var i=[].slice.call(document.images),n=i.length;if(!n)return go();var d=function(){if(--n<=0)go()};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}});setTimeout(go,2400)};<\/script></body></html>'); w.document.close(); },
+  printAll(){ var to=this.tplOpts(); const source=(ICUI.all&&ICUI.all.length)?ICUI.all:[this.person()];
+    const cards=source.map(s=> ICUI.kind==='staff'
+      ? '<div style="margin:8px;display:inline-block">'+ICUI.cardHtml({full_name:s.full_name,staff_no:s.staff_no||s.id,role:s.role,department:s.department,staff_type:s.staff_type,gender:s.gender,phone:s.phone,photo_url:s.photo_url,type:'staff',template:to.template,pc:to.pc,ac:to.ac})+'</div>'
+      : '<div style="margin:8px;display:inline-block">'+ICUI.cardHtml({full_name:s.full_name,class:s.class,arm:s.arm,admission_no:s.admission_no||s.id,gender:s.gender,photo_url:s.photo_url,date_of_birth:s.date_of_birth,type:'student',template:to.template,pc:to.pc,ac:to.ac})+'</div>').join('');
+    this.printHtml(cards, 'ID Cards'); }
 };
-document.addEventListener('DOMContentLoaded',()=>{ ICUI.load(); ICUI.render(); }); ICUI.load(); ICUI.render();
+document.addEventListener('DOMContentLoaded',()=>{ if(window.Super)Super.init(window.sb||null,window.SCHOOL); ICUI.load(); ICUI.render(); setTimeout(()=>ICUI.render(),500); }); if(document.readyState!=='loading'){ ICUI.load(); ICUI.render(); }
 </script></body></html>
