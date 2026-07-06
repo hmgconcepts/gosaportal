@@ -684,8 +684,18 @@ const Super = {
       </div>`;
     },
     print(person) {
+      // ENTERPRISE V11: robust ID-card printing. Never open an empty page:
+      // validate/fallback the person object, write print CSS, wait briefly for
+      // photos/QR/logo, then print even if a remote image stalls.
+      person = person || {};
+      if (!person.full_name && !person.name) person.full_name = 'Sample Student';
+      if (!person.admission_no && !person.staff_no && !person.id) person.admission_no = 'SAMPLE-ID';
+      const card = this.html(person) || '<div style="padding:30px;border:1px solid #ddd">ID card could not render.</div>';
       const w = window.open('', '_blank');
-      w.document.write('<html><head><title>ID Card</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"></head><body style="display:flex;justify-content:center;padding:30px">' + this.html(person) + '<script>window.onload=function(){var imgs=[].slice.call(document.images),left=imgs.length;if(!left)return window.print();var done=function(){if(--left<=0)setTimeout(function(){window.print()},300)};imgs.forEach(function(im){if(im.complete)done();else{im.onload=done;im.onerror=done}})};<\/script></body></html>');
+      if (!w) { if (typeof toast === 'function') toast('Popup blocked. Please allow popups to print ID cards.', 'warning'); return; }
+      const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI.replace(/[^/]*$/, '') : '';
+      w.document.open();
+      w.document.write('<!DOCTYPE html><html><head><title>ID Card</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{display:flex;justify-content:center;align-items:flex-start;padding:24px;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sc-idcard{break-inside:avoid;page-break-inside:avoid}img{max-width:100%}@media print{body{padding:0}}</style></head><body>' + card + '<script>window.onload=function(){var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.focus();window.print()},250)};var imgs=[].slice.call(document.images),left=imgs.length;if(!left)return go();var tick=function(){if(--left<=0)go()};imgs.forEach(function(im){if(im.complete)tick();else{im.onload=tick;im.onerror=tick}});setTimeout(go,2200)};<\/script></body></html>');
       w.document.close();
     }
   },
