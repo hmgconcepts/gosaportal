@@ -230,40 +230,37 @@ const Exam = {
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(m,t){ alert(m); }
 function openModal(){} function closeModal(){}
-// ENTERPRISE V6 (issue 13): full UTME-style multi-subject experience.
-// - A tab per subject with live "answered/total" counters
-// - The question palette shows ONLY the current subject's questions
-// - Per-subject navigation like real JAMB CBT
+// ENTERPRISE V13 / V5: robust UTME-style multi-subject experience.
+// This replaces the fragile post-render injection with a full subject-aware
+// renderer, so subject tabs ALWAYS appear when questions contain section/subject.
 (function(){
  if(!window.Exam) return;
- Exam.sections=function(){ return [...new Set(this.qs().map(q=>q.section||q.subject||'General'))]; };
- Exam.goSubject=function(sec){ const i=this.qs().findIndex(q=>(q.section||q.subject||'General')===sec); if(i>=0){this.idx=i;this.render();} };
- Exam.sectionStats=function(sec){ let t=0,a=0; this.qs().forEach((q,i)=>{ if((q.section||q.subject||'General')===sec){ t++; if(this.answers[i]!=null&&String(this.answers[i]).trim()!=='')a++; } }); return {t,a}; };
- Exam._oldRender=Exam.render;
+ Exam.subjectOf=function(q){ return (q && (q.section || q.subject || q.subject_section || q.exam_subject)) || 'General'; };
+ Exam.sections=function(){ const seen=[]; this.qs().forEach(q=>{ const s=this.subjectOf(q); if(!seen.includes(s)) seen.push(s); }); return seen; };
+ Exam.currentSubject=function(){ const q=this.qs()[this.idx]; return this.subjectOf(q); };
+ Exam.indexesForSubject=function(sec){ const out=[]; this.qs().forEach((q,i)=>{ if(this.subjectOf(q)===sec) out.push(i); }); return out; };
+ Exam.goSubject=function(sec){ const i=this.qs().findIndex(q=>this.subjectOf(q)===sec); if(i>=0){this.idx=i;this.render();} };
+ Exam.sectionStats=function(sec){ let t=0,a=0; this.qs().forEach((q,i)=>{ if(this.subjectOf(q)===sec){ t++; if(this.answers[i]!=null&&String(this.answers[i]).trim()!=='')a++; } }); return {t,a}; };
+ Exam.nextInSubject=function(){ const list=this.indexesForSubject(this.currentSubject()); const p=list.indexOf(this.idx); if(p>=0 && p<list.length-1){ this.idx=list[p+1]; this.render(); } };
+ Exam.prevInSubject=function(){ const list=this.indexesForSubject(this.currentSubject()); const p=list.indexOf(this.idx); if(p>0){ this.idx=list[p-1]; this.render(); } };
+ Exam.renderTabs=function(current){ const secs=this.sections(); if(secs.length<=1) return ''; return '<div class="cbt-subject-tabs" style="position:sticky;top:0;z-index:20;background:white;display:flex;gap:8px;flex-wrap:wrap;margin:-4px -4px 14px;padding:10px 4px;border-bottom:2px solid var(--gray-200)">'+secs.map(sec=>{ const st=this.sectionStats(sec), key=encodeURIComponent(sec); return '<button type="button" class="btn btn-sm '+(sec===current?'btn-primary':'btn-outline')+'" onclick="Exam.goSubject(decodeURIComponent(\''+key+'\'))" style="font-weight:800">'+esc(sec)+' <span style="font-size:.68rem;opacity:.85">('+st.a+'/'+st.t+')</span></button>'; }).join('')+'</div>'; };
+ Exam.renderPalette=function(current){ let localNo=0; return '<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px"><div style="font-size:.75rem;color:var(--gray-500);width:100%;margin-bottom:4px">'+esc(current)+' — question map</div>'+this.qs().map((qq,i)=>{ if(this.subjectOf(qq)!==current) return ''; localNo++; const bg=i===this.idx?'var(--primary);color:#fff':(this.answers[i]!=null?'#dcfce7':(this.flags[i]?'#fef08a':'#fff')); return '<button type="button" onclick="Exam.go('+i+')" title="'+esc(current)+' question '+localNo+'" style="width:34px;height:34px;border-radius:6px;border:1px solid var(--gray-300);background:'+bg+'">'+localNo+'</button>'; }).join('')+'</div>'; };
  Exam.render=function(){
   const q=this.qs()[this.idx]; if(!q) return;
-  const secs=this.sections(); const current=q.section||q.subject||'General';
-  const multi=secs.length>1;
-  const tabs=multi?'<div style="position:sticky;top:0;z-index:5;background:white;display:flex;gap:6px;flex-wrap:wrap;margin:-4px -4px 12px;padding:8px 4px 10px;border-bottom:2px solid var(--gray-200)">'+secs.map(sec=>{ const st=Exam.sectionStats(sec); const key=encodeURIComponent(sec); return '<button class="btn btn-sm '+(sec===current?'btn-primary':'btn-outline')+'" onclick="Exam.goSubject(decodeURIComponent(\''+key+'\'))">'+esc(sec)+' <span style="font-size:.68rem;opacity:.85">('+st.a+'/'+st.t+')</span></button>'; }).join('')+'</div>':'';
-  this._oldRender();
-  const root=this.root(); const card=root.querySelector('.card'); if(!card) return;
-  card.insertAdjacentHTML('afterbegin',tabs);
-  if(multi){
-    // Replace the global palette with a per-subject palette (UTME style)
-    const palettes=card.querySelectorAll(':scope > div');
-    const pal=palettes[palettes.length-1];
-    if(pal && pal.querySelector('button')){
-      let html='';
-      let localNo=0;
-      this.qs().forEach((qq,i)=>{
-        if((qq.section||qq.subject||'General')!==current) return;
-        localNo++;
-        const bg=i===this.idx?'var(--primary);color:#fff':(this.answers[i]!=null?'#dcfce7':(this.flags[i]?'#fef08a':'#fff'));
-        html+='<button onclick="Exam.go('+i+')" style="width:34px;height:34px;border-radius:6px;border:1px solid var(--gray-300);background:'+bg+'">'+localNo+'</button>';
-      });
-      pal.innerHTML='<div style="font-size:.75rem;color:var(--gray-500);width:100%;margin-bottom:4px">'+esc(current)+' — question map</div>'+html;
-    }
-  }
+  const current=this.currentSubject(); const subjectIndexes=this.indexesForSubject(current); const localPos=subjectIndexes.indexOf(this.idx); const localNo=localPos+1;
+  const hasOptions=(q.options||[]).length>0 && !['short_answer','short','numeric','essay','code','cloze','multinumeric','fill_blank','math_equation'].includes(q.type);
+  const opts=hasOptions?(q.options||[]).map((o,i)=>{ const L=String.fromCharCode(65+i); const checked=this.answers[this.idx]===L?'checked':''; return '<label style="display:block;padding:10px;border:1px solid var(--gray-200);border-radius:8px;margin:6px 0;cursor:pointer"><input type="radio" name="opt" value="'+L+'" '+checked+' onchange="Exam.answer(\''+L+'\')"> '+L+'. '+esc(o)+'</label>'; }).join(''):'';
+  const free=!hasOptions?'<textarea class="form-input" rows="3" oninput="Exam.answer(this.value)" placeholder="Type your answer">'+esc(this.answers[this.idx]||'')+'</textarea>':'';
+  this.root().innerHTML='<div class="card">'+this.renderTabs(current)+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap"><strong>'+esc(current)+' · Q '+localNo+' / '+subjectIndexes.length+' <span style="color:var(--gray-500);font-weight:600">(overall '+(this.idx+1)+' / '+this.qs().length+')</span></strong>'+
+    '<div>⏱ <span id="clock">'+Math.floor(this.remaining/60)+':'+String(this.remaining%60).padStart(2,'0')+'</span> <span id="viol" style="color:#dc2626;margin-left:10px"></span></div></div>'+
+    '<p style="font-size:1.05rem;margin-bottom:10px">'+esc(q.question)+'</p>'+ opts + free +
+    '<div style="display:flex;justify-content:space-between;margin-top:14px;gap:8px;flex-wrap:wrap">'+
+      '<button class="btn btn-outline" onclick="Exam.prevInSubject()" '+(localPos<=0?'disabled':'')+'>← Prev in '+esc(current)+'</button>'+
+      '<button class="btn btn-outline" onclick="Exam.flag()">🚩 Flag</button>'+
+      (localPos<subjectIndexes.length-1?'<button class="btn btn-primary" onclick="Exam.nextInSubject()">Next in '+esc(current)+' →</button>':'<button class="btn btn-outline" disabled>End of '+esc(current)+'</button>')+
+      '<button class="btn btn-primary" onclick="Exam.confirmSubmit()">Submit Exam ✓</button>'+
+    '</div>'+this.renderPalette(current)+'</div>';
  };
 })();
 

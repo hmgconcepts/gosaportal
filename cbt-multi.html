@@ -101,13 +101,14 @@ const MM = {
     const title = v('mm-title').trim();
     if (!title) { alert('Enter the package title.'); return; }
     const blocks = [...document.querySelectorAll('.ms-sub')];
-    let questions = []; const subjects = [];
+    let questions = []; const subjects = []; const subject_breakdown = [];
     for (const b of blocks) {
       const name = b.querySelector('.ms-name').value.trim();
       const csv = b.querySelector('.ms-csv').value.trim();
       if (!name || !csv) continue;
       const qs = CBT.parseCSV(csv);
-      qs.forEach(q => { q.section = name; q.subject = name; });
+      qs.forEach(q => { q.section = name; q.subject = name; q.subject_section = name; q.exam_subject = name; });
+      subject_breakdown.push({ name, start: questions.length, count: qs.length, end: questions.length + qs.length - 1 });
       questions = questions.concat(qs); subjects.push(name);
     }
     if (subjects.length < 2) { alert('Add at least TWO subjects, each with a name and CSV questions.'); return; }
@@ -118,6 +119,7 @@ const MM = {
       select_count: parseInt(v('mm-sel')) || 0, instructions: v('mm-instr'),
       randomise: document.getElementById('mm-rand').checked,
       release_results: document.getElementById('mm-rel').checked,
+      anti_cheat_config: { subject_breakdown },
       is_open: true, exam_mode: 'registered', csv_data: questions
     };
     const res = await CBT.createExam(exam);
