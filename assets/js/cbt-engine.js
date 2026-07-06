@@ -35,6 +35,7 @@ const CBT = {
     const answer = q.answer != null ? q.answer : (q.correct != null ? q.correct : q.correct_answer);
     return {
       id: q.id || ('q' + (idx + 1)),
+      _orig_index: q._orig_index != null ? Number(q._orig_index) : (q.orig_index != null ? Number(q.orig_index) : idx),
       type,
       question: q.question || q.prompt || q.text || '',
       options,

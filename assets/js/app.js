@@ -7,7 +7,7 @@
    student → student
    ==================================================================== */
 
-const PUBLIC_PAGES = ['login','index','about','contact','apply','register','signup','cbt-exam','offline',''];
+const PUBLIC_PAGES = ['login','index','about','contact','apply','register','signup','cbt-exam','exam-register','offline',''];
 
 /* ENTERPRISE V6 — global date helpers. School standard: dd/mm/yyyy everywhere. */
 function fmtDMY(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v);
@@ -40,6 +40,8 @@ const App = {
     }
     
     App.bindUI();
+    App.installSelectDedupe();
+    App.dedupeAllSelects();
     App.applyStoredTheme();
     App.loadRoleAccessMap();
     
@@ -939,6 +941,40 @@ const App = {
     openModal(caption || 'Gallery preview', body + '<p style="margin-top:8px"><a href="' + esc(url) + '" target="_blank" rel="noopener">Open original ↗</a></p>');
   },
 
+
+  /* ENTERPRISE V10: global dropdown de-duplication.
+     Any select rendered by CRUD, custom pages or static templates is cleaned so
+     users never see repeated option labels. Keeps the first option per label. */
+  dedupeSelectOptions(sel) {
+    if (!sel || sel.dataset.scDedupeRunning === '1') return;
+    sel.dataset.scDedupeRunning = '1';
+    try {
+      const seen = new Set();
+      const scan = (root) => Array.from(root.children || []).forEach(o => {
+        if (o.tagName === 'OPTGROUP') { scan(o); return; }
+        if (o.tagName !== 'OPTION') return;
+        if (!o.value && /^—|loading/i.test((o.textContent || '').trim())) return;
+        const label = (o.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const value = String(o.value || '').trim().toLowerCase();
+        const key = label || value;
+        if (!key) return;
+        if (seen.has(key)) o.remove(); else seen.add(key);
+      });
+      scan(sel);
+    } finally { sel.dataset.scDedupeRunning = '0'; }
+  },
+  dedupeAllSelects() {
+    try { document.querySelectorAll('select').forEach(sel => App.dedupeSelectOptions(sel)); } catch (_) {}
+  },
+  installSelectDedupe() {
+    if (this._dedupeObserver || typeof MutationObserver === 'undefined') return;
+    let t = null;
+    this._dedupeObserver = new MutationObserver(() => {
+      clearTimeout(t); t = setTimeout(() => App.dedupeAllSelects(), 80);
+    });
+    try { this._dedupeObserver.observe(document.documentElement || document.body, { childList:true, subtree:true }); } catch (_) {}
+  },
+
   openAddModal(type) {
     if (typeof CRUD !== 'undefined' && CRUD.def && CRUD.def(type)) { CRUD.openForm(type); return; }
     if (typeof openModal === 'function') openModal('Add ' + type, '<p>This module is view-only or has a dedicated page.</p>');
@@ -953,6 +989,7 @@ function openModal(title, body, footer) {
   document.getElementById('modal-body').innerHTML = body;
   document.getElementById('modal-footer').innerHTML = footer || '<button class="btn btn-outline" onclick="closeModal()">Close</button>';
   b.classList.add('show');
+  try { if (window.App) App.dedupeAllSelects(); } catch (_) {}
 }
 
 function closeModal() {

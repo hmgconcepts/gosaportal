@@ -727,7 +727,7 @@ const CRUD = {
   /* Open the add/edit modal with a REAL form */
   /* ---- option-source cache so dropdowns load once per form ---- */
   _optCache: {},
-  dedupeOptions(options) { const seen=new Set(); return (options||[]).filter(o=>{ const k=String(o.value==null?'':o.value).trim().toLowerCase(); const kk=k||String(o.label==null?'':o.label).trim().toLowerCase(); if(seen.has(kk)) return false; seen.add(kk); return true; }); },
+  dedupeOptions(options) { const seen=new Set(); return (options||[]).filter(o=>{ const label=String(o.label==null?'':o.label).replace(/\s+/g,' ').trim().toLowerCase(); const value=String(o.value==null?'':o.value).trim().toLowerCase(); const key=label||value; if(!key) return false; if(seen.has(key)) return false; seen.add(key); return true; }); },
 
   async loadOptions(c) {
     // c.type 'ref'    -> {refTable, refValue(col used as text), refExtra?}
@@ -784,7 +784,7 @@ const CRUD = {
       if (c.type === 'textarea') {
         field = '<textarea class="form-input" id="cf-' + CRUD.fid(c.key) + '" rows="2"' + req + '>' + esc(val) + '</textarea>';
       } else if (c.type === 'ref' || c.type === 'lookup' || c.type === 'select') {
-        const opts = (c.type === 'select') ? (c.options || []).map(o => ({ value: o, label: o })) : await this.loadOptions(c);
+        const opts = this.dedupeOptions((c.type === 'select') ? (c.options || []).map(o => ({ value: o, label: o })) : await this.loadOptions(c));
         const onchg = (c.type === 'ref' && c.autofill) ? ' onchange="CRUD.onRefChange(\'' + moduleId + '\',\'' + c.key + '\',this)"' : '';
         const optHtml = (o) => '<option value="' + esc(o.value) + '"' + (String(val) === String(o.value) ? ' selected' : '') + (o.row ? ' data-row=\'' + esc(JSON.stringify(o.row)) + '\'' : '') + '>' + esc(o.label) + '</option>';
         let inner;
@@ -821,6 +821,7 @@ const CRUD = {
     openModal((id ? 'Edit ' : 'Add ') + d.title, fields.join(''),
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
       '<button class="btn btn-primary" onclick="CRUD.save(\'' + moduleId + '\',' + (id ? '\'' + id + '\'' : 'null') + ')">Save</button>');
+    try { if (window.App && App.dedupeAllSelects) App.dedupeAllSelects(); } catch (_) {}
   },
 
   /* When a ref dropdown with autofill changes (e.g. pick a student), copy
@@ -1153,10 +1154,10 @@ const CRUD = {
     const have = new Set((existingRes.data || []).map(b => b.person_name));
     const rows = [];
     const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    (studRes.data||[]).forEach(s => { if(!have.has(s.full_name)) rows.push({ person_name:s.full_name, type:'student', date:s.date_of_birth, class:s.class }); });
+    (studRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'student', date:s.date_of_birth, class:s.class }); have.add(s.full_name); } });
     (staffRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'staff', date:s.date_of_birth, class:s.role||'Staff' }); have.add(s.full_name); } });
     (staffDm.data||[]).forEach(s => { const mi = months.indexOf(s.dob_month); if(!have.has(s.full_name) && mi >= 0) { rows.push({ person_name:s.full_name, type:'staff', date:'2000-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(s.dob_day)||1).padStart(2,'0'), class:s.role||'Staff' }); have.add(s.full_name); } });
-    (parentRes.data||[]).forEach(s => { if(!have.has(s.full_name)) rows.push({ person_name:s.full_name, type:'parent', date:s.date_of_birth, class:s.occupation||'Parent' }); });
+    (parentRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'parent', date:s.date_of_birth, class:s.occupation||'Parent' }); have.add(s.full_name); } });
     if (!rows.length) { toast('All available student, staff and parent birthdays are already imported.', 'info'); return; }
     const { error } = await this.sb.from('birthdays').insert(rows);
     if (error) { toast(error.message, 'danger'); return; }
