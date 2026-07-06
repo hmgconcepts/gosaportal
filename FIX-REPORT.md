@@ -278,3 +278,12 @@ Every defect above was fixed **at the source (generator)**, not just on the demo
 - Fixed empty print-page issue by hardening the ID-card print window, adding print CSS, image wait timeout and fallback person data.
 - Fixed bulk print fallback: if no list has loaded, the current/manual card prints instead of an empty page.
 - Preserved existing student/staff card templates, QR, photo, logo, signature and bulk-print features.
+
+---
+
+## 2026-07-06 V12 / SchoolConnect V4 verification and hardening
+
+- Added `verify-v4-workflows.js` to the generated GoSA repo.
+- Verifier checks the repaired workflows directly in the generated site: dropdown de-duplication, multi-subject CBT tabs, high-concurrency CBT SQL, birthdays for all roles, Digital Library delete, family-safe report cards, in-app message delivery, ID-card print fallback, modern/static output readiness and no AI API dependency.
+- V4 workflow verifier passed: 16/16 checks.
+- JS syntax and route/local-reference audits passed.
