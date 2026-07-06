@@ -55,6 +55,21 @@ const CBT = {
     let qs = exam._questions || exam.questions || exam.csv_data || [];
     if (typeof qs === 'string') { try { qs = JSON.parse(qs); } catch(e) { qs = []; } }
     qs = (qs || []).map((q,i) => this.normalizeQuestion(q,i));
+    // ENTERPRISE V13/V5: if an older/browser CSV path lost per-question
+    // section values, recover subject tabs from the multi-subject builder's
+    // anti_cheat_config.subject_breakdown metadata. This is a second safety net
+    // so tabs still appear for students.
+    const breakdown = exam && exam.anti_cheat_config && Array.isArray(exam.anti_cheat_config.subject_breakdown)
+      ? exam.anti_cheat_config.subject_breakdown : [];
+    if (breakdown.length > 1 && new Set(qs.map(q => q.section || q.subject || 'General')).size <= 1) {
+      breakdown.forEach(b => {
+        const start = Number(b.start) || 0;
+        const end = b.end != null ? Number(b.end) : (start + (Number(b.count) || 0) - 1);
+        for (let i = start; i <= end && i < qs.length; i++) {
+          if (qs[i]) { qs[i].section = b.name || ('Subject ' + (breakdown.indexOf(b)+1)); qs[i].subject = qs[i].section; }
+        }
+      });
+    }
     // ENTERPRISE V6 (issue 13): UTME-style multi-subject exams must keep each
     // subject's questions GROUPED — never mixed together randomly. Randomise
     // and select_count now operate WITHIN each subject section.
@@ -162,7 +177,12 @@ const CBT = {
         answer: get('answer','correct','correct_answer') || vals[5] || 'A',
         explanation: get('explanation','reason') || vals[6] || '',
         type: get('type','question_type') || vals[7] || 'mcq',
-        mark: Number(get('mark','score') || 1) || 1
+        mark: Number(get('mark','score') || 1) || 1,
+        difficulty: get('difficulty','level') || '',
+        topic: get('topic','lesson') || '',
+        tolerance: get('tolerance','accept') || '',
+        section: get('section','subject','subject_section','exam_subject') || '',
+        subject: get('subject','section','subject_section','exam_subject') || ''
       };
       questions.push(this.normalizeQuestion(q, i));
     });
