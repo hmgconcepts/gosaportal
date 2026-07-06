@@ -456,6 +456,24 @@ const Super = {
       const m = String(url || '').match(/[-\w]{25,}/);
       return m ? 'https://lh3.googleusercontent.com/d/' + m[0] + '=w1000' : '';
     },
+    /* ENTERPRISE FINAL V2 (#9/#10): shared authorised-signature block for ALL card templates. */
+    signBlock(color, width) {
+      const st = window.SC_SETTINGS || {};
+      let raw = ''; try { raw = localStorage.getItem('sc-signature-url') || ''; } catch(_) {}
+      raw = raw || st.signature_url || '';
+      let pn = ''; try { pn = localStorage.getItem('sc-principal-name') || ''; } catch(_) {}
+      pn = pn || st.principal_name || 'Principal';
+      const sg = this.driveDirect(raw);
+      const c = color || '#334155'; const w = width || 86;
+      return sg
+        ? '<div style="text-align:center"><img src="' + Super.esc(sg) + '" referrerpolicy="no-referrer" style="max-width:' + w + 'px;max-height:28px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><div style="font-size:.5rem;color:' + c + ';border-top:1px solid ' + c + ';margin-top:1px;padding-top:1px;font-weight:700">' + Super.esc(pn) + '</div></div>'
+        : '<div style="text-align:center;margin-top:10px"><div style="font-size:.5rem;color:' + c + ';border-top:1px solid ' + c + ';width:' + w + 'px;margin:0 auto;padding-top:1px;font-weight:700">' + Super.esc(pn) + '</div></div>';
+    },
+    /* Contact strip used by the new templates (#10: address + phone + email). */
+    contactStrip(s, dark) {
+      const bits = [s.address ? '📍 ' + Super.esc(s.address) : '', s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join(' · ');
+      return bits ? '<div style="font-size:.58rem;color:' + (dark ? '#94a3b8' : '#475569') + ';text-align:center;padding:5px 10px;line-height:1.5">' + bits + '</div>' : '';
+    },
     html(person) {
       const s = Super.school || {};
       const photo = this.driveDirect(person.photo_url || '');
@@ -529,19 +547,87 @@ const Super = {
               '<img src="' + this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || '', type: person.type || 'student' }), 220) + '" style="width:108px;height:108px" alt="QR">' +
               '<div style="font-size:.66rem;font-weight:900;letter-spacing:1.5px;color:' + navy + ';margin-top:3px">SCAN TO VERIFY</div>' +
               '<div style="margin-top:8px;display:flex;align-items:center;gap:5px;justify-content:center"><img src="' + logo + '" style="width:22px;height:22px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="text-align:left"><div style="font-size:.55rem;font-weight:900;color:#0f172a;line-height:1">' + Super.esc((s.shortName || '').toUpperCase()) + '</div><div style="height:12px;width:64px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px)"></div></div></div>' +
-            (function(){
-              /* ENTERPRISE V11 (issue 1): authorised signature on the card */
-              var st = window.SC_SETTINGS || {};
-              var raw = ''; try { raw = localStorage.getItem('sc-signature-url') || ''; } catch(_) {}
-              raw = raw || st.signature_url || '';
-              var pn = ''; try { pn = localStorage.getItem('sc-principal-name') || ''; } catch(_) {}
-              pn = pn || st.principal_name || 'Principal';
-              var sg = Super.idcard.driveDirect(raw);
-              return sg ? '<div style="margin-top:6px;text-align:center"><img src="' + Super.esc(sg) + '" referrerpolicy="no-referrer" style="max-width:86px;max-height:30px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><div style="font-size:.5rem;color:#334155;border-top:1px solid #94a3b8;margin-top:1px;padding-top:1px;font-weight:700">' + Super.esc(pn) + '</div></div>'
-                        : '<div style="margin-top:12px;text-align:center"><div style="font-size:.5rem;color:#334155;border-top:1px solid #94a3b8;width:86px;margin:0 auto;padding-top:1px;font-weight:700">' + Super.esc(pn) + '</div></div>';
-            })() +
+            '<div style="margin-top:6px">' + this.signBlock(navy, 86) + '</div>' +
             '</div></div>' +
           contactFooter + credit + '</div>';
+      }
+
+      /* ============================================================
+         ENTERPRISE FINAL V2 (#10): SIX new professional templates.
+         Every one carries: school logo+name, address/phone/email strip,
+         QR verify, owner photo (with Drive fallback chain) and the
+         authorised person's signature.
+         ============================================================ */
+      const miniPhoto = (wpx, hpx, rad) => photo
+        ? '<img src="' + Super.esc(photo) + '" referrerpolicy="no-referrer" data-alt="' + Super.esc(this.driveAlt(person.photo_url || '')) + '" style="width:' + wpx + 'px;height:' + hpx + 'px;border-radius:' + (rad||12) + 'px;object-fit:cover;background:#e2e8f0" onerror="if(this.dataset.alt&&this.src!==this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=\'\';}else{this.onerror=null;this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}"><div style="display:none;width:' + wpx + 'px;height:' + hpx + 'px;border-radius:' + (rad||12) + 'px;background:' + pc + ';color:#fff;align-items:center;justify-content:center;font-weight:900;font-size:1.8rem">' + initial + '</div>'
+        : '<div style="width:' + wpx + 'px;height:' + hpx + 'px;border-radius:' + (rad||12) + 'px;background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.8rem">' + initial + '</div>';
+      const detailRows = rows.join('');
+      const qrImg = (sz) => '<img src="' + this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || '', type: person.type || 'student' }), 200) + '" style="width:' + sz + 'px;height:' + sz + 'px" alt="QR">';
+
+      // 1) EXECUTIVE — gold-trimmed dark green, embassy style
+      if (tpl === 'executive') {
+        return '<div class="sc-idcard" style="width:420px;border-radius:16px;overflow:hidden;background:#0b3d2e;color:#f8fafc;font-family:Georgia,serif;box-shadow:0 12px 30px rgba(0,0,0,.3);border:2px solid #c9a227">' +
+          '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid #c9a227"><img src="' + logo + '" style="width:42px;height:42px;border-radius:8px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'"><div><strong style="font-size:.95rem;letter-spacing:.5px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</strong><div style="font-size:.6rem;color:#c9a227;letter-spacing:2px">' + tag + '</div></div></div>' +
+          '<div style="display:flex;gap:14px;padding:14px 16px;align-items:center">' + miniPhoto(96,112,10) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem;color:#fff">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.72rem;margin-top:5px;border-collapse:collapse;color:#d1fae5">' + detailRows.replace(/#64748b/g,'#a7f3d0') + '</table></div>' +
+          '<div style="text-align:center;background:#fff;border-radius:8px;padding:5px">' + qrImg(62) + '<div style="font-size:.5rem;color:#0b3d2e;font-weight:900">VERIFY</div></div></div>' +
+          '<div style="background:#0f4a38;padding:4px">' + this.signBlock('#f8fafc', 90) + '</div>' +
+          '<div style="background:#062b20">' + this.contactStrip(s, true) + '</div>' + credit + '</div>';
+      }
+      // 2) MINIMAL — clean white, thin accent line, Swiss typography
+      if (tpl === 'minimal') {
+        return '<div class="sc-idcard" style="width:400px;border-radius:14px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:Helvetica,Arial,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.08)">' +
+          '<div style="height:6px;background:' + pc + '"></div>' +
+          '<div style="padding:16px 18px;display:flex;gap:14px;align-items:flex-start">' + miniPhoto(84,100,8) +
+          '<div style="flex:1;min-width:0"><div style="font-size:.6rem;letter-spacing:2.5px;color:' + pc + ';font-weight:700">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + ' · ' + tag + '</div>' +
+          '<div style="font-weight:800;font-size:1.2rem;color:#0f172a;margin:4px 0">' + Super.esc(person.full_name||'') + '</div>' +
+          '<table style="font-size:.74rem;border-collapse:collapse">' + detailRows + '</table></div>' + qrImg(64) + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 18px 10px"><img src="' + logo + '" style="width:30px;height:30px;object-fit:contain" onerror="this.style.display=\'none\'">' + this.signBlock('#334155', 84) + '</div>' +
+          this.contactStrip(s, false) + credit + '</div>';
+      }
+      // 3) GRADIENT — vibrant diagonal gradient, modern student card
+      if (tpl === 'gradient') {
+        return '<div class="sc-idcard" style="width:400px;border-radius:18px;overflow:hidden;background:linear-gradient(120deg,' + pc + ' 0%,' + ac + ' 100%);color:#fff;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 12px 28px rgba(0,0,0,.25)">' +
+          '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px"><img src="' + logo + '" style="width:40px;height:40px;border-radius:10px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="flex:1"><strong>' + Super.esc(s.name||'School') + '</strong><div style="font-size:.62rem;opacity:.9;letter-spacing:1.5px">' + tag + '</div></div></div>' +
+          '<div style="background:rgba(255,255,255,.94);color:#0f172a;margin:0 12px;border-radius:14px;padding:12px;display:flex;gap:12px;align-items:center">' + miniPhoto(80,96,10) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.72rem;border-collapse:collapse">' + detailRows + '</table></div>' + qrImg(58) + '</div>' +
+          '<div style="display:flex;justify-content:center;padding:6px 0 2px"><span style="background:rgba(255,255,255,.92);border-radius:8px;padding:2px 10px">' + this.signBlock('#0f172a', 84) + '</span></div>' +
+          this.contactStrip(s, true).replace('#94a3b8','#e0e7ff') + credit + '</div>';
+      }
+      // 4) BADGE — conference-style portrait badge with big name
+      if (tpl === 'badge') {
+        return '<div class="sc-idcard" style="width:280px;border-radius:16px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.16);text-align:center">' +
+          '<div style="background:' + pc + ';color:#fff;padding:10px"><img src="' + logo + '" style="width:36px;height:36px;border-radius:8px;background:#fff;padding:2px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="font-weight:800;font-size:.8rem;margin-top:3px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</div></div>' +
+          '<div style="margin:-1px auto 0;background:' + ac + ';color:#fff;font-size:.58rem;letter-spacing:2px;padding:3px 0;font-weight:700">' + tag + '</div>' +
+          '<div style="padding:14px 12px 6px;display:flex;flex-direction:column;align-items:center">' + miniPhoto(110,110,999) +
+          '<div style="font-weight:900;font-size:1.15rem;margin-top:8px;color:#0f172a">' + Super.esc(person.full_name||'') + '</div>' +
+          '<table style="font-size:.72rem;border-collapse:collapse;margin:4px auto 0;text-align:left">' + detailRows + '</table>' +
+          '<div style="margin-top:8px">' + qrImg(70) + '<div style="font-size:.52rem;font-weight:900;color:' + pc + '">SCAN TO VERIFY</div></div>' +
+          '<div style="margin-top:6px">' + this.signBlock('#334155', 90) + '</div></div>' +
+          this.contactStrip(s, false) + credit + '</div>';
+      }
+      // 5) SMART — fintech-style card with chip + wave pattern
+      if (tpl === 'smart') {
+        return '<div class="sc-idcard" style="width:400px;border-radius:20px;overflow:hidden;position:relative;background:#111827;color:#e5e7eb;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 14px 34px rgba(0,0,0,.35)">' +
+          '<div style="position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,' + ac + '33,transparent 45%),radial-gradient(circle at 10% 90%,' + pc + '44,transparent 50%)"></div>' +
+          '<div style="position:relative;padding:16px 18px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:8px;align-items:center"><img src="' + logo + '" style="width:34px;height:34px;border-radius:8px;background:#fff;padding:2px;object-fit:contain" onerror="this.style.display=\'none\'"><strong style="font-size:.85rem">' + Super.esc(s.name||'School') + '</strong></div><span style="font-size:.55rem;letter-spacing:2px;color:' + ac + ';font-weight:800">' + tag + '</span></div>' +
+          '<div style="width:38px;height:28px;border-radius:6px;background:linear-gradient(135deg,#fbbf24,#b45309);margin:12px 0 8px"></div>' +
+          '<div style="display:flex;gap:12px;align-items:center">' + miniPhoto(72,86,8) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem;color:#fff;letter-spacing:.5px">' + Super.esc((person.full_name||'').toUpperCase()) + '</div><table style="font-size:.7rem;border-collapse:collapse;color:#cbd5e1">' + detailRows.replace(/#64748b/g,'#94a3b8') + '</table></div>' +
+          '<div style="background:#fff;border-radius:8px;padding:4px">' + qrImg(56) + '</div></div>' +
+          '<div style="display:flex;justify-content:flex-end;margin-top:6px"><span style="background:rgba(255,255,255,.92);border-radius:8px;padding:2px 8px">' + this.signBlock('#111827', 78) + '</span></div></div>' +
+          '<div style="position:relative;background:rgba(0,0,0,.35)">' + this.contactStrip(s, true) + '</div>' + credit + '</div>';
+      }
+      // 6) HERITAGE — classic crest style with serif type and double border
+      if (tpl === 'heritage') {
+        return '<div class="sc-idcard" style="width:410px;border-radius:12px;overflow:hidden;background:#fffef8;border:3px double ' + pc + ';font-family:Georgia,\'Times New Roman\',serif;box-shadow:0 8px 24px rgba(0,0,0,.14)">' +
+          '<div style="text-align:center;padding:10px 14px 4px"><img src="' + logo + '" style="width:46px;height:46px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="font-weight:900;font-size:1rem;color:' + pc + ';letter-spacing:1px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</div>' + (s.motto?'<div style="font-size:.62rem;font-style:italic;color:#7c2d12">' + Super.esc(s.motto) + '</div>':'') + '</div>' +
+          '<div style="background:' + pc + ';color:#fffef8;font-size:.6rem;letter-spacing:3px;text-align:center;padding:3px 0;font-weight:700">' + tag + '</div>' +
+          '<div style="display:flex;gap:14px;padding:12px 16px;align-items:center">' + miniPhoto(88,104,6) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.1rem;color:#1f2937">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.74rem;border-collapse:collapse;color:#374151">' + detailRows + '</table></div>' + qrImg(64) + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 16px 8px"><div style="font-size:.6rem;color:#6b7280">Session: <b>' + Super.esc(session) + '</b></div>' + this.signBlock(pc, 92) + '</div>' +
+          '<div style="border-top:1px solid ' + pc + '33">' + this.contactStrip(s, false) + '</div>' + credit + '</div>';
       }
 
       // VERTICAL (portrait, lanyard-style) professional template (issue 3)
@@ -555,7 +641,8 @@ const Super = {
           '<div style="text-align:center;padding:0 14px">' + bigPhoto + '<div style="font-weight:800;font-size:1.05rem;margin-top:8px;color:#0f172a">' + Super.esc(person.full_name || person.name || '') + '</div>' +
           '<table style="font-size:.74rem;margin:6px auto 0;border-collapse:collapse;text-align:left">' + rows.join('') + '</table></div>' +
           '<div style="display:flex;justify-content:center;padding:10px 0 6px"><img src="' + qr + '" style="width:74px;height:74px"></div>' +
-          '<div style="text-align:center;font-size:.6rem;color:#64748b;margin-bottom:6px">Session: <strong>' + Super.esc(session) + '</strong></div>' +
+          '<div style="text-align:center;font-size:.6rem;color:#64748b;margin-bottom:4px">Session: <strong>' + Super.esc(session) + '</strong></div>' +
+          '<div style="margin:0 auto 6px;width:110px">' + this.signBlock(pc, 100) + '</div>' +
           contactFooter + credit + '</div>';
       }
       // CORPORATE (dark, premium) horizontal template
@@ -569,7 +656,7 @@ const Super = {
           '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem;color:#fff">' + Super.esc(person.full_name || person.name || '') + '</div>' +
           '<table style="font-size:.73rem;margin-top:5px;border-collapse:collapse;color:#cbd5e1">' + rows.join('').replace(/#64748b/g, '#94a3b8').replace(/font-weight:600/g, 'font-weight:600;color:#fff') + '</table></div>' +
           '<img src="' + qr + '" style="width:66px;height:66px;background:#fff;padding:3px;border-radius:6px"></div>' +
-          '<div style="background:#1e293b;padding:7px 14px;font-size:.6rem;color:#94a3b8;text-align:center">' + Super.esc(s.address || '') + ' · ' + Super.esc(s.phone || '') + ' · ' + Super.esc(s.email || '') + '</div>' +
+          '<div style="background:#1e293b;padding:7px 14px;font-size:.6rem;color:#94a3b8;text-align:center">' + Super.esc(s.address || '') + ' · ' + Super.esc(s.phone || '') + ' · ' + Super.esc(s.email || '') + '<div style="display:flex;justify-content:center;margin-top:4px;filter:invert(0)"><span style="background:#fff;border-radius:6px;padding:2px 8px;display:inline-block">' + this.signBlock('#0f172a', 84) + '</span></div></div>' +
           '<div style="background:' + ac + ';color:#0f172a;font-size:.56rem;text-align:center;padding:3px 0;font-weight:700">Session ' + Super.esc(session) + ' · Powered by HMG Concepts</div></div>';
       }
       // HORIZONTAL (default, enhanced)
@@ -589,7 +676,7 @@ const Super = {
         <div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 14px 10px">
           <div style="font-size:.62rem;color:#64748b">
             <div>Session: <strong>${Super.esc(session)}</strong></div>
-            <div style="margin-top:10px;border-top:1px solid #cbd5e1;width:90px;text-align:center;font-size:.58rem;padding-top:1px">Signature</div>
+            </div><div style="margin-top:8px;width:100px">${this.signBlock('#334155', 92)}</div><div style="display:none">
           </div>
           <div style="text-align:center"><img src="${qr}" style="width:78px;height:78px" alt="QR"><div style="font-size:.55rem;font-weight:800;color:#0f172a">SCAN TO VERIFY</div><div style="height:18px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px);margin-top:3px"></div></div>
         </div>

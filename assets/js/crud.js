@@ -33,7 +33,7 @@ const CRUD = {
     academic_setup:[], approvals:[], admin_data:[], analytics:[], finance:[], hr:[], payroll:[],
     staff_loans:[], staff_bonus:[], appraisals:[], inventory:[], compliance:[], activity_log:[],
     storage:[], settings:[], promotion:[], alumni:[], financial_aid:[], donations:[], payments_online:[],
-    admissions:[], admission_links:[], departments:[], front_desk:[], document_builder:[], fleet_tracking:[], facility_booking:[],
+    admissions:[], admission_links:[], exam_registrations:['staff','teacher'], departments:[], front_desk:[], document_builder:[], fleet_tracking:[], facility_booking:[],
     menu:[], cafeteria:[], idcards:[], flyer:[], school_calendar:[], lost_found:[], parent_meeting:[]
   },
   init(supabaseClient) { this.sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null); },
@@ -240,12 +240,60 @@ const CRUD = {
     departments: { table:'departments', title:'Department', cols:[
       {key:'name',label:'Name',type:'text',required:true},{key:'head',label:'Head',type:'text'}
     ]},
-    admissions: { table:'admissions', title:'Admission', cols:[
-      {key:'full_name',label:'Applicant',type:'text',required:true},{key:'dob',label:'DOB',type:'date'},
+    /* ENTERPRISE FINAL V2 (#21): comprehensive admission application. */
+    admissions: { table:'admissions', title:'Admission Application', help:'Full applicant record: bio-data, origin, previous school, guardian, medical and documents. Extra fields are stored safely in data{} even on older databases.', cols:[
+      {key:'full_name',label:'Applicant full name (surname first)',type:'text',required:true},
+      {key:'dob',label:'Date of birth',type:'date'},
       {key:'gender',label:'Gender',type:'select',options:['male','female']},
-      {key:'parent_name',label:'Parent name',type:'text'},{key:'parent_email',label:'Parent email',type:'email'},
-      {key:'parent_phone',label:'Parent phone',type:'tel'},{key:'applying_for_class',label:'Applying for class',type:'text'},
+      {key:'data.nationality',label:'Nationality',type:'text'},
+      {key:'data.state_origin',label:'State of origin',type:'text'},
+      {key:'data.lga',label:'LGA / County',type:'text'},
+      {key:'data.religion',label:'Religion',type:'select',options:['Christianity','Islam','Traditional','Other']},
+      {key:'data.home_address',label:'Home address',type:'textarea'},
+      {key:'data.blood_group',label:'Blood group',type:'select',options:['A+','A-','B+','B-','AB+','AB-','O+','O-','Unknown']},
+      {key:'data.genotype',label:'Genotype',type:'select',options:['AA','AS','SS','AC','Unknown']},
+      {key:'data.medical_conditions',label:'Known medical conditions / allergies',type:'textarea'},
+      {key:'data.previous_school',label:'Previous school attended',type:'text'},
+      {key:'data.previous_class',label:'Last class completed',type:'text'},
+      {key:'data.reason_for_leaving',label:'Reason for leaving previous school',type:'text'},
+      {key:'applying_for_class',label:'Class applying for',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'data.entry_term',label:'Entry term',type:'lookup',lookupKind:'term'},
+      {key:'data.entry_session',label:'Entry session',type:'lookup',lookupKind:'session'},
+      {key:'parent_name',label:'Parent / Guardian full name',type:'text'},
+      {key:'data.parent_relationship',label:'Relationship',type:'select',options:['father','mother','guardian','sponsor','other']},
+      {key:'data.parent_occupation',label:'Parent occupation',type:'text'},
+      {key:'parent_email',label:'Parent email',type:'email'},
+      {key:'parent_phone',label:'Parent phone',type:'tel'},
+      {key:'data.parent_phone_alt',label:'Alternative phone',type:'tel'},
+      {key:'data.emergency_contact',label:'Emergency contact (name & phone)',type:'text'},
+      {key:'data.photo_link',label:'Passport photo (Drive link)',type:'text',help:'Share as “anyone with the link”'},
+      {key:'data.birth_cert_link',label:'Birth certificate (Drive link)',type:'text'},
+      {key:'data.last_result_link',label:'Last result / transcript (Drive link)',type:'text'},
+      {key:'data.special_needs',label:'Special needs / support required',type:'textarea'},
+      {key:'data.how_heard',label:'How did you hear about us?',type:'select',options:['referral','social media','website','flyer','drive-past','event','other']},
       {key:'status',label:'Status',type:'select',options:['submitted','reviewing','accepted','enrolled','rejected']}
+    ]},
+
+    /* ENTERPRISE FINAL V2 (#22): external examination registrations —
+       SSCE (WAEC/NECO), UTME/JAMB, IGCSE, Common Entrance, BECE, others.
+       Stored in module_records via the generic engine? No — dedicated def so
+       exports/extraction work richly; table module_records keeps it schema-safe. */
+    exam_registrations: { table:'module_records', generic:true, module:'exam_registrations', title:'External Exam Registration', help:'Register candidates for SSCE (WAEC/NECO), UTME/JAMB, IGCSE, Common Entrance, BECE and more. Track payment and submission status, then export all details as CSV/PDF for the exam body portal.', cols:[
+      {key:'data.exam_type',label:'Examination',type:'select',options:['WAEC SSCE','NECO SSCE','UTME (JAMB)','IGCSE (Cambridge)','Common Entrance (NCEE)','BECE (Junior WAEC)','GCE (private)','TOEFL/IELTS','Other'],required:true},
+      {key:'title',label:'Candidate full name',type:'text',required:true},
+      {key:'data.student',label:'Link to student record',type:'ref',refTable:'students',refValue:'full_name',refStore:'value',searchable:true},
+      {key:'data.class',label:'Present class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'data.exam_year',label:'Exam year',type:'number'},
+      {key:'data.exam_number',label:'Exam/Registration number (when issued)',type:'text'},
+      {key:'data.subjects',label:'Subjects (comma-separated, e.g. English, Maths, Physics…)',type:'textarea'},
+      {key:'data.jamb_courses',label:'UTME: course & institutions (1st/2nd choice)',type:'textarea'},
+      {key:'data.centre',label:'Exam centre (when assigned)',type:'text'},
+      {key:'amount',label:'Registration fee paid',type:'number'},
+      {key:'data.fee_balance',label:'Fee balance',type:'number'},
+      {key:'ref_date',label:'Registration date',type:'date'},
+      {key:'data.passport_link',label:'Passport photo (Drive link)',type:'text'},
+      {key:'status',label:'Status',type:'select',options:['collecting-details','paid','submitted-to-body','number-issued','completed']},
+      {key:'body',label:'Notes',type:'textarea'}
     ]},
     hr: { table:'payroll', title:'Salary / Payslip', alias:'payroll', cols:[
       {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true},
@@ -648,6 +696,9 @@ const CRUD = {
     const isLinkCol = (key) => /(_link|link|media_url|photo_url|video|image|thumbnail|read_link|drive)$/i.test(key) || /^(media_url|read_link|drive_link|photo_url)$/i.test(key);
     tb.innerHTML = filteredData.map(row => '<tr>' + cols.map(c => {
       let v = cellVal(row, c);
+      // ENTERPRISE FINAL V2 (#8): fee balance reflects in every record —
+      // auto-compute for display when the stored value is missing.
+      if (c.key === 'balance' && v == null && row.fee_total != null) v = Math.max(0, (Number(row.fee_total) || 0) - (Number(row.amount_paid) || 0));
       if (c.type === 'checkbox') v = v ? '✓' : '';
       if (v && (c.type === 'date' || c.type === 'datetime' || /(^|_)(date|dob|created_at|issued_on|due_date|ref_date)$/i.test(c.key))) v = CRUD.formatDate(v);
       // Issue 11: render link columns as image/video thumbnails when possible.
@@ -842,6 +893,8 @@ const CRUD = {
     if (d.table === 'fee_payments' && payload.balance == null && payload.fee_total != null) {
       payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
     }
+    // ENTERPRISE FINAL V2 (#8): normalise balance to a number when present
+    if (d.table === 'fee_payments' && payload.balance != null) payload.balance = Number(payload.balance) || 0;
     // Issue 5: auto-compute appraisal average score + band
     if (d.table === 'staff_appraisals') {
       const keys = ['punctuality', 'teaching_quality', 'student_results', 'teamwork', 'conduct'];
@@ -1016,20 +1069,44 @@ const CRUD = {
     if (!this.sb) return;
     const { data: f } = await this.sb.from('fee_payments').select('*').eq('id', id).maybeSingle();
     if (!f) return;
-    const sc = window.SCHOOL || {};
+    // ENTERPRISE FINAL V2 (#7): receipt now matches samples/sample-e-receipt.html exactly.
+    let stu = null;
+    try { if (f.student_id) { const r = await this.sb.from('students').select('full_name,class,admission_no').eq('id', f.student_id).maybeSingle(); stu = r.data; } } catch(_) {}
+    const sc = window.SCHOOL || {}; const stg = window.SC_SETTINGS || {};
     const cur = sc.currency || '₦';
-    const st = window.SC_SETTINGS || {};
-    const rawSig = localStorage.getItem('sc-signature-url') || st.signature_url || sc.signatureUrl || sc.signature_url || '';
+    const rawSig = localStorage.getItem('sc-signature-url') || stg.signature_url || sc.signatureUrl || sc.signature_url || '';
     const sig = (window.Super && Super.idcard && Super.idcard.driveDirect) ? Super.idcard.driveDirect(rawSig) : rawSig;
-    const pn = localStorage.getItem('sc-principal-name') || st.principal_name || sc.principalName || sc.principal_name || 'Bursar / Principal';
-    const sign = sig ? '<div style="margin-top:28px;text-align:center"><img src="' + esc(sig) + '" referrerpolicy="no-referrer" style="max-width:150px;max-height:70px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.15)"><br><b>' + esc(pn) + '</b><br>Official Signature</div>' : '';
-    const logo = 'assets/img/logo.' + (sc.logoExt || 'svg');
+    const pn = localStorage.getItem('sc-principal-name') || stg.principal_name || sc.principalName || sc.principal_name || 'Bursar / Principal';
+    // #8/#16: balance — manual entry respected; else auto-computed from fee_total
+    let bal = f.balance;
+    if (bal == null && f.fee_total != null) bal = Math.max(0, (Number(f.fee_total) || 0) - (Number(f.amount_paid) || 0));
     const rdate = CRUD.formatDate(f.created_at || new Date().toISOString());
-    const html = '<div style="width:620px;max-width:96vw;border:2px solid #111;padding:28px;font-family:Arial,sans-serif;color:#000;background:#fff"><div style="display:flex;align-items:center;justify-content:center;gap:12px"><img src="'+logo+'" style="width:62px;height:62px;object-fit:contain" onerror="this.style.display=\'none\'"><div><h2 style="text-align:center;margin:0">' + esc(sc.name || 'School') + '</h2><p style="text-align:center;margin:4px 0 0">E-RECEIPT</p></div></div><hr><p><b>Student:</b> ' + esc(f.student_name || '') + '</p><p><b>Amount paid:</b> ' + cur + Number(f.amount_paid || 0).toLocaleString() + '</p>' + (f.balance != null ? '<p><b>Remaining balance:</b> ' + cur + Number(f.balance || 0).toLocaleString() + (Number(f.balance)===0?' <span style="color:#16a34a;font-weight:700">(FULLY PAID)</span>':'') + '</p>' : '') + '<p><b>Method:</b> ' + esc(f.method || '') + ' &nbsp; <b>Reference:</b> ' + esc(f.reference || f.id || '') + '</p><p><b>Term:</b> ' + esc(f.term || '') + ' &nbsp; <b>Date:</b> ' + esc(rdate) + '</p><p style="font-size:.8rem;color:#555">This receipt was generated electronically from the school portal.</p>' + sign + '</div>';
+    const row = (k, v) => '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #cbd5e1;font-size:.9rem"><span>' + esc(k) + '</span><b style="color:#0f172a;text-align:right">' + v + '</b></div>';
+    const html = '<div style="width:520px;max-width:96vw;border:2px solid #111;padding:26px;background:#fff;font-family:Arial,sans-serif;color:#111">' +
+      '<div style="display:flex;align-items:center;justify-content:center;gap:12px;border-bottom:2px solid #111;padding-bottom:10px">' +
+        '<img src="assets/img/logo.' + (sc.logoExt || 'svg') + '" style="width:58px;height:58px;border-radius:12px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+        '<div style="text-align:center"><h2 style="margin:0;font-size:1.15rem">' + esc(sc.name || 'School') + '</h2>' +
+        '<p style="margin:2px 0 0;font-size:.72rem;color:#334155">' + esc(sc.address || '') + (sc.phone ? ' · ' + esc(sc.phone) : '') + (sc.email ? ' · ' + esc(sc.email) : '') + '</p>' +
+        '<p style="margin:2px 0 0;font-size:.72rem;letter-spacing:3px;font-weight:800">OFFICIAL E-RECEIPT</p></div></div>' +
+      row('Receipt No.', esc(f.reference || ('RCP-' + String(f.id || '').slice(0, 8).toUpperCase()))) +
+      row('Date', esc(rdate)) +
+      row('Student', esc((stu && stu.full_name) || f.student_name || '') + ((stu && stu.class) ? ' (' + esc(stu.class) + ')' : '')) +
+      ((stu && stu.admission_no) ? row('Admission No.', esc(stu.admission_no)) : '') +
+      row('Term / Session', esc(f.term || '-') + ' · ' + esc(f.session || '-')) +
+      row('Payment Method', esc(f.method || '-') + (f.reference ? ' · Ref: ' + esc(f.reference) : '')) +
+      (f.fee_total != null ? row('Total Fee for Term', cur + Number(f.fee_total).toLocaleString()) : '') +
+      '<div style="background:#f0fdf4;border:1px dashed #16a34a;border-radius:10px;padding:10px;text-align:center;margin-top:12px"><div style="font-size:.75rem;color:#334155">AMOUNT PAID</div><div style="font-size:1.5rem;font-weight:900;color:#16a34a">' + cur + Number(f.amount_paid || 0).toLocaleString() + '</div></div>' +
+      (bal != null ? (Number(bal) === 0
+        ? '<div style="background:#f0fdf4;border:1px solid #16a34a;border-radius:10px;padding:8px;text-align:center;margin-top:8px;font-size:.9rem;color:#16a34a;font-weight:800">Remaining Balance: ' + cur + '0 — FULLY PAID ✔</div>'
+        : '<div style="background:#fef2f2;border:1px dashed #dc2626;border-radius:10px;padding:8px;text-align:center;margin-top:8px;font-size:.9rem">Remaining Balance: <b style="color:#dc2626;font-size:1.1rem">' + cur + Number(bal).toLocaleString() + '</b></div>') : '') +
+      '<div style="margin-top:22px;text-align:center;font-size:.8rem">' +
+        (sig ? '<img src="' + esc(sig) + '" referrerpolicy="no-referrer" style="max-width:150px;max-height:60px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)">' : '') +
+        '<div style="border-top:1px solid #111;width:180px;margin:2px auto 0;padding-top:2px"><b>' + esc(pn) + '</b> — Bursar / Principal</div></div>' +
+      '<p style="margin-top:12px;font-size:.62rem;color:#94a3b8;text-align:center">Generated electronically by ' + esc(sc.name || '') + ' · School Connect</p></div>';
     const w = window.open('', '_blank');
     if (!w) { toast('Popup blocked! Please allow popups.', 'warning'); return; }
     w.document.open();
-    w.document.write('<!DOCTYPE html><html><head><title>E-Receipt</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"></head><body style="display:flex;justify-content:center;padding:20px">' + html + '<script>window.onload=function(){setTimeout(function(){window.print()},250)};<\/script></body></html>');
+    w.document.write('<!DOCTYPE html><html><head><title>E-Receipt</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"></head><body style="display:flex;justify-content:center;padding:20px">' + html + '<script>window.onload=function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}})};<\/script></body></html>');
     w.document.close();
     w.focus();
   },
