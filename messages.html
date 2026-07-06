@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Messaging • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Messaging. Free school management platform by HMG Concepts.">
-<meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -34,7 +34,7 @@ body{font-family:var(--font)!important;background:#f8fafc}
 .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:10px;min-height:42px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:.875rem;font-weight:700;line-height:1.2;white-space:normal;word-break:normal;transition:background .18s ease,color .18s ease,transform .18s ease}
 .app-nav a:hover{background:#f1f5f9;color:var(--primary);transform:translateX(2px)}
 .app-nav a.active{background:var(--gradient);color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.22)}
-body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!important}.app-nav a[style*="display: none"]{display:none!important}
+body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!important}.app-nav a[style*="display: none"]{display:none!important}
 .app-nav a.nav-locked{opacity:.62}.app-nav a.nav-locked .app-nav-icon{filter:grayscale(.35)}.app-nav a.nav-locked::after{content:'🔒';font-size:.72rem;opacity:.65;justify-self:end}.app-nav a.nav-locked.active{opacity:1}
 .app-nav-icon{width:32px;height:32px;min-width:32px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;line-height:1;border-radius:10px;background:rgba(79,70,229,.09);color:var(--primary);flex-shrink:0;overflow:hidden}
 .app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22);color:#fff}
@@ -105,23 +105,14 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement('div'),{textContent:('G'),style:'width:40px;height:40px;border-radius:10px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900'}))">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
         <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🏠</span>
           <span>Dashboard</span>
-        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
-          <span class="app-nav-icon">👤</span>
-          <span>My Profile</span>
-        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
-          <span class="app-nav-icon">🔐</span>
-          <span>Change Password</span>
-        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
-          <span class="app-nav-icon">🧪</span>
-          <span>Multi-Subject CBT</span>
-<a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">⚙️</span>
           <span>Academic Setup</span>
         </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
@@ -190,9 +181,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
           <span class="app-nav-icon">💰</span>
           <span>Fees</span>
-        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
-          <span class="app-nav-icon">🧾</span>
-          <span>Payment History</span>
         </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Timetable</span>
@@ -262,9 +250,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">📝</span>
           <span>Admissions</span>
-        </a><a href="exam_registrations.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
-          <span class="app-nav-icon">🎓</span>
-          <span>Exam Registrations</span>
         </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">🎓</span>
           <span>Promotion</span>
@@ -439,7 +424,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div class="app-content">
       
       <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📱 Messaging Centre — WhatsApp / Email / SMS</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Create a message, choose recipients, then send through free device/email links. This avoids paid SMS/WhatsApp APIs. The system stores the message log; your browser opens WhatsApp, email or SMS with the text prefilled for the selected recipient.</p></div>
-      <div class="grid grid-2"><div class="card"><h3>Compose</h3><div class="form-group"><label>Audience</label><select class="form-select" id="msg-aud" onchange="MSG.loadRecipients()"><option value="parents">Parents</option><option value="staff">Staff / Teachers</option><option value="students">Students</option><option value="admin">Admin / Management</option></select></div><div class="form-group"><label>Recipient</label><select class="form-select" id="msg-rec"><option value="">Loading…</option></select></div><div class="form-group"><label>Subject / title</label><input class="form-input" id="msg-title"></div><div class="form-group"><label>Message</label><textarea class="form-input" id="msg-body" rows="6"></textarea></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="MSG.send('whatsapp')">Send WhatsApp</button><button class="btn btn-outline" onclick="MSG.send('email')">Send Email</button><button class="btn btn-outline" onclick="MSG.send('sms')">Send SMS</button><button class="btn btn-outline" onclick="MSG.logOnly()">Save to In-App Inbox</button></div></div><div class="card"><h3>In-App Inbox / Message Log</h3><div id="msg-log">Loading…</div></div></div>
+      <div class="grid grid-2"><div class="card"><h3>Compose</h3><div class="form-group"><label>Audience</label><select class="form-select" id="msg-aud" onchange="MSG.loadRecipients()"><option value="parents">Parents</option><option value="staff">Staff / Teachers</option><option value="students">Students</option><option value="admin">Admin / Management</option></select></div><div class="form-group"><label>Recipients <span style="color:var(--gray-500);font-weight:400">(multi-select enabled)</span></label><select class="form-select" id="msg-rec" multiple size="9" onchange="MSG.updateCount()"><option value="">Loading…</option></select><div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="MSG.selectAll()">Select all</button><button class="btn btn-sm btn-outline" onclick="MSG.clearSelection()">Clear</button><span id="msg-count" style="color:var(--gray-500);font-size:.85rem">0 recipients selected</span></div></div><div class="form-group"><label>Subject / title</label><input class="form-input" id="msg-title"></div><div class="form-group"><label>Message</label><textarea class="form-input" id="msg-body" rows="6"></textarea></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="MSG.logOnly()">Deliver In-App</button><button class="btn btn-outline" onclick="MSG.send('whatsapp')">WhatsApp + In-App</button><button class="btn btn-outline" onclick="MSG.send('email')">Email + In-App</button><button class="btn btn-outline" onclick="MSG.send('sms')">SMS + In-App</button></div><p style="color:var(--gray-500);font-size:.82rem;margin-top:8px">In-app messages are stored with each recipient's profile ID, so they appear in the recipient's Inbox. WhatsApp/SMS use free device links; no paid API is required.</p></div><div class="card"><h3>In-App Inbox / Message Log</h3><div id="msg-log">Loading…</div></div></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Built by <a href="https://cssadewale.pages.dev" target="_blank" rel="noopener">Adewale Samson Adeagbo</a> · Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a> · <a href="developer.html">About the developer</a>
@@ -466,5 +451,76 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
-const MSG={rows:[], async init(){await this.loadRecipients(); this.loadLog();}, async loadRecipients(){ const aud=document.getElementById('msg-aud').value; let rows=[]; try{ if(aud==='parents'){const r=await sb.from('profiles').select('id,full_name,email,phone').eq('role','parent').limit(1000); rows=r.data||[];} if(aud==='staff'){const r=await sb.from('staff').select('id,full_name,email,phone').limit(1000); rows=r.data||[];} if(aud==='admin'){const r=await sb.from('profiles').select('id,full_name,email,phone').in('role',['admin','principal','proprietor','head_teacher','bursar']).limit(1000); rows=r.data||[];} if(aud==='students'){const r=await sb.from('students').select('id,full_name,email,guardian_phone,guardian_email,class').limit(1000); rows=(r.data||[]).map(x=>({id:x.id,full_name:(x.class?x.class+' · ':'')+x.full_name,email:x.email||x.guardian_email,phone:x.guardian_phone}));} }catch(e){} const sel=document.getElementById('msg-rec'); sel.innerHTML='<option value="">— choose —</option>'+rows.map(x=>'<option value="'+x.id+'" data-email="'+esc(x.email||'')+'" data-phone="'+esc(x.phone||'')+'">'+esc(x.full_name||x.email||x.phone||x.id)+'</option>').join('');}, text(){return (document.getElementById('msg-title').value?document.getElementById('msg-title').value+'\n\n':'')+document.getElementById('msg-body').value;}, async log(channel){ try{ const opt=document.getElementById('msg-rec').selectedOptions[0]; const recName=opt?opt.textContent:'User'; await sb.from('module_records').insert({module:'inbox',title:document.getElementById('msg-title').value,body:document.getElementById('msg-body').value,status:'unread',data:{channel:channel,audience:document.getElementById('msg-aud').value,recipient:document.getElementById('msg-rec').value,to:recName,from:(window.SC_PROFILE&&SC_PROFILE.full_name)||'User'}});}catch(e){} this.loadLog();}, send(ch){ const opt=document.getElementById('msg-rec').selectedOptions[0]; if(!opt||!opt.value){toast('Choose a recipient','warning');return;} const phone=(opt.dataset.phone||'').replace(/[^0-9]/g,''); const email=opt.dataset.email||''; const text=this.text(); if(ch==='whatsapp'){ if(!phone){toast('Recipient has no phone','warning');return;} window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(text),'_blank');} if(ch==='email'){ if(!email){toast('Recipient has no email','warning');return;} location.href='mailto:'+email+'?subject='+encodeURIComponent(document.getElementById('msg-title').value)+'&body='+encodeURIComponent(document.getElementById('msg-body').value);} if(ch==='sms'){ if(!phone){toast('Recipient has no phone','warning');return;} location.href='sms:'+phone+'?&body='+encodeURIComponent(text);} this.log(ch);}, logOnly(){this.log('in-app'); toast('Message saved to In-App Inbox','success');}, async loadLog(){ const box=document.getElementById('msg-log'); try{const r=await sb.from('module_records').select('*').eq('module','inbox').order('created_at',{ascending:false}).limit(50); box.innerHTML=(r.data||[]).length?'<div class="table-wrap"><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Subject</th><th>Channel</th></tr></thead><tbody>'+(r.data||[]).map(x=>'<tr><td>'+esc((x.created_at||'').slice(0,10))+'</td><td>'+esc((x.data&&x.data.from)||'User')+'</td><td>'+esc((x.data&&x.data.to)||'User')+'</td><td>'+esc(x.title||'')+'</td><td>'+esc((x.data&&x.data.channel)||'in-app')+'</td></tr>').join('')+'</tbody></table></div>':'<p>No messages logged yet.</p>';}catch(e){box.innerHTML='<p>Could not load log.</p>';}}}; document.addEventListener('DOMContentLoaded',()=>MSG.init()); MSG.init();
+const MSG={
+  rows:[],
+  async init(){ await this.loadRecipients(); this.loadLog(); },
+  esc:s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),
+  dedupe(rows){ const seen=new Set(); return (rows||[]).filter(x=>{ const key=String(x.recipient_id||x.id||x.full_name||x.email||x.phone||'').toLowerCase(); if(!key||seen.has(key))return false; seen.add(key); return true; }); },
+  async loadRecipients(){
+    const aud=document.getElementById('msg-aud').value; let rows=[];
+    try{
+      if(aud==='parents'){
+        const r=await sb.from('profiles').select('id,full_name,email,phone,role').eq('role','parent').limit(3000);
+        rows=(r.data||[]).map(x=>Object.assign({},x,{recipient_id:x.id}));
+      }
+      if(aud==='staff'){
+        const r=await sb.from('profiles').select('id,full_name,email,phone,role').in('role',['staff','teacher','admin','principal','proprietor','head_teacher','bursar']).limit(3000);
+        rows=(r.data||[]).map(x=>Object.assign({},x,{recipient_id:x.id}));
+      }
+      if(aud==='admin'){
+        const r=await sb.from('profiles').select('id,full_name,email,phone,role').in('role',['super_admin','admin','principal','proprietor','head_teacher','bursar']).limit(1000);
+        rows=(r.data||[]).map(x=>Object.assign({},x,{recipient_id:x.id}));
+      }
+      if(aud==='students'){
+        const r=await sb.from('students').select('id,user_id,full_name,email,guardian_phone,guardian_email,class,admission_no').limit(4000);
+        rows=(r.data||[]).map(x=>({id:x.id,recipient_id:x.user_id||'',full_name:(x.class?x.class+' · ':'')+x.full_name,email:x.email||x.guardian_email,phone:x.guardian_phone,admission_no:x.admission_no}));
+      }
+    }catch(e){ console.warn('Recipients load failed', e); }
+    this.rows=this.dedupe(rows);
+    const sel=document.getElementById('msg-rec');
+    sel.innerHTML='<option value="__all">✅ Select all visible recipients</option>'+this.rows.map(x=>'<option value="'+this.esc(x.recipient_id||x.id)+'" data-id="'+this.esc(x.id||'')+'" data-recipient="'+this.esc(x.recipient_id||'')+'" data-email="'+this.esc(x.email||'')+'" data-phone="'+this.esc(x.phone||'')+'">'+this.esc(x.full_name||x.email||x.phone||x.id)+(x.recipient_id?'':' — no login account')+'</option>').join('');
+    this.updateCount();
+  },
+  updateCount(){ const n=this.selected().length; const c=document.getElementById('msg-count'); if(c)c.textContent=n+' recipient'+(n===1?'':'s')+' selected'; },
+  selected(){
+    const sel=document.getElementById('msg-rec'); if(!sel)return[];
+    const vals=[...sel.selectedOptions].map(o=>o.value);
+    if(vals.includes('__all')) return this.rows.slice();
+    const chosen=new Set(vals);
+    return this.rows.filter(x=>chosen.has(String(x.recipient_id||x.id)));
+  },
+  selectAll(){ const sel=document.getElementById('msg-rec'); [...sel.options].forEach(o=>o.selected=true); this.updateCount(); },
+  clearSelection(){ const sel=document.getElementById('msg-rec'); [...sel.options].forEach(o=>o.selected=false); this.updateCount(); },
+  text(){return (document.getElementById('msg-title').value?document.getElementById('msg-title').value+'\n\n':'')+document.getElementById('msg-body').value;},
+  async log(channel){
+    if(!sb){toast('Database not configured','warning');return;}
+    const recs=this.selected(); if(!recs.length){toast('Choose at least one recipient or click Select all.','warning');return;}
+    const title=document.getElementById('msg-title').value.trim(); const body=document.getElementById('msg-body').value.trim();
+    if(!title&&!body){toast('Type a subject or message.','warning');return;}
+    const from=(window.SC_PROFILE&&SC_PROFILE.full_name)||'User'; const uid=(window.SC_PROFILE&&SC_PROFILE.id)||null;
+    const rows=recs.map(r=>({module:'inbox',title,body,status:'unread',audience:'private',recipient_id:r.recipient_id||null,created_by:uid,data:{channel,audience:document.getElementById('msg-aud').value,recipient:r.recipient_id||r.id,source_id:r.id,to:r.full_name||r.email||r.phone||'Recipient',from}}));
+    const deliverable=rows.filter(r=>r.recipient_id);
+    if(!deliverable.length){ toast('Selected recipient(s) have no linked login account for in-app delivery. Add/link user accounts first.','warning',7000); return; }
+    const {error}=await sb.from('module_records').insert(deliverable);
+    if(error){toast(error.message,'danger',7000);return;}
+    try{ if(window.Notifications){ for(const r of deliverable.slice(0,30)){ await Notifications.create({title:'💬 '+(title||'New message'),body:body.slice(0,140),url:'inbox.html',audience:'private',recipient_id:r.recipient_id,channels:['inapp','push']}); } } }catch(_){ }
+    toast('✅ In-app message delivered to '+deliverable.length+' recipient(s).','success',6000); this.loadLog();
+  },
+  send(ch){
+    const recs=this.selected(); if(!recs.length){toast('Choose recipient(s).','warning');return;}
+    const text=this.text(), title=document.getElementById('msg-title').value;
+    if(ch==='email'){
+      const emails=[...new Set(recs.map(r=>r.email).filter(Boolean))]; if(!emails.length){toast('No selected recipient has email.','warning');return;}
+      location.href='mailto:?bcc='+encodeURIComponent(emails.join(','))+'&subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(document.getElementById('msg-body').value);
+    }
+    if(ch==='whatsapp'||ch==='sms'){
+      const phones=[...new Set(recs.map(r=>String(r.phone||'').replace(/[^0-9]/g,'')).filter(Boolean))]; if(!phones.length){toast('No selected recipient has phone.','warning');return;}
+      const first=phones[0]; if(phones.length>1) toast('Opening the first recipient. For bulk WhatsApp/SMS, repeat from the log/list because browsers block mass popups. In-app delivery supports bulk instantly.','info',9000);
+      if(ch==='whatsapp') window.open('https://wa.me/'+first+'?text='+encodeURIComponent(text),'_blank'); else location.href='sms:'+first+'?&body='+encodeURIComponent(text);
+    }
+    this.log(ch);
+  },
+  logOnly(){this.log('in-app');},
+  async loadLog(){ const box=document.getElementById('msg-log'); try{const r=await sb.from('module_records').select('*').eq('module','inbox').order('created_at',{ascending:false}).limit(80); box.innerHTML=(r.data||[]).length?'<div class="table-wrap"><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Subject</th><th>Channel</th><th>Status</th></tr></thead><tbody>'+(r.data||[]).map(x=>'<tr><td>'+esc((x.created_at||'').slice(0,10))+'</td><td>'+esc((x.data&&x.data.from)||'User')+'</td><td>'+esc((x.data&&x.data.to)||'User')+'</td><td>'+esc(x.title||'')+'</td><td>'+esc((x.data&&x.data.channel)||'in-app')+'</td><td>'+esc(x.status||'')+'</td></tr>').join('')+'</tbody></table></div>':'<p>No messages logged yet.</p>';}catch(e){box.innerHTML='<p>Could not load log.</p>';}}
+}; document.addEventListener('DOMContentLoaded',()=>MSG.init()); MSG.init();
 </script></body></html>

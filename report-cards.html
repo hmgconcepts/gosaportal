@@ -5,10 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Report Cards • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Report Cards. Free school management platform by HMG Concepts.">
-<meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
-<link rel="apple-touch-icon" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,7 +34,7 @@ body{font-family:var(--font)!important;background:#f8fafc}
 .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:10px;min-height:42px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:.875rem;font-weight:700;line-height:1.2;white-space:normal;word-break:normal;transition:background .18s ease,color .18s ease,transform .18s ease}
 .app-nav a:hover{background:#f1f5f9;color:var(--primary);transform:translateX(2px)}
 .app-nav a.active{background:var(--gradient);color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.22)}
-body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!important}.app-nav a[style*="display: none"]{display:none!important}
+body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!important}.app-nav a[style*="display: none"]{display:none!important}
 .app-nav a.nav-locked{opacity:.62}.app-nav a.nav-locked .app-nav-icon{filter:grayscale(.35)}.app-nav a.nav-locked::after{content:'🔒';font-size:.72rem;opacity:.65;justify-self:end}.app-nav a.nav-locked.active{opacity:1}
 .app-nav-icon{width:32px;height:32px;min-width:32px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;line-height:1;border-radius:10px;background:rgba(79,70,229,.09);color:var(--primary);flex-shrink:0;overflow:hidden}
 .app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22);color:#fff}
@@ -84,7 +83,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
   </div>
   <div class="pwa-install-actions">
-    <button class="btn btn-outline btn-sm" data-pwa-action="dismiss">Not now</button>
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
     <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
   </div>
 </div>
@@ -106,23 +105,14 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement('div'),{textContent:('G'),style:'width:40px;height:40px;border-radius:10px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900'}))">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
         <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🏠</span>
           <span>Dashboard</span>
-        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
-          <span class="app-nav-icon">👤</span>
-          <span>My Profile</span>
-        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
-          <span class="app-nav-icon">🔐</span>
-          <span>Change Password</span>
-        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
-          <span class="app-nav-icon">🧪</span>
-          <span>Multi-Subject CBT</span>
-<a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">⚙️</span>
           <span>Academic Setup</span>
         </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
@@ -191,9 +181,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
           <span class="app-nav-icon">💰</span>
           <span>Fees</span>
-        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
-          <span class="app-nav-icon">🧾</span>
-          <span>Payment History</span>
         </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Timetable</span>
@@ -263,9 +250,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">📝</span>
           <span>Admissions</span>
-        </a><a href="exam_registrations.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
-          <span class="app-nav-icon">🎓</span>
-          <span>Exam Registrations</span>
         </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">🎓</span>
           <span>Promotion</span>
@@ -440,8 +424,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div class="app-content">
       <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:14px"><b>👀 See samples first:</b> <a href="samples/sample-report-card.html" target="_blank">Report Card</a> · <a href="samples/sample-class-broadsheet.html" target="_blank">Class Broadsheet</a> · <a href="samples/sample-subject-broadsheet.html" target="_blank">Subject Broadsheet</a> · <a href="samples/sample-e-receipt.html" target="_blank">Fee E-Receipt</a></div>
       
-      <div class="card" style="margin-bottom:16px" data-family-only><h3 style="margin-top:0">🔒 Read-only Report Cards</h3><p style="color:var(--gray-600);margin:0">Parents can only print/view report cards for their linked children. Students can only print/view their own report card. Score entry, broadsheets and subject scoresheets are staff-only.</p></div>
-      <div class="card" style="margin-bottom:16px" data-staff-only>
+      <div class="card" style="margin-bottom:16px">
         <p style="color:var(--gray-600);margin:0 0 12px">Build a report card with <strong>fully custom columns</strong>
         (e.g. CA1, CA2, Assignment, Project, Exam). Apportion a maximum mark to each column, then enter scores.
         Columns marked <em>From CBT</em> are filled automatically when students take the matching online exam.</p>
@@ -454,7 +437,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <button class="btn btn-primary" onclick="RC.load()">Load / Build</button>
       </div>
       <div id="rc-cols" data-staff-only></div>
-      <div id="rc-grid" data-staff-only></div>
+      <div id="rc-grid"></div>
       <div class="card" style="margin-top:16px">
         <h3>📄 Step 4 · Generate outputs</h3>
         <p style="color:var(--gray-600);font-size:.9rem">Generate printable termly outputs from the recorded scores (all subjects).</p>
@@ -497,8 +480,6 @@ const RC = {
   async init(){ if(!sb)return; try{ const [cls,sub,term,ses]=await Promise.all([sb.from('classes').select('name').order('name'),sb.from('subjects').select('name').order('name'),sb.from('lookups').select('value').eq('kind','term').order('position'),sb.from('lookups').select('value').eq('kind','session').order('position')]); const fill=(id,data,k)=>{const el=document.getElementById(id);if(el)el.innerHTML='<option value="">— select —</option>'+(data||[]).map(r=>'<option value="'+esc(r[k])+'">'+esc(r[k])+'</option>').join('');}; fill('rc-class',cls.data,'name'); fill('rc-subject',sub.data,'name'); fill('rc-term',term.data,'value'); fill('rc-session',ses.data,'value'); }catch(e){} },
   ctxVals(){ return { class:document.getElementById('rc-class').value.trim(), subject:document.getElementById('rc-subject').value.trim(), term:document.getElementById('rc-term').value.trim(), session:document.getElementById('rc-session').value.trim() }; },
   async load(){
-    const role=String((window.SC_PROFILE&&SC_PROFILE.role)||(window.App&&App.currentRole)||'').toLowerCase();
-    if(role==='parent'||role==='student'){ toast('Report cards are read-only for your role. Use Student Report Card below.','info',6000); return; }
     if(!sb){ toast('Database not configured.','warning'); return; }
     this.ctx=this.ctxVals();
     if(!this.ctx.class||!this.ctx.subject){ toast('Enter class and subject.','warning'); return; }
@@ -588,13 +569,61 @@ const RC = {
 }; document.addEventListener('DOMContentLoaded',()=>RC.init()); RC.init();
 </script>
 <script>
-// School Connect v3: high-fidelity exports from Report Cards page.
+// School Connect v10: high-fidelity, family-safe Report Cards.
 (function(){
-  if(!window.ReportEngine || !window.RC) return;
+  if(!window.RC) return;
+  const adminRoles=['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher'];
+  RC.role=function(){return String((window.SC_PROFILE&&SC_PROFILE.role)||(window.App&&App.currentRole)||'').toLowerCase().replace(/\s+/g,'_');};
+  RC.familyMode=function(){return ['parent','student'].includes(this.role());};
   RC._reportCtx = function(){ return { class:document.getElementById('rc-class').value, subject:document.getElementById('rc-subject').value, term:document.getElementById('rc-term').value, session:document.getElementById('rc-session').value, student:document.getElementById('rc-student').value }; };
-  RC.reportCard = async function(){ const c=this._reportCtx(); try{ const role=String((window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase(); if(role==='student'){ const st=await sb.from('students').select('full_name,class').eq('user_id',SC_PROFILE.id).maybeSingle(); if(st.data){ c.student=st.data.full_name; c.class=c.class||st.data.class; } } if(role==='parent'){ const links=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id); const ids=(links.data||[]).map(x=>x.student_id); const kids=ids.length?(await sb.from('students').select('full_name,class').in('id',ids)).data||[]:[]; if(!kids.some(k=>String(k.full_name).toLowerCase()===String(c.student).toLowerCase())){ if(kids[0]){ c.student=kids[0].full_name; c.class=c.class||kids[0].class; } else { toast('No child linked to this parent account.','warning'); return; } } } if(!c.student){toast('Enter/select a student name for report card.','warning');return;} ReportEngine.init(sb); const html=await ReportEngine.renderStudent(c); ReportEngine.print('Student Report Card — '+c.student, html, false);}catch(e){toast(e.message||String(e),'danger',6000);} };
-  RC.broadsheet = async function(){ const c=this._reportCtx(); if(!c.class){toast('Select a class.','warning');return;} try{ReportEngine.init(sb); const html=await ReportEngine.renderClass(c); ReportEngine.print('Class Broadsheet — '+c.class, html, true);}catch(e){toast(e.message||String(e),'danger',6000);} };
-  RC.scoresheet = async function(){ const c=this._reportCtx(); if(!c.class||!c.subject){toast('Select class and subject.','warning');return;} try{ReportEngine.init(sb); const html=await ReportEngine.renderSubject(c); ReportEngine.print('Subject Broadsheet — '+c.subject, html, true);}catch(e){toast(e.message||String(e),'danger',6000);} };
+  RC._oldLoad=RC.load;
+  RC._oldSaveScore=RC.saveScore;
+  RC.load=function(){ if(this.familyMode()){ toast('Report cards are read-only for parents/students. Use the “Generate my report card” button only.','warning',6500); return; } return this._oldLoad(); };
+  RC.saveScore=function(){ if(this.familyMode()){ toast('Read-only: parents/students cannot edit report cards.','warning'); return; } return this._oldSaveScore.apply(this,arguments); };
+  RC.applyFamilyMode=async function(){
+    const r=this.role(); if(!['parent','student'].includes(r)) return;
+    const cols=document.getElementById('rc-cols'), grid=document.getElementById('rc-grid'); if(cols)cols.style.display='none'; if(grid)grid.style.display='none';
+    document.querySelectorAll('[data-staff-only], #rc-class, #rc-subject').forEach(el=>{ if(el.tagName==='INPUT'||el.tagName==='SELECT'||el.tagName==='BUTTON') el.disabled=true; else el.style.display='none'; });
+    let host=document.getElementById('rc-family-safe');
+    if(!host){
+      host=document.createElement('div'); host.id='rc-family-safe'; host.className='card'; host.style.cssText='margin-bottom:16px;border-left:5px solid var(--primary)';
+      const app=document.querySelector('.app-content'); if(app) app.insertBefore(host, app.firstElementChild&&app.firstElementChild.nextSibling);
+    }
+    if(r==='student'){
+      let st=null; try{ const res=await sb.from('students').select('id,full_name,class,admission_no').eq('user_id',SC_PROFILE.id).maybeSingle(); st=res.data; }catch(_){ }
+      if(!st){ host.innerHTML='<h3>🧾 My Report Card</h3><p>Your login is not linked to a student record yet. Ask the school admin to link your student profile.</p>'; return; }
+      document.getElementById('rc-student').value=st.full_name; document.getElementById('rc-class').value=st.class||'';
+      host.innerHTML='<h3>🧾 My Report Card — Read Only</h3><p>Student: <b>'+esc(st.full_name)+'</b> · '+esc(st.class||'')+'</p><button class="btn btn-primary" onclick="RC.reportCard()">Generate my report card</button>';
+    }
+    if(r==='parent'){
+      let kids=[]; try{ const links=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id); const ids=(links.data||[]).map(x=>x.student_id).filter(Boolean); if(ids.length){ const res=await sb.from('students').select('id,full_name,class,admission_no').in('id',ids); kids=res.data||[]; } }catch(_){ }
+      if(!kids.length){ host.innerHTML='<h3>🧾 Children Report Cards</h3><p>No child is linked to this parent account yet.</p>'; return; }
+      host.innerHTML='<h3>🧾 Children Report Cards — Read Only</h3><p>Select one of your linked children. You cannot view or edit any other student\'s report card.</p><select class="form-select" id="rc-child-safe">'+kids.map(k=>'<option value="'+esc(k.full_name)+'" data-class="'+esc(k.class||'')+'">'+esc(k.full_name)+' — '+esc(k.class||'')+'</option>').join('')+'</select><button class="btn btn-primary" style="margin-top:10px" onclick="var s=document.getElementById(\'rc-child-safe\');document.getElementById(\'rc-student\').value=s.value;document.getElementById(\'rc-class\').value=s.selectedOptions[0].dataset.class||\'\';RC.reportCard()">Generate child report card</button>';
+      document.getElementById('rc-student').value=kids[0].full_name; document.getElementById('rc-class').value=kids[0].class||'';
+    }
+  };
+  RC.reportCard = async function(){
+    const c=this._reportCtx(); try{
+      const role=this.role();
+      if(role==='student'){
+        const st=await sb.from('students').select('full_name,class').eq('user_id',SC_PROFILE.id).maybeSingle();
+        if(!st.data){ toast('Your account is not linked to a student record.','warning'); return; }
+        c.student=st.data.full_name; c.class=c.class||st.data.class;
+      }
+      if(role==='parent'){
+        const links=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id); const ids=(links.data||[]).map(x=>x.student_id).filter(Boolean);
+        const kids=ids.length?(await sb.from('students').select('full_name,class').in('id',ids)).data||[]:[];
+        if(!kids.length){ toast('No child linked to this parent account.','warning'); return; }
+        if(!kids.some(k=>String(k.full_name).toLowerCase()===String(c.student).toLowerCase())){ toast('Access denied: you can only view your linked children.','danger',7000); return; }
+        const k=kids.find(k=>String(k.full_name).toLowerCase()===String(c.student).toLowerCase()); c.class=c.class||k.class;
+      }
+      if(!c.student){toast('Enter/select a student name for report card.','warning');return;}
+      ReportEngine.init(sb); const html=await ReportEngine.renderStudent(c); ReportEngine.print('Student Report Card — '+c.student, html, false);
+    }catch(e){toast(e.message||String(e),'danger',6000);}
+  };
+  RC.broadsheet = async function(){ if(this.familyMode()){toast('Broadsheets are staff-only.','warning');return;} const c=this._reportCtx(); if(!c.class){toast('Select a class.','warning');return;} try{ReportEngine.init(sb); const html=await ReportEngine.renderClass(c); ReportEngine.print('Class Broadsheet — '+c.class, html, true);}catch(e){toast(e.message||String(e),'danger',6000);} };
+  RC.scoresheet = async function(){ if(this.familyMode()){toast('Scoresheets are staff-only.','warning');return;} const c=this._reportCtx(); if(!c.class||!c.subject){toast('Select class and subject.','warning');return;} try{ReportEngine.init(sb); const html=await ReportEngine.renderSubject(c); ReportEngine.print('Subject Broadsheet — '+c.subject, html, true);}catch(e){toast(e.message||String(e),'danger',6000);} };
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>RC.applyFamilyMode(),900)); setTimeout(()=>RC.applyFamilyMode(),1500);
 })();
 </script>
 </body></html>

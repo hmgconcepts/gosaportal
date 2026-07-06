@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Public Examination Registration • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — public examination registration form.">
+<link rel="icon" type="image/png" href="assets/img/logo.png"><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="assets/css/style.css">
+<style>:root{--primary:#0506ae;--accent:#964eec;--gradient:linear-gradient(135deg,#0506ae,#964eec)}body{background:#f8fafc}.pub-wrap{max-width:860px;margin:0 auto;padding:22px}.pub-hero{background:var(--gradient);color:#fff;border-radius:24px;padding:28px;display:flex;gap:18px;align-items:center}.pub-hero img{width:74px;height:74px;border-radius:18px;background:#fff;object-fit:contain}.pub-hero h1{margin:0;color:#fff}.pub-hero p{margin:6px 0 0;opacity:.92}.req{color:#dc2626}.success-box{background:#ecfdf5;border:1px solid #86efac;color:#166534;border-radius:16px;padding:18px}</style>
+</head><body>
+<main class="pub-wrap">
+  <section class="pub-hero"><img src="assets/img/logo.png" alt=""><div><h1>Examination Registration</h1><p>Register for external/school examinations without needing a portal account. The school examination officer will review and extract your details.</p></div></section>
+  <div class="card" style="margin-top:18px">
+    <h2 style="margin-top:0">Candidate Details</h2>
+    <p style="color:var(--gray-600)">Fields marked <span class="req">*</span> are required. This free form saves directly to the school portal for staff export to CSV/PDF.</p>
+    <div class="grid grid-2">
+      <div class="form-group"><label>Examination <span class="req">*</span></label><select class="form-select" id="er-exam"><option>WAEC SSCE</option><option>NECO SSCE</option><option>UTME (JAMB)</option><option>IGCSE (Cambridge)</option><option>Common Entrance (NCEE)</option><option>BECE (Junior WAEC)</option><option>GCE (private)</option><option>Other</option></select></div>
+      <div class="form-group"><label>Candidate full name <span class="req">*</span></label><input class="form-input" id="er-name" autocomplete="name"></div>
+      <div class="form-group"><label>Class / level</label><input class="form-input" id="er-class" placeholder="e.g. SSS3"></div>
+      <div class="form-group"><label>Date of birth</label><input type="date" class="form-input" id="er-dob"></div>
+      <div class="form-group"><label>Gender</label><select class="form-select" id="er-gender"><option value="">— select —</option><option>Male</option><option>Female</option></select></div>
+      <div class="form-group"><label>Parent/Guardian phone <span class="req">*</span></label><input class="form-input" id="er-phone" inputmode="tel"></div>
+      <div class="form-group"><label>Email</label><input type="email" class="form-input" id="er-email"></div>
+      <div class="form-group"><label>Amount paid / deposit</label><input type="number" class="form-input" id="er-amount" min="0" step="0.01"></div>
+    </div>
+    <div class="form-group"><label>Subjects / papers <span class="req">*</span></label><textarea class="form-input" id="er-subjects" rows="3" placeholder="English, Mathematics, Physics..."></textarea></div>
+    <div class="form-group"><label>Additional notes</label><textarea class="form-input" id="er-notes" rows="2"></textarea></div>
+    <button class="btn btn-primary btn-lg" onclick="ExamReg.submit()">Submit Registration</button>
+    <a class="btn btn-outline" href="index.html">Back to home</a>
+    <div id="er-out" style="margin-top:14px"></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="assets/js/config.js"></script>
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+const ExamReg={
+  v:id=>document.getElementById(id).value.trim(),
+  async submit(){
+    const out=document.getElementById('er-out'); if(!window.sb){out.innerHTML='<p class="toast toast-warning">Database not configured.</p>';return;}
+    const name=this.v('er-name'), phone=this.v('er-phone'), subjects=this.v('er-subjects');
+    if(!name||!phone||!subjects){out.innerHTML='<p style="color:#dc2626">Please fill candidate name, phone and subjects.</p>';return;}
+    const data={exam_type:this.v('er-exam'),candidate_name:name,class:this.v('er-class'),date_of_birth:this.v('er-dob'),gender:this.v('er-gender'),phone,email:this.v('er-email'),subjects,notes:this.v('er-notes'),anonymous:true,submitted_from:'public_exam_register'};
+    const amount=Number(this.v('er-amount'))||0;
+    const row={module:'exam_registrations',title:data.exam_type+' — '+name,body:subjects,status:'submitted',amount,data,source:'public'};
+    const {error}=await sb.from('module_records').insert(row);
+    if(error){out.innerHTML='<p style="color:#dc2626">Could not submit: '+esc(error.message)+'</p>';return;}
+    out.innerHTML='<div class="success-box"><b>✅ Registration submitted.</b><br>Your details have been sent to the examination officer. Keep this name/reference: <b>'+esc(name)+'</b>.</div>';
+    document.querySelectorAll('input,textarea').forEach(x=>x.value='');
+  }
+};
+</script>
+</body></html>

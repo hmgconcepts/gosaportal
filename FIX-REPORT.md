@@ -239,3 +239,33 @@ Every defect above was fixed **at the source (generator)**, not just on the demo
 | End-to-end generator build (headless) | logo missing, abs URLs, no offline.html, 95-URL sitemap | all green (see §5.7) |
 
 *Next step: send me the bugs you came across and I'll address them against this fixed baseline.*
+
+---
+
+## 2026-07-06 Additional expert audit fixes
+
+### GOSA-429 — `report-cards.html` was a GitHub 429 error page
+- Replaced the corrupted 199-byte `report-cards.html` with the actual branded Report Cards page.
+- The page now loads the portal shell, `report-engine.js`, Supabase config, notifications, role navigation and document-printing controls.
+- Confirmed no repository file still contains `429: Too Many Requests` or GitHub scraping warning text.
+
+### GOSA-PWA — Notification click default path
+- Changed the service-worker notification-click fallback from `/` to `./` so sub-path/project deployments open the portal root correctly.
+
+### GOSA-HDR — Camera policy for QR scanning
+- Updated `_headers` from `camera=()` to `camera=(self)` so QR/check-in/ID-card camera workflows are not blocked on Cloudflare Pages/Netlify.
+
+### GOSA-GEN — Aligned bundled generator copies
+- Updated the included `generator.js` copies to the fixed generator version so stale generator code is not accidentally reused.
+
+---
+
+## 2026-07-06 V10 user-discovered issue fixes applied to generated GoSA portal
+
+- Added dropdown de-duplication runtime and stronger CRUD option de-duplication.
+- Updated CBT exam page/runtime/database scripts for multi-subject subject tabs, exact randomised-question grading and 400+ candidate retry/cache/queue hardening.
+- Rebuilt Messaging Centre with multi-select recipients, Select All/Clear and real recipient Inbox delivery.
+- Updated Report Cards page to enforce read-only student/parent views and linked-child-only access.
+- Added public anonymous `exam-register.html` and fixed `exam_registrations.html` heading to “Examination”.
+- Updated birthday import logic for students, staff and parents without duplicate birthday rows in a single import run.
+- Aligned generator/runtime copies with fixed School Connect generator.

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>External Exam Registrations • God of Seed Academy</title>
-<meta name="description" content="God of Seed Academy — Inventory &amp; Assets. Free school management platform by HMG Concepts.">
+<meta name="description" content="God of Seed Academy — Examination. Free school management platform by HMG Concepts.">
 <meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-<meta property="og:title" content="Inventory &amp; Assets • God of Seed Academy">
+<meta property="og:title" content="Examination • God of Seed Academy">
 <meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
@@ -427,7 +427,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   <main class="app-main">
     <header class="app-topbar">
       <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
-      <h1 class="app-page-title">Inventory &amp; Assets</h1>
+      <h1 class="app-page-title">Examination</h1>
       <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
         
         <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
@@ -456,7 +456,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <button class="btn btn-primary" onclick="CRUD.openForm('exam_registrations')" data-staff-only>+ Add new</button>
         <button class="btn btn-outline" onclick="CRUD.renderList('exam_registrations')">↻ Refresh</button>
         <button class="btn btn-outline" onclick="CRUD.exportCSV('exam_registrations')" data-staff-only>⬇ Export CSV</button>
-        <button class="btn btn-outline" onclick="CRUD.exportPDF('exam_registrations')" data-staff-only>📄 Export PDF</button>
+        <button class="btn btn-outline" onclick="CRUD.exportPDF('exam_registrations')" data-staff-only>📄 Export PDF</button><a class="btn btn-primary" href="exam-register.html" target="_blank" data-staff-only>🌐 Public candidate registration form</a>
         <button class="btn btn-outline" onclick="CRUD.importCSV('exam_registrations')" data-admin-only>⬆ Import CSV</button>
         
         

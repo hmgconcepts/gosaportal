@@ -55,7 +55,7 @@ self.addEventListener('push', e => {
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || '/';
+  const url = (e.notification.data && e.notification.data.url) || './';
   e.waitUntil(clients.matchAll({ type: 'window' }).then(list => {
     for (const c of list) { if (c.url.includes(url)) return c.focus(); }
     return clients.openWindow(url);

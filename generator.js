@@ -15,13 +15,27 @@ const Generator = {
   // Cache for loaded file contents
   _cache: {},
 
+  /** Detect proxy/GitHub/host error documents that must never be bundled as app files. */
+  isBadRemoteContent(text) {
+    const s = String(text || '').slice(0, 500).toLowerCase();
+    return s.includes('429: too many requests') ||
+      s.includes('for more on scraping github') ||
+      s.includes('rate limit exceeded') ||
+      s.includes('<title>too many requests</title>') ||
+      s.includes('<title>not found</title>') ||
+      s.includes('404: not found');
+  },
+
   /** Load a file from the local filesystem (builder runs from the same origin). */
   async loadFile(path) {
     if (Generator._cache[path]) return Generator._cache[path];
     try {
-      const res = await fetch(path);
+      const res = await fetch(path, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status} for ${path}`);
       const text = await res.text();
+      if (Generator.isBadRemoteContent(text)) {
+        throw new Error(`Refusing to bundle host error document from ${path}`);
+      }
       Generator._cache[path] = text;
       return text;
     } catch (e) {
@@ -70,7 +84,7 @@ const Generator = {
       timetable_generator: 'timetable-generator.html',
       student_profile: 'student-profile.html',
       verify_certificate: 'verify-certificate.html',
-      feature_guide: 'feature-guide.html', profile: 'profile.html', 'change-password': 'change-password.html'
+      feature_guide: 'feature-guide.html', profile: 'profile.html', change_password: 'change-password.html', 'change-password': 'change-password.html', cbt_multi: 'cbt-multi.html', 'cbt-multi': 'cbt-multi.html', payment_history: 'payment-history.html', 'payment-history': 'payment-history.html'
     };
     return map[id] || (id + '.html');
   },
@@ -106,8 +120,17 @@ const Generator = {
       font:          config.font         || { id: 'inter', family: 'Inter', css: 'Inter' },
       fontId:        config.fontId       || 'inter',
       logoExt:       config.logoExt      || 'svg',
+      logoData:      config.logoData     || '',
       campuses:      config.campuses     || [],
       hmgLink:       config.hmgLink      || 'https://hmgconcepts.pages.dev/',
+      // FIX C-03: address/phone/email/currency/siteUrl were collected by the
+      // wizard but dropped here, so every generated config.js shipped with
+      // empty contact details (see gosaportal: address:'', phone:'', email:'').
+      address:       config.address      || '',
+      phone:         config.phone        || '',
+      email:         config.email        || '',
+      currency:      config.currency     || '₦',
+      siteUrl:       config.siteUrl      || '',
       modules:       Array.isArray(config.modules) ? config.modules : []
     };
 
@@ -130,7 +153,7 @@ const Generator = {
     // ---- 2b. Load specialised page templates when available ----
     // These pages have richer workflows than generic CRUD pages (CBT taking,
     // certificate printing, admissions links, inbox workflow and teacher overview).
-    const specialIds = ['apply','student-profile','cbt','cbt-prompts','cbt-exam','certificates','admissions','entrance','teacher-overview','inbox','messages','notifications','voting','academic_records','report-cards','idcards','analytics','academic_setup','apply','profile','change-password','cbt-multi'];
+    const specialIds = ['payment-history', 'cbt','cbt-prompts','cbt-exam','certificates','admissions','entrance','teacher-overview','inbox','messages','notifications','voting','academic_records','report-cards','idcards','analytics','academic_setup','apply','exam-register','profile','change-password','cbt-multi'];
     const staticPages = {};
     for (const sid of specialIds) {
       try {
@@ -173,11 +196,29 @@ const Generator = {
       'database/enhancements-schema.sql',
       'database/update-v1-schema.sql',
       'database/update-v2-schema.sql',
-      'database/update-v4-schema.sql'
+      'database/update-v4-schema.sql',
+      'database/update-v6-schema.sql',
+      'database/update-v8-schema.sql',
+      'database/update-v9-schema.sql',
+      'database/update-v11-schema.sql'
     ];
     const sqlContents = {};
     for (const f of sqlFiles) {
       sqlContents[f] = await Generator.loadFile(f);
+    }
+
+    // ---- 5b. Fetch CSV templates/sample banks ----
+    // FIX C-02: students.html links to "students_import_template.csv" and the
+    // CBT pages reference the sample question banks, but earlier builds never
+    // put the CSVs in the ZIP — the download buttons 404'd on client sites.
+    const csvFiles = [
+      'database/students_import_template.csv',
+      'database/sample-question-bank.csv',
+      'database/sample-questions.csv'
+    ];
+    const csvContents = {};
+    for (const f of csvFiles) {
+      csvContents[f] = await Generator.loadFile(f);
     }
 
     // ---- 6. Generate all JS files ----
@@ -220,12 +261,14 @@ const Generator = {
       { id: 'about',              name: 'About',               fn: () => T.modulePage(resolvedConfig, 'about', { noShell: true }) },
       { id: 'contact',            name: 'Contact',             fn: () => T.modulePage(resolvedConfig, 'contact', { noShell: true }) },
       { id: 'apply',              name: 'Apply',               fn: () => staticPages['apply'] || T.modulePage(resolvedConfig, 'apply', { noShell: true }) },
+      { id: 'exam-register',      name: 'Exam Registration',   fn: () => staticPages['exam-register'] || T.modulePage(resolvedConfig, 'exam_registrations', { noShell: true }) },
       { id: 'profile',            name: 'My Profile',          fn: () => staticPages['profile'] || Generator.fallbackPage('profile') },
       { id: 'change-password',    name: 'Change Password',     fn: () => staticPages['change-password'] || Generator.fallbackPage('change-password') },
       { id: 'notifications',      name: 'Notifications',       fn: () => staticPages['notifications'] || T.modulePage(resolvedConfig, 'notifications', { requireRole: 'all' }) },
       { id: 'developer',          name: 'Developer',           fn: () => T.modulePage(resolvedConfig, 'developer', { requireRole: 'all' }) },
       { id: 'voting',             name: 'Voting & Polls',      fn: () => staticPages['voting'] || T.voting(resolvedConfig) },
       { id: 'timetable-generator',name: 'Auto-Timetable',      fn: () => T.modulePage(resolvedConfig, 'timetable-generator') },
+      { id: 'payment-history',    name: 'Payment History',     fn: () => staticPages['payment-history'] || Generator.fallbackPage('payment-history') },
     ];
 
     for (const p of dedicatedPages) {
@@ -274,8 +317,11 @@ const Generator = {
 
     // ---- 14. PWA assets ----
     zip.file('manifest.json', Generator.generateManifest(resolvedConfig));
-    zip.file('sw.js', Generator.generateServiceWorker());
-    zip.file('robots.txt', Generator.generateRobots());
+    zip.file('sw.js', Generator.generateServiceWorker(resolvedConfig));
+    // FIX S-09: sw.js precaches ./offline.html but the generator never emitted
+    // it — the offline fallback silently failed. Now every ZIP contains it.
+    zip.file('offline.html', Generator.generateOfflinePage(resolvedConfig));
+    zip.file('robots.txt', Generator.generateRobots(resolvedConfig));
     zip.file('sitemap.xml', Generator.generateSitemap(resolvedConfig));
     zip.file('.nojekyll', '');
 
@@ -288,6 +334,22 @@ const Generator = {
       if (content) zip.file(f, Generator.schoolSQL ? Generator.schoolSQL(content, resolvedConfig) : content);
     }
 
+    // ---- 16a-1b. SAMPLE document templates (ENTERPRISE FINAL #4): report card,
+    // class broadsheet, subject broadsheet, e-receipt — so users see exactly
+    // what the printed documents look like before entering any data.
+    for (const sf of ['sample-report-card.html','sample-class-broadsheet.html','sample-subject-broadsheet.html','sample-e-receipt.html']) {
+      const sc2 = await Generator.loadFile('samples/' + sf);
+      if (sc2) zip.file('samples/' + sf, sc2);
+    }
+
+    // ---- 16a-2. CSV templates (root copy for the download button + database/ copies) ----
+    for (const [f, content] of Object.entries(csvContents)) {
+      if (content) zip.file(f, content);
+    }
+    if (csvContents['database/students_import_template.csv']) {
+      zip.file('students_import_template.csv', csvContents['database/students_import_template.csv']);
+    }
+
     // ---- 16b. Optional modern/full-stack SaaS scaffold ----
     if ((config.buildType || '').toLowerCase() === 'modern') {
       Generator.addModernScaffold(zip, resolvedConfig);
@@ -296,8 +358,29 @@ const Generator = {
     // ---- 17. README with setup instructions ----
     zip.file('README.md', Generator.generateREADME(resolvedConfig));
 
-    // ---- 18. Logo placeholder (SVG) ----
+    // ---- 18. Logo ----
+    // FIX L-01: The wizard stores the uploaded logo as a base64 data URL in
+    // config.logoData, but previous versions never wrote it into the ZIP —
+    // every generated page referenced assets/img/logo.<ext> which did not
+    // exist, producing a broken logo on the whole client site.
+    // Now: decode the uploaded logo and write it as assets/img/logo.<ext>.
+    // Always also include the generated SVG placeholder as a fallback.
     zip.file('assets/img/logo.svg', Generator.generateLogoSVG(resolvedConfig));
+    const logoData = config.logoData || resolvedConfig.logoData;
+    const logoExtOut = (resolvedConfig.logoExt || 'svg').toLowerCase();
+    if (logoData && /^data:image\//.test(logoData) && logoExtOut !== 'svg') {
+      try {
+        const base64 = logoData.split(',')[1] || '';
+        zip.file('assets/img/logo.' + logoExtOut, base64, { base64: true });
+      } catch (e) {
+        console.warn('[Generator] Could not embed uploaded logo:', e.message);
+      }
+    } else if (logoData && logoExtOut === 'svg' && /^data:image\/svg/.test(logoData)) {
+      try {
+        const b64 = logoData.split(',')[1] || '';
+        zip.file('assets/img/logo.svg', atob(b64));
+      } catch (e) { /* keep generated placeholder */ }
+    }
 
     console.log('[Generator] Build complete. ZIP entries:', Object.keys(zip.files).length);
     const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
@@ -314,7 +397,9 @@ const Generator = {
       .replace(/s\.admission_prefix := 'STD'/g, "s.admission_prefix := '" + acronym + "'")
       .replace(/s\.admission_prefix := 'SCH'/g, "s.admission_prefix := '" + acronym + "'")
       .replace(/coalesce\(s\.admission_prefix,'STD'\)/g, "coalesce(s.admission_prefix,'" + acronym + "')")
-      .replace(/coalesce\(s\.admission_prefix,'SCH'\)/g, "coalesce(s.admission_prefix,'" + acronym + "')");
+      .replace(/coalesce\(s\.admission_prefix,'SCH'\)/g, "coalesce(s.admission_prefix,'" + acronym + "')")
+      // ENTERPRISE V11 (issue 8): make the v11 row-backfill install the school acronym directly
+      .replace(/update public\.school_settings\s+set admission_prefix = v_default/g, "update public.school_settings set admission_prefix = '" + acronym + "'");
   },
 
   staticSimplePage(cfg, filename) {
@@ -323,15 +408,35 @@ const Generator = {
 
   /** Replace demo branding in copied specialised static pages. */
   sanitizeStaticPage(html, cfg) {
+    // FIX C-04/C-05: specialised static pages are copied from the generator's
+    // demo templates. They must be fully re-branded before they enter a client
+    // ZIP; otherwise pages such as report-cards.html can leak demo names,
+    // acronyms, colours, theme IDs, logo paths or HMG links. Also reject any
+    // accidental host/rate-limit document so a GitHub 429 page is never shipped.
+    if (Generator.isBadRemoteContent(html)) return '';
     const safeName = cfg.schoolName || 'School';
     const shortName = cfg.shortName || 'SC';
+    const primary = cfg.themePrimary || cfg.primary || '#4f46e5';
+    const accent = cfg.themeAccent || cfg.accent || '#06b6d4';
+    const themeId = cfg.themeId || 'default';
+    const fontId = cfg.fontId || (cfg.font && cfg.font.id) || 'inter';
+    const hmgLink = cfg.hmgLink || 'https://hmgconcepts.pages.dev/';
+    const ext = (cfg.logoExt || 'svg').toLowerCase();
+    const mime = ext === 'svg' ? 'image/svg+xml' : 'image/' + (ext === 'jpg' ? 'jpeg' : ext);
     return String(html || '')
+      .replace(/School Connect Demo School/g, safeName)
       .replace(/God of Seed Academy/g, safeName)
-      .replace(/GOSA/g, shortName)
-      .replace(/GoSA/g, shortName)
-      .replace(/assets\/img\/logo\.png/g, 'assets/img/logo.svg')
-      .replace(/type="image\/png" href="assets\/img\/logo\.svg"/g, 'type="image/svg+xml" href="assets/img/logo.svg"')
-      .replace(/logoExt: 'png'/g, "logoExt: 'svg'");
+      .replace(/\bSCD\b/g, shortName)
+      .replace(/\bGOSA\b/g, shortName)
+      .replace(/\bGoSA\b/g, shortName)
+      .replace(/#0506ae/gi, primary)
+      .replace(/#964eec/gi, accent)
+      .replace(/data-theme="theme15"/g, 'data-theme="' + themeId + '"')
+      .replace(/data-font="plusjakarta"/g, 'data-font="' + fontId + '"')
+      .replace(/https:\/\/hmgconcepts\.pages\.dev\//g, hmgLink)
+      .replace(/assets\/img\/logo\.(png|jpe?g|webp|svg)/g, 'assets/img/logo.' + ext)
+      .replace(/type="image\/(png|jpeg|webp|svg\+xml)"(\s+href="assets\/img\/logo\.)/g, 'type="' + mime + '"$2')
+      .replace(/logoExt: '(png|jpe?g|webp|svg)'/g, "logoExt: '" + ext + "'");
   },
 
   /** Generate the school-specific config.js */
@@ -354,6 +459,10 @@ window.SCHOOL = {
   theme: ${JSON.stringify({ id: cfg.themeId, primary: cfg.themePrimary, accent: cfg.themeAccent })},
   layout: ${JSON.stringify(cfg.layout)},
   font: ${JSON.stringify(cfg.font)},
+  address: ${JSON.stringify(cfg.address || '')},
+  phone: ${JSON.stringify(cfg.phone || '')},
+  email: ${JSON.stringify(cfg.email || '')},
+  siteUrl: ${JSON.stringify(cfg.siteUrl || '')},
   campuses: ${JSON.stringify(cfg.campuses || [])},
   hmgLink: ${JSON.stringify(cfg.hmgLink || 'https://hmgconcepts.pages.dev/')},
   logoExt: ${JSON.stringify(cfg.logoExt || 'svg')},
@@ -456,15 +565,25 @@ if (window.CRUD) CRUD.init(sb);
 
   /** Landing page content (index.html body) */
   indexContent(cfg) {
-    const theme = cfg.themePrimary;
+    // FIX X-01: school name/motto are now HTML-escaped everywhere they are
+    // interpolated (a name containing quotes or angle brackets previously
+    // produced broken/injectable markup on the landing page).
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const name = esc(cfg.schoolName);
+    const motto = esc(cfg.schoolMotto);
+    const contactBits = [
+      cfg.address ? `<li>📍 ${esc(cfg.address)}</li>` : '',
+      cfg.phone ? `<li>📞 <a href="tel:${esc(cfg.phone)}">${esc(cfg.phone)}</a></li>` : '',
+      cfg.email ? `<li>✉️ <a href="mailto:${esc(cfg.email)}">${esc(cfg.email)}</a></li>` : ''
+    ].join('');
     return `
-${Generator.bellAndBanner()}
+${Generator.bellAndBanner(cfg)}
 <div style="min-height:100vh;display:flex;flex-direction:column">
   <nav class="nav">
     <div class="nav-inner">
       <div class="nav-logo">
-        <img src="assets/img/logo.${cfg.logoExt || 'svg'}" alt="${cfg.schoolName}" onerror="this.style.display='none'">
-        <span>${cfg.schoolName}</span>
+        <img src="assets/img/logo.${cfg.logoExt || 'svg'}" alt="${name}" onerror="this.style.display='none'">
+        <span>${name}</span>
       </div>
       <ul class="nav-links">
         <li><a href="about.html">About</a></li>
@@ -480,8 +599,8 @@ ${Generator.bellAndBanner()}
 
   <div class="hero">
     <div class="hero-badge">🏫 Free &amp; Open Source</div>
-    <h1>Welcome to <span class="highlight">${cfg.schoolName}</span></h1>
-    <p class="hero-sub">${cfg.schoolMotto || 'A modern school management portal — built free with Supabase + GitHub Pages.'}</p>
+    <h1>Welcome to <span class="highlight">${name}</span></h1>
+    <p class="hero-sub">${motto || 'A modern school management portal — built free with Supabase + GitHub Pages.'}</p>
     <div class="hero-actions">
       <a href="login.html" class="btn-hero btn-hero-primary">🔐 Sign in to Portal</a>
       <a href="apply.html" class="btn-hero btn-hero-secondary">📝 Apply for Admission</a>
@@ -511,8 +630,9 @@ ${Generator.bellAndBanner()}
   <div class="footer">
     <div class="footer-grid">
       <div class="footer-brand">
-        <h4>${cfg.schoolName}</h4>
-        <p>${cfg.schoolMotto || 'Built with School Connect by HMG Concepts.'}</p>
+        <h4>${name}</h4>
+        <p>${motto || 'Built with School Connect by HMG Concepts.'}</p>
+        ${contactBits ? `<ul style="list-style:none;padding:0;margin-top:10px">${contactBits}</ul>` : ''}
       </div>
       <div>
         <h5>Quick Links</h5>
@@ -539,14 +659,17 @@ ${Generator.bellAndBanner()}
       </div>
     </div>
     <div class="footer-bottom">
-      © ${new Date().getFullYear()} ${cfg.schoolName} · Built with <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" style="color:#94a3b8">School Connect by HMG Concepts</a>
+      © ${new Date().getFullYear()} ${name} · Built with <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" style="color:#94a3b8">School Connect by HMG Concepts</a>
     </div>
   </div>
 </div>
 `;
   },
 
-  bellAndBanner() {
+  bellAndBanner(cfg) {
+    // FIX L-02: install banner previously hard-coded logo.svg even when the
+    // school logo is a PNG/JPG.
+    const logoExt = (cfg && cfg.logoExt) || 'svg';
     return `<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
   <span id="notif-badge" class="notif-badge" style="display:none">0</span>
@@ -554,7 +677,7 @@ ${Generator.bellAndBanner()}
 </div>
 <div id="pwa-install-banner" class="pwa-install">
   <div class="pwa-install-header">
-    <img src="assets/img/logo.svg" alt="" class="pwa-install-icon">
+    <img src="assets/img/logo.${logoExt}" alt="" class="pwa-install-icon">
     <div style="flex:1">
       <div class="pwa-install-title">📲 Install School Connect</div>
       <div class="pwa-install-msg">Get push notifications for messages and announcements.</div>
@@ -603,40 +726,59 @@ ${Generator.bellAndBanner()}
 
   /** Generate PWA manifest.json */
   generateManifest(cfg) {
+    // FIX M-01: start_url must be relative ('./index.html') so the PWA works when
+    // deployed under a sub-path (e.g. GitHub Pages project sites), and the icon
+    // must honour the uploaded logo extension (png/jpg/svg) instead of a
+    // hard-coded logo.svg that may not exist in the ZIP.
+    const logoExt = cfg.logoExt || 'svg';
+    const iconType = logoExt === 'svg' ? 'image/svg+xml' : 'image/' + (logoExt === 'jpg' ? 'jpeg' : logoExt);
+    const icons = logoExt === 'svg'
+      ? [{ src: 'assets/img/logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }]
+      : [
+          { src: 'assets/img/logo.' + logoExt, sizes: '192x192', type: iconType, purpose: 'any maskable' },
+          { src: 'assets/img/logo.' + logoExt, sizes: '512x512', type: iconType, purpose: 'any maskable' }
+        ];
     return JSON.stringify({
       name: cfg.schoolName,
       short_name: cfg.shortName || cfg.schoolName,
       description: (cfg.schoolMotto || 'School Management Portal') + ' — Powered by School Connect',
-      start_url: '/',
+      start_url: './index.html',
+      scope: './',
       display: 'standalone',
-      background_color: cfg.themePrimary || '#0f172a',
+      background_color: '#ffffff',
       theme_color: cfg.themePrimary || '#0f172a',
-      icons: [
-        { src: 'assets/img/logo.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' }
-      ]
+      icons: icons
     }, null, 2);
   },
 
   /** Generate service worker with proper offline caching */
-  generateServiceWorker() {
+  generateServiceWorker(cfg) {
+    // FIX S-08b: All URLs are now RELATIVE ('./...') instead of absolute
+    // ('/...') so the PWA works when hosted under a sub-path (GitHub Pages
+    // project sites — the deployment target the README recommends).
+    // The precache list also honours the uploaded logo extension and
+    // includes offline.html, and the cache name embeds the build date so
+    // every regenerated site invalidates stale caches.
+    const logoExt = (cfg && cfg.logoExt) || 'svg';
+    const stamp = new Date().toISOString().slice(0, 10);
     return `/**
  * School Connect — Service Worker v8
- * FIX S-08: Proper offline caching strategy (was: bare skipWaiting stub)
- * Caches: HTML, CSS, JS, fonts, images.
+ * Caches: HTML, CSS, JS, fonts, images. Offline fallback: offline.html.
  * Strategy: Cache-first for assets, network-first for HTML.
  */
-const CACHE_NAME = 'sc-v8';
+const CACHE_NAME = 'sc-v8-${stamp}';
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/login.html',
-  '/dashboard.html',
-  '/assets/css/style.css',
-  '/assets/js/config.js',
-  '/assets/js/app.js',
-  '/assets/js/crud.js',
-  '/assets/img/logo.svg',
-  '/manifest.json'
+  './',
+  './index.html',
+  './login.html',
+  './dashboard.html',
+  './offline.html',
+  './assets/css/style.css',
+  './assets/js/config.js',
+  './assets/js/app.js',
+  './assets/js/crud.js',
+  './assets/img/logo.${logoExt}',
+  './manifest.json'
 ];
 
 // Install: pre-cache shell assets
@@ -670,30 +812,41 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Navigation: network-first, fall back to cache
+  // Navigation: network-first WITH A 4-SECOND TIMEOUT (ENTERPRISE V8, issue 14:
+  // on slow/patchy networks the cached page is served instead of hanging),
+  // falling back to cache, then offline.html.
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request).then(res => {
-        const clone = res.clone();
+    event.respondWith((async () => {
+      const cached = await caches.match(request);
+      try {
+        const net = await Promise.race([
+          fetch(request),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('slow-network')), 4000))
+        ]);
+        const clone = net.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-        return res;
-      }).catch(() => caches.match('/index.html'))
-    );
+        return net;
+      } catch (e) {
+        if (cached) return cached;
+        return (await caches.match('./offline.html')) || (await caches.match('./index.html'));
+      }
+    })());
     return;
   }
 
-  // Assets: cache-first
+  // Assets: stale-while-revalidate (ENTERPRISE V8, issue 14) — serve the cached
+  // copy INSTANTLY on slow networks while refreshing it in the background.
   if (request.method === 'GET') {
     event.respondWith(
       caches.match(request).then(cached => {
-        if (cached) return cached;
-        return fetch(request).then(res => {
+        const refresh = fetch(request).then(res => {
           if (res.ok) {
             const clone = res.clone();
             caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
           }
           return res;
-        });
+        }).catch(() => cached);
+        return cached || refresh;
       })
     );
   }
@@ -705,14 +858,14 @@ self.addEventListener('push', event => {
     const data = event.data ? event.data.json() : {};
     const title = data.title || 'School Connect';
     const body = data.body || 'You have a new notification';
-    const icon = data.icon || '/assets/img/logo.svg';
-    const url = data.url || '/';
+    const icon = data.icon || './assets/img/logo.${logoExt}';
+    const url = data.url || './';
 
     event.waitUntil(
       self.registration.showNotification(title, {
         body,
         icon,
-        badge: '/assets/img/logo.svg',
+        badge: './assets/img/logo.${logoExt}',
         data: { url },
         requireInteraction: false,
         vibrate: [200, 100, 200]
@@ -726,7 +879,7 @@ self.addEventListener('push', event => {
 // Notification click handler
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const url = event.notification.data?.url || './';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
@@ -741,29 +894,75 @@ console.log('[SW] School Connect service worker loaded — v8');
 `;
   },
 
+  /** Generate offline.html fallback page (FIX S-09) */
+  /** Alias kept for verify.sh compatibility (pageOffline). */
+  pageOffline(cfg) { return Generator.generateOfflinePage(cfg); },
+
+  generateOfflinePage(cfg) {
+    const name = (cfg && cfg.schoolName) || 'School Connect';
+    const primary = (cfg && cfg.themePrimary) || '#4f46e5';
+    const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Offline • ${esc(name)}</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#f8fafc;color:#0f172a;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;text-align:center}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:40px 32px;max-width:420px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+h1{font-size:1.4rem;margin:12px 0 8px}
+p{color:#64748b;line-height:1.6}
+.icon{font-size:3rem}
+a{display:inline-block;margin-top:18px;background:${primary};color:#fff;text-decoration:none;padding:10px 22px;border-radius:10px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="icon">📡</div>
+  <h1>You are offline</h1>
+  <p>${esc(name)} could not be reached. Check your internet connection — pages you visited before are still available.</p>
+  <a href="./index.html" onclick="location.reload();return false">Try again</a>
+</div>
+</body>
+</html>`;
+  },
+
   /** Generate robots.txt */
-  generateRobots() {
+  generateRobots(cfg) {
+    // FIX R-01: "Disallow: /assets/js/*.js" blocked crawlers from rendering
+    // the site properly (Google needs JS/CSS access) and the wildcard pattern
+    // is non-standard. Also emit an absolute sitemap URL when known.
+    const base = (cfg && cfg.siteUrl) ? String(cfg.siteUrl).replace(/\/+$/, '') : '';
     return `User-agent: *
 Allow: /
-Disallow: /assets/js/*.js
 Disallow: /database/
 
-Sitemap: /sitemap.xml
+Sitemap: ${base ? base + '/sitemap.xml' : '/sitemap.xml'}
 `;
   },
 
   /** Generate sitemap.xml */
   generateSitemap(cfg) {
-    const base = 'https://yourschool.github.io'; // User replaces this
+    // FIX R-02: sitemap must only list PUBLIC pages with ABSOLUTE URLs.
+    // The previously deployed output listed 90+ private, auth-gated pages
+    // (dashboard, payroll, admin-data…) with relative <loc> values like
+    // "/students.html", which is invalid per the sitemap protocol and asks
+    // Google to index private pages. Use cfg.siteUrl when provided; fall
+    // back to a clearly-marked placeholder the deployer replaces once.
+    const base = ((cfg && cfg.siteUrl) ? String(cfg.siteUrl).replace(/\/+$/, '') : 'https://REPLACE-WITH-YOUR-DOMAIN.example');
+    const publicPages = [
+      { p: '/',                   cf: 'weekly',  pr: '1.0' },
+      { p: '/about.html',         cf: 'monthly', pr: '0.8' },
+      { p: '/contact.html',       cf: 'monthly', pr: '0.6' },
+      { p: '/apply.html',         cf: 'weekly',  pr: '0.8' },
+      { p: '/exam-register.html', cf: 'weekly',  pr: '0.7' },
+      { p: '/login.html',         cf: 'monthly', pr: '0.5' },
+      { p: '/feature-guide.html', cf: 'monthly', pr: '0.5' }
+    ];
     return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>${base}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>${base}/login.html</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>${base}/dashboard.html</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>${base}/about.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>${base}/contact.html</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>${base}/apply.html</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
-  <url><loc>${base}/feature-guide.html</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+${publicPages.map(u => `  <url><loc>${base}${u.p}</loc><changefreq>${u.cf}</changefreq><priority>${u.pr}</priority></url>`).join('\n')}
 </urlset>`;
   },
 
@@ -774,7 +973,7 @@ Sitemap: /sitemap.xml
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.supabase.io wss://*.supabase.co
 
 /_headers
@@ -862,7 +1061,9 @@ ${(Array.isArray(cfg.modules) ? cfg.modules : []).map(m => `- ${m.replace(/_/g, 
     zip.file('modern/README.md', '# '+cfg.schoolName+' Modern Full-Stack/SaaS Scaffold\n\nThis optional scaffold is additive. The traditional static PWA remains fully usable. Use this folder when you want a Next.js-style full-stack/SaaS wrapper with API routes, server-side environment variables, subscriptions/multi-tenant expansion and future billing integrations. No AI API is required.\n\nDeploy: copy the static portal into /public, set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY, then deploy to Vercel.');
     zip.file('modern/package.json', JSON.stringify({scripts:{dev:'next dev',build:'next build',start:'next start'},dependencies:{'@supabase/supabase-js':'latest','next':'latest','react':'latest','react-dom':'latest'},devDependencies:{}}, null, 2));
     zip.file('modern/app/page.jsx', "export default function Page(){return <main style={{padding:40,fontFamily:'system-ui'}}> <h1>"+cfg.schoolName+" SaaS Shell</h1><p>The static School Connect PWA lives in /public. Add tenant routing, server actions and billing here when needed.</p><a href='/index.html'>Open Portal</a></main>}");
-    zip.file('modern/app/api/health/route.js', "export async function GET(){return Response.json({ok:true, product:'School Connect SaaS scaffold'})}");
+    zip.file('modern/app/api/health/route.js', "export async function GET(){return Response.json({ok:true, product:'School Connect SaaS scaffold', time:new Date().toISOString()})}");
+    zip.file('modern/middleware.js', "import { NextResponse } from 'next/server';\nexport function middleware(req){ const res=NextResponse.next(); res.headers.set('X-Content-Type-Options','nosniff'); res.headers.set('Referrer-Policy','strict-origin-when-cross-origin'); return res; }\n");
+    zip.file('modern/app/api/tenant/route.js', "import { tenantFromHost } from '../../lib/tenant';\nexport async function GET(req){return Response.json({tenant:tenantFromHost(req.headers.get('host')), mode:'free-saas-ready'})}\n");
     zip.file('modern/.env.example', 'NEXT_PUBLIC_SUPABASE_URL=\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\nSUPABASE_SERVICE_ROLE_KEY=server-only-do-not-expose\nNEXT_PUBLIC_SAAS_MODE=true\n');
     zip.file('modern/lib/supabase-browser.js', "import { createClient } from '@supabase/supabase-js';\nexport const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);\n");
     zip.file('modern/lib/tenant.js', "export function tenantFromHost(host){ const h=(host||'').split(':')[0]; return h.split('.')[0] || 'default'; }\n");
