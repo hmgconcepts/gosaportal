@@ -130,7 +130,7 @@ const Notifications = {
         </div>`).join('');
     } catch (err) {
       console.warn('[Notifications] loadDropdownItems error:', err.message || err);
-      list.innerHTML = '<div class="toast-msg" style="padding:24px;text-align:center;color:var(--gray-500)">Could not load notifications.<br><small>' + esc(err.message || 'Check database connection') + '</small></div>';
+      list.innerHTML = '<div class="toast-msg" style="padding:24px;text-align:center;color:var(--gray-500)">Could not load notifications.<br><small>' + (typeof esc==='function'?esc:Notifications._esc)(err.message || 'Check database connection') + '</small></div>';
     }
   },
 
