@@ -970,7 +970,7 @@ const App = {
     if (this._dedupeObserver || typeof MutationObserver === 'undefined') return;
     let t = null;
     this._dedupeObserver = new MutationObserver(() => {
-      clearTimeout(t); t = setTimeout(() => App.dedupeAllSelects(), 80);
+      clearTimeout(t); t = setTimeout(() => App.dedupeAllSelects(), 30);
     });
     try { this._dedupeObserver.observe(document.documentElement || document.body, { childList:true, subtree:true }); } catch (_) {}
   },

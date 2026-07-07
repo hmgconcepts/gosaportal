@@ -1,5 +1,5 @@
 // ====================================================================
-// School Connect Gen v3 — Generated School Site Config
+// School Connect Gen v9 — Generated School Site Config
 // ====================================================================
 
 // Supabase credentials
@@ -29,10 +29,26 @@ window.SCHOOL = {
   logoExt: 'png',
   primary: '#0506ae',
   accent: '#964eec',
-  themeId: 'indigo',
+  themeId: 'theme15',
   campuses: [],
   hmgLink: 'https://hmgconcepts.pages.dev/',
   currency: '\u20A6'
 };
 
 console.log('[School Connect] Config loaded — Supabase: ' + window.SUPABASE_URL);
+
+// === Missing utility functions (FIX: added by audit) ===
+window.SC = window.SC || {};
+if (!window.SC.esc) {
+  window.SC.esc = function(s) {
+    return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  };
+}
+if (!window.SC.jsStr) {
+  window.SC.jsStr = function(s) { return JSON.stringify(String(s==null?'':s)); };
+}
+if (!window.SC.slugify) {
+  window.SC.slugify = function(s) { return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); };
+}
+if (!window.SC.THEMES) window.SC.THEMES = [];
+if (!window.SC.MODULES) window.SC.MODULES = [];

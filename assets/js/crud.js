@@ -232,10 +232,13 @@ const CRUD = {
       {key:'subject',label:'Subject',type:'text'},{key:'class',label:'Class',type:'text'},
       {key:'term',label:'Term',type:'text'},{key:'drive_link',label:'Drive link',type:'text'}
     ]},
-    birthdays: { table:'birthdays', title:'Birthday', cols:[
-      {key:'person_name',label:'Pick a student (auto-fills date & class)',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','date_of_birth'],refStore:'value',autofill:{date:'date_of_birth',class:'class'}},
-      {key:'type',label:'Type',type:'select',options:['student','staff','parent']},
-      {key:'date',label:'Date of birth',type:'date'},{key:'class',label:'Class',type:'text'}
+    birthdays: { table:'birthdays', title:'Birthday', help:'Track birthdays for students, staff AND parents. Change the Type dropdown to Student/Staff/Parent, then pick the person from the correct list or type their name manually.', cols:[
+      {key:'type',label:'Type (choose first — changes the person picker)',type:'select',options:['student','staff','parent'],required:true},
+      {key:'person_name',label:'Person name (or pick from list)',type:'text',required:true,help:'Type a name or use the picker below for auto-fill.'},
+      {key:'student_ref',label:'Pick Student (for student birthdays)',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','date_of_birth'],refStore:'value',autofill:{person_name:'full_name',date:'date_of_birth',class:'class'},help:'Only for student type — auto-fills name, DOB and class.'},
+      {key:'staff_ref',label:'Pick Staff (for staff birthdays)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['dob_day','dob_month','role'],refStore:'value',autofill:{person_name:'full_name'},help:'Only for staff type — auto-fills name.'},
+      {key:'parent_ref',label:'Pick Parent (for parent birthdays)',type:'ref',refTable:'parents',refValue:'full_name',refStore:'value',autofill:{person_name:'full_name'},help:'Only for parent type — auto-fills name.'},
+      {key:'date',label:'Date of birth',type:'date'},{key:'class',label:'Class / Role',type:'text'}
     ]},
     departments: { table:'departments', title:'Department', cols:[
       {key:'name',label:'Name',type:'text',required:true},{key:'head',label:'Head',type:'text'}
