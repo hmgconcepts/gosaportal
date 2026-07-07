@@ -476,8 +476,15 @@ const MSG={
         rows=(r.data||[]).map(x=>Object.assign({},x,{recipient_id:x.id}));
       }
       if(aud==='students'){
+        // Try students table first (has class, admission_no etc.)
         const r=await sb.from('students').select('id,user_id,full_name,email,guardian_phone,guardian_email,class,admission_no').limit(4000);
-        rows=(r.data||[]).map(x=>({id:x.id,recipient_id:x.user_id||'',full_name:(x.class?x.class+' · ':'')+x.full_name,email:x.email||x.guardian_email,phone:x.guardian_phone,admission_no:x.admission_no}));
+        rows=(r.data||[]).map(x=>({id:x.id,recipient_id:x.user_id||x.id,full_name:(x.class?x.class+' · ':'')+x.full_name,email:x.email||x.guardian_email,phone:x.guardian_phone,admission_no:x.admission_no}));
+        // Also include student profiles that may not be in the students register yet
+        try{
+          const p=await sb.from('profiles').select('id,full_name,email,phone,role').eq('role','student').limit(2000);
+          const existing=new Set(rows.map(x=>x.recipient_id));
+          (p.data||[]).forEach(x=>{ if(!existing.has(x.id)) rows.push({id:x.id,recipient_id:x.id,full_name:x.full_name,email:x.email,phone:x.phone}); });
+        }catch(_){}
       }
     }catch(e){ console.warn('Recipients load failed', e); }
     this.rows=this.dedupe(rows);
