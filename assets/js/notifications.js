@@ -109,17 +109,26 @@ const Notifications = {
     const list = document.getElementById('notif-list');
     if (!list) return;
     list.innerHTML = '<div class="toast-msg" style="padding:24px;text-align:center"><span class="pulse">Loading…</span></div>';
-    const items = await this.fetchRecent(10);
-    if (!items.length) {
-      list.innerHTML = '<div class="toast-msg" style="padding:24px;text-align:center">No notifications yet.</div>';
-      return;
+    try {
+      if (!this.sb) {
+        list.innerHTML = '<div class="toast-msg" style="padding:24px;text-align:center;color:var(--gray-500)">Connect to database to see notifications.<br><small>Add Supabase keys in config.js</small></div>';
+        return;
+      }
+      const items = await this.fetchRecent(10);
+      if (!items.length) {
+        list.innerHTML = '<div class="toast-msg" style="padding:24px;text-align:center">No notifications yet.</div>';
+        return;
+      }
+      list.innerHTML = items.map(n => `
+        <div class="notif-item" onclick="Notifications.openItem('${n.id}', '${String(n.url || '').replace(/'/g, "\'")}')">
+          <div class="notif-item-title">${esc(n.title)}</div>
+          <div class="notif-item-msg">${esc(n.body || '')}</div>
+          <div class="notif-item-time">${timeAgo(n.created_at)}</div>
+        </div>`).join('');
+    } catch (err) {
+      console.warn('[Notifications] loadDropdownItems error:', err.message || err);
+      list.innerHTML = '<div class="toast-msg" style="padding:24px;text-align:center;color:var(--gray-500)">Could not load notifications.<br><small>' + esc(err.message || 'Check database connection') + '</small></div>';
     }
-    list.innerHTML = items.map(n => `
-      <div class="notif-item" onclick="Notifications.openItem('${n.id}', '${String(n.url || '').replace(/'/g, "\'")}')">
-        <div class="notif-item-title">${esc(n.title)}</div>
-        <div class="notif-item-msg">${esc(n.body || '')}</div>
-        <div class="notif-item-time">${timeAgo(n.created_at)}</div>
-      </div>`).join('');
   },
 
   async openItem(id, url) {
