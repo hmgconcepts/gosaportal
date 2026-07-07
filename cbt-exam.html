@@ -238,7 +238,7 @@ function openModal(){} function closeModal(){}
 (function(){
  if(!window.Exam) return;
  Exam.subjectOf=function(q){ return (q && (q.section || q.subject || q.subject_section || q.exam_subject)) || 'General'; };
- Exam.sections=function(){ const seen=[]; this.qs().forEach(q=>{ const s=this.subjectOf(q); if(!seen.includes(s)) seen.push(s); }); return seen; };
+ Exam.sections=function(){ const seen=[]; this.qs().forEach(q=>{ const s=this.subjectOf(q); if(!seen.includes(s)) seen.push(s); }); console.log('[CBT] sections detected:', seen); return seen; };
  Exam.currentSubject=function(){ const q=this.qs()[this.idx]; return this.subjectOf(q); };
  Exam.indexesForSubject=function(sec){ const out=[]; this.qs().forEach((q,i)=>{ if(this.subjectOf(q)===sec) out.push(i); }); return out; };
  Exam.goSubject=function(sec){ const i=this.qs().findIndex(q=>this.subjectOf(q)===sec); if(i>=0){this.idx=i;this.render();} };
