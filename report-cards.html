@@ -541,7 +541,49 @@ const RC = {
     const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='report-'+this.ctx.class+'-'+this.ctx.subject+'.csv'; a.click();
   },
   /* ---- Issue 6: printable termly outputs (report card / broadsheet / scoresheet) ---- */
-  _print(title, html){ const w=window.open('','_blank'); if(!w){toast('Popup blocked! Please allow popups.','warning');return;} const sc=(window.SCHOOL||{}); const st=window.SC_SETTINGS||{}; const rawSig=localStorage.getItem('sc-signature-url')||st.signature_url||'', pn=localStorage.getItem('sc-principal-name')||st.principal_name||'Principal'; const sig=(window.Super&&Super.idcard&&Super.idcard.driveDirect)?Super.idcard.driveDirect(rawSig):rawSig; const sign=sig?'<div style="text-align:center;margin-top:28px"><img src="'+sig+'" referrerpolicy="no-referrer" style="max-width:150px;max-height:70px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><br><b>'+pn+'</b><br>Official Signature</div>':''; w.document.open(); w.document.write('<!DOCTYPE html><html><head><title>'+title+'</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"><style>body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;background:#fff}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px;text-align:left}th{background:#f1f5f9}h1,h2{margin:4px 0}.hd{text-align:center;border-bottom:3px solid '+(sc.themePrimary||'#4f46e5')+';padding-bottom:10px;margin-bottom:14px}</style></head><body><div class="hd"><h1>'+esc(sc.name||"School")+'</h1><p>'+esc(sc.motto||'')+'</p><h2>'+title+'</h2></div>'+html+sign+'<p style="margin-top:30px;font-size:11px;color:#94a3b8;text-align:center">Powered by HMG Concepts</p><script>setTimeout(()=>window.print(),500);<\/script></body></html>'); w.document.close(); w.focus(); },
+  _print(title, html){ const w=window.open('','_blank'); if(!w){toast('Popup blocked! Please allow popups.','warning');return;} const sc=(window.SCHOOL||{}); const st=window.SC_SETTINGS||{}; const rawSig=localStorage.getItem('sc-signature-url')||st.signature_url||'', pn=localStorage.getItem('sc-principal-name')||st.principal_name||'Principal'; const sig=(window.Super&&Super.idcard&&Super.idcard.driveDirect)?Super.idcard.driveDirect(rawSig):rawSig; const sign=sig?'<div style="text-align:center;margin-top:28px"><img src="'+sig+'" referrerpolicy="no-referrer" style="max-width:150px;max-height:70px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><br><b>'+pn+'</b><br>Official Signature</div>':''; w.document.open(); w.document.write('<!DOCTYPE html><html><head><title>'+title+'</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"><style>body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;background:#fff}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px;text-align:left}th{background:#f1f5f9}h1,h2{margin:4px 0}.hd{text-align:center;border-bottom:3px solid '+(sc.themePrimary||'#4f46e5')+';padding-bottom:10px;margin-bottom:14px}</style></head><body><div class="hd"><h1>'+esc(sc.name||"School")+'</h1><p>'+esc(sc.motto||'')+'</p><h2>'+title+'</h2></div>'+html+sign+'<p style="margin-top:30px;font-size:11px;color:#94a3b8;text-align:center">Powered by HMG Concepts</p><script>setTimeout(()=>window.print(),500);<\/script>
+<script>
+// ENTERPRISE V15/V7: server-scoped family report-card renderer.
+(function(){
+ if(!window.RC) return;
+ RC.familyReportRows = async function(studentId, term, session){
+   if(!studentId) throw new Error('No linked student selected.');
+   const res = await sb.rpc('get_family_report_card', { p_student_id: studentId, p_term: term || '', p_session: session || '' });
+   if(res.error) throw new Error(res.error.message || 'Could not load secured report card rows. Run database/reportcard-schema.sql.');
+   return res.data || [];
+ };
+ RC.printFamilyReport = async function(studentId, studentName, klass){
+   try{
+     const term=document.getElementById('rc-term').value||'', session=document.getElementById('rc-session').value||'';
+     const rows=await RC.familyReportRows(studentId, term, session);
+     const sc=window.SCHOOL||{}; const total=rows.reduce((a,r)=>a+Number(r.obtained||0),0), max=rows.reduce((a,r)=>a+Number(r.obtainable||0),0); const avg=max?((total/max)*100):0;
+     const html='<div class="report-sheet sample-report"><div class="head"><img class="logo" src="assets/img/logo.'+(sc.logoExt||'svg')+'" onerror="this.style.display=\'none\'"><div class="school"><h1>'+esc(sc.name||'School')+'</h1><p>'+esc(sc.address||'')+' · '+esc(sc.phone||'')+' · '+esc(sc.email||'')+'</p><p style="font-style:italic;color:#7c2d12">Motto: '+esc(sc.motto||'')+'</p></div><div class="photo">Student<br>Photo</div></div><div class="title">TERMINAL REPORT SHEET — '+esc(term||'TERM')+', '+esc(session||'SESSION')+'</div><table class="info"><tr><td><b>Name:</b> '+esc(studentName)+'</td><td><b>Class:</b> '+esc(klass||'')+'</td><td><b>Access:</b> Read-only family copy</td></tr></table><table class="scores" style="margin-top:8px"><thead><tr><th class="left">SUBJECT</th><th>OBTAINED</th><th>OBTAINABLE</th><th>%</th><th>GRADE</th><th>REMARK</th></tr></thead><tbody>'+ (rows.length?rows.map(r=>'<tr><td class="left">'+esc(r.subject||'')+'</td><td>'+Number(r.obtained||0).toFixed(1)+'</td><td>'+Number(r.obtainable||0).toFixed(1)+'</td><td>'+Number(r.percent||0).toFixed(1)+'%</td><td class="grade">'+esc(r.grade||'')+'</td><td>'+esc(r.remark||'')+'</td></tr>').join(''):'<tr><td colspan="6">No report-card scores found for this term/session.</td></tr>')+'</tbody></table><table class="info" style="margin-top:8px"><tr><td><b>Total Score:</b> '+total.toFixed(1)+' / '+max.toFixed(1)+'</td><td><b>Average:</b> '+avg.toFixed(1)+'%</td><td><b>Permission:</b> Read-only</td></tr></table><p class="note">Secured family report card — generated only for linked child/student account.</p></div>';
+     ReportEngine.init(sb); ReportEngine.print('Student Report Card — '+studentName, html, false);
+   }catch(e){ toast(e.message||String(e),'danger',8000); }
+ };
+ RC.applyFamilyMode = async function(){
+   const role=String((window.SC_PROFILE&&SC_PROFILE.role)||(window.App&&App.currentRole)||'').toLowerCase().replace(/\s+/g,'_');
+   if(!['parent','student'].includes(role)) return;
+   ['rc-cols','rc-grid'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display='none';});
+   document.querySelectorAll('#rc-cols input,#rc-cols button,#rc-grid input,#rc-grid button,[data-staff-only]').forEach(el=>{el.disabled=true; el.style.display='none';});
+   let host=document.getElementById('rc-family-safe'); if(!host){host=document.createElement('div');host.id='rc-family-safe';host.className='card';host.style.cssText='margin-bottom:16px;border-left:5px solid var(--primary)';const app=document.querySelector('.app-content'); if(app)app.insertBefore(host, app.firstElementChild&&app.firstElementChild.nextSibling);} 
+   if(role==='student'){
+     const res=await sb.from('students').select('id,full_name,class,admission_no').eq('user_id',SC_PROFILE.id).maybeSingle(); const st=res.data;
+     if(!st){host.innerHTML='<h3>🧾 My Report Card</h3><p>Your login is not linked to a student record yet.</p>';return;}
+     host.innerHTML='<h3>🧾 My Report Card — Read Only</h3><p><b>'+esc(st.full_name)+'</b> · '+esc(st.class||'')+'</p><button class="btn btn-primary" onclick="RC.printFamilyReport(\''+st.id+'\',\''+esc(st.full_name).replace(/'/g,'&#39;')+'\',\''+esc(st.class||'').replace(/'/g,'&#39;')+'\')">Generate my report card</button>';
+   } else {
+     const links=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id).then(r=>r,()=>({data:[]})); const ids=(links.data||[]).map(x=>x.student_id).filter(Boolean);
+     const kids=ids.length?(await sb.from('students').select('id,full_name,class,admission_no').in('id',ids)).data||[]:[];
+     if(!kids.length){host.innerHTML='<h3>🧾 Children Report Cards</h3><p>No child is linked to this parent account.</p>';return;}
+     host.innerHTML='<h3>🧾 Children Report Cards — Read Only</h3><p>Only linked children are listed. No write access is available.</p><select class="form-select" id="rc-child-safe">'+kids.map(k=>'<option value="'+esc(k.id)+'" data-name="'+esc(k.full_name)+'" data-class="'+esc(k.class||'')+'">'+esc(k.full_name)+' — '+esc(k.class||'')+'</option>').join('')+'</select><button class="btn btn-primary" style="margin-top:10px" onclick="var s=document.getElementById(\'rc-child-safe\');var o=s.selectedOptions[0];RC.printFamilyReport(s.value,o.dataset.name,o.dataset.class)">Generate child report card</button>';
+   }
+ };
+ const old=RC.reportCard; RC.reportCard=function(){ if(RC.familyMode&&RC.familyMode()){ const s=document.getElementById('rc-child-safe'); if(s){ const o=s.selectedOptions[0]; return RC.printFamilyReport(s.value,o.dataset.name,o.dataset.class); } return RC.applyFamilyMode(); } return old.apply(RC,arguments); };
+ document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>RC.applyFamilyMode(),1200)); setTimeout(()=>RC.applyFamilyMode(),1800);
+})();
+</script>
+
+</body></html>'); w.document.close(); w.focus(); },
   async reportCard(){ if(!sb){toast('Database not configured','warning');return;} const name=document.getElementById('rc-student').value.trim(); if(!name){toast('Enter a student name','warning');return;}
     const term=this.ctx.term||document.getElementById('rc-term').value, ses=this.ctx.session||document.getElementById('rc-session').value, cls=this.ctx.class||document.getElementById('rc-class').value;
     const {data}=await sb.from('report_subject_totals').select('*').eq('student_name',name).eq('term',term).eq('session',ses);
@@ -626,4 +668,46 @@ const RC = {
   document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>RC.applyFamilyMode(),900)); setTimeout(()=>RC.applyFamilyMode(),1500);
 })();
 </script>
+
+<script>
+// ENTERPRISE V15/V7: server-scoped family report-card renderer.
+(function(){
+ if(!window.RC) return;
+ RC.familyReportRows = async function(studentId, term, session){
+   if(!studentId) throw new Error('No linked student selected.');
+   const res = await sb.rpc('get_family_report_card', { p_student_id: studentId, p_term: term || '', p_session: session || '' });
+   if(res.error) throw new Error(res.error.message || 'Could not load secured report card rows. Run database/reportcard-schema.sql.');
+   return res.data || [];
+ };
+ RC.printFamilyReport = async function(studentId, studentName, klass){
+   try{
+     const term=document.getElementById('rc-term').value||'', session=document.getElementById('rc-session').value||'';
+     const rows=await RC.familyReportRows(studentId, term, session);
+     const sc=window.SCHOOL||{}; const total=rows.reduce((a,r)=>a+Number(r.obtained||0),0), max=rows.reduce((a,r)=>a+Number(r.obtainable||0),0); const avg=max?((total/max)*100):0;
+     const html='<div class="report-sheet sample-report"><div class="head"><img class="logo" src="assets/img/logo.'+(sc.logoExt||'svg')+'" onerror="this.style.display=\'none\'"><div class="school"><h1>'+esc(sc.name||'School')+'</h1><p>'+esc(sc.address||'')+' · '+esc(sc.phone||'')+' · '+esc(sc.email||'')+'</p><p style="font-style:italic;color:#7c2d12">Motto: '+esc(sc.motto||'')+'</p></div><div class="photo">Student<br>Photo</div></div><div class="title">TERMINAL REPORT SHEET — '+esc(term||'TERM')+', '+esc(session||'SESSION')+'</div><table class="info"><tr><td><b>Name:</b> '+esc(studentName)+'</td><td><b>Class:</b> '+esc(klass||'')+'</td><td><b>Access:</b> Read-only family copy</td></tr></table><table class="scores" style="margin-top:8px"><thead><tr><th class="left">SUBJECT</th><th>OBTAINED</th><th>OBTAINABLE</th><th>%</th><th>GRADE</th><th>REMARK</th></tr></thead><tbody>'+ (rows.length?rows.map(r=>'<tr><td class="left">'+esc(r.subject||'')+'</td><td>'+Number(r.obtained||0).toFixed(1)+'</td><td>'+Number(r.obtainable||0).toFixed(1)+'</td><td>'+Number(r.percent||0).toFixed(1)+'%</td><td class="grade">'+esc(r.grade||'')+'</td><td>'+esc(r.remark||'')+'</td></tr>').join(''):'<tr><td colspan="6">No report-card scores found for this term/session.</td></tr>')+'</tbody></table><table class="info" style="margin-top:8px"><tr><td><b>Total Score:</b> '+total.toFixed(1)+' / '+max.toFixed(1)+'</td><td><b>Average:</b> '+avg.toFixed(1)+'%</td><td><b>Permission:</b> Read-only</td></tr></table><p class="note">Secured family report card — generated only for linked child/student account.</p></div>';
+     ReportEngine.init(sb); ReportEngine.print('Student Report Card — '+studentName, html, false);
+   }catch(e){ toast(e.message||String(e),'danger',8000); }
+ };
+ RC.applyFamilyMode = async function(){
+   const role=String((window.SC_PROFILE&&SC_PROFILE.role)||(window.App&&App.currentRole)||'').toLowerCase().replace(/\s+/g,'_');
+   if(!['parent','student'].includes(role)) return;
+   ['rc-cols','rc-grid'].forEach(id=>{const el=document.getElementById(id); if(el) el.style.display='none';});
+   document.querySelectorAll('#rc-cols input,#rc-cols button,#rc-grid input,#rc-grid button,[data-staff-only]').forEach(el=>{el.disabled=true; el.style.display='none';});
+   let host=document.getElementById('rc-family-safe'); if(!host){host=document.createElement('div');host.id='rc-family-safe';host.className='card';host.style.cssText='margin-bottom:16px;border-left:5px solid var(--primary)';const app=document.querySelector('.app-content'); if(app)app.insertBefore(host, app.firstElementChild&&app.firstElementChild.nextSibling);} 
+   if(role==='student'){
+     const res=await sb.from('students').select('id,full_name,class,admission_no').eq('user_id',SC_PROFILE.id).maybeSingle(); const st=res.data;
+     if(!st){host.innerHTML='<h3>🧾 My Report Card</h3><p>Your login is not linked to a student record yet.</p>';return;}
+     host.innerHTML='<h3>🧾 My Report Card — Read Only</h3><p><b>'+esc(st.full_name)+'</b> · '+esc(st.class||'')+'</p><button class="btn btn-primary" onclick="RC.printFamilyReport(\''+st.id+'\',\''+esc(st.full_name).replace(/'/g,'&#39;')+'\',\''+esc(st.class||'').replace(/'/g,'&#39;')+'\')">Generate my report card</button>';
+   } else {
+     const links=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id).then(r=>r,()=>({data:[]})); const ids=(links.data||[]).map(x=>x.student_id).filter(Boolean);
+     const kids=ids.length?(await sb.from('students').select('id,full_name,class,admission_no').in('id',ids)).data||[]:[];
+     if(!kids.length){host.innerHTML='<h3>🧾 Children Report Cards</h3><p>No child is linked to this parent account.</p>';return;}
+     host.innerHTML='<h3>🧾 Children Report Cards — Read Only</h3><p>Only linked children are listed. No write access is available.</p><select class="form-select" id="rc-child-safe">'+kids.map(k=>'<option value="'+esc(k.id)+'" data-name="'+esc(k.full_name)+'" data-class="'+esc(k.class||'')+'">'+esc(k.full_name)+' — '+esc(k.class||'')+'</option>').join('')+'</select><button class="btn btn-primary" style="margin-top:10px" onclick="var s=document.getElementById(\'rc-child-safe\');var o=s.selectedOptions[0];RC.printFamilyReport(s.value,o.dataset.name,o.dataset.class)">Generate child report card</button>';
+   }
+ };
+ const old=RC.reportCard; RC.reportCard=function(){ if(RC.familyMode&&RC.familyMode()){ const s=document.getElementById('rc-child-safe'); if(s){ const o=s.selectedOptions[0]; return RC.printFamilyReport(s.value,o.dataset.name,o.dataset.class); } return RC.applyFamilyMode(); } return old.apply(RC,arguments); };
+ document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>RC.applyFamilyMode(),1200)); setTimeout(()=>RC.applyFamilyMode(),1800);
+})();
+</script>
+
 </body></html>

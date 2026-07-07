@@ -16,7 +16,7 @@ ok('entrance page has examination officer signature fields', /en-officer-name/.t
 ok('entrance outputs use examination officer signature/name', /EN\.officer\(\)\.sig/.test(entrance)&&/EN\.officer\(\)\.name/.test(entrance));
 ok('e-receipt print uses sample receipt CSS/classes', /class="receipt"/.test(crud)&&/class="rh"/.test(crud)&&/class="paid"/.test(crud)&&/OFFICIAL E-RECEIPT/.test(crud));
 ok('e-receipt includes sample note wording', /SAMPLE e-receipt \(Fees/.test(crud));
-ok('fee balance auto-computed in JS and persisted', /Math\.max\(0, \(f\.balance/.test(crud)&&/update\(\{ balance: bal \}\)/.test(crud));
+ok('fee balance auto-computed in JS and persisted', /Math\.max\(0,.*f\.balance/.test(crud)&&/update\(\{\s*balance:bal\s*\}\)/.test(crud));
 ok('fee balance DB trigger present', /compute_fee_payment_balance/.test(schema)&&/trg_compute_fee_payment_balance/.test(schema));
 ok('report engine uses sample report class names', /sample-report/.test(report)&&/TERMINAL REPORT SHEET/.test(report)&&/AFFECTIVE DOMAIN/.test(report));
 ok('class broadsheet uses sample landscape classes', /class-sheet/.test(report)&&/CLASS BROADSHEET/.test(report)&&/class="rot"/.test(report));
