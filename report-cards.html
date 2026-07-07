@@ -9,8 +9,10 @@
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Report Cards • God of Seed Academy">
 <meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
@@ -465,6 +467,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
 <script src="assets/js/report-engine.js"></script>
+<script src="assets/js/analytics.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
@@ -541,7 +544,33 @@ const RC = {
     const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='report-'+this.ctx.class+'-'+this.ctx.subject+'.csv'; a.click();
   },
   /* ---- Issue 6: printable termly outputs (report card / broadsheet / scoresheet) ---- */
-  _print(title, html){ const w=window.open('','_blank'); if(!w){toast('Popup blocked! Please allow popups.','warning');return;} const sc=(window.SCHOOL||{}); const st=window.SC_SETTINGS||{}; const rawSig=localStorage.getItem('sc-signature-url')||st.signature_url||'', pn=localStorage.getItem('sc-principal-name')||st.principal_name||'Principal'; const sig=(window.Super&&Super.idcard&&Super.idcard.driveDirect)?Super.idcard.driveDirect(rawSig):rawSig; const sign=sig?'<div style="text-align:center;margin-top:28px"><img src="'+sig+'" referrerpolicy="no-referrer" style="max-width:150px;max-height:70px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><br><b>'+pn+'</b><br>Official Signature</div>':''; w.document.open(); w.document.write('<!DOCTYPE html><html><head><title>'+title+'</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"><style>body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;background:#fff}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px;text-align:left}th{background:#f1f5f9}h1,h2{margin:4px 0}.hd{text-align:center;border-bottom:3px solid '+(sc.themePrimary||'#4f46e5')+';padding-bottom:10px;margin-bottom:14px}</style></head><body><div class="hd"><h1>'+esc(sc.name||"School")+'</h1><p>'+esc(sc.motto||'')+'</p><h2>'+title+'</h2></div>'+html+sign+'<p style="margin-top:30px;font-size:11px;color:#94a3b8;text-align:center">Powered by HMG Concepts</p><script>setTimeout(()=>window.print(),500);<\/script>
+  _print(title, html){ const w=window.open('','_blank'); if(!w){toast('Popup blocked! Please allow popups.','warning');return;} const sc=(window.SCHOOL||{}); const st=window.SC_SETTINGS||{}; const rawSig=localStorage.getItem('sc-signature-url')||st.signature_url||'', pn=localStorage.getItem('sc-principal-name')||st.principal_name||'Principal'; const sig=(window.Super&&Super.idcard&&Super.idcard.driveDirect)?Super.idcard.driveDirect(rawSig):rawSig; const sign=sig?'<div style="text-align:center;margin-top:28px"><img src="'+sig+'" referrerpolicy="no-referrer" style="max-width:150px;max-height:70px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><br><b>'+pn+'</b><br>Official Signature</div>':''; w.document.open(); w.document.write('<!DOCTYPE html><html><head><title>'+title+'</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"><style>body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;background:#fff}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px;text-align:left}th{background:#f1f5f9}h1,h2{margin:4px 0}.hd{text-align:center;border-bottom:3px solid '+(sc.themePrimary||'#4f46e5')+';padding-bottom:10px;margin-bottom:14px}</style></head><body><div class="hd"><h1>'+esc(sc.name||"School")+'</h1><p>'+esc(sc.motto||'')+'</p><h2>'+title+'</h2></div>'+html+sign+'<p style="margin-top:30px;font-size:11px;color:#94a3b8;text-align:center">Powered by HMG Concepts</p><scr'+"ipt>setTimeout(()=>window.print(),500);</scr"+"ipt></body></html>'); w.document.close(); w.focus(); },
+  async reportCard(){ if(!sb){toast('Database not configured','warning');return;} const name=document.getElementById('rc-student').value.trim(); if(!name){toast('Enter a student name','warning');return;}
+    const term=this.ctx.term||document.getElementById('rc-term').value, ses=this.ctx.session||document.getElementById('rc-session').value, cls=this.ctx.class||document.getElementById('rc-class').value;
+    const {data}=await sb.from('report_subject_totals').select('*').eq('student_name',name).eq('term',term).eq('session',ses);
+    let rows=(data||[]); let html='<p><strong>Student:</strong> '+esc(name)+' &nbsp; <strong>Class:</strong> '+esc(cls)+' &nbsp; <strong>Term:</strong> '+esc(term)+' &nbsp; <strong>Session:</strong> '+esc(ses)+'</p>';
+    if(!rows.length){ html+='<p>No recorded scores yet for this student/term.</p>'; }
+    else { let go=0,ob=0; html+='<table><thead><tr><th>Subject</th><th>Obtained</th><th>Obtainable</th><th>%</th><th>Grade</th></tr></thead><tbody>'+rows.map(r=>{go+=Number(r.obtained||0);ob+=Number(r.obtainable||0);return '<tr><td>'+esc(r.subject)+'</td><td>'+r.obtained+'</td><td>'+r.obtainable+'</td><td>'+r.percent+'%</td><td>'+RC.grade(r.percent)+'</td></tr>';}).join('')+'</tbody></table>'; var pct=ob?((go/ob)*100).toFixed(1):0; html+='<p style="margin-top:12px"><strong>Overall:</strong> '+go.toFixed(1)+' / '+ob.toFixed(1)+' ('+pct+'%) — Grade '+RC.grade(pct)+'</p>'; html+='<div style="margin-top:24px;display:flex;justify-content:space-between"><div>____________________<br>Class Teacher</div><div>____________________<br>Head of School</div></div>'; }
+    RC._print('Termly Report Card', html);
+  },
+  async broadsheet(){ if(!sb){toast('Database not configured','warning');return;} const cls=this.ctx.class||document.getElementById('rc-class').value, term=this.ctx.term||document.getElementById('rc-term').value, ses=this.ctx.session||document.getElementById('rc-session').value;
+    if(!cls){toast('Enter a class','warning');return;}
+    const {data}=await sb.from('report_subject_totals').select('*').eq('class',cls).eq('term',term).eq('session',ses);
+    const subs=[...new Set((data||[]).map(r=>r.subject))].sort(); const studs=[...new Set((data||[]).map(r=>r.student_name))].sort();
+    let html='<p><strong>Class:</strong> '+esc(cls)+' &nbsp; <strong>Term:</strong> '+esc(term)+'</p><table><thead><tr><th>Student</th>'+subs.map(s=>'<th>'+esc(s)+'</th>').join('')+'<th>Total</th><th>%</th></tr></thead><tbody>';
+    studs.forEach(st=>{ let tot=0,obt=0; html+='<tr><td>'+esc(st)+'</td>'+subs.map(su=>{const r=(data||[]).find(x=>x.student_name===st&&x.subject===su); if(r){tot+=Number(r.obtained||0);obt+=Number(r.obtainable||0);} return '<td>'+(r?r.obtained:'-')+'</td>';}).join('')+'<td>'+tot.toFixed(1)+'</td><td>'+(obt?((tot/obt)*100).toFixed(1):0)+'%</td></tr>'; });
+    html+='</tbody></table>'; if(!studs.length)html='<p>No scores recorded for this class/term.</p>'; RC._print('Class Broadsheet — '+esc(cls), html);
+  },
+  async scoresheet(){ if(!sb){toast('Database not configured','warning');return;} const cls=this.ctx.class||document.getElementById('rc-class').value, sub=this.ctx.subject||document.getElementById('rc-subject').value;
+    if(!cls||!sub){toast('Enter class and subject','warning');return;}
+    const ids=this.cols.map(c=>c.id); const {data:scores}=ids.length?await sb.from('report_scores').select('*').in('column_id',ids):{data:[]};
+    const map={}; (scores||[]).forEach(s=>{map[(s.student_id_ref||s.student_name)+'|'+s.column_id]=s.score;});
+    let html='<p><strong>Class:</strong> '+esc(cls)+' &nbsp; <strong>Subject:</strong> '+esc(sub)+'</p><table><thead><tr><th>Student</th>'+this.cols.map(c=>'<th>'+esc(c.name)+'<br>/'+c.max_mark+'</th>').join('')+'<th>Total</th></tr></thead><tbody>';
+    (this.students||[]).forEach(st=>{ const ref=st.admission_no||st.full_name; let tot=0; html+='<tr><td>'+esc(st.full_name)+'</td>'+this.cols.map(c=>{const v=map[ref+'|'+c.id];if(v!=null)tot+=Number(v);return '<td>'+(v!=null?v:'')+'</td>';}).join('')+'<td>'+tot.toFixed(1)+'</td></tr>'; });
+    html+='</tbody></table>'; RC._print('Teacher Scoresheet — '+esc(sub)+' ('+esc(cls)+')', html);
+  }
+}; document.addEventListener('DOMContentLoaded',()=>RC.init()); RC.init();
+</script>
 <script>
 // ENTERPRISE V15/V7: server-scoped family report-card renderer.
 (function(){
@@ -581,34 +610,6 @@ const RC = {
  const old=RC.reportCard; RC.reportCard=function(){ if(RC.familyMode&&RC.familyMode()){ const s=document.getElementById('rc-child-safe'); if(s){ const o=s.selectedOptions[0]; return RC.printFamilyReport(s.value,o.dataset.name,o.dataset.class); } return RC.applyFamilyMode(); } return old.apply(RC,arguments); };
  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>RC.applyFamilyMode(),1200)); setTimeout(()=>RC.applyFamilyMode(),1800);
 })();
-</script>
-
-</body></html>'); w.document.close(); w.focus(); },
-  async reportCard(){ if(!sb){toast('Database not configured','warning');return;} const name=document.getElementById('rc-student').value.trim(); if(!name){toast('Enter a student name','warning');return;}
-    const term=this.ctx.term||document.getElementById('rc-term').value, ses=this.ctx.session||document.getElementById('rc-session').value, cls=this.ctx.class||document.getElementById('rc-class').value;
-    const {data}=await sb.from('report_subject_totals').select('*').eq('student_name',name).eq('term',term).eq('session',ses);
-    let rows=(data||[]); let html='<p><strong>Student:</strong> '+esc(name)+' &nbsp; <strong>Class:</strong> '+esc(cls)+' &nbsp; <strong>Term:</strong> '+esc(term)+' &nbsp; <strong>Session:</strong> '+esc(ses)+'</p>';
-    if(!rows.length){ html+='<p>No recorded scores yet for this student/term.</p>'; }
-    else { let go=0,ob=0; html+='<table><thead><tr><th>Subject</th><th>Obtained</th><th>Obtainable</th><th>%</th><th>Grade</th></tr></thead><tbody>'+rows.map(r=>{go+=Number(r.obtained||0);ob+=Number(r.obtainable||0);return '<tr><td>'+esc(r.subject)+'</td><td>'+r.obtained+'</td><td>'+r.obtainable+'</td><td>'+r.percent+'%</td><td>'+RC.grade(r.percent)+'</td></tr>';}).join('')+'</tbody></table>'; var pct=ob?((go/ob)*100).toFixed(1):0; html+='<p style="margin-top:12px"><strong>Overall:</strong> '+go.toFixed(1)+' / '+ob.toFixed(1)+' ('+pct+'%) — Grade '+RC.grade(pct)+'</p>'; html+='<div style="margin-top:24px;display:flex;justify-content:space-between"><div>____________________<br>Class Teacher</div><div>____________________<br>Head of School</div></div>'; }
-    RC._print('Termly Report Card', html);
-  },
-  async broadsheet(){ if(!sb){toast('Database not configured','warning');return;} const cls=this.ctx.class||document.getElementById('rc-class').value, term=this.ctx.term||document.getElementById('rc-term').value, ses=this.ctx.session||document.getElementById('rc-session').value;
-    if(!cls){toast('Enter a class','warning');return;}
-    const {data}=await sb.from('report_subject_totals').select('*').eq('class',cls).eq('term',term).eq('session',ses);
-    const subs=[...new Set((data||[]).map(r=>r.subject))].sort(); const studs=[...new Set((data||[]).map(r=>r.student_name))].sort();
-    let html='<p><strong>Class:</strong> '+esc(cls)+' &nbsp; <strong>Term:</strong> '+esc(term)+'</p><table><thead><tr><th>Student</th>'+subs.map(s=>'<th>'+esc(s)+'</th>').join('')+'<th>Total</th><th>%</th></tr></thead><tbody>';
-    studs.forEach(st=>{ let tot=0,obt=0; html+='<tr><td>'+esc(st)+'</td>'+subs.map(su=>{const r=(data||[]).find(x=>x.student_name===st&&x.subject===su); if(r){tot+=Number(r.obtained||0);obt+=Number(r.obtainable||0);} return '<td>'+(r?r.obtained:'-')+'</td>';}).join('')+'<td>'+tot.toFixed(1)+'</td><td>'+(obt?((tot/obt)*100).toFixed(1):0)+'%</td></tr>'; });
-    html+='</tbody></table>'; if(!studs.length)html='<p>No scores recorded for this class/term.</p>'; RC._print('Class Broadsheet — '+esc(cls), html);
-  },
-  async scoresheet(){ if(!sb){toast('Database not configured','warning');return;} const cls=this.ctx.class||document.getElementById('rc-class').value, sub=this.ctx.subject||document.getElementById('rc-subject').value;
-    if(!cls||!sub){toast('Enter class and subject','warning');return;}
-    const ids=this.cols.map(c=>c.id); const {data:scores}=ids.length?await sb.from('report_scores').select('*').in('column_id',ids):{data:[]};
-    const map={}; (scores||[]).forEach(s=>{map[(s.student_id_ref||s.student_name)+'|'+s.column_id]=s.score;});
-    let html='<p><strong>Class:</strong> '+esc(cls)+' &nbsp; <strong>Subject:</strong> '+esc(sub)+'</p><table><thead><tr><th>Student</th>'+this.cols.map(c=>'<th>'+esc(c.name)+'<br>/'+c.max_mark+'</th>').join('')+'<th>Total</th></tr></thead><tbody>';
-    (this.students||[]).forEach(st=>{ const ref=st.admission_no||st.full_name; let tot=0; html+='<tr><td>'+esc(st.full_name)+'</td>'+this.cols.map(c=>{const v=map[ref+'|'+c.id];if(v!=null)tot+=Number(v);return '<td>'+(v!=null?v:'')+'</td>';}).join('')+'<td>'+tot.toFixed(1)+'</td></tr>'; });
-    html+='</tbody></table>'; RC._print('Teacher Scoresheet — '+esc(sub)+' ('+esc(cls)+')', html);
-  }
-}; document.addEventListener('DOMContentLoaded',()=>RC.init()); RC.init();
 </script>
 <script>
 // School Connect v10: high-fidelity, family-safe Report Cards.

@@ -1,6 +1,6 @@
 // School Connect Service Worker — offline + push
 const CACHE = 'sc-cache-2026-07-05-fv2';
-const CORE = ['./','./index.html','./login.html','./dashboard.html','./offline.html','./assets/css/style.css','./assets/js/config.js','./assets/js/app.js','./assets/js/notifications.js','./assets/js/voting.js','./assets/js/pwa-install.js','./assets/js/super.js','./assets/js/site-help.js','./assets/js/cbt-engine.js','./assets/js/analytics.js','./assets/js/enterprise.js','./assets/js/crud.js','./assets/img/logo.png','./manifest.json'];
+const CORE = ['./','./index.html','./login.html','./dashboard.html','./offline.html','./assets/css/style.css','./assets/js/config.js','./assets/js/app.js','./assets/js/notifications.js','./assets/js/voting.js','./assets/js/pwa-install.js','./assets/js/super.js','./assets/js/site-help.js','./assets/js/cbt-engine.js','./assets/js/analytics.js','./assets/js/enterprise.js','./assets/js/crud.js','./assets/js/report-engine.js','./assets/img/logo.png','./manifest.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(()=>self.skipWaiting()));
