@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Advanced Fleet GPS • God of Seed Academy</title>
-<meta name="description" content="God of Seed Academy — Advanced Fleet GPS. Free school management platform by HMG Concepts.">
+<title>Staff Attendance Geofence • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — Settings. Free school management platform by HMG Concepts.">
 <meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-<meta property="og:title" content="Advanced Fleet GPS • God of Seed Academy">
+<meta property="og:title" content="Settings • God of Seed Academy">
 <meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
@@ -61,19 +61,19 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 @media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
 </style>
 
-    <meta name="description" content="God of Seed Academy — Advanced Fleet GPS. Free school management platform by HMG Concepts.">
+    <meta name="description" content="God of Seed Academy — Settings. Free school management platform by HMG Concepts.">
     <meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="./fleet_tracking.html">
-    <meta property="og:title" content="Advanced Fleet GPS • God of Seed Academy">
-    <meta property="og:description" content="God of Seed Academy — Advanced Fleet GPS. Free school management platform by HMG Concepts.">
-    <meta property="og:url" content="./fleet_tracking.html">
+    <link rel="canonical" href="./settings.html">
+    <meta property="og:title" content="Settings • God of Seed Academy">
+    <meta property="og:description" content="God of Seed Academy — Settings. Free school management platform by HMG Concepts.">
+    <meta property="og:url" content="./settings.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Advanced Fleet GPS • God of Seed Academy">
-    <meta name="twitter:description" content="God of Seed Academy — Advanced Fleet GPS. Free school management platform by HMG Concepts.">
+    <meta name="twitter:title" content="Settings • God of Seed Academy">
+    <meta name="twitter:description" content="God of Seed Academy — Settings. Free school management platform by HMG Concepts.">
     <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
   </head>
 <body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
@@ -204,7 +204,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🍽️</span>
           <span>Menu</span>
-        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="active">
           <span class="app-nav-icon">⚙️</span>
           <span>Settings (2FA · Language · A11y)</span>
         </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
@@ -447,7 +447,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   <main class="app-main">
     <header class="app-topbar">
       <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
-      <h1 class="app-page-title">Advanced Fleet GPS</h1>
+      <h1 class="app-page-title">Staff Attendance Geofence</h1>
       <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
         
         <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
@@ -456,36 +456,56 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
       </div>
     </header>
-    <div class="app-content">
+    <div class="app-content"><div class="card" style="background:#ecfeff;border-color:#67e8f9;margin-bottom:16px"><h2 style="margin:0 0 6px">📍 Dedicated Admin Geofence Page</h2><p style="margin:0;color:#0e7490">Admin GPS capture workflow: stand inside the school premises, click “Use this device's current location”, allow browser GPS permission, then save. Staff check-in will be blocked outside the configured radius.</p></div>
       
-      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer" onclick="var b=document.getElementById('pg-more');b.style.display=b.style.display==='none'?'block':'none'">
-        <div><strong>ℹ️ What is this page?</strong> <span style="color:var(--gray-700)">Bus route logistics, driver tracking, and maintenance logs. Manages institutional transportation logistics by maintaining active ledgers of school bus routes, assigned transport vehicles, authorized drivers, daily pick-up schedules, and scheduled fleet maintenance.</span></div>
-        <span style="color:var(--primary)">▼</span>
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>🔐 Security (2-Factor)</h3>
+          <p style="color:var(--gray-600);font-size:.9rem">Free email one-time-code on sign-in (uses Supabase email OTP — no SMS/AI cost).</p>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="st-2fa" onchange="ST.toggle2fa(this.checked)"> Enable 2FA for my account</label>
+        </div>
+        <div class="card">
+          <h3>🌍 Language</h3>
+          <select class="form-select" id="st-lang" onchange="ST.lang(this.value)">
+            <option value="en">English</option><option value="fr">Français</option><option value="sw">Kiswahili</option>
+            <option value="ha">Hausa</option><option value="yo">Yorùbá</option><option value="ig">Igbo</option>
+          </select>
+          <p style="color:var(--gray-500);font-size:.82rem;margin-top:8px">UI labels marked for translation switch instantly.</p>
+        </div>
+        <div class="card">
+          <h3>♿ Accessibility</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="Enterprise.i18n.setFontScale(90)">A-</button>
+            <button class="btn btn-outline btn-sm" onclick="Enterprise.i18n.setFontScale(100)">A</button>
+            <button class="btn btn-outline btn-sm" onclick="Enterprise.i18n.setFontScale(120)">A+</button>
+            <button class="btn btn-outline btn-sm" onclick="Enterprise.i18n.toggleContrast()">High contrast</button>
+          </div>
+        </div>
+
+        <div class="card" data-admin-only>
+          <h3>📍 Staff Attendance Geofence</h3>
+          <p style="color:var(--gray-600);font-size:.9rem">Set the official school GPS location and allowed radius. Staff check-in is blocked when the device is outside this radius or when GPS permission is denied. This prevents staff from marking attendance from home or outside school premises.</p>
+          <div class="grid grid-2">
+            <div class="form-group"><label>School latitude</label><input class="form-input" id="st-lat" type="number" step="0.000001" placeholder="e.g. 6.524400"></div>
+            <div class="form-group"><label>School longitude</label><input class="form-input" id="st-lng" type="number" step="0.000001" placeholder="e.g. 3.379200"></div>
+            <div class="form-group"><label>Allowed radius (metres)</label><input class="form-input" id="st-radius" type="number" min="20" max="2000" value="200"></div>
+            <div class="form-group"><label style="display:flex;gap:8px;align-items:center;margin-top:28px"><input type="checkbox" id="st-enforce-geo" checked> Enforce staff on-premises attendance</label></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="ST.useCurrentLocation()">📡 Capture school GPS from this device</button>
+            <button class="btn btn-primary btn-sm" onclick="ST.saveGeofence()">Save geofence</button>
+          </div>
+          <p id="st-geo-preview" style="font-size:.82rem;color:var(--gray-500);margin-top:8px">No geofence loaded yet.</p>
+        </div>
+        <div class="card" data-admin-only>
+          <h3>✍️ Official Signature for Documents</h3>
+          <p style="color:var(--gray-600);font-size:.9rem">Paste a Google Drive/direct image link for the principal/admin signature. It will appear on receipts, certificates, admission letters and academic records printed from this browser/site.</p>
+          <div class="form-group"><label>Principal / signatory name</label><input class="form-input" id="st-principal" placeholder="Principal name"></div>
+          <div class="form-group"><label>Signature image link</label><input class="form-input" id="st-signature" placeholder="https://drive.google.com/... or image URL"></div>
+          <button class="btn btn-primary btn-sm" onclick="ST.saveSignature()">Save signature</button>
+          <div id="st-sign-preview" style="margin-top:8px"></div>
+        </div>
       </div>
-      <div id="pg-more" style="display:none;margin-top:10px">
-        <p style="margin:4px 0;color:var(--gray-700)"><strong>Who uses it:</strong> Staff and Admin.</p>
-        <p style="margin:8px 0 4px;color:var(--gray-700)"><strong>How to use it:</strong></p>
-        <ol style="margin:0;padding-left:20px;color:var(--gray-700);line-height:1.7"><li>Click Add new.</li><li>Input bus vehicle registration and route name.</li><li>Assign authorized transport driver.</li><li>Log daily route schedules and maintenance notes.</li></ol>
-        
-        
-        <p style="margin:10px 0 0;font-size:.85rem;color:var(--gray-500)">Tip: click the <strong>ℹ️ Help</strong> button in the top bar, or the 💬 assistant, for the full explanation of any page.</p>
-      </div></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-        <button class="btn btn-primary" onclick="CRUD.openForm('fleet_tracking')" data-staff-only>+ Add new</button>
-        <button class="btn btn-outline" onclick="CRUD.renderList('fleet_tracking')">↻ Refresh</button>
-        <button class="btn btn-outline" onclick="CRUD.exportCSV('fleet_tracking')" data-staff-only>⬇ Export CSV</button>
-        <button class="btn btn-outline" onclick="CRUD.exportPDF('fleet_tracking')" data-staff-only>📄 Export PDF</button>
-        <button class="btn btn-outline" onclick="CRUD.importCSV('fleet_tracking')" data-admin-only>⬆ Import CSV</button>
-        
-        
-        
-        
-        
-      </div>
-      
-      <div class="table-wrap"><table id="fleet_tracking-table"><thead><tr><th>Loading…</th></tr></thead><tbody><tr><td><span class="pulse">Loading…</span></td></tr></tbody></table></div>
-      <script>document.addEventListener('DOMContentLoaded',function(){ if(window.CRUD) CRUD.renderList('fleet_tracking'); });</script>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Built by <a href="https://cssadewale.pages.dev" target="_blank" rel="noopener">Adewale Samson Adeagbo</a> · Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a> · <a href="developer.html">About the developer</a>
@@ -513,4 +533,18 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.Enterprise) Enterprise.init(sb);
   if (window.CRUD) CRUD.init(sb);
 </script>
-</body></html>
+<script>
+const ST={
+  async init(){ try{ const p=await Enterprise.security.getPrefs(); const c=document.getElementById('st-2fa'); if(c)c.checked=!!p.two_factor; }catch(e){}
+    const l=document.getElementById('st-lang'); if(l) l.value=Enterprise.i18n.lang; const sig=document.getElementById('st-signature'), pn=document.getElementById('st-principal'); if(sig) sig.value=localStorage.getItem('sc-signature-url')||''; if(pn) pn.value=localStorage.getItem('sc-principal-name')||''; await ST.loadGeofence(); ST.preview(); },
+  async toggle2fa(on){ const r=await Enterprise.security.setTwoFactor(on); if(r&&r.error){toast(r.error.message||r.error,'danger');return;} toast(on?'2FA enabled':'2FA disabled','success'); },
+  lang(l){ Enterprise.i18n.setLang(l); toast('Language set','success'); },
+  preview(){ const box=document.getElementById('st-sign-preview'); const raw=localStorage.getItem('sc-signature-url')||''; const url=(window.Super&&Super.idcard&&Super.idcard.driveDirect)?Super.idcard.driveDirect(raw):raw; if(box) box.innerHTML=url?'<img src="'+esc(url)+'" referrerpolicy="no-referrer" style="max-width:180px;max-height:80px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)" onerror="this.replaceWith(document.createTextNode(&quot;Signature link saved; preview unavailable — check the Drive link is public.&quot;))">':''; },
+  async saveSignature(){ const url=document.getElementById('st-signature').value.trim(), name=document.getElementById('st-principal').value.trim(); localStorage.setItem('sc-signature-url',url); localStorage.setItem('sc-principal-name',name); try{ if(sb) await sb.from('school_settings').upsert({id:1,signature_url:url,principal_name:name},{onConflict:'id'}); }catch(e){} ST.preview(); toast('Signature saved for exported documents','success'); },
+  async loadGeofence(){ try{ let data=null; if(sb){ const r=await sb.from('school_settings').select('latitude,longitude,geo_radius_m,enforce_geofence').eq('id',1).maybeSingle(); data=r.data; } data=data||window.SC_SETTINGS||{}; const lat=document.getElementById('st-lat'), lng=document.getElementById('st-lng'), rad=document.getElementById('st-radius'), enf=document.getElementById('st-enforce-geo'); if(lat&&data.latitude!=null)lat.value=data.latitude; if(lng&&data.longitude!=null)lng.value=data.longitude; if(rad&&data.geo_radius_m!=null)rad.value=data.geo_radius_m; if(enf)enf.checked=data.enforce_geofence!==false; ST.renderGeoPreview(); }catch(e){ ST.renderGeoPreview('Could not load geofence: '+(e.message||e)); } },
+  renderGeoPreview(msg){ const box=document.getElementById('st-geo-preview'); if(!box)return; if(msg){box.textContent=msg;return;} const lat=document.getElementById('st-lat')?.value, lng=document.getElementById('st-lng')?.value, rad=document.getElementById('st-radius')?.value||200, enf=document.getElementById('st-enforce-geo')?.checked; box.textContent=(lat&&lng)?('Current geofence: '+lat+', '+lng+' within '+rad+'m · '+(enf?'enforced':'not enforced')):'No geofence set. Staff check-in will ask admin to configure location.'; },
+  async useCurrentLocation(){ if(!navigator.geolocation){toast('GPS is not supported on this device/browser.','danger');return;} navigator.geolocation.getCurrentPosition(pos=>{ document.getElementById('st-lat').value=pos.coords.latitude.toFixed(6); document.getElementById('st-lng').value=pos.coords.longitude.toFixed(6); ST.renderGeoPreview(); toast('Current location captured. Click Save geofence.','success'); }, err=>toast('Could not capture location: '+err.message,'danger'), {enableHighAccuracy:true,timeout:15000,maximumAge:0}); },
+  async saveGeofence(){ const latitude=Number(document.getElementById('st-lat').value), longitude=Number(document.getElementById('st-lng').value), geo_radius_m=Math.max(20,Number(document.getElementById('st-radius').value)||200), enforce_geofence=document.getElementById('st-enforce-geo').checked; if(!isFinite(latitude)||!isFinite(longitude)){toast('Enter valid latitude and longitude, or use current location.','warning');return;} try{ if(sb){ const {error}=await sb.from('school_settings').upsert({id:1,latitude,longitude,geo_radius_m,enforce_geofence,geo_updated_at:new Date().toISOString()},{onConflict:'id'}); if(error)throw error; } window.SC_SETTINGS=Object.assign(window.SC_SETTINGS||{},{latitude,longitude,geo_radius_m,enforce_geofence}); window.SCHOOL=Object.assign(window.SCHOOL||{},{latitude,longitude,geoRadius:geo_radius_m,enforceGeofence:enforce_geofence}); ST.renderGeoPreview(); toast('Staff attendance geofence saved.','success'); }catch(e){toast('Could not save geofence: '+(e.message||e),'danger',8000);} }
+};
+document.addEventListener('DOMContentLoaded',ST.init); ST.init();
+</script></body></html>

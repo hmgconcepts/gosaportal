@@ -7,7 +7,27 @@
 .ms-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0}
 .ms-step{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;font-size:.85rem}
 .ms-step b{display:block;color:var(--primary,#4f46e5)}
-</style></head><body>
+</style>
+    <meta name="description" content="Multi-Subject CBT Builder — School Connect v5 by HMG Concepts">
+    <meta name="keywords" content="school, multi-subject cbt builder, school management, HMG Concepts, School Connect">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./cbt-multi.html">
+    <meta property="og:title" content="Multi-Subject CBT Builder">
+    <meta property="og:description" content="Multi-Subject CBT Builder — School Connect v5 by HMG Concepts">
+    <meta property="og:url" content="./cbt-multi.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Multi-Subject CBT Builder">
+    <meta name="twitter:description" content="Multi-Subject CBT Builder — School Connect v5 by HMG Concepts">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head><body data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+<div id="sc-page-guard" style="display:none;padding:40px;text-align:center">
+  <h2>🔒 Restricted</h2>
+  <p>This page is only available to staff and administrators.</p>
+  <a class="btn btn-primary" href="dashboard.html">Back to dashboard</a>
+</div>
 <main class="ms-wrap">
   <div class="card">
     <h1 style="margin-top:0">🧪 Multi-Subject CBT Builder <span class="ms-badge">UTME / Common-Entrance mode</span></h1>
@@ -119,7 +139,7 @@ const MM = {
       select_count: parseInt(v('mm-sel')) || 0, instructions: v('mm-instr'),
       randomise: document.getElementById('mm-rand').checked,
       release_results: document.getElementById('mm-rel').checked,
-      anti_cheat_config: { subject_breakdown },
+      anti_cheat_config: { subject_breakdown, subjects, multi_subject: true },
       is_open: true, exam_mode: 'registered', csv_data: questions
     };
     const res = await CBT.createExam(exam);
@@ -137,5 +157,22 @@ const MM = {
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 MM.addSubject('English Language'); MM.addSubject('Mathematics');
 MM.lookups();
+</script>
+<script>
+/* Role guard for non-shell pages */
+(async function(){
+  try {
+    if (!window.sb) return; // public page when not configured
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) { location.href = 'login.html'; return; }
+    const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    const role = String((profile && profile.role) || 'student').toLowerCase();
+    const allowed = ['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher'];
+    if (!allowed.includes(role)) {
+      document.querySelector('.ms-wrap').style.display = 'none';
+      document.getElementById('sc-page-guard').style.display = 'block';
+    }
+  } catch(_) {}
+})();
 </script>
 </body></html>
