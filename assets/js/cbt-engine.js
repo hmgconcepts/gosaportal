@@ -10,7 +10,12 @@ const CBT = {
 
   init(supabaseClient) {
     this._sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null);
-    if (this._sb && (location.pathname.includes('cbt') || document.getElementById('exam-root') || document.querySelector('[data-cbt-action]'))) this.bindFloatingToolbar();
+    // FIX V2.1 Issue #11: Calculator and math keyboard ONLY on CBT exam taking page (cbt-exam.html), not on manager pages
+    const page = (location.pathname.split('/').pop() || '').toLowerCase();
+    const isExamPage = page === 'cbt-exam.html' || page.startsWith('cbt-exam') || !!document.getElementById('exam-root') || !!document.getElementById('cbt-exam-root') || !!document.querySelector('[data-cbt-exam]');
+    if (this._sb && isExamPage) {
+      try { this.bindFloatingToolbar(); } catch(e) {}
+    }
     if (document.getElementById('cbt-list') && window.CBTUI) { try { CBTUI.refresh(); } catch(e) { console.warn('CBTUI.refresh failed:', e); } }
   },
 
@@ -73,6 +78,7 @@ const CBT = {
       });
       }
     }
+    // Final safety net: if sections are still missing but question-level subject metadata exists under alternate keys, copy it in now.
     qs = qs.map((q,i) => {
       if (!(q.section || q.subject)) {
         const raw = (exam && ((exam._questions && exam._questions[i]) || (exam.questions && exam.questions[i]) || (Array.isArray(exam.csv_data) && exam.csv_data[i]))) || {};
@@ -212,14 +218,28 @@ const CBT = {
     return rows;
   },
 
-  toggleCalculator() { const existing=document.getElementById('cbt-calculator'); if(existing){existing.remove();return;} const calc=document.createElement('div'); calc.id='cbt-calculator'; calc.style.cssText='position:fixed;bottom:90px;right:20px;background:white;border:2px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.15);z-index:10000;width:280px;font-family:sans-serif;'; this._renderCalculatorHTML(calc); document.body.appendChild(calc); },
+  toggleCalculator() {
+    // FIX #11: Only allow calculator on CBT exam pages
+    const page = (location.pathname.split('/').pop() || '').replace('.html','');
+    if (!['cbt-exam','cbt_exam','cbt-multi','cbt_multi','cbt'].includes(page)) {
+      if (typeof toast === 'function') toast('Calculator is only available during CBT exams.', 'info', 4000);
+      return;
+    }
+    const existing=document.getElementById('cbt-calculator'); if(existing){existing.remove();return;} const calc=document.createElement('div'); calc.id='cbt-calculator'; calc.style.cssText='position:fixed;bottom:90px;right:20px;background:white;border:2px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.15);z-index:10000;width:280px;font-family:sans-serif;'; this._renderCalculatorHTML(calc); document.body.appendChild(calc); },
   _renderCalculatorHTML(calc) { const basic=['7','8','9','÷','4','5','6','×','1','2','3','-','0','.','⌫','+']; const scientific=['sin','cos','tan','π','√','x²','ln','log','(',')']; calc.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><strong>🧮 Calculator</strong><button onclick="CBT.toggleCalcMode()" class="btn btn-sm btn-outline">'+(this.calcState.mode==='basic'?'Basic':'Scientific')+'</button><button onclick="document.getElementById(\'cbt-calculator\').remove()" class="btn btn-sm btn-outline">×</button></div><input id="calc-display" value="'+this.calcState.display+'" style="width:100%;font-size:24px;padding:10px;text-align:right;margin-bottom:10px;border:1px solid #cbd5e1;border-radius:8px" readonly>'+(this.calcState.mode==='scientific'?'<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:8px">'+scientific.map(b=>'<button onclick="CBT.calcInput(\''+b+'\')">'+b+'</button>').join('')+'</div>':'')+'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px">'+basic.map(b=>'<button onclick="CBT.calcInput(\''+b+'\')" style="padding:10px">'+b+'</button>').join('')+'</div><div style="display:flex;gap:8px;margin-top:10px"><button onclick="CBT.calcClear()" style="flex:1">C</button><button onclick="CBT.calcEquals()" style="flex:2">=</button></div>'; },
   toggleCalcMode(){ this.calcState.mode=this.calcState.mode==='basic'?'scientific':'basic'; const c=document.getElementById('cbt-calculator'); if(c)this._renderCalculatorHTML(c); },
   calcInput(v){ const d=document.getElementById('calc-display'); if(!d)return; if(v==='⌫'){d.value=d.value.slice(0,-1);} else if(v==='x²'){d.value=Math.pow(Number(d.value)||0,2);} else if(v==='π'){d.value+=Math.PI;} else d.value+=v; this.calcState.display=d.value; },
   calcClear(){ const d=document.getElementById('calc-display'); if(d){d.value='';this.calcState.display='';} },
   calcEquals(){ const d=document.getElementById('calc-display'); if(!d)return; try{ d.value=String(eval(d.value.replace(/÷/g,'/').replace(/×/g,'*'))); this.calcState.display=d.value; }catch(e){d.value='Error';this.calcState.display='';} },
   calcMemoryClear(){ this.calcState.memory=0; },
-  toggleMathKeyboard(){ const existing=document.getElementById('cbt-math-keyboard'); if(existing){existing.remove();return;} const kb=document.createElement('div'); kb.id='cbt-math-keyboard'; kb.style.cssText='position:fixed;bottom:160px;right:20px;background:white;border:2px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.15);z-index:10000;max-width:340px'; const syms=['+','-','×','÷','=','(',')','²','³','√','π','%','≤','≥','≠','≈','α','β','θ']; kb.innerHTML='<div style="display:flex;justify-content:space-between"><strong>⌨️ Math Keyboard</strong><button onclick="document.getElementById(\'cbt-math-keyboard\').remove()">×</button></div><p style="font-size:12px;color:#64748b">Click inside an answer field, then click a symbol.</p><div style="display:flex;flex-wrap:wrap;gap:5px">'+syms.map(s=>'<button onclick="CBT.insertMathSymbol(\''+s+'\')" style="min-width:36px;height:36px">'+s+'</button>').join('')+'</div>'; document.body.appendChild(kb); },
+  toggleMathKeyboard(){
+    // FIX #11: Only allow math keyboard on CBT exam pages
+    const page = (location.pathname.split('/').pop() || '').replace('.html','');
+    if (!['cbt-exam','cbt_exam','cbt-multi','cbt_multi','cbt'].includes(page)) {
+      if (typeof toast === 'function') toast('Math keyboard is only available during CBT exams.', 'info', 4000);
+      return;
+    }
+    const existing=document.getElementById('cbt-math-keyboard'); if(existing){existing.remove();return;} const kb=document.createElement('div'); kb.id='cbt-math-keyboard'; kb.style.cssText='position:fixed;bottom:160px;right:20px;background:white;border:2px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.15);z-index:10000;max-width:340px'; const syms=['+','-','×','÷','=','(',')','²','³','√','π','%','≤','≥','≠','≈','α','β','θ']; kb.innerHTML='<div style="display:flex;justify-content:space-between"><strong>⌨️ Math Keyboard</strong><button onclick="document.getElementById(\'cbt-math-keyboard\').remove()">×</button></div><p style="font-size:12px;color:#64748b">Click inside an answer field, then click a symbol.</p><div style="display:flex;flex-wrap:wrap;gap:5px">'+syms.map(s=>'<button onclick="CBT.insertMathSymbol(\''+s+'\')" style="min-width:36px;height:36px">'+s+'</button>').join('')+'</div>'; document.body.appendChild(kb); },
   insertMathSymbol(sym){ const a=document.activeElement; if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')){ const st=a.selectionStart||a.value.length; a.value=a.value.slice(0,st)+sym+a.value.slice(a.selectionEnd||st); a.setSelectionRange(st+sym.length,st+sym.length); a.focus(); a.dispatchEvent(new Event('input',{bubbles:true})); } else if(typeof toast==='function') toast('Click inside an answer field first','info'); }
 };
 

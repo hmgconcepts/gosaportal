@@ -340,60 +340,34 @@ const Enterprise = {
     async list() {
       if (typeof Voting !== 'undefined') {
         const polls = await Voting.listPolls();
-        // Translate candidates column to options for compatibility
-        const translated = (polls || []).map(p => {
-          const opts = p.candidates ? JSON.parse(p.candidates) : [];
-          return Object.assign({}, p, { options: opts.map((c, i) => ({ id: c.id || 'c'+(i+1), label: c.name || c.label || '', desc: c.info || c.desc || '' })) });
-        });
-        return { data: translated };
+        return { data: (polls || []).map(p => {
+          let opts = [];
+          try { opts = (typeof p.candidates === 'string') ? JSON.parse(p.candidates) : (p.candidates || []); } catch(e) {}
+          return Object.assign({}, p, { options: opts.map((c, i) => ({ id: c.id || 'c'+(i+1), label: c.label || c.name || '', desc: c.desc || c.info || '' })) });
+        }) };
       }
       return { data: [] };
     },
     async create(p) {
       if (typeof Voting !== 'undefined') {
-        const mappedCandidates = (p.options || []).map((o, i) => ({ id: o.id || 'c'+(i+1), name: o.label || '', info: o.desc || '', photo: '' }));
-        const r = await Voting.createPoll({
-          title: p.title,
-          description: p.description,
-          candidates: mappedCandidates,
-          type: p.type,
-          closes_at: p.closes_on,
-          anonymous: p.anonymous,
-          allow_multiple: p.multi_winner,
-          audience: p.audience
+        return await Voting.createPoll({
+          title: p.title, description: p.description,
+          candidates: p.candidates || p.options, type: p.type,
+          closes_at: p.closes_on, anonymous: p.anonymous,
+          allow_multiple: p.multi_winner, audience: p.audience
         });
-        return r;
       }
       return { error: 'Voting module missing' };
     },
-    async vote(pollId, candidateIndices) {
+    async vote(pollId, candidateIds) {
       if (typeof Voting !== 'undefined') {
-        const { poll } = await Voting.getResults(pollId);
-        const candidates = poll.candidates ? JSON.parse(poll.candidates) : [];
-        const chosenIds = candidateIndices.map(idx => {
-          const c = candidates[idx];
-          return c ? c.id : 'c' + (idx + 1);
-        });
-        // Call Voting.vote for each chosen ID
-        let lastRes = null;
-        for (const cid of chosenIds) {
-          lastRes = await Voting.vote(pollId, cid);
-        }
-        return lastRes || { error: 'No choices voted' };
+        return await Voting.vote(pollId, candidateIds);
       }
       return { error: 'Voting module missing' };
     },
     async update(pollId, patch) {
       if (typeof Voting !== 'undefined') {
-        if (patch.status === 'closed') {
-          await Voting.closePoll(pollId);
-          return { data: { status: 'closed' } };
-        } else {
-          if (Voting.sb) {
-            await Voting.sb.from('polls').update({ status: 'open' }).eq('id', pollId);
-            return { data: { status: 'open' } };
-          }
-        }
+        return await Voting.updatePoll(pollId, patch);
       }
       return { error: 'Voting module missing' };
     }

@@ -63,6 +63,7 @@ const App = {
     App.installSelectDedupe();
     App.dedupeAllSelects();
     App.applyStoredTheme();
+    App.hydrateBrandAssets();
     App.loadRoleAccessMap();
 
     const page = currentPage();
@@ -107,6 +108,43 @@ const App = {
     } catch (_) {}
   },
 
+  hydrateBrandAssets() {
+    try {
+      const school = window.SCHOOL || {};
+      const ext = String(school.logoExt || 'svg').toLowerCase();
+      const logoPath = 'assets/img/logo.' + ext;
+      // Many older generated pages hard-coded logo.svg. Always hydrate the
+      // app shell, install banner and HMG/public nav to the actual uploaded
+      // school logo. If the file is missing, the existing onerror fallback remains.
+      document.querySelectorAll('.app-brand img, .pwa-install-icon, .nav-logo img, img[data-school-logo]').forEach(img => {
+        if (!img) return;
+        const src = img.getAttribute('src') || '';
+        if (!src || /assets\/img\/logo\.(svg|png|jpe?g|webp)$/i.test(src)) {
+          img.setAttribute('src', logoPath);
+          img.setAttribute('alt', school.name || img.getAttribute('alt') || 'School logo');
+          if (!img.getAttribute('onerror')) img.setAttribute('onerror', "this.onerror=null;this.src='assets/img/logo.svg'");
+        }
+      });
+      document.querySelectorAll('.app-brand strong').forEach(el => { if (school.name) el.textContent = school.name; });
+    } catch (e) { console.warn('Brand hydration skipped:', e.message || e); }
+  },
+
+  markActiveNav() {
+    try {
+      const pageFile = (location.pathname.split('/').pop() || 'index.html').split('?')[0];
+      const pageId = App.normalizeModuleId(pageFile.replace(/\.html$/,''));
+      const aliases = new Set([pageId, pageFile.replace(/\.html$/,'')]);
+      document.querySelectorAll('.app-nav a[data-module-id]').forEach(a => {
+        const hrefFile = ((a.getAttribute('href') || '').split('/').pop() || '').split('?')[0];
+        const mid = App.normalizeModuleId(a.getAttribute('data-module-id') || hrefFile.replace(/\.html$/,''));
+        const hrefId = App.normalizeModuleId(hrefFile.replace(/\.html$/,''));
+        const active = aliases.has(mid) || aliases.has(hrefId) || hrefFile === pageFile;
+        a.classList.toggle('active', !!active);
+        if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      });
+    } catch (_) {}
+  },
+
   applyStoredTheme() {
     const saved = localStorage.getItem('sc-theme');
     if (saved) document.body.dataset.theme = saved;
@@ -129,32 +167,94 @@ const App = {
      to nav, dashboard tokens, and access checks. Safe to call from
      App.init() because it self-gates on the global App._roleResolved.
      ================================================================= */
+
+  // === v5 FIX: Network resilience & guest flash bug ===
+  // Cache profile to avoid guest flash on slow network
+  getCachedProfile() {
+    try {
+      const c = localStorage.getItem('sc-cached-profile');
+      if (c) return JSON.parse(c);
+    } catch(_) {}
+    return null;
+  },
+  setCachedProfile(p) {
+    try { localStorage.setItem('sc-cached-profile', JSON.stringify(p)); } catch(_) {}
+  },
+  showDashboardLoading(show) {
+    let el = document.getElementById('sc-dash-loading');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sc-dash-loading';
+      el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px';
+      el.innerHTML = '<div style="width:48px;height:48px;border:4px solid #e2e8f0;border-top-color:#4f46e5;border-radius:50%;animation:spin 1s linear infinite"></div><div style="color:#475569;font-weight:700">Loading your dashboard…</div><div style="font-size:.85rem;color:#94a3b8">Slow network detected — using cached session</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+      document.body.appendChild(el);
+    }
+    el.style.display = show ? 'flex' : 'none';
+  },
+
   async resolveAndApplyRole() {
     const currentSb = window.sb || this.sb || null;
     const page = currentPage();
+    // Show loading immediately on dashboard to prevent guest flash
+    if (page === 'dashboard') this.showDashboardLoading(true);
+    // Try to use cached profile for instant UI while network resolves
+    const cached = this.getCachedProfile();
+    if (cached && cached.role && page === 'dashboard') {
+      try {
+        App.currentRole = String(cached.role).toLowerCase();
+        window.SC_PROFILE = cached;
+        App.applyRoleDashboard(App.currentRole, cached);
+        App.applyRoleNav(App.currentRole);
+      } catch(_) {}
+    }
+
     if (!currentSb) {
-      // No Supabase configured → show setup banner, treat as guest
-      // for dashboard, demo for other pages. (matches v15 default)
       const setupBanner = document.getElementById('sc-setup-required');
       if (setupBanner) setupBanner.style.display = 'flex';
       const setupDetail = document.getElementById('sc-setup-detail');
       if (setupDetail) setupDetail.textContent = ' Edit assets/js/config.js with your Supabase URL and anon key.';
-      const effectiveRole = (page === 'dashboard') ? 'guest' : 'demo';
+      const effectiveRole = (page === 'dashboard') ? (cached ? cached.role : 'guest') : 'demo';
       App.currentRole = effectiveRole;
-      App.applyRoleDashboard(effectiveRole, { full_name: 'Guest', role: effectiveRole });
+      App.applyRoleDashboard(effectiveRole, cached || { full_name: 'Guest', role: effectiveRole });
       App.applyRoleNav(effectiveRole);
       App.loadPageData();
+      this.showDashboardLoading(false);
       return;
     }
+    // Retry logic with exponential backoff for slow network
     let user = null;
-    try {
-      const u = await currentSb.auth.getUser();
-      user = u && u.data && u.data.user;
-    } catch (e) { user = null; }
-    if (!user) { location.href = 'login.html'; return; }
+    let retries = 3;
+    for (let attempt=0; attempt<=retries; attempt++) {
+      try {
+        const u = await currentSb.auth.getUser();
+        user = u && u.data && u.data.user;
+        if (user) break;
+      } catch (e) {
+        if (attempt < retries) {
+          await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+          continue;
+        }
+      }
+      if (attempt < retries && !user) {
+        await new Promise(r => setTimeout(r, 400));
+      }
+    }
+    if (!user) {
+      // If we have cached profile, keep it instead of forcing login
+      if (cached && cached.id) {
+        console.warn('[Auth] getUser failed, using cached profile');
+        App.currentRole = String(cached.role||'student').toLowerCase();
+        window.SC_PROFILE = cached;
+        App.applyRoleDashboard(App.currentRole, cached);
+        App.applyRoleNav(App.currentRole);
+        App.loadPageData();
+        this.showDashboardLoading(false);
+        return;
+      }
+      location.href = 'login.html';
+      return;
+    }
 
-    // Prefer the SECURITY-DEFINER RPC for one-shot read of role/status.
-    // Falls back to direct profiles select if the RPC is missing.
     let role = '', status = 'active', name = '', profile = null;
     try {
       const rpc = await currentSb.rpc('sc_current_role');
@@ -166,35 +266,44 @@ const App = {
       }
     } catch (_) {}
     if (!role) {
-      try {
-        const { data, error } = await currentSb.from('profiles').select('full_name,email,role,status,photo_url,phone').eq('id', user.id).maybeSingle();
-        if (error) console.warn('Profile lookup failed:', error.message || error);
-        profile = data || profile;
-        role = (profile && profile.role) || user.user_metadata?.role || 'student';
-        status = (profile && profile.status) || 'active';
-        name = (profile && profile.full_name) || user.user_metadata?.full_name || user.email || 'User';
-      } catch (err) {
-        role = user.user_metadata?.role || 'student';
+      for (let attempt=0; attempt<2; attempt++) {
+        try {
+          const { data, error } = await currentSb.from('profiles').select('full_name,email,role,status,photo_url,phone').eq('id', user.id).maybeSingle();
+          if (error) throw error;
+          profile = data || profile;
+          role = (profile && profile.role) || user.user_metadata?.role || 'student';
+          status = (profile && profile.status) || 'active';
+          name = (profile && profile.full_name) || user.user_metadata?.full_name || user.email || 'User';
+          break;
+        } catch (err) {
+          if (attempt===0) await new Promise(r=>setTimeout(r, 600));
+        }
+      }
+      if (!role) {
+        role = user.user_metadata?.role || cached?.role || 'student';
         status = 'active';
-        name = user.user_metadata?.full_name || user.email || 'User';
+        name = user.user_metadata?.full_name || cached?.full_name || user.email || 'User';
       }
     }
     if (status === 'pending') {
-      document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px"><div style="max-width:440px;text-align:center;background:white;padding:40px;border-radius:16px"><h2 style="margin-bottom:12px">⏳ Account pending approval</h2><p>Your account is awaiting admin approval.</p></div></div>';
+      document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px"><div style="max-width:440px;text-align:center;background:white;padding:40px;border-radius:16px"><h2 style="margin-bottom:12px">⏳ Account pending approval</h2><p>Your account is awaiting admin approval.</p><a href="login.html" class="btn btn-primary" style="margin-top:16px">Back to Login</a></div></div>';
       return;
     }
     if (status === 'suspended') {
-      document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px"><div style="max-width:440px;text-align:center;background:white;padding:40px;border-radius:16px"><h2>🚫 Account suspended</h2><p>Please contact the school administrator.</p></div></div>';
+      document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px"><div style="max-width:440px;text-align:center;background:white;padding:40px;border-radius:16px"><h2>🚫 Account suspended</h2><p>Please contact the school administrator.</p><a href="login.html" class="btn btn-outline" style="margin-top:16px">Back to Login</a></div></div>';
       return;
     }
     App.currentRole = String(role).toLowerCase();
     App.currentUserName = name;
     App.currentProfile = profile || {};
     window.SC_PROFILE = Object.assign({ id: user.id, email: user.email }, profile || {}, { role: role, status, full_name: name });
+    this.setCachedProfile(window.SC_PROFILE);
     App.applyVisibilityTokens(App.currentRole);
     App.applyRoleDashboard(App.currentRole, { full_name: name, email: user.email, role: App.currentRole });
     App.applyRoleNav(App.currentRole);
     App.loadPageData();
+    this.showDashboardLoading(false);
+    try { localStorage.setItem('sc-last-role', App.currentRole); } catch(_){}
     App._roleResolved = true;
   },
 
@@ -272,6 +381,51 @@ const App = {
       q.innerHTML = filteredLinks.map(x => '<a class="btn btn-outline btn-sm" href="'+x[1]+'">'+x[0]+'</a>').join('');
     }
     App.injectAccessManager(role);
+    if (String(role || '').toLowerCase() === 'parent' || App.isAdminRole(role)) {
+      setTimeout(() => App.renderParentChildrenDashboard(role), 50);
+    }
+  },
+
+  async renderParentChildrenDashboard(role) {
+    const box = document.getElementById('dash-parent-kids');
+    if (!box) return;
+    const supabase = window.sb || this.sb || null;
+    const profile = window.SC_PROFILE || {};
+    if (!supabase || !supabase.from) {
+      box.innerHTML = '<div style="color:var(--gray-500)">Connect Supabase to display linked children.</div>';
+      return;
+    }
+    try {
+      const isParent = String(profile.role || role || '').toLowerCase() === 'parent';
+      if (!isParent || !profile.id) {
+        box.innerHTML = '<div style="color:var(--gray-500)">Admin inspection mode: sign in as a parent to see real linked children here.</div>';
+        return;
+      }
+      const { data: links, error: linkErr } = await supabase.from('parent_child').select('student_id,relationship,verified').eq('parent_id', profile.id);
+      if (linkErr) throw linkErr;
+      const ids = (links || []).map(x => x.student_id).filter(Boolean);
+      if (!ids.length) {
+        box.innerHTML = '<div class="card" style="background:#fff7ed;border-color:#fed7aa"><b>No child linked yet.</b><br><span style="color:#9a3412">Please ask the school administrator to link your parent account to your child on the Parents page.</span></div>';
+        return;
+      }
+      const { data: kids, error: kidErr } = await supabase.from('students').select('id,full_name,class,arm,admission_no,photo_url').in('id', ids).order('full_name');
+      if (kidErr) throw kidErr;
+      const rel = {}; (links || []).forEach(l => rel[l.student_id] = l.relationship || 'Parent');
+      box.innerHTML = (kids || []).map(k => {
+        const klass = [k.class, k.arm].filter(Boolean).join(' ') || 'Class not set';
+        const photo = k.photo_url ? '<img src="'+esc(k.photo_url)+'" referrerpolicy="no-referrer" style="width:48px;height:48px;border-radius:14px;object-fit:cover;border:1px solid var(--gray-200)">' : '<div style="width:48px;height:48px;border-radius:14px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:1.5rem">👤</div>';
+        return '<div style="display:flex;gap:12px;align-items:flex-start;border:1px solid var(--gray-200);border-radius:14px;padding:12px;background:#fff">'+photo+
+          '<div style="flex:1;min-width:0"><b>'+esc(k.full_name || 'Student')+'</b><div style="font-size:.82rem;color:var(--gray-500)">'+esc(klass)+' · '+esc(k.admission_no || '')+' · '+esc(rel[k.id] || 'Parent')+'</div>'+
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+
+          '<a class="btn btn-outline btn-sm" href="student-profile.html?student='+encodeURIComponent(k.id)+'">Dashboard</a>'+
+          '<a class="btn btn-outline btn-sm" href="attendance.html?student='+encodeURIComponent(k.id)+'">Attendance</a>'+
+          '<a class="btn btn-outline btn-sm" href="report-cards.html?student='+encodeURIComponent(k.id)+'">Report Card</a>'+
+          '<a class="btn btn-outline btn-sm" href="idcards.html?student='+encodeURIComponent(k.id)+'">ID Card</a>'+
+          '</div></div></div>';
+      }).join('') || '<div style="color:var(--gray-500)">No linked student record was found.</div>';
+    } catch (e) {
+      box.innerHTML = '<div style="color:#b91c1c">Could not load linked children: '+esc(e.message || e)+'</div>';
+    }
   },
 
   isAdminRole(role) {
@@ -297,9 +451,16 @@ const App = {
       'cbt-exam':'cbt_exam', 'cbt_exam':'cbt_exam',
       'timetable-generator':'timetable_generator', 'timetable_generator':'timetable_generator',
       'student-profile':'student_profile', 'student_profile':'student_profile',
+      'school-fees':'school_fees', 'school_fees':'school_fees', 'school-products':'school_products', 'school_products':'school_products',
+      'status-manager':'status_manager', 'status_manager':'status_manager', 'ecosystem-products':'ecosystem', 'ecosystem_products':'ecosystem', 'ecosystem':'ecosystem',
+      'hmg-digital-products':'hmg_digital_products', 'hmg_digital_products':'hmg_digital_products',
       'feature-guide':'feature_guide', 'feature_guide':'feature_guide',
       'verify-certificate':'verify_certificate', 'verify_certificate':'verify_certificate',
-      'payment-history':'payment_history', 'payment-history':'payment_history'
+      'payment-history':'payment_history',
+      'school-fees':'school_fees', 'school-products':'school_products', 'status-manager':'status_manager',
+      'payment-history':'payment_history',
+      'school-fees':'school_fees', 'school-products':'school_products', 'status-manager':'status_manager',
+      'hmg-digital-products':'hmg_digital_products', 'ecosystem-products':'ecosystem_products'
     };
     return map[id] || id.replace(/-/g,'_');
   },
@@ -341,7 +502,7 @@ const App = {
     'lesson-plans','behaviour','support_plans','support-plans',
     'cafeteria','menu','hostel','broadcast','document_builder',
     'document-builder','helpdesk','visitors','leave','checkin',
-    'book_request','book-request','idcards','reports',
+    'book_request','book-request','reports',
     // v4: user explicitly said these should NOT be in parent or student nav.
     // Parents/students have alternative pages for their data
     // (student-profile.html, fees.html, results.html, report-cards.html, etc.)
@@ -350,12 +511,11 @@ const App = {
     'cbt','cbt-multi','cbt_multi',
     // 'cbt-exam' is intentionally NOT blacklisted — students/parents
     // enter an exam code to take a CBT (see STUDENT/PARENT_WHITELIST).
-    'inbox','messages',
+    'messages',
     'digital_library','digital-library',
     'surveys',
     'lms','gamification',
-    'eresources','e-resources',
-    'complaints','broadcast','document_builder','document-builder'
+    'broadcast','document_builder','document-builder'
   ]),
 
   /* Role-friendly modules that STUDENTS can see (separate from allow list) */
@@ -363,15 +523,14 @@ const App = {
      A student is allowed to see their own dashboard, their profile,
      their own results, their own report card (read-only), their
      attendance, their timetable, their assignments, their fees, and
-     basic public pages. They CANNOT see CBT manager, online pay,
-     voting, inbox, messages, e-resources, surveys, etc.
+     basic public pages. They cannot manage CBT or school administration; family-safe pages remain read-only.
      Students CAN take a CBT exam (cbt-exam) by entering the code. */
   STUDENT_WHITELIST: new Set([
     'dashboard','profile','change-password','notifications',
     'student-profile','student_profile',
     'results','report-cards','report_cards',
-    'attendance','timetable','assignments',
-    'fees',
+    'attendance','timetable','assignments','idcards','inbox','complaints','eresources','e-resources','certificates',
+    'fees','idcards',
     'voting',
     'announcements','events','school_calendar','school-calendar',
     'gallery','helpdesk','lost_found','lost-found',
@@ -380,7 +539,7 @@ const App = {
     'flyer',
     'feature-guide','feature_guide','about','contact',
     'index','login','apply','verify-certificate','verify_certificate',
-    'cbt-exam','cbt_exam'
+    'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products'
   ]),
 
   /* Role-friendly modules that PARENTS can see (no admin/finance/HR) */
@@ -389,16 +548,15 @@ const App = {
      their children's results, their children's report card (read-only),
      their children's attendance, the announcements, events, and basic
      public pages. They CANNOT see CBT manager, multi-subject CBT,
-     online pay (payments_online), voting, inbox, messages, e-resources,
-     surveys, digital_library, etc. Parents CAN take a CBT exam
+     online pay (payments_online) or administrative modules. Family-safe pages are read-only. Parents CAN take a CBT exam
      (cbt-exam) by entering the code. */
   PARENT_WHITELIST: new Set([
     'dashboard','profile','change-password','notifications',
     'student-profile','student_profile',
-    'fees',
+    'fees','idcards',
     'results','report-cards','report_cards',
     'academic-records','academic_records',
-    'attendance','assignments','timetable',
+    'attendance','assignments','timetable','idcards','inbox','complaints','eresources','e-resources','certificates',
     'announcements','events','school_calendar','school-calendar',
     'gallery','helpdesk','lost_found','lost-found',
     'diary','parent_meeting','parent-meeting',
@@ -406,7 +564,7 @@ const App = {
     'voting',
     'feature-guide','feature_guide','about','contact',
     'index','login','apply','verify-certificate','verify_certificate',
-    'cbt-exam','cbt_exam'
+    'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products'
   ]),
 
   /* denyParent ... financial_aid, denyStudent ... transport — second safety net
@@ -606,7 +764,31 @@ const App = {
   /* =================================================================
      NAVIGATION
      ================================================================= */
-  NAV_ORDER: ['dashboard','profile','student-profile','change-password','notifications','academic_setup','students','staff','parents','classes','subjects','departments','attendance','timetable','timetable-generator','sow','lesson_plans','results','report-cards','academic-records','transcripts','rubrics','cbt','cbt-prompts','cbt-multi','cbt-exam','entrance','assignments','digital_library','library','book_request','eresources','lms','announcements','events','school_calendar','messages','inbox','broadcast','complaints','voting','surveys','gallery','birthdays','fees','payment-history','payments_online','finance','financial_aid','donations','hr','payroll','staff_loans','staff_bonus','appraisals','leave','substitutions','admissions','exam_registrations','promotion','alumni','certificates','transfer_cert','idcards','flyer','document_builder','conduct','behaviour','health','counselling','support_plans','diary','gamification','hostel','cafeteria','menu','transport','fleet_tracking','visitors','checkin','front_desk','lost_found','parent_meeting','facility_booking','library_borrowers','career_counseling','helpdesk','directory','reports','analytics','inventory','storage','compliance','activity_log','admin-data','approvals','settings','teacher-overview','feature-guide','developer'],
+  NAV_ORDER: ['dashboard','profile','student-profile','change-password','notifications','academic_setup','students','staff','parents','classes','subjects','departments','attendance','timetable','timetable-generator','sow','lesson_plans','results','report-cards','affective_traits','psychomotor_traits','report_comments','academic-records','transcripts','rubrics','cbt','cbt-prompts','cbt-multi','cbt-exam','entrance','assignments','digital_library','library','book_request','eresources','lms','announcements','events','school_calendar','messages','inbox','broadcast','complaints','voting','surveys','gallery','birthdays','fees','school-fees','school-products','payment-history','payments_online','finance','financial_aid','donations','hr','payroll','staff_loans','staff_bonus','appraisals','leave','substitutions','admissions','exam_registrations','promotion','alumni','certificates','transfer_cert','idcards','flyer','document_builder','conduct','behaviour','health','counselling','support_plans','diary','gamification','hostel','cafeteria','menu','transport','fleet_tracking','visitors','checkin','front_desk','lost_found','parent_meeting','facility_booking','library_borrowers','career_counseling','helpdesk','directory','reports','analytics','inventory','storage','compliance','activity_log','admin-data','approvals','settings','teacher-overview','feature-guide','hmg-digital-products','status-manager','developer'],
+
+  // v2 NAV-01: Pages may be generated from older static templates whose
+  // hand-written sidebars do not contain later modules. Inject these canonical
+  // links at runtime so navigation is complete, then apply the normal role/RLS
+  // visibility rules. This avoids relying on one stale page template.
+  ESSENTIAL_NAV: [
+    ['affective_traits','⭐','Affective Domain','affective_traits.html','super_admin admin principal proprietor head_teacher bursar staff teacher'],
+    ['psychomotor_traits','🏃','Psychomotor Domain','psychomotor_traits.html','super_admin admin principal proprietor head_teacher bursar staff teacher'],
+    ['report_comments','💬','Report Card Comments','report_comments.html','super_admin admin principal proprietor head_teacher bursar staff teacher'],
+    ['school_fees','💳','School Fee Structure','school-fees.html','super_admin admin principal proprietor head_teacher bursar'],
+    ['school_products','🛍️','School Products','school-products.html','super_admin admin principal proprietor head_teacher bursar'],
+    ['status_manager','🔐','Role & Status Manager','status-manager.html','super_admin admin principal proprietor head_teacher bursar'],
+    ['ecosystem','🌐','HMG Ecosystem','ecosystem.html','super_admin admin principal proprietor head_teacher bursar staff teacher parent student'],
+    ['hmg_digital_products','🏢','HMG Digital Products','hmg-digital-products.html','super_admin admin principal proprietor head_teacher bursar staff teacher parent student']
+  ],
+  ensureEssentialNav() {
+    const nav=document.querySelector('.app-nav'); if(!nav) return;
+    this.ESSENTIAL_NAV.forEach(([id,icon,label,href,allow]) => {
+      if(nav.querySelector('[data-module-id="'+id+'"]')) return;
+      const a=document.createElement('a'); a.href=href; a.dataset.moduleId=id; a.dataset.roleAllow=allow;
+      a.innerHTML='<span class="app-nav-icon">'+icon+'</span><span>'+label+'</span>';
+      nav.appendChild(a);
+    });
+  },
 
   injectNavSearch() {
     try {
@@ -647,9 +829,14 @@ const App = {
       const nav = document.querySelector('.app-nav'); if (!nav) return;
       const links = [...nav.querySelectorAll('a[data-module-id]')];
       if (links.length < 2) return;
+      // FIX NAV-01: dedupe by NORMALIZED module id, not the raw data-module-id.
+      // The codebase uses both 'school_fees' and 'school-fees' as ids (e.g.
+      // ESSENTIAL_NAV injects 'school_fees' while hand-written nav uses
+      // 'school-fees'); without normalization both links survived and the
+      // sidebar showed every aliased module twice.
       const seen = new Set();
       links.forEach(a => {
-        const id = a.getAttribute('data-module-id');
+        const id = App.normalizeModuleId(a.getAttribute('data-module-id'));
         if (seen.has(id)) a.remove(); else seen.add(id);
       });
       const order = App.NAV_ORDER;
@@ -662,7 +849,9 @@ const App = {
   applyRoleNav(role) {
     document.body.dataset.roleReady = '1';
     document.body.dataset.currentRole = String(role || '').toLowerCase();
+    App.ensureEssentialNav();
     App.normalizeNavOrder();
+    App.markActiveNav();
     App.injectNavSearch();
     const links = [...document.querySelectorAll('[data-role-allow]')];
     const isAdmin = App.isAdminRole(role);
@@ -676,7 +865,8 @@ const App = {
       //  1. data-role-allow: explicit role list
       //  2. App.canAccessAllowList: expands role inheritance (admin -> staff -> teacher etc.)
       //  3. App.moduleAllowedForRole: family blacklist/whitelist + page-specific deny
-      const allowOk = App.canAccessAllowList(App.allowTextForElement(el), role) && App.moduleAllowedForRole(moduleId, role);
+      const familyReadOnly = ['parent','student'].includes(String(role||'').toLowerCase()) && App.moduleAllowedForRole(moduleId, role);
+      const allowOk = familyReadOnly || (App.canAccessAllowList(App.allowTextForElement(el), role) && App.moduleAllowedForRole(moduleId, role));
       let ok = allowOk;
       /* v5: if the page is in the nav-show map and the role is NOT in it, hide it (even if allowOk=true) */
       if (ok && navShowMap[moduleId] && Array.isArray(navShowMap[moduleId]) && !isAdmin) {
@@ -720,13 +910,17 @@ const App = {
       const page = currentPage();
       if (window.CRUD && CRUD.def && CRUD.def(page)) {
         clearTimeout(App._crudRoleTimer);
+        // FIX #1: Increased debounce from 150ms to 600ms to prevent race
+        // condition where the initial renderList (from loadPageData) is
+        // overridden by this role-refresh before data arrives from Supabase.
+        // The 600ms window gives the first render time to complete.
         App._crudRoleTimer = setTimeout(() => {
           if (typeof CRUD.renderList === 'function') {
             try { CRUD.renderList(page, { roleRefresh: true }); } catch(e) {}
           }
           // Apply read-only role enforcement to the form fields
           try { App.enforceReadOnlyForm(role, page); } catch(e) {}
-        }, 150);
+        }, 600);
       }
     } catch(e) {}
   },
@@ -842,7 +1036,8 @@ const App = {
     const required = active ? App.allowTextForElement(active) : shell.getAttribute('data-require-role');
     const blockedByNav = active && active.style.display === 'none';
     const activeId = active ? (active.getAttribute('data-module-id') || active.getAttribute('href') || '') : currentPage();
-    const blockedByRole = (required && !App.canAccessAllowList(required, role)) || !App.moduleAllowedForRole(activeId, role);
+    const familyReadOnly = ['parent','student'].includes(String(role||'').toLowerCase()) && App.moduleAllowedForRole(activeId, role);
+    const blockedByRole = (!familyReadOnly && required && !App.canAccessAllowList(required, role)) || !App.moduleAllowedForRole(activeId, role);
 
     if (!blockedByNav && !blockedByRole && !(active && active.classList.contains('nav-locked'))) return;
 
@@ -978,6 +1173,7 @@ const App = {
   signOut() {
     const supabase = window.sb || this.sb || null;
     if (!supabase) { location.href = 'login.html'; return; }
+    try { localStorage.removeItem('sc-cached-profile'); localStorage.removeItem('sc-last-role'); } catch(_){}
     supabase.auth.signOut().then(() => { location.href = 'login.html'; });
   },
 

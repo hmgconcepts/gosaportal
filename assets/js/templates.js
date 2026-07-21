@@ -38,7 +38,7 @@ const T = {
 ${fontLink}
 <meta property="og:title" content="${T.esc(title)} • ${T.esc(config.schoolName)}">
 <meta property="og:description" content="${T.esc(config.schoolName)} — Free school management by HMG Concepts">
-<meta property="og:image" content="assets/img/logo.png">
+<meta property="og:image" content="assets/img/logo.${logoExt}">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="assets/css/style.css">
@@ -215,7 +215,8 @@ ${T.modal()}
       timetable_generator: 'timetable-generator.html',
       student_profile: 'student-profile.html',
       verify_certificate: 'verify-certificate.html',
-      feature_guide: 'feature-guide.html', profile:'profile.html', change_password:'change-password.html', cbt_multi:'cbt-multi.html'
+      feature_guide: 'feature-guide.html', profile:'profile.html', change_password:'change-password.html', cbt_multi:'cbt-multi.html',
+      ecosystem_products: 'ecosystem.html', ecosystem:'ecosystem.html', hmg_digital_products:'hmg-digital-products.html', school_fees:'school-fees.html', school_products:'school-products.html', status_manager:'status-manager.html'
     };
     return map[id] || (id + '.html');
   },
@@ -346,17 +347,17 @@ ${T.setupRequiredBanner()}
       'cbt','cbt_prompts','entrance','assignments','timetable','timetable_generator','sow',
       'lesson_plans','library','digital_library','eresources','announcements','events','messages','inbox',
       'complaints','broadcast','diary','checkin','checkin_staff','checkin-staff','behaviour','conduct','health','support_plans',
-      'certificates','reports','directory','rubrics','counselling','substitutions','helpdesk','book_request'
+      'certificates','reports','directory','rubrics','counselling','substitutions','helpdesk','book_request', 'ecosystem_products','hmg_digital_products'
     ]);
     const parentSet = new Set([
       'dashboard','profile','change_password','notifications','feature_guide','student_profile','fees','payments_online','results',
       'report_cards','attendance','assignments','diary','timetable','announcements','events','messages','inbox',
-      'complaints','eresources','certificates','school_calendar','voting'
+      'complaints','eresources','certificates','school_calendar','voting','idcards', 'ecosystem_products','hmg_digital_products'
     ]);
     const studentSet = new Set([
       'dashboard','profile','change_password','notifications','feature_guide','student_profile','cbt_exam','assignments','digital_library',
       'eresources','timetable','results','report_cards','attendance','announcements','events','messages','inbox',
-      'complaints','certificates','diary','school_calendar','voting'
+      'complaints','certificates','diary','school_calendar','voting','idcards', 'ecosystem_products','hmg_digital_products'
     ]);
 
     const roles = [admin];
@@ -381,8 +382,9 @@ ${T.setupRequiredBanner()}
       activity_log:'🧮', lesson_plans:'🗒️', behaviour:'🏅', support_plans:'🧩',
       donations:'💝', substitutions:'🔁', helpdesk:'🆘', payments_online:'💳', notifications:'🔔',
       'report_cards':'🧾', 'admin-data':'🗄️', flyer:'📰', approvals:'✅', 'timetable-generator':'🗓️', checkin:'📲', 'checkin-staff':'⏰', 'checkin_staff':'⏰', diary:'📔', surveys:'🗒️', menu:'🍽️', settings:'⚙️',
-      digital_library:'📚', 'cbt-prompts':'🧩', entrance:'🎯', storage:'🗄️', developer:'👨‍💻',
+      digital_library:'📚', 'cbt-prompts':'🧩', entrance:'🎯', storage:'🗄️', developer:'👨‍💻', ecosystem:'🌐', ecosystem_products:'🌐',
       payroll:'🧾', staff_loans:'🏦', staff_bonus:'🎁', appraisals:'⭐', 'student-profile':'👤', academic_records:'📄',
+      affective_traits:'⭐', psychomotor_traits:'🏃', report_comments:'💬',
       rubrics:'📐', transcripts:'🎓', transfer_cert:'📄', counselling:'💬'
     };
     return map[id] || '◦';
@@ -393,6 +395,7 @@ ${T.setupRequiredBanner()}
   labelFor(id, fallbackName) {
     const map = {
       dashboard:'Dashboard', about:'About', contact:'Contact', apply:'Apply', 'feature-guide':'Feature Guide', 'verify-certificate':'Verify Certificate', 'teacher-overview':'Teacher Overview', 'cbt-exam':'Take Exam', 'cbt-multi':'Multi-Subject CBT', profile:'My Profile', 'change-password':'Change Password', 'student-profile':'Student Profile', academic_records:'Academic Records', academic_setup:'Academic Setup', students:'Students', staff:'Staff', classes:'Classes',
+      ecosystem_products:'HMG Ecosystem', ecosystem:'HMG Ecosystem', hmg_digital_products:'HMG Digital Products', school_fees:'School Fee Structure', school_products:'School Products', status_manager:'Role & Status Manager',
       attendance:'Attendance', results:'Results', timetable:'Timetable',
       'timetable-generator':'Auto-Timetable', sow:'Scheme', cbt:'CBT', assignments:'Assignments',
       library:'Library', conduct:'Conduct', health:'Health', promotion:'Promotion',
@@ -410,34 +413,42 @@ ${T.setupRequiredBanner()}
       activity_log:'Activity Log', lesson_plans:'Lesson Plans', behaviour:'Behaviour',
       support_plans:'Support Plans', donations:'Donations', substitutions:'Substitutions',
       helpdesk:'Help Desk', payments_online:'Online Pay', 'report_cards':'Report Cards',
+      affective_traits:'Affective Domain', psychomotor_traits:'Psychomotor Domain', report_comments:'Report Comments',
       'admin-data':'Admin Data', approvals:'Approvals', flyer:'Flyer', checkin:'QR Check-in', 'checkin-staff':'Staff Check-In', 'checkin_staff':'Staff Check-In', diary:'Diary',
       surveys:'Surveys', menu:'Menu', academic_records:'Records'
     };
     return map[id] || fallbackName || id;
   },
 
-  /* Get list of all pages/modules for this school.
-     FIX v9: Includes all relevant modules for complete portal nav.
-     The navigator is a complete portal map, not only the wizard's selected modules. */
+  /* Get the list of pages/modules to show in this school's sidebar nav.
+     FIX NAV-1 (audit — the #1 cause of broken links in generated sites):
+     Previously this returned ALL 88 catalog modules plus a "dedicated" list,
+     so the sidebar linked to module pages the generator had NOT emitted (every
+     client who selected a subset got a nav full of 404s). The nav must be a
+     SUBSET of the generated pages. It is now:
+       base            – always-on app pages (dashboard)
+       dedicatedPages  – pages the generator ALWAYS emits (Generator.build,
+                         step 11). Kept in lock-step with that list, so every
+                         id here is guaranteed to resolve.
+       selected        – the modules the user actually picked in the wizard.
+     nav ⊆ generated pages ⇒ zero broken internal links, guaranteed. */
   allModules(config) {
     const byId = id => (window.SC.MODULES || []).find(m => m.id === id) || { id, name: T.labelFor(id, id) };
     const base = ['dashboard'];
-    // Catalog = all modules from SC.MODULES (the full module registry)
-    const catalogIds = (window.SC.MODULES || []).map(m => m.id);
-    // User selected modules from wizard config
-    const selected = Array.isArray(config.modules) ? config.modules.slice() : [];
-    // Dedicated pages — always available regardless of module selection
+    // Pages the generator unconditionally writes into every ZIP (see the
+    // `dedicatedPages` array in generator.js — these two lists must match).
     const dedicatedPages = [
-      // Public pages (about/contact/apply/verify) are still generated, but are not
-      // placed inside authenticated role dashboards to keep staff/parent/student
-      // navigation focused.
-      'student-profile', 'profile', 'change-password', 'cbt-exam', 'cbt-multi', 'teacher-overview', 'feature-guide', 'notifications', 'parents'
+      'student-profile', 'profile', 'change-password', 'notifications', 'settings',
+      'voting', 'teacher-overview', 'cbt-exam', 'cbt-prompts', 'cbt-multi',
+      'timetable-generator', 'payment-history', 'exam-register', 'feature-guide',
+      'verify-certificate',
+      // Baseline learner/parent-safe pages are always in the navigation because the generator now emits all catalog pages.
+      'assignments','results','timetable','attendance','report-cards','fees','sow'
     ];
-    // Combine and dedupe — avoid 'class' vs 'classes' collisions
-    const known = [...new Set([...base, ...catalogIds, ...dedicatedPages])];
-    const extraSelected = selected.filter(id => !known.includes(id));
-    const allIds = [...known, ...extraSelected].filter(Boolean);
-    return allIds.map(id => byId(id));
+    // Only the modules the user selected. Never the full catalog.
+    const selected = Array.isArray(config.modules) ? config.modules.slice() : [];
+    const navIds = [...new Set([...base, ...dedicatedPages, ...selected])].filter(Boolean);
+    return navIds.map(id => byId(id));
   },
 
   /* ---------- Dashboard ---------- */
@@ -458,7 +469,27 @@ ${T.setupRequiredBanner()}
     const studentLinks = [
       ['Take CBT','cbt-exam.html'],['Multi-Subject CBT','cbt-multi.html'],['Assignments','assignments.html'],['Digital Library','digital_library.html'],['E-Resources','eresources.html'],['Timetable','timetable.html'],['Results','results.html'],['Report Cards','report-cards.html'],['My Profile','student-profile.html'],['Diary','diary.html'],['Announcements','announcements.html'],['Inbox','inbox.html'],['Complaints','complaints.html'],['Certificates','certificates.html']
     ];
-    const buttons = arr => arr.map(x => `<a class="btn btn-outline btn-sm" href="${x[1]}">${T.esc(x[0])}</a>`).join('');
+    // FIX NAV-2 (audit): the dashboard's role quick-link tiles hardcoded
+    // EVERY module's filename regardless of selection, so a subset client got
+    // dozens of dead buttons. We now filter each tile to only link to pages the
+    // generator actually emits. `_dashBase` lists ONLY the pages the generator
+    // writes unconditionally (Generator.build step 11 + index/login/dashboard);
+    // everything else (idcards, certificates, flyer, finance, …) only appears
+    // when the user selected that module, so it is covered by `_dashSelected`.
+    // NOTE: keep `_dashBase` in lock-step with the dedicatedPages array in
+    // generator.js — if a page becomes always-on there, add its id here too.
+    const _dashBase = ['dashboard','login','index','about','contact','apply','developer',
+      'feature-guide','student-profile','profile','change-password','cbt-exam','cbt-multi',
+      'cbt-prompts','teacher-overview','notifications','settings','voting','timetable-generator',
+      'payment-history','exam-register','verify-certificate','ecosystem','hmg-ecosystem',
+      'checkin-staff','geofence-settings'];
+    const _dashSelected = Array.isArray(config.modules) ? config.modules.slice() : [];
+    const available = new Set(
+      [..._dashBase, ..._dashSelected].map(id => T.pageFileName(id))
+    );
+    const buttons = arr => arr
+      .filter(x => available.has(x[1]))
+      .map(x => `<a class="btn btn-outline btn-sm" href="${x[1]}">${T.esc(x[0])}</a>`).join('');
     return T.shell(config, 'Dashboard', `
       <div class="card" style="margin-bottom:18px;background:var(--gradient);color:#fff">
         <h2 style="margin:0;color:#fff">Welcome, <span id="dash-user-name">User</span></h2>
@@ -821,7 +852,10 @@ ${T.setupRequiredBanner()}
     "school_calendar":{what:"Master academic event schedule and holiday tracking. The definitive institutional calendar displaying term start dates, examination timeframes, public holidays, sports events, and parent-teacher meeting schedules for the entire school community.",who:"Staff manage; All users view.",steps:["Click Add new.","Specify calendar event title and exact dates.","Categorize event (Exam, Holiday, Term-start).","Publish to master institutional dashboard."]},
     "lost_found":{what:"Campus property logging for lost items and claims. A campus property ledger where staff and students log found personal items, textbooks, and electronic devices. Records item descriptions, finding locations, and successful property claims.",who:"All users view; Staff manage.",steps:["Click Add new.","Log item description and finding location.","Categorize status (Lost vs Found).","Update record status once claimed by owner."]},
     "parent_meeting":{what:"PTA assembly logging, scheduling, and official minutes. Manages institutional Parent-Teacher Association (PTA) assemblies, individual teacher consultation schedules, official meeting agendas, and published assembly minutes.",who:"Staff manage; Parents view.",steps:["Click Add new.","Schedule PTA assembly date, time, and venue.","Publish official meeting agenda topics.","Attach comprehensive post-meeting assembly minutes."]},
-    "book_request":{what:"Student book reservation and lending requests. A dedicated library service portal where students and staff request physical book reservations, track lending availability, and lodge requests for new curriculum textbooks.",who:"Students/Staff request; Librarian manages.",steps:["Click Add new.","Specify book title and author name.","Submit reservation request.","Track reservation status (Requested, Reserved, Issued)."]}},
+    "book_request":{what:"Student book reservation and lending requests. A dedicated library service portal where students and staff request physical book reservations, track lending availability, and lodge requests for new curriculum textbooks.",who:"Students/Staff request; Librarian manages.",steps:["Click Add new.","Specify book title and author name.","Submit reservation request.","Track reservation status (Requested, Reserved, Issued)."]},
+    "exam_registrations":{what:"One central register for ALL external examinations — WAEC/NECO SSCE, UTME (JAMB), IGCSE (Cambridge), Common Entrance (NCEE), BECE, NABTEB, GCE and more. Each candidate row holds their personal details, NIN, chosen subjects/courses, fees (with auto balance), passport link and status. Filter by exam type, year or class, then export the whole register to CSV/PDF ready for upload to the examination body.",who:"Admin, examination officer and principal manage; candidates submit via the public exam-register.html form.",steps:["Candidates fill the public exam-register.html form (no login).","Open exam-register.html to review every submitted candidate.","Set status: pending → approved → uploaded to exam body.","Use Export CSV / Export PDF to send the register to WAEC/NECO/JAMB."]},
+    "exam_register":{what:"A public, no-login registration form for external examinations (WAEC, NECO, UTME/JAMB, IGCSE, NCEE, BECE, NABTEB, GCE and more). Candidates complete 40+ fields — personal details, NIN, contact, parent/guardian, school, subjects, payment and required documents — and the data flows straight into the school portal for the examination officer.",who:"Any candidate submits (open to the public); the school examination officer reviews.",steps:["Open exam-register.html (no login needed).","Pick the examination type to reveal its specific fields.","Fill personal, NIN, contact, subject and document details.","Submit — the examination officer reviews it in exam-register.html."]},
+    "exam-register":{what:"A public, no-login registration form for external examinations (WAEC, NECO, UTME/JAMB, IGCSE, NCEE, BECE, NABTEB, GCE and more). Candidates complete 40+ fields — personal details, NIN, contact, parent/guardian, school, subjects, payment and required documents — and the data flows straight into the school portal for the examination officer.",who:"Any candidate submits (open to the public); the school examination officer reviews.",steps:["Open exam-register.html (no login needed).","Pick the examination type to reveal its specific fields.","Fill personal, NIN, contact, subject and document details.","Submit — the examination officer reviews it in exam-register.html."]}},
 
   guideHTML(moduleId, mod) {
     const g = T.PAGE_GUIDE[moduleId];

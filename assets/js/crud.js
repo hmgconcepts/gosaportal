@@ -83,7 +83,10 @@ const CRUD = {
       {key:'arm',label:'Arm',type:'text'},
       {key:'level',label:'Level',type:'select',options:['Pre-Nursery','Nursery','Primary','JSS','SSS','Other']},
       {key:'class_teacher',label:'Class teacher (pick from staff)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',refFilter:{staff_type:'teaching'}},
-      {key:'capacity',label:'Capacity',type:'number'}
+      {key:'capacity',label:'Capacity',type:'number'},
+      {key:'next_term_fees',label:'Next term fee bill amount',type:'number'},
+      {key:'next_term_fees_currency',label:'Currency',type:'select',options:['₦', '$', '£', '€']},
+      {key:'next_term_fees_note',label:'Next term fees payment note',type:'text'}
     ]},
     subjects: { table:'subjects', title:'Subject', cols:[
       {key:'name',label:'Subject',type:'text',required:true},
@@ -403,9 +406,12 @@ const CRUD = {
       {key:'priority',label:'Priority',type:'select',options:['low','normal','high','urgent']},
       {key:'status',label:'Status',type:'select',options:['open','in_progress','resolved','closed']}
     ]},
-    directory: { table:'profiles', title:'Person', readOnly:true, cols:[
-      {key:'full_name',label:'Name',type:'text'},{key:'email',label:'Email',type:'email'},
-      {key:'role',label:'Role',type:'text'},{key:'status',label:'Status',type:'text'}
+    directory: { table:'profiles', title:'Person', cols:[
+      {key:'full_name',label:'Name',type:'text',required:true},
+      {key:'email',label:'Email',type:'email',readonly:true,help:'Email login address (cannot be edited)'},
+      {key:'role',label:'Role',type:'select',options:['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher','parent','student'],required:true},
+      {key:'status',label:'Status',type:'select',options:['pending','approved','suspended','rejected'],required:true},
+      {key:'phone',label:'Phone',type:'text'}
     ]},
     activity_log: { table:'activity_log', title:'Activity', readOnly:true, cols:[
       {key:'created_at',label:'When',type:'text'},
@@ -430,7 +436,7 @@ const CRUD = {
       {key:'select_count',label:'Select N questions (0 = all)',type:'number'},
       {key:'randomise',label:'Randomise questions',type:'checkbox'},
       {key:'negative_mark',label:'Negative mark per wrong answer',type:'number'},
-      {key:'exam_mode',label:'Exam mode',type:'select',options:['open','registered']},
+      {key:'exam_mode',label:'Exam mode',type:'select',options:['open','anonymous','registered'],help:'Open: anyone with link, no login. Anonymous: candidates hide identity, results anonymized. Registered: only logged-in students of assigned class.'},
       {key:'is_open',label:'Open for candidates',type:'checkbox'},
       {key:'release_results',label:'Release results instantly',type:'checkbox'},
       {key:'instructions',label:'Candidate instructions',type:'textarea'},
@@ -541,6 +547,40 @@ const CRUD = {
       {key:'recommendation',label:'Recommendation',type:'select',options:['promote','retain','train','warn','commend']},
       {key:'comments',label:'Appraiser comments',type:'textarea'},
       {key:'appraiser',label:'Appraised by',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',searchable:true}
+    ]},
+    school_fees: { table:'class_fee_structure', title:'Class / Department Fee Structure', help:'Define current-term and next-term bills by class, arm and department. The matching next-term bill is printed automatically on each student report card; previous balances come from fee payment records.', cols:[
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name',required:true},
+      {key:'arm',label:'Arm / Stream (select from dropdown — no typing)',type:'lookup',lookupKind:'arm',help:'Pick from existing arms (A/B/C/D) — created in Academic Setup > Lookups. No manual typing — prevents typos.'},
+      {key:'department',label:'Department / Section',type:'ref',refTable:'departments',refValue:'name',refStore:'value',help:'Optional: Nursery, Primary, Junior Secondary, Science, Arts, Boarding, etc.'},
+      {key:'term',label:'Term scope',type:'select',options:['Current Term','Next Term'],required:true},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'tuition',label:'Tuition fee',type:'number'},
+      {key:'exam_fee',label:'Exam / assessment fee',type:'number'},
+      {key:'development',label:'Development / PTA levy',type:'number'},
+      {key:'transport',label:'Transport fee',type:'number'},
+      {key:'boarding',label:'Boarding / hostel fee',type:'number'},
+      {key:'other_fee',label:'Other compulsory fee',type:'number'},
+      {key:'discount',label:'Discount amount',type:'number'},
+      {key:'total',label:'Total bill (auto-fill or override)',type:'number',help:'If left 0, report cards calculate the total from the fee components.'},
+      {key:'due_date',label:'Due date',type:'date'},
+      {key:'next_term_begins',label:'Next term begins',type:'date'},
+      {key:'note',label:'Payment note / bank instruction',type:'textarea'}
+    ]},
+    school_products: { table:'school_products', title:'School Product', cols:[
+      {key:'name',label:'Product name',type:'text',required:true},
+      {key:'category',label:'Category',type:'select',options:['Uniform','Textbook','Exercise Book','Stationery','Bag','Other'],required:true},
+      {key:'price',label:'Price',type:'number'},
+      {key:'size_option',label:'Size / Options (e.g. M, L, XL or 40-leaves)',type:'text'},
+      {key:'stock_note',label:'Stock status / Note',type:'text'}
+    ]},
+    status_manager: { table:'role_status_log', title:'Role & Status Manager', help:'Clear, unambiguous workflow: pick an existing platform user from dropdown (no typing), system auto-fills previous role and email. Assign new role, choose action, save. Every change is audited (who changed, when, why). First-time admin guide: 1) Select person. 2) Review auto-filled previous role. 3) Pick new role & action. 4) Add reason. 5) Save — profile updates instantly + activity log recorded.', cols:[
+      {key:'person_id',label:'Select Person (from existing platform users — dropdown)',type:'ref',refTable:'profiles',refValue:'full_name',refExtra:['email','role','status'],refStore:'id',searchable:true,required:true,help:'Dropdown of all registered users — mandatory. Auto-fills name and previous role below — no manual typing.',autofill:{person_name:'full_name',previous_role:'role'}},
+      {key:'person_name',label:'Person full name (auto-filled from selection)',type:'text',readonly:true,help:'Auto-filled; you can manually override only if creating audit for non-user'},
+      {key:'previous_role',label:'Previous / Current role (auto-filled)',type:'text',readonly:true,help:'Auto-filled from selected profile — shows role before change'},
+      {key:'new_role',label:'New role to assign',type:'select',options:['super_admin','admin','principal','proprietor','head_teacher','staff','teacher','parent','student','bursar'],required:true,help:'Choose the target role'},
+      {key:'action',label:'Action type',type:'select',options:['promote','demote','convert','suspend','reactivate','deactivate'],required:true,help:'Why changing? Promote, convert, suspend, etc.'},
+      {key:'reason',label:'Reason for change (audit)',type:'textarea',help:'Explain reason for audit trail — e.g. Appointment letter reference'},
+      {key:'changed_by',label:'Authorized by (auto)',type:'text',help:'Leave blank — auto-filled with current admin name'}
     ]}
   },
 
@@ -631,6 +671,7 @@ const CRUD = {
      - Parents see only their linked children's data
      - Staff/Admin see all data (no filter)
   */
+  // The last visible records are session-scoped by user/role/module; never use a shared cache.
   stableTableCacheKey(moduleId, suffix='') {
     const uid = (window.SC_PROFILE && SC_PROFILE.id) || 'guest';
     const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.App && App.currentRole) || 'guest';
@@ -752,11 +793,55 @@ const CRUD = {
       } catch(e) { console.warn('Parent filter failed:', e); filteredData = []; }
     }
 
+    // FIX V2.1 — Persistent table: never clear existing rows when filtered result is empty.
+    // This resolves issue #1 where parent/student pages flashed data then disappeared.
+    // Strategy: keep cached HTML or existing DOM, show informative banner above table.
     if (!filteredData || !filteredData.length) {
-      let cached = null; try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch(_) {}
-      if (cached && cached.html) { tb.innerHTML = cached.html + '<tr><td colspan="' + (cols.length + (writable ? 1 : 0)) + '" style="color:#64748b;background:#f8fafc">No new live rows found right now; the last visible records are kept here so recipients can continue reading them.</td></tr>'; return; }
-      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0)) + '" style="color:var(--gray-500)">No records yet.' + (writable ? ' Click “+ Add new”.' : '') + '</td></tr>'; return;
+      let cached = null;
+      try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch(_) {}
+      const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+      let infoBox = wrap ? wrap.querySelector('.sc-table-persist-info') : null;
+      if (!infoBox && wrap) {
+        infoBox = document.createElement('div');
+        infoBox.className = 'sc-table-persist-info';
+        infoBox.style.cssText = 'background:#eff6ff;border:1px solid #bfdbfe;padding:12px 14px;border-radius:10px;margin-bottom:14px;color:#1e40af;font-size:.9rem;line-height:1.5';
+        wrap.insertBefore(infoBox, wrap.firstChild);
+      }
+      const dataCount = (data || []).length;
+      let msg = '';
+      if (isParent) {
+        msg = dataCount > 0
+          ? `ℹ️ <strong>No linked records found</strong> — Database has ${dataCount} record(s) but none are linked to your children. Ask admin to link via <em>Parents → Parent-Child Link</em>. Previous records (if any) are preserved below so you can continue reading.`
+          : 'ℹ️ No records yet — Ask admin to create records and link your children via Parents page.';
+      } else if (isStudent) {
+        msg = dataCount > 0
+          ? `ℹ️ <strong>No records linked to your profile</strong> — Database has ${dataCount} record(s) but your student profile is not linked. Ask admin to set your <em>user_id</em> in Students table. Previous records preserved below.`
+          : 'ℹ️ No records yet.';
+      } else {
+        msg = dataCount > 0
+          ? `ℹ️ Database has ${dataCount} record(s) but none match the current filter. Showing previously cached records if available.`
+          : 'No records yet.' + (writable ? ' Click “+ Add new”.' : '');
+      }
+      if (infoBox) infoBox.innerHTML = msg;
+
+      if (cached && cached.html) {
+        tb.innerHTML = cached.html;
+        // inject search again
+        try { CRUD.injectTableSearch(moduleId, tableEl, (dataCount || 0)); } catch(_) {}
+        return;
+      }
+      // If table already has real rows (not loading placeholder), keep them
+      const existingHasRows = tb.querySelectorAll('tr').length > 0 && !tb.querySelector('tr td')?.textContent?.includes('No records yet');
+      const existingHTML = tb.innerHTML;
+      const hasRealRows = existingHTML && !existingHTML.includes('No records yet') && !existingHTML.includes('pulse') && existingHTML.trim().length > 20;
+      if (hasRealRows) {
+        // Keep existing rows, do not clear
+        return;
+      }
+      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0)) + '" style="color:var(--gray-500);padding:20px;text-align:center" class="empty-msg">' + msg + '</td></tr>';
+      return;
     }
+    
     const isLinkCol = (key) => /(_link|link|media_url|photo_url|video|image|thumbnail|read_link|drive)$/i.test(key) || /^(media_url|read_link|drive_link|photo_url)$/i.test(key);
     const renderedRows = filteredData.map(row => '<tr>' + cols.map(c => {
       let v = cellVal(row, c);
@@ -788,6 +873,46 @@ const CRUD = {
     try { sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), html: renderedRows })); } catch(_) {}
     // re-apply role visibility to the freshly-rendered action buttons
     if (window.App && App.applyVisibilityTokens) try { App.applyVisibilityTokens(App.currentRole || (window.SC_PROFILE && SC_PROFILE.role) || ''); } catch (e) {}
+    // ENHANCEMENT (#2): inject a live instant-search box above every module
+    // table so recipients can find any record instantly. Persists the query.
+    CRUD.injectTableSearch(moduleId, tableEl, filteredData.length);
+  },
+
+  /** Instant per-table search — enhances EVERY CRUD module page at once. */
+  injectTableSearch(moduleId, tableEl, rowCount) {
+    if (!tableEl) return;
+    const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+    if (!wrap || wrap.querySelector('.sc-table-search')) {
+      // already injected — just refresh the count
+      const count = wrap.querySelector('.sc-table-count');
+      if (count) count.textContent = rowCount + ' record' + (rowCount === 1 ? '' : 's');
+      return;
+    }
+    const box = document.createElement('div');
+    box.className = 'sc-table-search';
+    box.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px';
+    const saved = '';
+    try { /* q lives for the session per module */ } catch(_) {}
+    box.innerHTML =
+      '<input class="form-input sc-table-q" placeholder="🔍 Search this table…" ' +
+      'style="flex:1;min-width:200px;max-width:420px;padding:9px 12px;border:1px solid var(--gray-200,#e2e8f0);border-radius:10px;font-size:.9rem" ' +
+      'data-module="' + moduleId + '">' +
+      '<span class="sc-table-count" style="font-size:.8rem;color:var(--gray-500,#64748b);font-weight:700">' + rowCount + ' record' + (rowCount === 1 ? '' : 's') + '</span>';
+    wrap.insertBefore(box, wrap.firstChild === tableEl ? tableEl : (wrap.querySelector('table') || tableEl));
+    const q = box.querySelector('.sc-table-q');
+    q.addEventListener('input', function () {
+      const term = this.value.trim().toLowerCase();
+      const rows = tableEl.querySelectorAll('tbody tr');
+      let shown = 0;
+      rows.forEach(function (r) {
+        if (r.querySelector('.pulse')) return;            // skip loading / error rows
+        const match = !term || r.textContent.toLowerCase().indexOf(term) !== -1;
+        r.style.display = match ? '' : 'none';
+        if (match) shown++;
+      });
+      const count = box.querySelector('.sc-table-count');
+      if (count) count.textContent = term ? (shown + ' of ' + rows.length + ' match') : (rowCount + ' record' + (rowCount === 1 ? '' : 's'));
+    });
   },
 
   /* Open the add/edit modal with a REAL form */
@@ -987,6 +1112,51 @@ const CRUD = {
       }
     }
     // (res declared below by the self-healing save wrapper)
+    
+    // === v5 FIX: Auto-generate admission_no and staff_no starting with school acronym ===
+    const getAcronym = () => {
+      try {
+        const cfg = window.SCHOOL || {};
+        let ac = (cfg.admissionAcronym || cfg.shortName || cfg.name || 'SCH').toString().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8) || 'SCH';
+        return ac;
+      } catch(_) { return 'SCH'; }
+    };
+    if (d.table === 'students' && !id && (!payload.admission_no || String(payload.admission_no).trim()==='')) {
+      try {
+        const ac = getAcronym();
+        const { data: maxRows } = await this.sb.from('students').select('admission_no').ilike('admission_no', ac+'/%').order('admission_no', {ascending:false}).limit(1);
+        let nextNum = 1;
+        if (maxRows && maxRows[0] && maxRows[0].admission_no) {
+          const m = String(maxRows[0].admission_no).match(/\/(\d+)$/);
+          if (m) nextNum = parseInt(m[1],10)+1;
+        } else {
+          const { count } = await this.sb.from('students').select('id', {count:'exact', head:true});
+          nextNum = (count||0)+1;
+        }
+        payload.admission_no = ac + '/' + String(nextNum).padStart(4,'0');
+      } catch(e) { console.warn('auto-admission failed', e.message); }
+    }
+    if (d.table === 'staff' && !id && (!payload.staff_no || String(payload.staff_no).trim()==='')) {
+      try {
+        const ac = getAcronym();
+        const { data: maxRows } = await this.sb.from('staff').select('staff_no').ilike('staff_no', ac+'-%').order('staff_no', {ascending:false}).limit(1);
+        let nextNum = 1;
+        if (maxRows && maxRows[0] && maxRows[0].staff_no) {
+          const m = String(maxRows[0].staff_no).match(/-(\d+)$/);
+          if (m) nextNum = parseInt(m[1],10)+1;
+        } else {
+          const { count } = await this.sb.from('staff').select('id', {count:'exact', head:true});
+          nextNum = (count||0)+1;
+        }
+        payload.staff_no = ac + '-STF-' + String(nextNum).padStart(4,'0');
+      } catch(e) {}
+    }
+    // Auto-fill changed_by for role_status_log
+    if (d.table === 'role_status_log' && !payload.changed_by) {
+      try { payload.changed_by = (window.SC_PROFILE && SC_PROFILE.full_name) || (window.SC_PROFILE && SC_PROFILE.email) || ''; } catch(_){}
+    }
+
+
     // parent_child duplicate guard: show a friendly message instead of Supabase unique constraint error.
     if (!id && d.table === 'parent_child' && payload.parent_id && payload.student_id) {
       const ex = await this.sb.from('parent_child').select('id').eq('parent_id', payload.parent_id).eq('student_id', payload.student_id).maybeSingle().then(r=>r, ()=>({data:null}));
