@@ -56,13 +56,14 @@ alter table public.profiles add column if not exists dob_month text;
 
 -- =====================================================================
 -- ENTERPRISE V3 EARLY HELPERS (must exist before any RLS policy uses them)
+-- FIXED v15: is_admin no longer includes 'teacher' (privilege escalation fix)
 -- =====================================================================
 create or replace function public.is_admin(uid uuid)
 returns boolean language sql security definer stable as $$
   select exists (
     select 1 from public.profiles
     where id = uid
-      and role in ('super_admin','admin','administrator','owner','director','principal','proprietor','head_teacher','teacher','bursar')
+      and role in ('super_admin','admin','administrator','owner','director','principal','proprietor','head_teacher','bursar')
       and status in ('approved','active')
   );
 $$;
@@ -123,6 +124,9 @@ create table if not exists public.classes (
   level text,
   class_teacher text,
   capacity int default 40,
+  next_term_fees numeric default 0,
+  next_term_fees_currency text default '₦',
+  next_term_fees_note text default 'Payable before resumption',
   created_at timestamptz default now()
 );
 alter table public.classes enable row level security;
@@ -550,17 +554,52 @@ create table if not exists public.admissions (
 );
 alter table public.admissions enable row level security;
 
+-- FIXED v15: payroll now includes bonus/overtime/tax/pension/loan columns
+-- and net_pay is computed via trigger (not generated column) to handle all fields
 create table if not exists public.payroll (
   id uuid primary key default uuid_generate_v4(),
   staff_id uuid references public.staff(id) on delete cascade,
+  staff_name text,
   month text, year int,
-  basic numeric, allowances numeric, deductions numeric,
-  net_pay numeric generated always as
-    (coalesce(basic,0)+coalesce(allowances,0)-coalesce(deductions,0)) stored,
+  basic numeric default 0,
+  allowances numeric default 0,
+  bonus numeric default 0,
+  overtime numeric default 0,
+  tax numeric default 0,
+  pension numeric default 0,
+  loan_deduction numeric default 0,
+  other_deductions numeric default 0,
+  deductions numeric default 0, -- legacy compat
+  net_pay numeric default 0,
+  method text default 'bank transfer',
   status text default 'draft' check (status in ('draft','approved','paid')),
   created_at timestamptz default now()
 );
 alter table public.payroll enable row level security;
+-- Ensure new columns exist on legacy databases
+alter table public.payroll add column if not exists staff_name text;
+alter table public.payroll add column if not exists bonus numeric default 0;
+alter table public.payroll add column if not exists overtime numeric default 0;
+alter table public.payroll add column if not exists tax numeric default 0;
+alter table public.payroll add column if not exists pension numeric default 0;
+alter table public.payroll add column if not exists loan_deduction numeric default 0;
+alter table public.payroll add column if not exists other_deductions numeric default 0;
+alter table public.payroll add column if not exists method text default 'bank transfer';
+
+-- Trigger to compute net_pay correctly
+create or replace function public.compute_payroll_net()
+returns trigger language plpgsql as $$
+begin
+  new.net_pay := greatest(0,
+    coalesce(new.basic,0)+coalesce(new.allowances,0)+coalesce(new.bonus,0)+coalesce(new.overtime,0)
+    - coalesce(new.tax,0)-coalesce(new.pension,0)-coalesce(new.loan_deduction,0)-coalesce(new.other_deductions,0)-coalesce(new.deductions,0)
+  );
+  return new;
+end $$;
+drop trigger if exists trg_compute_payroll_net on public.payroll;
+create trigger trg_compute_payroll_net
+before insert or update of basic, allowances, bonus, overtime, tax, pension, loan_deduction, other_deductions, deductions on public.payroll
+for each row execute function public.compute_payroll_net();
 
 create table if not exists public.hostel_allocations (
   id uuid primary key default uuid_generate_v4(),
@@ -886,21 +925,72 @@ end $$;
 
 
 -- ---- Results ownership: staff can read academic scores, but only admins or the teacher who created a score may update/delete it ----
-drop policy if exists "results_select_v5" on public.results;
-drop policy if exists "results_insert_v5" on public.results;
-drop policy if exists "results_update_v5" on public.results;
-drop policy if exists "results_delete_v5" on public.results;
-drop policy if exists "results_select_v5" on public.results;
-create policy "results_select_v5" on public.results for select using (
-  public.is_staff(auth.uid()) or public.is_parent_of(auth.uid(), student_id)
-  or student_id in (select id from public.students where user_id = auth.uid())
+drop policy if exists "results_update_teacher" on public.results;
+drop policy if exists "results_delete_teacher" on public.results;
+drop policy if exists "results_update_teacher" on public.results;
+create policy "results_update_teacher" on public.results for update using (public.is_admin(auth.uid()) or teacher_id = auth.uid());
+drop policy if exists "results_delete_teacher" on public.results;
+create policy "results_delete_teacher" on public.results for delete using (public.is_admin(auth.uid()) or teacher_id = auth.uid());
+
+-- ---- Affective & Psychomotor Domains (NEW in v9) ----
+create table if not exists public.affective_traits (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references public.students(id) on delete cascade,
+  term text, session text,
+  ratings jsonb default '{}'::jsonb, -- {trait: rating, ...}
+  teacher_id uuid references public.profiles(id),
+  created_at timestamptz default now(),
+  unique(student_id, term, session)
 );
-drop policy if exists "results_insert_v5" on public.results;
-create policy "results_insert_v5" on public.results for insert with check (public.is_staff(auth.uid()));
-drop policy if exists "results_update_v5" on public.results;
-create policy "results_update_v5" on public.results for update using (public.is_admin(auth.uid()) or teacher_id = auth.uid()) with check (public.is_admin(auth.uid()) or teacher_id = auth.uid());
-drop policy if exists "results_delete_v5" on public.results;
-create policy "results_delete_v5" on public.results for delete using (public.is_admin(auth.uid()) or teacher_id = auth.uid());
+alter table public.affective_traits enable row level security;
+drop policy if exists "read_affective" on public.affective_traits;
+create policy "read_affective" on public.affective_traits for select using (auth.role() = 'authenticated');
+drop policy if exists "write_affective" on public.affective_traits;
+create policy "write_affective" on public.affective_traits for all using (public.is_staff(auth.uid()));
+
+create table if not exists public.psychomotor_traits (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references public.students(id) on delete cascade,
+  term text, session text,
+  ratings jsonb default '{}'::jsonb,
+  teacher_id uuid references public.profiles(id),
+  created_at timestamptz default now(),
+  unique(student_id, term, session)
+);
+alter table public.psychomotor_traits enable row level security;
+drop policy if exists "read_psychomotor" on public.psychomotor_traits;
+create policy "read_psychomotor" on public.psychomotor_traits for select using (auth.role() = 'authenticated');
+drop policy if exists "write_psychomotor" on public.psychomotor_traits;
+create policy "write_psychomotor" on public.psychomotor_traits for all using (public.is_staff(auth.uid()));
+
+create table if not exists public.report_comments (
+  id uuid primary key default uuid_generate_v4(),
+  student_id uuid references public.students(id) on delete cascade,
+  term text, session text,
+  class_teacher_comment text,
+  principal_comment text,
+  next_term_begins date,
+  created_at timestamptz default now(),
+  unique(student_id, term, session)
+);
+alter table public.report_comments enable row level security;
+drop policy if exists "read_comments" on public.report_comments;
+create policy "read_comments" on public.report_comments for select using (auth.role() = 'authenticated');
+drop policy if exists "write_comments" on public.report_comments;
+create policy "write_comments" on public.report_comments for all using (public.is_staff(auth.uid()));
+
+-- ---- Update RLS for teacher isolation on key academic tables ----
+do $$
+declare t text;
+declare owned_tables text[] := array['assignments','scheme_of_work','lesson_plans','cbt_exams','attendance'];
+begin
+  foreach t in array owned_tables loop
+    execute format('drop policy if exists "update_own_%s" on public.%I', t, t);
+    execute format('drop policy if exists "delete_own_%s" on public.%I', t, t);
+    execute format('create policy "update_own_%s" on public.%I for update using (public.is_admin(auth.uid()) or teacher_id = auth.uid() or posted_by = auth.uid() or recorded_by = auth.uid())', t, t);
+    execute format('create policy "delete_own_%s" on public.%I for delete using (public.is_admin(auth.uid()) or teacher_id = auth.uid() or posted_by = auth.uid() or recorded_by = auth.uid())', t, t);
+  end loop;
+end $$;
 
 -- ---- Attendance: parents see own children; staff manage ----
 drop policy if exists "att_read"  on public.attendance;
@@ -1151,6 +1241,13 @@ group by p.id, p.title;
 --      set role = 'admin', status = 'approved'
 --    where email = 'your-email@example.com';
 -- =====================================================================
+
+-- FIX V2.1 Issue #17: next term fees bill on report card
+alter table public.school_settings add column if not exists next_term_fees numeric default 0;
+alter table public.school_settings add column if not exists next_term_fees_currency text default '₦';
+alter table public.school_settings add column if not exists next_term_begins date;
+alter table public.school_settings add column if not exists next_term_fees_note text default 'Payable before resumption';
+
 select 'School Connect schema v8 installed successfully ✅' as status;
 
 
@@ -1184,9 +1281,9 @@ grant execute on function public.verify_certificate(text) to anon, authenticated
 -- ENTERPRISE V4: school_settings must exist before any ALTER/POLICY uses it
 create table if not exists public.school_settings (
   id int primary key default 1,
-  admission_prefix text default 'SCH',
+  admission_prefix text default 'GSA',
   admission_next int default 1,
-  staff_prefix text default 'STF',
+  staff_prefix text default 'GSA',
   staff_next int default 1,
   parent_prefix text default 'PAR',
   parent_next int default 1,
@@ -1194,6 +1291,15 @@ create table if not exists public.school_settings (
   principal_name text default '',
   role_access jsonb,
   role_write jsonb,
+  -- FIX GEO-02 (#8): geofence columns declared on the base table so they are
+  -- ALWAYS present. Previously they were added later in a DO block that some
+  -- deployments skipped, causing "Could not find the 'enforce_geofence' column
+  -- of 'school_settings' in the schema cache" when saving the staff geofence.
+  latitude numeric,
+  longitude numeric,
+  geo_radius_m integer default 200,
+  enforce_geofence boolean default true,
+  geo_updated_at timestamptz,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -1494,13 +1600,31 @@ create policy "rep_delete_v12" on public.reports for delete using (public.is_adm
 
 -- Generic module records (reports, counselling, wellbeing, etc.): staff can read,
 -- creator/admin can modify; family users only modify their own allowed family records.
+-- FIXED v15: Added missing SELECT and INSERT policies (previous version only had update/delete)
+drop policy if exists "mr_select_v15" on public.module_records;
+drop policy if exists "mr_insert_v15" on public.module_records;
 drop policy if exists "mr_update_family" on public.module_records;
 drop policy if exists "mr_update_v12_owner" on public.module_records;
 drop policy if exists "mr_delete_v12_owner" on public.module_records;
+
+create policy "mr_select_v15" on public.module_records for select using (
+  public.is_staff(auth.uid())
+  or created_by = auth.uid()
+  or recipient_id = auth.uid()
+  or audience in ('all','public')
+  or (audience = 'parent' and exists (select 1 from public.profiles where id=auth.uid() and role='parent'))
+  or (audience = 'student' and exists (select 1 from public.profiles where id=auth.uid() and role='student'))
+);
+
+create policy "mr_insert_v15" on public.module_records for insert with check (
+  auth.role() = 'authenticated'
+);
+
 drop policy if exists "mr_update_v12_owner" on public.module_records;
 create policy "mr_update_v12_owner" on public.module_records for update using (
   public.is_admin(auth.uid()) or created_by = auth.uid()
 ) with check (public.is_admin(auth.uid()) or created_by = auth.uid());
+
 drop policy if exists "mr_delete_v12_owner" on public.module_records;
 create policy "mr_delete_v12_owner" on public.module_records for delete using (public.is_admin(auth.uid()) or created_by = auth.uid());
 
@@ -1529,3 +1653,260 @@ create table if not exists public.exam_registrations (
   payload jsonb default '{}'::jsonb,
   created_at timestamptz default now()
 );
+
+-- =====================================================================
+-- SCHOOL CONNECT V1 FINAL CUMULATIVE PATCH (2026-07-19)
+-- Purpose: make complete-schema.sql genuinely self-contained for fresh
+-- installs. It includes all v15/v16 operational tables and fixes reported
+-- schema-cache errors, report-score upsert constraints, parent-child naming,
+-- class/department next-term fee bills, school stamps/signature settings and
+-- staff check-in deadlines.
+-- Safe to re-run.
+-- =====================================================================
+
+-- Ensure school_settings has every setting used by the runtime.
+alter table if exists public.school_settings add column if not exists next_term_fees numeric default 0;
+alter table if exists public.school_settings add column if not exists next_term_fees_currency text default '₦';
+alter table if exists public.school_settings add column if not exists next_term_fees_note text default 'Payable before resumption';
+alter table if exists public.school_settings add column if not exists next_term_begins date;
+alter table if exists public.school_settings add column if not exists signature_url text default '';
+alter table if exists public.school_settings add column if not exists principal_name text default '';
+alter table if exists public.school_settings add column if not exists stamp_color text default '#1e3a8a';
+alter table if exists public.school_settings add column if not exists checkin_deadline time default '08:00';
+alter table if exists public.school_settings add column if not exists checkin_grace_minutes int default 0;
+alter table if exists public.school_settings add column if not exists role_access jsonb default '{}'::jsonb;
+alter table if exists public.school_settings add column if not exists role_write jsonb default '{}'::jsonb;
+
+-- Class / department fee bills. This fixes schema-cache errors for
+-- class_fee_structure and powers next-term report-card bills.
+create table if not exists public.class_fee_structure (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid references public.schools(id) on delete cascade,
+  class text not null,
+  arm text default '',
+  department text default '',
+  term text not null default 'Current Term' check (term in ('Current Term','Next Term')),
+  session text default '',
+  tuition numeric(12,2) default 0,
+  exam_fee numeric(12,2) default 0,
+  development numeric(12,2) default 0,
+  transport numeric(12,2) default 0,
+  boarding numeric(12,2) default 0,
+  other_fee numeric(12,2) default 0,
+  discount numeric(12,2) default 0,
+  total numeric(12,2) default 0,
+  due_date date,
+  next_term_begins date,
+  note text default '',
+  fee_items jsonb default '[]'::jsonb,
+  active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique(class, arm, department, term)
+);
+alter table public.class_fee_structure add column if not exists department text default '';
+alter table public.class_fee_structure add column if not exists session text default '';
+alter table public.class_fee_structure add column if not exists other_fee numeric(12,2) default 0;
+alter table public.class_fee_structure add column if not exists next_term_begins date;
+alter table public.class_fee_structure add column if not exists note text default '';
+alter table public.class_fee_structure add column if not exists fee_items jsonb default '[]'::jsonb;
+alter table public.class_fee_structure add column if not exists active boolean default true;
+create index if not exists class_fee_structure_school_idx on public.class_fee_structure(school_id);
+create index if not exists class_fee_structure_lookup_idx on public.class_fee_structure(class, arm, department, term);
+create unique index if not exists class_fee_structure_class_arm_department_term_uq on public.class_fee_structure(class, arm, department, term);
+
+-- School products store. Fixes public.school_products schema-cache errors.
+create table if not exists public.school_products (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid references public.schools(id) on delete cascade,
+  name text not null,
+  category text default 'Other' check (category in ('Uniform','Textbook','Exercise Book','Stationery','Bag','Other')),
+  price numeric(12,2) default 0,
+  size_option text default '',
+  stock_note text default '',
+  active boolean default true,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create index if not exists school_products_school_idx on public.school_products(school_id);
+
+-- Role/status audit trail. Fixes public.role_status_log schema-cache errors.
+create table if not exists public.role_status_log (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid references public.schools(id) on delete cascade,
+  person_name text not null,
+  current_role text default '',
+  new_role text not null,
+  action text default 'convert' check (action in ('promote','demote','convert','suspend','reactivate','deactivate')),
+  reason text default '',
+  changed_by text default '',
+  changed_at timestamptz default now()
+);
+create index if not exists role_status_log_school_idx on public.role_status_log(school_id);
+
+-- Staff / student clocks for operational attendance.
+create table if not exists public.staff_clock (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid references public.schools(id) on delete cascade,
+  staff_id uuid references public.staff(id) on delete cascade,
+  staff_no text,
+  staff_name text,
+  status text default 'present' check (status in ('present','late','absent','excused','clocked_out')),
+  clock_in timestamptz,
+  clock_out timestamptz,
+  date date default current_date,
+  note text default '',
+  created_at timestamptz default now()
+);
+create index if not exists staff_clock_school_idx on public.staff_clock(school_id);
+create index if not exists staff_clock_staff_idx on public.staff_clock(staff_id);
+
+create table if not exists public.student_clock (
+  id uuid primary key default gen_random_uuid(),
+  school_id uuid references public.schools(id) on delete cascade,
+  student_id uuid references public.students(id) on delete cascade,
+  clock_in timestamptz,
+  clock_out timestamptz,
+  date date default current_date,
+  note text default '',
+  created_at timestamptz default now()
+);
+create index if not exists student_clock_school_idx on public.student_clock(school_id);
+create index if not exists student_clock_student_idx on public.student_clock(student_id);
+
+-- Affective / psychomotor / comments: ensure exact names exist and schema cache reloads.
+create table if not exists public.affective_traits (
+  id uuid primary key default gen_random_uuid(), student_id uuid references public.students(id) on delete cascade,
+  term text, session text, data jsonb default '{}'::jsonb, teacher_id uuid references public.profiles(id), created_at timestamptz default now(), unique(student_id,term,session)
+);
+create table if not exists public.psychomotor_traits (
+  id uuid primary key default gen_random_uuid(), student_id uuid references public.students(id) on delete cascade,
+  term text, session text, data jsonb default '{}'::jsonb, teacher_id uuid references public.profiles(id), created_at timestamptz default now(), unique(student_id,term,session)
+);
+create table if not exists public.report_comments (
+  id uuid primary key default gen_random_uuid(), student_id uuid references public.students(id) on delete cascade,
+  term text, session text, class_teacher_comment text, principal_comment text, next_term_begins date,
+  created_at timestamptz default now(), unique(student_id,term,session)
+);
+
+-- Report-score ON CONFLICT repair. PostgREST upsert now matches exactly.
+alter table if exists public.report_scores add column if not exists updated_by uuid references public.profiles(id) default auth.uid();
+do $$ begin
+  if exists (select 1 from pg_constraint where conname='report_scores_column_id_student_id_ref_student_name_key') then
+    alter table public.report_scores drop constraint report_scores_column_id_student_id_ref_student_name_key;
+  end if;
+exception when undefined_table then null; end $$;
+create unique index if not exists report_scores_column_student_subject_uq
+  on public.report_scores(column_id, student_id_ref, student_name, subject);
+
+-- Results CBT/report export upsert repair: a partial unique index cannot satisfy
+-- ON CONFLICT (assessment_source, assessment_ref) reliably in PostgREST.
+do $$ begin
+  if to_regclass('public.results') is not null then
+    drop index if exists public.results_assessment_ref_unique;
+    -- Collapse accidental duplicate non-null assessment exports before enforcing uniqueness.
+    delete from public.results r
+    using public.results newer
+    where r.ctid < newer.ctid
+      and r.assessment_ref is not null
+      and newer.assessment_ref is not null
+      and coalesce(r.assessment_source,'') = coalesce(newer.assessment_source,'')
+      and r.assessment_ref = newer.assessment_ref;
+    create unique index if not exists results_assessment_ref_unique on public.results(assessment_source, assessment_ref);
+  end if;
+end $$;
+
+-- Parent-child compatibility: the platform canonical table is parent_child.
+-- Some older pages referred to parent_children. Provide a read-compatible
+-- view alias only where the base table exists, so old links do not break.
+do $$ begin
+  if to_regclass('public.parent_child') is not null then
+    execute 'create or replace view public.parent_children with (security_invoker = true) as select * from public.parent_child';
+    execute 'grant select on public.parent_children to authenticated';
+  end if;
+end $$;
+
+-- RLS for new/fixed tables.
+alter table public.class_fee_structure enable row level security;
+alter table public.school_products enable row level security;
+alter table public.role_status_log enable row level security;
+alter table public.staff_clock enable row level security;
+alter table public.student_clock enable row level security;
+alter table public.affective_traits enable row level security;
+alter table public.psychomotor_traits enable row level security;
+alter table public.report_comments enable row level security;
+
+drop policy if exists "class_fee_structure_read" on public.class_fee_structure;
+create policy "class_fee_structure_read" on public.class_fee_structure for select using (auth.role() = 'authenticated');
+drop policy if exists "class_fee_structure_write" on public.class_fee_structure;
+create policy "class_fee_structure_write" on public.class_fee_structure for all using (public.is_admin(auth.uid())) with check (public.is_admin(auth.uid()));
+
+drop policy if exists "school_products_read" on public.school_products;
+create policy "school_products_read" on public.school_products for select using (auth.role() = 'authenticated');
+drop policy if exists "school_products_write" on public.school_products;
+create policy "school_products_write" on public.school_products for all using (public.is_admin(auth.uid())) with check (public.is_admin(auth.uid()));
+
+drop policy if exists "role_status_log_read" on public.role_status_log;
+create policy "role_status_log_read" on public.role_status_log for select using (public.is_admin(auth.uid()));
+drop policy if exists "role_status_log_write" on public.role_status_log;
+create policy "role_status_log_write" on public.role_status_log for all using (public.is_admin(auth.uid())) with check (public.is_admin(auth.uid()));
+
+drop policy if exists "staff_clock_read" on public.staff_clock;
+create policy "staff_clock_read" on public.staff_clock for select using (public.is_staff(auth.uid()) or public.is_admin(auth.uid()));
+drop policy if exists "staff_clock_write" on public.staff_clock;
+create policy "staff_clock_write" on public.staff_clock for all using (public.is_staff(auth.uid()) or public.is_admin(auth.uid())) with check (public.is_staff(auth.uid()) or public.is_admin(auth.uid()));
+
+drop policy if exists "student_clock_read" on public.student_clock;
+create policy "student_clock_read" on public.student_clock for select using (public.is_staff(auth.uid()) or public.is_parent_of(auth.uid(), student_id) or exists (select 1 from public.students s where s.id=student_clock.student_id and s.user_id=auth.uid()));
+drop policy if exists "student_clock_write" on public.student_clock;
+create policy "student_clock_write" on public.student_clock for all using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()));
+
+drop policy if exists "affective_traits_read" on public.affective_traits;
+create policy "affective_traits_read" on public.affective_traits for select using (auth.role() = 'authenticated');
+drop policy if exists "affective_traits_write" on public.affective_traits;
+create policy "affective_traits_write" on public.affective_traits for all using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()));
+
+drop policy if exists "psychomotor_traits_read" on public.psychomotor_traits;
+create policy "psychomotor_traits_read" on public.psychomotor_traits for select using (auth.role() = 'authenticated');
+drop policy if exists "psychomotor_traits_write" on public.psychomotor_traits;
+create policy "psychomotor_traits_write" on public.psychomotor_traits for all using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()));
+
+drop policy if exists "report_comments_read" on public.report_comments;
+create policy "report_comments_read" on public.report_comments for select using (auth.role() = 'authenticated');
+drop policy if exists "report_comments_write" on public.report_comments;
+create policy "report_comments_write" on public.report_comments for all using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()));
+
+-- Parent attendance read-only policy with canonical parent_child table.
+drop policy if exists "attendance_parent_read_v16" on public.attendance;
+create policy "attendance_parent_read_v16" on public.attendance for select using (
+  exists (select 1 from public.students s where s.id = attendance.student_id and s.user_id = auth.uid())
+  or exists (select 1 from public.parent_child pc where pc.student_id = attendance.student_id and pc.parent_id = auth.uid())
+  or public.is_staff(auth.uid())
+);
+
+-- Teacher ownership hardening for report scores.
+drop policy if exists "rs_staff" on public.report_scores;
+drop policy if exists "rs_insert_v16_owner" on public.report_scores;
+drop policy if exists "rs_update_v16_owner" on public.report_scores;
+drop policy if exists "rs_delete_v16_owner" on public.report_scores;
+create policy "rs_insert_v16_owner" on public.report_scores for insert with check (public.is_admin(auth.uid()) or (public.is_staff(auth.uid()) and coalesce(updated_by, auth.uid()) = auth.uid()));
+drop policy if exists "rs_update_v16_owner" on public.report_scores;
+create policy "rs_update_v16_owner" on public.report_scores for update using (public.is_admin(auth.uid()) or updated_by = auth.uid()) with check (public.is_admin(auth.uid()) or coalesce(updated_by, auth.uid()) = auth.uid());
+drop policy if exists "rs_delete_v16_owner" on public.report_scores;
+create policy "rs_delete_v16_owner" on public.report_scores for delete using (public.is_admin(auth.uid()) or updated_by = auth.uid());
+
+-- updated_at triggers when helper exists.
+do $$ begin
+  if exists (select 1 from pg_proc where proname = 'set_updated_at') then
+    drop trigger if exists class_fee_structure_updated on public.class_fee_structure;
+    create trigger class_fee_structure_updated before update on public.class_fee_structure for each row execute function public.set_updated_at();
+    drop trigger if exists school_products_updated on public.school_products;
+    create trigger school_products_updated before update on public.school_products for each row execute function public.set_updated_at();
+  end if;
+end $$;
+
+notify pgrst, 'reload schema';
+-- =====================================================================
+-- END SCHOOL CONNECT V1 FINAL CUMULATIVE PATCH
+-- =====================================================================
+

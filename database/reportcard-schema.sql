@@ -84,7 +84,7 @@ create table if not exists public.report_scores (
   updated_by uuid references public.profiles(id),
   updated_at timestamptz default now(),
   created_at timestamptz default now(),
-  unique(column_id, student_id_ref, student_name)
+  unique(column_id, student_id_ref, student_name, subject)
 );
 alter table public.report_scores enable row level security;
 create index if not exists report_scores_lookup_idx
@@ -199,7 +199,7 @@ begin
     v_col.id, p_student_name, coalesce(p_student_id_ref,''), p_class, p_subject,
     coalesce(p_term,''), coalesce(p_session,''), v_scaled, 'cbt'
   )
-  on conflict (column_id, student_id_ref, student_name)
+  on conflict (column_id, student_id_ref, student_name, subject)
   do update set score = excluded.score, source = 'cbt', updated_at = now();
 
   return jsonb_build_object('mapped', true, 'column', v_col.name, 'scaled', v_scaled, 'max', v_max);
@@ -277,3 +277,23 @@ do $$ begin
 exception when others then
   raise notice 'security_invoker not supported on this Postgres version; rely on app filtering + table RLS.';
 end $$;
+
+
+-- =====================================================================
+-- V3 FINAL: SCHOOL-WIDE REPORT-CARD COLUMN TEMPLATE
+-- Run automatically as part of complete-schema.sql.  Assessment columns
+-- use subject='*' once per class/term/session and are reused by every
+-- subject. Scores retain their subject so one learner can have CA1 in
+-- Mathematics and English without a uniqueness collision.
+-- =====================================================================
+do $$ begin
+  if exists (select 1 from pg_constraint where conname='report_scores_column_id_student_id_ref_student_name_key') then
+    alter table public.report_scores drop constraint report_scores_column_id_student_id_ref_student_name_key;
+  end if;
+exception when undefined_table then null; end $$;
+create unique index if not exists report_scores_column_student_subject_uq
+  on public.report_scores(column_id, student_id_ref, student_name, subject);
+create index if not exists assessment_columns_global_template_idx
+  on public.assessment_columns(class, term, session, position) where subject='*';
+comment on table public.assessment_columns is 'V3: Create shared school-wide report columns once using subject=*; they are reused for all subjects in a class/term/session.';
+notify pgrst, 'reload schema';

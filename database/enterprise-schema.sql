@@ -2,7 +2,7 @@
 -- ENTERPRISE V4: school_settings must exist before any ALTER/POLICY uses it
 create table if not exists public.school_settings (
   id int primary key default 1,
-  admission_prefix text default 'GOSA',
+  admission_prefix text default 'SCH',
   admission_next int default 1,
   staff_prefix text default 'STF',
   staff_next int default 1,

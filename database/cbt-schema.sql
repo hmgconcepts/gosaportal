@@ -57,7 +57,7 @@ create table if not exists public.cbt_exams (
   select_count integer not null default 0,   -- 0 = use all questions
   randomise boolean not null default true,
   negative_mark numeric not null default 0,
-  exam_mode text not null default 'open' check (exam_mode in ('open','registered')),
+  exam_mode text not null default 'open' check (exam_mode in ('open','anonymous','registered')),
   is_open boolean not null default false,
   is_archived boolean not null default false,
   release_results boolean not null default true,
