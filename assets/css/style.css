@@ -496,3 +496,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow] { visibility: visibl
 
 .dashboard-live-feed{margin-top:18px;border:1px solid var(--gray-200);background:linear-gradient(180deg,#fff,#f8fafc)}
 .dashboard-live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.feed-item{padding:12px;border-bottom:1px solid var(--gray-100)}.feed-item:last-child{border-bottom:none}.feed-item a{font-weight:800;color:var(--primary);text-decoration:none}.feed-meta{font-size:.78rem;color:var(--gray-500);margin-top:3px}.feed-body{font-size:.88rem;color:var(--gray-700);margin-top:5px;line-height:1.55}.receipt-mini{display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--gray-100)}
+
+/* ENHANCEMENT: instant table search */
+.sc-table-search{animation:scfade .2s ease}
+.sc-table-q:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+@keyframes scfade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.table-wrap{overflow-x:auto}
