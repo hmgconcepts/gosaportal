@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /database/
+Disallow: /samples/
+
+Sitemap: https://gosasite.vercel.app/sitemap.xml
