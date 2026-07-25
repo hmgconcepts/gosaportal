@@ -48,7 +48,7 @@ window.SC.MODULES = [];
 
 // Shared escaping/serialisation helpers (defence-in-depth for any inline render).
 window.SC.esc = function (s) {
-  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); 
 };
 window.SC.jsStr = function (s) { return JSON.stringify(String(s == null ? '' : s)); };
 window.SC.slugify = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
