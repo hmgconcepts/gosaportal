@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Punctuality Points •  God of Seed Academy</title></title>
+<meta name="description" content="Punctuality Points: reward on-time check-in and closing check-out, build term totals, and push them into student results when the school chooses.">
+<meta name="keywords" content="$1">
+<meta name="theme-color" content="#1c72e7">
+<link rel="icon" type="image/png" href="assets/img/logo.svg">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<meta property="og:title" content="Punctuality Points •  God of Seed Academy">
+<meta property="og:description" content="Reward student punctuality and push points into report cards.">
+<meta property="og:image" content="assets/img/og-cover.svg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) ===
+   Guarantees the logged-in dashboard layout renders correctly even if the
+   external stylesheet is cached/blocked/fails to load. Mirrors style.css. */
+:root{--sc-primary:#1c72e7;--sc-accent:#5e2174}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc}
+.app-sidebar{width:250px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:40}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px;border-bottom:1px solid #e2e8f0}
+.app-brand img{width:40px;height:40px;border-radius:10px;object-fit:contain;flex-shrink:0;background:#f8fafc}
+.app-brand strong{display:block;font-size:.95rem;font-weight:800;color:#0f172a;line-height:1.2}
+.app-nav{display:flex;flex-direction:column;gap:2px;padding:12px 10px;flex:1}
+.app-nav a{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;color:#475569;text-decoration:none;font-size:.9rem;font-weight:600;line-height:1;white-space:nowrap}
+.app-nav a:hover{background:#f1f5f9;color:#1c72e7}
+.app-nav a.active{background:#1c72e7;color:#fff}
+.app-nav-icon{width:24px;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:14px 24px;background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30}
+.app-page-title{font-size:1.25rem;font-weight:800;color:#0f172a;margin:0}
+.app-content{padding:24px;flex:1;max-width:1280px;width:100%}
+.app-layout.topnav{flex-direction:column}
+.app-layout.topnav .app-sidebar{width:100%;height:auto;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-nav{flex-direction:row;flex:1;padding:8px;gap:4px}
+.app-layout.topnav .app-nav a{flex-direction:column;gap:4px;font-size:.7rem;padding:8px 12px;text-align:center}
+@media(max-width:900px){.app-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 25px -5px rgba(0,0,0,.2)}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar{position:sticky;transform:none}.app-content{padding:16px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <link rel="canonical" href="https://gosasite.vercel.app/cbt.html">
+    <meta property="og:url" content="https://gosasite.vercel.app/cbt.html">
+</head>
+<body data-theme="theme2" data-school="God of Seed Academy" data-font="raleway">
+
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.svg" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="app-layout layout1" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.svg" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <div>
+          <strong>God of Seed Academy</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="punctuality.html" data-module-id="punctuality" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⏱️</span>
+          <span>Punctuality</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Report Cards</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="active">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="hr.html" data-module-id="hr" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💼</span>
+          <span>HR &amp; Payroll</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar student" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar student" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student any all public" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student any all public" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
+      </div>
+    </aside>
+  <main class="app-main">
+    <header class="app-topbar">
+      <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
+      <h1 class="app-page-title">⏱ Punctuality Points</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        
+        <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle theme">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout style="display:none">Sign out</button>
+      </div>
+    </header>
+    <div class="app-content">
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px" data-staff-only>
+        <button class="btn btn-primary" onclick="Punct.compute()">⚡ Compute awards (chosen date)</button>
+        <button class="btn btn-outline" onclick="Punct.pushModal()">🚀 Push points → Report Card</button>
+        <button class="btn btn-outline" onclick="Punct.exportCSV()">⬇ Export CSV</button>
+        <button class="btn btn-outline" onclick="Punct.refresh()">↻ Refresh</button>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <p style="color:var(--gray-600);margin:0">
+          Encourage punctuality: students who <strong>check in at/before the deadline</strong> and
+          <strong>check out during the closing period</strong> earn points every school day.
+          Points build up across the term and — only if the school wants — can be
+          <strong>pushed into the students' Results</strong> (any report-card column) exactly like CBT scores.
+          Check-ins/outs come from the student QR <a href="checkin.html">check-in page</a> (<em>student_clock</em>).
+        </p>
+      </div>
+
+      <div class="card" id="punct-setup" style="display:none;border-left:4px solid #f59e0b"></div>
+
+      <div class="grid grid-2" style="gap:18px;margin-bottom:18px">
+        <div class="card">
+          <h3 style="margin-top:0">⚙️ Scoring rules</h3>
+          <div class="grid grid-3">
+            <div class="form-group"><label>Check-in deadline</label><input type="time" id="c-deadline" class="form-input" value="07:30"></div>
+            <div class="form-group"><label>Closing starts</label><input type="time" id="c-close" class="form-input" value="12:30"></div>
+            <div class="form-group"><label>Points / punctual day</label><input type="number" id="c-full" class="form-input" value="2" min="0" step="0.5"></div>
+          </div>
+          <div class="grid grid-3">
+            <div class="form-group"><label>Points, on-time check-in only</label><input type="number" id="c-partial" class="form-input" value="0" min="0" step="0.5"><small style="color:var(--gray-500">0 = strict (both required)</small></div>
+            <div class="form-group"><label>&nbsp;</label><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="c-req" checked> Require closing check-out</label></div>
+            <div class="form-group"><label>&nbsp;</label><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="c-enabled" checked> Engine enabled</label></div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="Punct.saveConfig()">💾 Save rules</button>
+          <small style="color:var(--gray-500);margin-left:8px">Times are compared in your server's timezone. Saved in <code>punctuality_config</code>.</small>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">⚡ Compute daily awards</h3>
+          <div class="grid grid-3">
+            <div class="form-group"><label>Date</label><input type="date" id="f-date" class="form-input"></div>
+            <div class="form-group"><label>Class (optional)</label><input id="f-class" class="form-input" placeholder="all classes"></div>
+            <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" onclick="Punct.compute()">Compute</button></div>
+          </div>
+          <p style="color:var(--gray-500);font-size:.85rem;margin:8px 0 0">Run after morning check-in, and again after closing — re-running the same
+          day simply re-grades it (late check-outs still earn their point afterwards). Tip: compute each
+          school day once the gate closes.</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <h3 style="margin-top:0">📅 Daily awards</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <div class="form-group" style="margin:0"><label>From</label><input type="date" id="f-from" class="form-input"></div>
+          <div class="form-group" style="margin:0"><label>To</label><input type="date" id="f-to" class="form-input"></div>
+          <div class="form-group" style="margin:0"><label>&nbsp;</label><button class="btn btn-outline btn-sm" onclick="Punct.refresh()">Apply filter</button></div>
+        </div>
+        <div id="punct-list"><span class="pulse">Loading…</span></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">🏆 Term leaderboard (filtered range)</h3>
+        <div id="punct-board"><span class="pulse">Loading…</span></div>
+        <p style="color:var(--gray-500);font-size:.85rem;margin-top:8px">Ready for end-of-term? Use
+        <strong>Push points → Report Card</strong> to write these totals into the Results table
+        (e.g. a dedicated "Punctuality" column or CA2). Re-pushing updates the same rows — never duplicates.</p>
+      </div>
+
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
+      © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
+    </footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/voting.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script src="assets/js/crud.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
+  else { Notifications.init(sb); Voting.init(sb); }
+  PWAInstall.init();
+  if (window.Super) Super.init(sb, window.SCHOOL);
+  if (window.Enterprise) Enterprise.init(sb);
+  if (window.CRUD) CRUD.init(sb);
+</script>
+<script>
+var Punct = {
+  cfg: { deadline:'07:30', checkout_open:'12:30', points_full:2, points_partial:0, require_checkout:true, enabled:true },
+  rows: [],
+  esc: function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
+  el: function (id) { return document.getElementById(id); },
+  _missing: function (err) { return /PGRST20[45]|schema cache|Could not find the (table|function)|does not exist|404|42P01/i.test(String(err && (err.message || err.code || err.details) || '')); },
+  async init() {
+    if (typeof sb === 'undefined' || !sb) { const z = this.el('punct-setup'); z.style.display = 'block'; z.innerHTML = '<h3>⚠️ Database not configured</h3><p>Add your Supabase keys in assets/js/config.js.</p>'; return; }
+    const probe = await sb.from('punctuality_config').select('id').limit(1);
+    if (probe.error && this._missing(probe.error)) { this.setupNeeded(); return; }
+    this.pickDefaults();
+    await Promise.all([this.loadConfig(), this.refresh()]);
+  },
+  setupNeeded() {
+    const z = this.el('punct-setup'); z.style.display = 'block';
+    z.innerHTML = '<h3>🛠 One-time database step needed</h3><p>The Punctuality Points engine needs its tables + functions. Run <b>database/punctuality-points.sql</b> (or simply re-run the full <b>database/complete-schema.sql</b> — it is idempotent) in your Supabase SQL Editor, then reload this page. New builds (schema v12.4+) already include it.</p>';
+  },
+  pickDefaults() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (this.el('f-date') && !this.el('f-date').value) this.el('f-date').value = today;
+    if (this.el('f-from') && !this.el('f-from').value) { const d = new Date(); d.setDate(d.getDate() - 30); this.el('f-from').value = d.toISOString().slice(0, 10); this.el('f-to').value = today; }
+  },
+  async loadConfig() {
+    const r = await sb.from('punctuality_config').select('*').eq('id', 1).maybeSingle();
+    const data = r && r.data;
+    if (data) this.cfg = { deadline: String(data.deadline).slice(0, 5), checkout_open: String(data.checkout_open).slice(0, 5), points_full: data.points_full, points_partial: data.points_partial, require_checkout: data.require_checkout !== false, enabled: data.enabled !== false };
+    this.el('c-deadline').value = this.cfg.deadline; this.el('c-close').value = this.cfg.checkout_open;
+    this.el('c-full').value = this.cfg.points_full; this.el('c-partial').value = this.cfg.points_partial;
+    this.el('c-req').checked = this.cfg.require_checkout; this.el('c-enabled').checked = this.cfg.enabled;
+  },
+  async saveConfig() {
+    const patch = { id: 1, deadline: this.el('c-deadline').value || '07:30', checkout_open: this.el('c-close').value || '12:30',
+      points_full: parseFloat(this.el('c-full').value) || 0, points_partial: parseFloat(this.el('c-partial').value) || 0,
+      require_checkout: this.el('c-req').checked, enabled: this.el('c-enabled').checked, updated_at: new Date().toISOString() };
+    const r = await sb.from('punctuality_config').upsert(patch);
+    if (r.error) { toast('Could not save rules: ' + r.error.message, 'danger'); return; }
+    this.cfg = { deadline: patch.deadline.slice(0, 5), checkout_open: patch.checkout_open.slice(0, 5), points_full: patch.points_full, points_partial: patch.points_partial, require_checkout: patch.require_checkout, enabled: patch.enabled };
+    toast('✅ Punctuality rules saved.', 'success');
+  },
+  async compute() {
+    const date = this.el('f-date').value || new Date().toISOString().slice(0, 10);
+    const cls = this.el('f-class').value.trim();
+    toast('Grading punctuality for ' + date + '…', 'info', 1500);
+    let awarded = null;
+    try {
+      const r = await sb.rpc('compute_punctuality_awards', { p_date: date, p_class: cls });
+      if (r.error) { if (!this._missing(r.error)) { toast('Compute failed: ' + r.error.message, 'danger'); return; } } else awarded = r.data;
+    } catch (e) { awarded = null; }
+    if (awarded == null) { awarded = await this.computeClient(date, cls); if (awarded === false) return; }
+    toast('✅ ' + awarded + ' punctual award(s) for ' + date + '.', 'success');
+    this.refresh();
+  },
+  async computeClient(date, cls) { // fallback when the RPC is absent — identical rule
+    const r = await sb.from('student_clock').select('student_id,clock_in,clock_out').eq('date', date).limit(5000);
+    if (r.error) { toast('Could not read check-ins: ' + r.error.message, 'danger'); return false; }
+    const byId = {};
+    (r.data || []).forEach(function (x) { if (!x.student_id) return; const b = byId[x.student_id] || (byId[x.student_id] = { in: null, out: null }); if (x.clock_in && (!b.in || x.clock_in < b.in)) b.in = x.clock_in; if (x.clock_out && (!b.out || x.clock_out > b.out)) b.out = x.clock_out; });
+    const ids = Object.keys(byId); if (!ids.length) { toast('No check-ins found for ' + date + '.', 'info'); return 0; }
+    const st = await sb.from('students').select('id,full_name,admission_no,class').in('id', ids);
+    let awarded = 0;
+    for (const s of (st.data || [])) {
+      if (cls && s.class !== cls) continue;
+      const b = byId[s.id] || {}; const tIn = b.in ? b.in.slice(11, 16) : null, tOut = b.out ? b.out.slice(11, 16) : null;
+      let pts = 0, rule = 'late';
+      if (!this.cfg.enabled) rule = 'config_disabled';
+      else if (tIn && tIn <= this.cfg.deadline) {
+        if (!this.cfg.require_checkout) { pts = this.cfg.points_full; rule = 'full'; }
+        else if (tOut && tOut >= this.cfg.checkout_open) { pts = this.cfg.points_full; rule = 'full'; }
+        else { pts = this.cfg.points_partial; rule = 'no_checkout'; }
+      }
+      if (pts > 0) awarded++;
+      await sb.from('punctuality_awards').upsert({ student_id: s.id, student_id_ref: s.admission_no || '', student_name: s.full_name || '', class: s.class || '', date: date, checkin_at: b.in, checkout_at: b.out, points: pts, rule: rule }, { onConflict: 'student_id,date' });
+    }
+    return awarded;
+  },
+  async refresh() {
+    const from = this.el('f-from').value, to = this.el('f-to').value, cls = this.el('f-class').value.trim();
+    let q = sb.from('punctuality_awards').select('*').order('date', { ascending: false }).limit(2000);
+    if (from) q = q.gte('date', from); if (to) q = q.lte('date', to); if (cls) q = q.eq('class', cls);
+    const r = await q;
+    if (r.error) { this.el('punct-list').innerHTML = '<div class="card">Could not load awards: ' + this.esc(r.error.message) + '</div>'; return; }
+    this.rows = r.data || []; this.render();
+  },
+  render() {
+    const rows = this.rows;
+    if (!rows.length) {
+      this.el('punct-list').innerHTML = '<p style="color:var(--gray-500)">No awards in this range yet. Use <strong>Compute</strong> after morning check-in / closing check-out.</p>';
+      this.el('punct-board').innerHTML = ''; return;
+    }
+    const tot = rows.reduce(function (a, r) { return a + Number(r.points || 0); }, 0);
+    this.el('punct-list').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Student</th><th>ID</th><th>Class</th><th>Check-in</th><th>Check-out</th><th>Rule</th><th>Points</th></tr></thead><tbody>' +
+      rows.map((r) => '<tr><td>' + this.esc(r.date) + '</td><td><strong>' + this.esc(r.student_name) + '</strong></td><td>' + this.esc(r.student_id_ref || '') + '</td><td>' + this.esc(r.class || '') + '</td><td>' + (r.checkin_at ? new Date(r.checkin_at).toLocaleTimeString() : '—') + '</td><td>' + (r.checkout_at ? new Date(r.checkout_at).toLocaleTimeString() : '—') + '</td><td><span class="badge">' + this.esc(r.rule) + '</span></td><td><strong>' + (r.points > 0 ? '+' + r.points : '0') + '</strong></td></tr>').join('') +
+      '</tbody></table></div><p style="color:var(--gray-500);font-size:.85rem">' + rows.length + ' day-award(s) · total ' + tot + ' point(s) in range.</p>';
+    const bySt = {};
+    rows.forEach(function (r) { const b = bySt[r.student_id] || (bySt[r.student_id] = { name: r.student_name, ref: r.student_id_ref, cls: r.class, pts: 0, days: 0 }); b.pts += Number(r.points || 0); if (Number(r.points) > 0) b.days++; });
+    const board = Object.values(bySt).sort(function (a, b) { return b.pts - a.pts; }).slice(0, 50);
+    this.el('punct-board').innerHTML = '<div class="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>ID</th><th>Class</th><th>Punctual days</th><th>Total points</th></tr></thead><tbody>' +
+      board.map((b, i) => '<tr><td>' + (i + 1) + '</td><td><strong>' + this.esc(b.name) + '</strong></td><td>' + this.esc(b.ref || '') + '</td><td>' + this.esc(b.cls || '') + '</td><td>' + b.days + '</td><td><strong>' + b.pts + '</strong></td></tr>').join('') + '</tbody></table></div>';
+  },
+  exportCSV() {
+    if (!this.rows.length) { toast('Nothing to export.', 'info'); return; }
+    const head = 'Date,Student,ID,Class,CheckIn,CheckOut,Rule,Points\n';
+    const body = this.rows.map(function (r) { return [r.date, '"' + (r.student_name || '').replace(/"/g, '""') + '"', r.student_id_ref || '', r.class || '', r.checkin_at || '', r.checkout_at || '', r.rule, r.points].join(','); }).join('\n');
+    const blob = new Blob([head + body], { type: 'text/csv' }); const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'punctuality-awards.csv'; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  },
+  async pushModal() {
+    let cols = [{ name: 'ca1' }, { name: 'ca2' }, { name: 'ca3' }, { name: 'exam' }], terms = [], sessions = [];
+    try { if (window.ReportEngine && ReportEngine.reportPickerOptions) { const p = await ReportEngine.reportPickerOptions(); if (p.columns && p.columns.length) cols = p.columns; terms = p.terms || []; sessions = p.sessions || []; } } catch (_) {}
+    const opt = (v, l) => '<option value="' + this.esc(v) + '">' + this.esc(l) + '</option>';
+    openModal('🚀 Push Punctuality Points → Report Card',
+      '<p style="color:var(--gray-600)">Sum each student\'s punctuality points over a period and write the total into a <strong>report-card column</strong> (e.g. CA2 or a dedicated "Punctuality" column). Re-pushing the same term/class/range <strong>updates</strong> the same rows — never duplicates.</p>' +
+      '<div class="grid grid-3">' +
+      '<div class="form-group"><label>Target column (Results)</label><select id="pp-col" class="form-select">' + cols.map(function (c) { const nm = (c.name || '').toLowerCase(); return opt(nm, (c.name || nm) + (c.max_mark ? ' (max ' + c.max_mark + ')' : '')); }).join('') + '</select></div>' +
+      '<div class="form-group"><label>Term</label><input id="pp-term" class="form-input" list="pp-terms" placeholder="e.g. First Term"><datalist id="pp-terms">' + terms.map(function (t) { return opt(t, t); }).join('') + '</datalist></div>' +
+      '<div class="form-group"><label>Session</label><input id="pp-sess" class="form-input" list="pp-sessions" placeholder="e.g. 2025/2026"><datalist id="pp-sessions">' + sessions.map(function (t) { return opt(t, t); }).join('') + '</datalist></div>' +
+      '</div><div class="grid grid-3">' +
+      '<div class="form-group"><label>Class (optional)</label><input id="pp-class" class="form-input" placeholder="all classes"></div>' +
+      '<div class="form-group"><label>From date (optional)</label><input id="pp-from" type="date" class="form-input"></div>' +
+      '<div class="form-group"><label>To date (optional)</label><input id="pp-to" type="date" class="form-input"></div></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button> <button class="btn btn-primary" onclick="Punct.doPush()">🚀 Push now</button>');
+  },
+  async doPush() {
+    const p = { p_term: this.el('pp-term').value.trim(), p_session: this.el('pp-sess').value.trim(), p_column: (this.el('pp-col').value || 'ca2').toLowerCase(), p_class: this.el('pp-class').value.trim(), p_start: this.el('pp-from').value || null, p_end: this.el('pp-to').value || null };
+    if (!p.p_term) { toast('Pick the term.', 'warning'); return; }
+    closeModal(); toast('Pushing punctuality points into Results…', 'info', 1800);
+    let done = null;
+    try { const r = await sb.rpc('sc_push_punctuality_to_results', p); if (r.error) { if (!this._missing(r.error)) { toast('Push failed: ' + r.error.message, 'danger', 7000); return; } } else done = r.data; } catch (e) { done = null; }
+    if (done == null) { done = await this.pushClient(p); if (done === false) return; }
+    toast('✅ Punctuality points pushed for ' + done + ' student(s) into Results column "' + p.p_column + '". Open Report Cards to see them.', 'success', 8000);
+    if (window.App && App.logActivity) App.logActivity('push-punctuality', 'results', p.p_column);
+  },
+  async pushClient(p) { // fallback when the RPC is absent — identical upserts client-side
+    let q = sb.from('punctuality_awards').select('student_id,student_name,student_id_ref,class,date,points').limit(20000);
+    if (p.p_class) q = q.eq('class', p.p_class); if (p.p_start) q = q.gte('date', p.p_start); if (p.p_end) q = q.lte('date', p.p_end);
+    const r = await q; if (r.error) { toast('Could not read awards: ' + r.error.message, 'danger'); return false; }
+    if (!r.data || !r.data.length) { toast('No awards in that scope.', 'info'); return 0; }
+    const sums = {}; r.data.forEach(function (x) { const b = sums[x.student_id] || (sums[x.student_id] = { name: x.student_name, ref: x.student_id_ref, cls: x.class, pts: 0 }); b.pts += Number(x.points || 0); });
+    const col = (p.p_column || '').toLowerCase();
+    if (['ca1', 'ca2', 'ca3', 'exam'].indexOf(col) < 0) { toast('Fallback push supports ca1/ca2/ca3/exam only — run database/punctuality-points.sql for custom columns.', 'warning', 7000); return false; }
+    let ok = 0;
+    for (const id of Object.keys(sums)) {
+      const b = sums[id], ref = await this._uuid('punctuality|' + id + '|' + p.p_term + '|' + p.p_session + '|' + col + '|' + (p.p_class || b.cls || ''));
+      const payload = { student_id: id, student_name: b.name, student_id_ref: b.ref, subject: 'PUNCTUALITY', class: p.p_class || b.cls, term: p.p_term, session: p.p_session, assessment_source: 'punctuality', assessment_ref: ref };
+      payload[col] = b.pts;
+      const u = await sb.from('results').upsert(payload, { onConflict: 'assessment_source,assessment_ref' });
+      if (u.error) { const ins = await sb.from('results').insert(payload); if (!ins.error) ok++; } else ok++;
+    }
+    return ok;
+  },
+  async _uuid(txt) {
+    try { const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)); const h = Array.from(new Uint8Array(buf).slice(0, 16)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join(''); return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20, 32); }
+    catch (e) { // deterministic non-secure-context fallback (cyrb53 ×2)
+      const h = function (str, seed) { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0'); };
+      const x = h(txt, 7) + h(txt, 13); return x.slice(0, 8) + '-' + x.slice(8, 12) + '-' + x.slice(12, 16) + '-' + x.slice(16, 20) + '-' + x.slice(20, 32);
+    }
+  }
+};
+Punct.init();
+</script>
+</body></html>

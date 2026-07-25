@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Install App — PWA Guide • School Connect</title>
+<meta name="description" content="How to install the School Connect app on your phone or desktop. Once installed you get push notifications, offline access, and a full-screen experience. 100% free.">
+<meta name="theme-color" content="#06b6d4">
+<link rel="canonical" href="./install.html">
+<meta property="og:title" content="Install the School Connect App">
+<meta property="og:description" content="Get push notifications, offline access, and a full-screen app. Free for Android, iOS, Windows, Mac, Linux.">
+<meta property="og:image" content="assets/img/og-cover.svg">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  body { background: linear-gradient(135deg, #ecfeff 0%, #fff 100%); min-height:100vh; }
+  .install-page { padding: 120px 24px 60px; max-width: 1100px; margin: 0 auto; }
+  .install-hero { text-align: center; padding: 40px 20px; background: white; border-radius: 24px; box-shadow: var(--shadow-lg); margin-bottom: 40px; border: 2px solid var(--primary); }
+  .install-hero .icon { font-size: 4rem; margin-bottom: 16px; }
+  .install-hero h1 { font-size: 2.4rem; font-weight: 900; color: var(--dark); margin-bottom: 12px; }
+  .install-hero p { color: var(--gray-600); max-width: 600px; margin: 0 auto 24px; }
+  .install-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 40px; }
+  .install-card { background: white; padding: 32px; border-radius: 16px; border: 1px solid var(--gray-200); box-shadow: var(--shadow); }
+  .install-card h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+  .install-card ol { padding-left: 24px; line-height: 1.8; color: var(--gray-700); }
+  .install-card ol li { margin-bottom: 6px; }
+  .install-card ol li::marker { color: var(--primary); font-weight: 700; }
+  .benefits { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 24px; }
+  .benefit { background: white; padding: 20px; border-radius: 12px; border: 1px solid var(--gray-200); display: flex; align-items: start; gap: 12px; }
+  .benefit-icon { font-size: 1.6rem; }
+  .benefit-title { font-weight: 700; color: var(--dark); font-size: 0.95rem; }
+  .benefit-desc { color: var(--gray-600); font-size: 0.85rem; line-height: 1.5; margin-top: 4px; }
+  .detect-banner { background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.2); border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+  .detect-banner-icon { font-size: 1.6rem; }
+  .detect-banner strong { color: var(--accent); display: block; }
+  .detect-banner small { color: var(--gray-600); font-size: 0.85rem; }
+</style>
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <meta property="og:url" content="https://gosasite.vercel.app/install.html">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <img src="assets/img/logo.svg" alt="">
+      <span>School Connect</span>
+    </a>
+    <button class="mobile-toggle" onclick="document.querySelector('.nav-links').classList.toggle('show')" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="voting.html">Voting</a></li>
+      <li><a href="notifications.html">Notifications</a></li>
+      <li><a href="install.html" class="active">Install</a></li>
+      <li><a href="ecosystem.html">Ecosystem</a></li>
+      <li><a href="login.html">Sign in</a></li>
+      <li><a href="apply.html" class="btn-primary">Apply Now</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.svg" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Click "Install App" to get the full app experience.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<main class="install-page">
+
+  <section class="install-hero">
+    <div class="icon">📲</div>
+    <h1>Install School Connect</h1>
+    <p>Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed. Works offline. Looks and feels like a real app.</p>
+    <button class="btn btn-primary btn-lg" onclick="installNow()">⚡ Install Now</button>
+    <p style="margin-top:12px;font-size:0.85rem;color:var(--gray-500)">Free · 5 MB · No App Store needed</p>
+  </section>
+
+  <div id="detect-info" class="detect-banner">
+    <div class="detect-banner-icon">🔍</div>
+    <div>
+      <strong id="detect-os">Detecting your device…</strong>
+      <small id="detect-detail">Showing the right instructions for your browser.</small>
+    </div>
+  </div>
+
+  <h2 style="font-size:1.6rem;font-weight:800;color:var(--dark);margin-bottom:20px">📋 How to install</h2>
+  <div class="install-grid">
+    <div class="install-card" id="card-android">
+      <h3>🤖 Android (Chrome / Edge)</h3>
+      <ol>
+        <li>Tap the menu (⋮) in the top-right corner.</li>
+        <li>Tap <strong>"Install app"</strong> or <strong>"Add to Home Screen"</strong>.</li>
+        <li>Confirm by tapping <strong>"Install"</strong>.</li>
+        <li>The app appears on your home screen with the school logo.</li>
+      </ol>
+      <p style="margin-top:16px;font-size:0.85rem;color:var(--gray-500)">✓ Push notifications work after install.</p>
+    </div>
+    <div class="install-card" id="card-ios">
+      <h3>🍎 iPhone / iPad (Safari)</h3>
+      <ol>
+        <li>Open this page in <strong>Safari</strong> (not Chrome).</li>
+        <li>Tap the <strong>Share</strong> button ⬆️ at the bottom.</li>
+        <li>Scroll down and tap <strong>"Add to Home Screen"</strong>.</li>
+        <li>Tap <strong>"Add"</strong> in the top-right corner.</li>
+      </ol>
+      <p style="margin-top:16px;font-size:0.85rem;color:var(--gray-500)">⚠️ iOS only supports push if the app is added to Home Screen.</p>
+    </div>
+    <div class="install-card" id="card-windows">
+      <h3>🪟 Windows / Mac (Edge / Chrome)</h3>
+      <ol>
+        <li>Look for the install icon (⊕) in the address bar.</li>
+        <li>Click it and choose <strong>"Install"</strong>.</li>
+        <li>The app opens in its own window, like a real program.</li>
+        <li>Pin it to your taskbar / dock for quick access.</li>
+      </ol>
+      <p style="margin-top:16px;font-size:0.85rem;color:var(--gray-500)">✓ Push notifications work in Edge &amp; Chrome on desktop.</p>
+    </div>
+  </div>
+
+  <h2 style="font-size:1.6rem;font-weight:800;color:var(--dark);margin:40px 0 20px">✨ Benefits of installing</h2>
+  <div class="benefits">
+    <div class="benefit"><div class="benefit-icon">🔔</div><div><div class="benefit-title">Push notifications</div><div class="benefit-desc">Alerts arrive even when the browser is closed.</div></div></div>
+    <div class="benefit"><div class="benefit-icon">📡</div><div><div class="benefit-title">Offline access</div><div class="benefit-desc">Open the app, view your results &amp; ID card — no internet.</div></div></div>
+    <div class="benefit"><div class="benefit-icon">📱</div><div><div class="benefit-title">Full-screen</div><div class="benefit-desc">No browser chrome. Looks like a native app.</div></div></div>
+    <div class="benefit"><div class="benefit-icon">⚡</div><div><div class="benefit-title">Faster</div><div class="benefit-desc">Loads instantly from the local cache.</div></div></div>
+    <div class="benefit"><div class="benefit-icon">🏠</div><div><div class="benefit-title">Home screen icon</div><div class="benefit-desc">One tap to open — like WhatsApp or Gmail.</div></div></div>
+    <div class="benefit"><div class="benefit-icon">💾</div><div><div class="benefit-title">Less data usage</div><div class="benefit-desc">Cached assets save bandwidth.</div></div></div>
+  </div>
+
+  <div style="background:white;padding:32px;border-radius:16px;margin-top:40px;border-left:6px solid var(--primary)">
+    <h2 style="font-size:1.3rem;font-weight:800;color:var(--dark);margin-bottom:12px">❓ Why a banner keeps appearing</h2>
+    <p style="color:var(--gray-700);line-height:1.7">Every page on the platform shows the install banner until the app is installed. This is intentional — we want every parent and teacher to actually install it so they receive push notifications for messages, broadcasts and polls. You can dismiss it once but it will return after a couple of days (configurable).</p>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <div class="footer-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div>
+      <h5>🎓 School Connect</h5>
+      <p style="color:var(--gray-400);font-size:0.9rem">An HMG Ecosystem generator that builds complete school management platforms. HMG Ecosystem Licensed.</p>
+    </div>
+    <div>
+      <h5>Demo</h5>
+      <a href="voting.html">Voting</a>
+      <a href="notifications.html">Notifications</a>
+      <a href="install.html">PWA Install</a>
+    </div>
+    <div>
+      <h5>Ecosystem</h5>
+      <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a>
+      <a href="ecosystem.html">Explore</a>
+    </div>
+  </div>
+  <div class="footer-bottom">© 2026 HMG Concepts · <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" style="color:var(--gray-400)">hmgconcepts.pages.dev</a></div>
+<div class="hmg-credit-v7" style="text-align:center;padding:12px;font-size:12px;color:var(--gray-500);border-top:1px solid var(--gray-200);margin-top:24px">Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:none;font-weight:600">HMG Concepts — School Connect</a> · School management made simple.</div>
+</footer>
+
+<script>
+  function detectDevice() {
+    const ua = navigator.userAgent;
+    const osEl = document.getElementById('detect-os');
+    const detailEl = document.getElementById('detect-detail');
+    if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) {
+      osEl.textContent = '📱 Detected: iPhone / iPad (Safari recommended)';
+      detailEl.textContent = 'Tap the Share button ⬆️ and choose "Add to Home Screen".';
+    } else if (/Android/.test(ua)) {
+      osEl.textContent = '🤖 Detected: Android';
+      detailEl.textContent = 'Tap the menu (⋮) and choose "Install app" or "Add to Home Screen".';
+    } else if (/Windows/.test(ua)) {
+      osEl.textContent = '🪟 Detected: Windows';
+      detailEl.textContent = 'Look for the install icon (⊕) in the address bar of Edge or Chrome.';
+    } else if (/Mac/.test(ua)) {
+      osEl.textContent = '🍎 Detected: macOS';
+      detailEl.textContent = 'Use Chrome or Edge. Look for the install icon (⊕) in the address bar.';
+    } else if (/Linux/.test(ua)) {
+      osEl.textContent = '🐧 Detected: Linux';
+      detailEl.textContent = 'Use Chrome or Edge. Look for the install icon (⊕) in the address bar.';
+    } else {
+      osEl.textContent = '🌐 Detected: ' + ua.split(' ').pop();
+      detailEl.textContent = 'Most modern browsers support PWA install. Look for the install icon.';
+    }
+  }
+  detectDevice();
+
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+
+  async function installNow() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === 'accepted') {
+        toast('🎉 Installing…', 'success', 4000);
+      } else {
+        toast('You can install later from your browser menu.', 'info', 4000);
+      }
+      deferredPrompt = null;
+    } else {
+      const ua = navigator.userAgent;
+      if (/iPad|iPhone|iPod/.test(ua)) {
+        toast('Tap the Share button ⬆️ and choose "Add to Home Screen".', 'info', 5000);
+      } else {
+        toast('Look for the install icon (⊕) in your browser address bar.', 'info', 5000);
+      }
+    }
+  }
+
+  function toast(msg, type='info', ms=3500) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.innerHTML = '<div class="toast-msg">' + msg + '</div>';
+    c.appendChild(t);
+    setTimeout(() => { t.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, ms);
+  }
+
+  if (typeof PWAInstall !== 'undefined') PWAInstall.init();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>

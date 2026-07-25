@@ -1,0 +1,175 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Payment History & Tracking</title><link rel="stylesheet" href="assets/css/style.css">
+<style>
+.ph-wrap{max-width:1100px;margin:26px auto;padding:0 16px}
+.ph-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:14px 0}
+.ph-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:14px 0}
+.ph-kpi{background:#fff;border:1px solid var(--gray-200,#e2e8f0);border-radius:14px;padding:14px;text-align:center}
+.ph-kpi b{display:block;font-size:1.4rem;color:var(--primary,#4f46e5)}
+.ph-kpi span{font-size:.72rem;color:var(--gray-500,#64748b);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.ph-quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+@media(max-width:640px){.ph-filters{grid-template-columns:1fr 1fr}}
+</style>    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <link rel="canonical" href="./payment-history.html">
+    <meta property="og:url" content="./payment-history.html">
+    <meta name="twitter:card" content="summary_large_image">
+</head><body>
+<main class="ph-wrap">
+  <div class="card">
+    <h1 style="margin-top:0">💰 Payment History &amp; Tracking</h1>
+    <p style="color:var(--gray-600)">Track and bulk-print fee collections <b>daily, weekly, monthly, termly, by session or any custom range</b>. Every row keeps its amount paid and remaining balance; totals are computed automatically. Export as CSV or print/save as PDF (one report, or one receipt per payment).</p>
+
+    <div class="ph-quick">
+      <button class="btn btn-sm btn-outline" onclick="PH.preset('today')">📅 Today</button>
+      <button class="btn btn-sm btn-outline" onclick="PH.preset('yesterday')">Yesterday</button>
+      <button class="btn btn-sm btn-outline" onclick="PH.preset('week')">This Week</button>
+      <button class="btn btn-sm btn-outline" onclick="PH.preset('month')">This Month</button>
+      <button class="btn btn-sm btn-outline" onclick="PH.preset('30')">Last 30 Days</button>
+      <button class="btn btn-sm btn-outline" onclick="PH.preset('term')">This Term (by term field)</button>
+      <button class="btn btn-sm btn-outline" onclick="PH.preset('all')">All Time</button>
+    </div>
+
+    <div class="ph-filters">
+      <div class="form-group"><label>From (date)</label><input class="form-input" type="date" id="ph-from"></div>
+      <div class="form-group"><label>To (date)</label><input class="form-input" type="date" id="ph-to"></div>
+      <div class="form-group"><label>Term</label><select class="form-select" id="ph-term"><option value="">— any term —</option></select></div>
+      <div class="form-group"><label>Session</label><select class="form-select" id="ph-session"><option value="">— any session —</option></select></div>
+      <div class="form-group"><label>Class</label><select class="form-select" id="ph-class"><option value="">— any class —</option></select></div>
+      <div class="form-group"><label>Method</label><select class="form-select" id="ph-method"><option value="">— any method —</option><option>cash</option><option>transfer</option><option>pos</option><option>online</option></select></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="PH.load()">🔎 Load history</button>
+      <button class="btn btn-outline" onclick="PH.printReport()">🖨 Print / PDF report</button>
+      <button class="btn btn-outline" onclick="PH.printReceipts()">🧾 Bulk-print receipts (1/page)</button>
+      <button class="btn btn-outline" onclick="PH.exportCSV()">⬇ Export CSV</button>
+    </div>
+
+    <div class="ph-kpis">
+      <div class="ph-kpi"><b id="k-count">0</b><span>Payments</span></div>
+      <div class="ph-kpi"><b id="k-paid">0</b><span>Total collected</span></div>
+      <div class="ph-kpi"><b id="k-bal">0</b><span>Outstanding balance</span></div>
+      <div class="ph-kpi"><b id="k-avg">0</b><span>Average payment</span></div>
+      <div class="ph-kpi"><b id="k-days">0</b><span>Collection days</span></div>
+    </div>
+
+    <div id="ph-daily" class="card" style="display:none;background:#f8fafc"><h3 style="margin-top:0">📆 Per-day summary (for the selected range)</h3><div id="ph-daily-body"></div></div>
+    <div class="table-wrap" style="margin-top:12px"><table id="ph-table"><thead><tr><th>Date</th><th>Student</th><th>Term</th><th>Session</th><th>Method</th><th>Reference</th><th>Paid</th><th>Balance</th></tr></thead><tbody><tr><td colspan="8" style="color:var(--gray-500)">Pick a range and press “Load history”.</td></tr></tbody></table></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+/* ENTERPRISE FINAL: dedicated payment-history tracking + bulk printing (daily/weekly/monthly/termly). */
+const PH = {
+  rows: [],
+  cur(){ return (window.SCHOOL && SCHOOL.currency) || '₦'; },
+  dmy(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); },
+  iso(d){ return d.toISOString().slice(0,10); },
+  preset(p){
+    const now=new Date(); const from=document.getElementById('ph-from'), to=document.getElementById('ph-to');
+    const set=(a,b)=>{ from.value=a?this.iso(a):''; to.value=b?this.iso(b):''; };
+    if(p==='today') set(now,now);
+    else if(p==='yesterday'){ const y=new Date(now); y.setDate(y.getDate()-1); set(y,y); }
+    else if(p==='week'){ const s=new Date(now); s.setDate(s.getDate()-((s.getDay()+6)%7)); set(s,now); }
+    else if(p==='month'){ set(new Date(now.getFullYear(),now.getMonth(),1),now); }
+    else if(p==='30'){ const s=new Date(now); s.setDate(s.getDate()-30); set(s,now); }
+    else if(p==='term'){ set(null,null); toast('Pick the Term in the dropdown, then Load.','info'); document.getElementById('ph-term').focus(); return this.load(); }
+    else if(p==='all'){ set(null,null); }
+    this.load();
+  },
+  async lookups(){
+    if(!window.sb) return;
+    const uniqFill=(sel,vals)=>{ const el=document.getElementById(sel); const seen=new Set();
+      (vals||[]).forEach(v=>{ v=String(v==null?'':v).trim(); const k=v.toLowerCase(); if(!v||seen.has(k))return; seen.add(k); const o=document.createElement('option'); o.textContent=v; el.appendChild(o); }); };
+    try{ const {data}=await sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position');
+      uniqFill('ph-term',(data||[]).filter(x=>x.kind==='term').map(x=>x.value));
+      uniqFill('ph-session',(data||[]).filter(x=>x.kind==='session').map(x=>x.value));
+    }catch(_){}
+    try{ const {data}=await sb.from('classes').select('name').order('name'); uniqFill('ph-class',(data||[]).map(x=>x.name)); }catch(_){}
+  },
+  async load(){
+    if(!window.sb){ toast('Database not configured.','warning'); return; }
+    let q=sb.from('fee_payments').select('*').order('created_at',{ascending:false}).limit(5000);
+    const from=document.getElementById('ph-from').value, to=document.getElementById('ph-to').value;
+    if(from) q=q.gte('created_at',from+'T00:00:00');
+    if(to)   q=q.lte('created_at',to+'T23:59:59');
+    const term=document.getElementById('ph-term').value, ses=document.getElementById('ph-session').value, mth=document.getElementById('ph-method').value;
+    if(term) q=q.eq('term',term); if(ses) q=q.eq('session',ses); if(mth) q=q.eq('method',mth);
+    const {data,error}=await q;
+    if(error){ toast(error.message,'danger'); return; }
+    let rows=data||[];
+    const cls=document.getElementById('ph-class').value;
+    if(cls){
+      try{ const {data:studs}=await sb.from('students').select('id').eq('class',cls).limit(3000);
+        const ids=new Set((studs||[]).map(s=>s.id)); rows=rows.filter(r=>ids.has(r.student_id)); }catch(_){}
+    }
+    this.rows=rows; this.render();
+  },
+  render(){
+    const cur=this.cur(); const tb=document.querySelector('#ph-table tbody');
+    const paid=this.rows.reduce((a,b)=>a+(Number(b.amount_paid)||0),0);
+    const bal=this.rows.reduce((a,b)=>a+(Number(b.balance)||0),0);
+    const days={}; this.rows.forEach(r=>{ const d=String(r.created_at||'').slice(0,10); days[d]=days[d]||{n:0,paid:0}; days[d].n++; days[d].paid+=Number(r.amount_paid)||0; });
+    document.getElementById('k-count').textContent=this.rows.length;
+    document.getElementById('k-paid').textContent=cur+paid.toLocaleString();
+    document.getElementById('k-bal').textContent=cur+bal.toLocaleString();
+    document.getElementById('k-avg').textContent=cur+(this.rows.length?Math.round(paid/this.rows.length):0).toLocaleString();
+    document.getElementById('k-days').textContent=Object.keys(days).length;
+    tb.innerHTML=this.rows.length?this.rows.map(r=>'<tr><td>'+this.dmy(r.created_at)+'</td><td>'+esc(r.student_name||'')+'</td><td>'+esc(r.term||'')+'</td><td>'+esc(r.session||'')+'</td><td>'+esc(r.method||'')+'</td><td>'+esc(r.reference||'')+'</td><td><b>'+cur+Number(r.amount_paid||0).toLocaleString()+'</b></td><td>'+(r.balance!=null?cur+Number(r.balance).toLocaleString():'—')+'</td></tr>').join(''):'<tr><td colspan="8" style="color:var(--gray-500)">No payments in this range.</td></tr>';
+    const db=document.getElementById('ph-daily'), dbb=document.getElementById('ph-daily-body');
+    const keys=Object.keys(days).sort().reverse();
+    if(keys.length>1){ db.style.display=''; dbb.innerHTML='<div class="table-wrap"><table><thead><tr><th>Date</th><th>Payments</th><th>Collected</th></tr></thead><tbody>'+keys.map(k=>'<tr><td>'+this.dmy(k)+'</td><td>'+days[k].n+'</td><td><b>'+cur+days[k].paid.toLocaleString()+'</b></td></tr>').join('')+'</tbody></table></div>'; }
+    else db.style.display='none';
+  },
+  _win(title,body){
+    const w=window.open('','_blank'); if(!w){ toast('Popup blocked! Please allow popups.','warning'); return null; }
+    w.document.open();
+    w.document.write('<!DOCTYPE html><html><head><title>'+title+'</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"><style>body{font-family:Arial,sans-serif;color:#111;padding:22px}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #cbd5e1;padding:5px 7px;font-size:11.5px;text-align:left}th{background:#f1f5f9}h1{margin:0;font-size:1.2rem}.tot{background:#eef2ff;font-weight:800}@media print{button{display:none}}</style></head><body>'+body+'<script>window.onload=function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}})};<\\/script></body></html>');
+    w.document.close(); w.focus(); return w;
+  },
+  printReport(){
+    if(!this.rows.length){ toast('Load a range first.','warning'); return; }
+    const sc=window.SCHOOL||{}, cur=this.cur();
+    const paid=this.rows.reduce((a,b)=>a+(Number(b.amount_paid)||0),0), bal=this.rows.reduce((a,b)=>a+(Number(b.balance)||0),0);
+    const range=(document.getElementById('ph-from').value?this.dmy(document.getElementById('ph-from').value):'beginning')+' → '+(document.getElementById('ph-to').value?this.dmy(document.getElementById('ph-to').value):'today');
+    const body='<div style="display:flex;align-items:center;gap:12px;border-bottom:3px double #1e2a5e;padding-bottom:8px"><img src="assets/img/logo.'+(sc.logoExt||'svg')+'" style="width:52px;height:52px;object-fit:contain" onerror="this.style.display=\'none\'"><div><h1>'+esc(sc.name||'School')+' — Payment History Report</h1><div style="font-size:.8rem;color:#334155">Range: '+range+' · Printed '+this.dmy(new Date())+'</div></div></div>'+
+      '<table><thead><tr><th>Date</th><th>Student</th><th>Term</th><th>Method</th><th>Reference</th><th>Paid</th><th>Balance</th></tr></thead><tbody>'+
+      this.rows.map(r=>'<tr><td>'+this.dmy(r.created_at)+'</td><td>'+esc(r.student_name||'')+'</td><td>'+esc(r.term||'')+'</td><td>'+esc(r.method||'')+'</td><td>'+esc(r.reference||'')+'</td><td>'+cur+Number(r.amount_paid||0).toLocaleString()+'</td><td>'+(r.balance!=null?cur+Number(r.balance).toLocaleString():'—')+'</td></tr>').join('')+
+      '<tr class="tot"><td colspan="5">TOTALS — '+this.rows.length+' payment(s)</td><td>'+cur+paid.toLocaleString()+'</td><td>'+cur+bal.toLocaleString()+'</td></tr></tbody></table>'+
+      '<p style="font-size:.65rem;color:#94a3b8;text-align:center;margin-top:14px">Licensed Platform · HMG Technologies</p>';
+    this._win('Payment History Report',body);
+  },
+  printReceipts(){
+    if(!this.rows.length){ toast('Load a range first.','warning'); return; }
+    if(this.rows.length>60 && !confirm(this.rows.length+' receipts will be printed (one per page). Continue?')) return;
+    const sc=window.SCHOOL||{}, cur=this.cur();
+    const st=window.SC_SETTINGS||{};
+    const raw=localStorage.getItem('sc-signature-url')||st.signature_url||'';
+    const sig=(window.Super&&Super.idcard&&Super.idcard.driveDirect)?Super.idcard.driveDirect(raw):raw;
+    const pn=localStorage.getItem('sc-principal-name')||st.principal_name||'Bursar / Principal';
+    const sign=sig?'<div style="margin-top:16px;text-align:center"><img src="'+esc(sig)+'" referrerpolicy="no-referrer" style="max-width:130px;max-height:60px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><br><b>'+esc(pn)+'</b></div>':'';
+    const one=(r)=>'<div style="page-break-after:always;display:flex;justify-content:center;padding:10px"><div style="width:520px;border:2px solid #111;padding:22px"><div style="display:flex;align-items:center;justify-content:center;gap:10px"><img src="assets/img/logo.'+(sc.logoExt||'svg')+'" style="width:50px;height:50px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="text-align:center"><h2 style="margin:0;font-size:1rem">'+esc(sc.name||'School')+'</h2><div style="font-size:.68rem;letter-spacing:2px;font-weight:800">E-RECEIPT</div></div></div><hr>'+
+      '<p style="font-size:.85rem"><b>Student:</b> '+esc(r.student_name||'')+'</p>'+
+      '<p style="font-size:.85rem"><b>Date:</b> '+this.dmy(r.created_at)+' · <b>Term:</b> '+esc(r.term||'')+' '+esc(r.session||'')+'</p>'+
+      '<p style="font-size:.85rem"><b>Method:</b> '+esc(r.method||'')+' · <b>Ref:</b> '+esc(r.reference||r.id||'')+'</p>'+
+      '<p style="font-size:1rem"><b>Amount paid:</b> <span style="color:#16a34a;font-weight:800">'+cur+Number(r.amount_paid||0).toLocaleString()+'</span></p>'+
+      (r.balance!=null?'<p style="font-size:.9rem"><b>Remaining balance:</b> '+cur+Number(r.balance).toLocaleString()+(Number(r.balance)===0?' <span style="color:#16a34a;font-weight:800">(FULLY PAID)</span>':'')+'</p>':'')+
+      sign+'</div></div>';
+    this._win('Bulk Receipts',this.rows.map(one).join(''));
+  },
+  exportCSV(){
+    if(!this.rows.length){ toast('Load a range first.','warning'); return; }
+    const keys=['created_at','student_name','term','session','method','reference','amount_paid','balance'];
+    const csv=[keys.join(',')].concat(this.rows.map(r=>keys.map(k=>'"'+String(r[k]==null?'':r[k]).replace(/"/g,'""')+'"').join(','))).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='payment-history.csv'; a.click();
+  }
+};
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(m,t){ alert(m); }
+PH.lookups();
+</script>
+</body></html>

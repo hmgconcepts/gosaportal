@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>CBT / Online Exams • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — CBT / Online Exams. Free school management platform by HMG Concepts.">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+<meta name="theme-color" content="#0506ae">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<meta property="og:title" content="CBT / Online Exams • God of Seed Academy">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:image" content="assets/img/og-cover.svg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) ===
+   Guarantees the logged-in dashboard layout renders correctly even if the
+   external stylesheet is cached/blocked/fails to load. Mirrors style.css. */
+:root{--sc-primary:#0506ae;--sc-accent:#964eec}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc}
+.app-sidebar{width:250px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:40}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px;border-bottom:1px solid #e2e8f0}
+.app-brand img{width:40px;height:40px;border-radius:10px;object-fit:contain;flex-shrink:0;background:#f8fafc}
+.app-brand strong{display:block;font-size:.95rem;font-weight:800;color:#0f172a;line-height:1.2}
+.app-nav{display:flex;flex-direction:column;gap:2px;padding:12px 10px;flex:1}
+.app-nav a{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;color:#475569;text-decoration:none;font-size:.9rem;font-weight:600;line-height:1;white-space:nowrap}
+.app-nav a:hover{background:#f1f5f9;color:#0506ae}
+.app-nav a.active{background:#0506ae;color:#fff}
+.app-nav-icon{width:24px;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:14px 24px;background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30}
+.app-page-title{font-size:1.25rem;font-weight:800;color:#0f172a;margin:0}
+.app-content{padding:24px;flex:1;max-width:1280px;width:100%}
+.app-layout.topnav{flex-direction:column}
+.app-layout.topnav .app-sidebar{width:100%;height:auto;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-nav{flex-direction:row;flex:1;padding:8px;gap:4px}
+.app-layout.topnav .app-nav a{flex-direction:column;gap:4px;font-size:.7rem;padding:8px 12px;text-align:center}
+@media(max-width:900px){.app-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 25px -5px rgba(0,0,0,.2)}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar{position:sticky;transform:none}.app-content{padding:16px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+
+    <meta name="description" content="God of Seed Academy — CBT / Online Exams. Free school management platform by HMG Concepts.">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./cbt.html">
+    <meta property="og:title" content="CBT / Online Exams • God of Seed Academy">
+    <meta property="og:description" content="God of Seed Academy — CBT / Online Exams. Free school management platform by HMG Concepts.">
+    <meta property="og:url" content="./cbt.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="CBT / Online Exams • God of Seed Academy">
+    <meta name="twitter:description" content="God of Seed Academy — CBT / Online Exams. Free school management platform by HMG Concepts.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head>
+<body data-theme="theme2" data-school="God of Seed Academy" data-font="raleway">
+
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="app-layout layout1" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
+        <div>
+          <strong>God of Seed Academy</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>My Profile</span>
+        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔐</span>
+          <span>Change Password</span>
+        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Multi-Subject CBT</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Report Cards</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payment History</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="active">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="exam-register.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Exam Registrations</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="hr.html" data-module-id="hr" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💼</span>
+          <span>HR &amp; Payroll</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a>
+      </div>
+    </aside>
+  <main class="app-main">
+    <header class="app-topbar">
+      <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
+      <h1 class="app-page-title">CBT / Online Exams</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        
+        <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle theme">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout style="display:none">Sign out</button>
+      </div>
+    </header>
+    <div class="app-content">
+      
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px" data-staff-only>
+        <button class="btn btn-primary" onclick="CBTUI.newExam()">+ New Exam / Test</button>
+        <button class="btn btn-outline" onclick="CBTUI.downloadTemplate()">⬇ CSV Template</button>
+        <button class="btn btn-outline" onclick="CBTUI.refresh()">↻ Refresh</button>
+        <button class="btn btn-outline" onclick="CBTUI.importBackup()">📥 Import offline backup (JSON)</button>
+      </div>
+      <div class="card" style="margin-bottom:18px">
+        <p style="color:var(--gray-600);margin:0">
+          Create online exams, tests, assignments, projects and quizzes with <strong>17 question types</strong>,
+          timer, randomisation, negative marking, anti-cheat and certificates. Share a 6-character
+          <strong>code</strong> or a direct link — students need no account. Map each assessment to a
+          <strong>report-card column</strong> and results flow automatically into the student's report card.
+        </p>
+      </div>
+      <div id="cbt-list"><span class="pulse">Loading exams…</span></div>
+    
+      <div class="card" style="margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0">
+        <h3 style="margin-top:0">📊 CBT → Report Card Mapping (Mid-Term & Terminal)</h3>
+        <p style="color:var(--gray-700)">CBT is used for <strong>mid-term tests (CA1/CA2)</strong> and <strong>terminal examination objectives (Exam)</strong>. After students submit, push scores into Results table with column selection (CA1, CA2, CA3, CBT Exam, Exam, Project, etc). Then generate <strong>class broadsheet, subject broadsheet and report card</strong> from Report Cards page — all automatically.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores → Official Report Cards</button>
+          <a class="btn btn-outline btn-sm" href="report-cards.html">📄 Open Report Cards</a>
+          <a class="btn btn-outline btn-sm" href="academic-records.html">📊 Broadsheets</a>
+        </div>
+        <p style="font-size:.82rem;color:var(--gray-500);margin-top:8px">Tip: When creating a CBT exam, set <em>Report-card column</em> (e.g. CA1 for mid-term, Exam for terminal) and <em>Max score contribution</em> (e.g. 20). Scores are scaled accordingly.</p>
+      </div>
+
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
+      © 2026 God of Seed Academy · Built by <a href="https://cssadewale.pages.dev" target="_blank" rel="noopener">Adewale Samson Adeagbo</a> · Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a> · <a href="developer.html">About the developer</a>
+    </footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/voting.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script src="assets/js/crud.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/analytics.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
+  else { Notifications.init(sb); Voting.init(sb); }
+  PWAInstall.init();
+  if (window.Super) Super.init(sb, window.SCHOOL);
+  if (window.Enterprise) Enterprise.init(sb);
+  if (window.CRUD) CRUD.init(sb);
+</script>
+<script src="assets/js/cbt-engine.js"></script>
+<script>
+CBT.init(sb);
+if(window.CBTUI && window.CBTUI.loadPickers) window.CBTUI.loadPickers();
+window.CBTUI = {
+  _filters: { q:'', class:'', subject:'', teacher:'', mode:'all', group:'all' },
+  canManageExam(e){ const r=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase(); const admin=['super_admin','admin','administrator','owner','director','principal','proprietor','head_teacher','bursar']; return admin.includes(r) || (['staff','teacher'].includes(r) && e && (!e.teacher_id || e.teacher_id === (window.SC_PROFILE&&SC_PROFILE.id))); },
+  async refresh(){
+    const box = document.getElementById('cbt-list');
+    if(!sb){ box.innerHTML = '<div class="card">⚠️ Database not configured. Add your Supabase keys in assets/js/config.js.</div>'; return; }
+    const { data, error } = await CBT.listExams();
+    if(error){ box.innerHTML = '<div class="card">Could not load exams: '+esc(error.message)+'</div>'; return; }
+    if(!data || !data.length){ box.innerHTML = '<div class="card">No exams yet. Click <strong>+ New Exam / Test</strong> to create one.</div>'; return; }
+    const teacherIds = [...new Set((data||[]).map(e => e.teacher_id).filter(Boolean))];
+    let teacherMap = {};
+    try {
+      if (teacherIds.length) {
+        const r = await sb.from('profiles').select('id,full_name').in('id', teacherIds);
+        (r.data||[]).forEach(x => teacherMap[x.id] = x.full_name || x.id);
+      }
+    } catch(_) {}
+    const exams = (data||[]).map(e => ({ ...e, teacher_name: teacherMap[e.teacher_id] || '' }));
+    const isMulti = (e) => String(e.subject||'').indexOf('MULTI-SUBJECT') === 0 || !!(e.anti_cheat_config && e.anti_cheat_config.multi_subject);
+    const isAnon = (e) => String(e.exam_mode||'').toLowerCase() === 'open';
+    const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort();
+    const classes = uniq(exams.map(e => e.class || ''));
+    const subjects = uniq(exams.map(e => e.subject || ''));
+    const teachers = uniq(exams.map(e => e.teacher_name || ''));
+    const f = this._filters || { q:'', class:'', subject:'', teacher:'', mode:'all', group:'all' };
+    const controls = '<div class="card" style="margin-bottom:14px"><div class="grid grid-3">'+
+      '<div class="form-group"><label>Search</label><input class="form-input" id="cbt-f-q" value="'+esc(f.q||'')+'" placeholder="title/code/subject" oninput="CBTUI.setFilter(\'q\',this.value)"></div>'+
+      '<div class="form-group"><label>Class</label><select class="form-select" id="cbt-f-class" onchange="CBTUI.setFilter(\'class\',this.value)"><option value="">All classes</option>'+classes.map(v=>'<option '+((f.class||'')===v?'selected':'')+' value="'+esc(v)+'">'+esc(v)+'</option>').join('')+'</select></div>'+
+      '<div class="form-group"><label>Subject</label><select class="form-select" id="cbt-f-subject" onchange="CBTUI.setFilter(\'subject\',this.value)"><option value="">All subjects</option>'+subjects.map(v=>'<option '+((f.subject||'')===v?'selected':'')+' value="'+esc(v)+'">'+esc(v)+'</option>').join('')+'</select></div>'+
+      '<div class="form-group"><label>Teacher</label><select class="form-select" id="cbt-f-teacher" onchange="CBTUI.setFilter(\'teacher\',this.value)"><option value="">All teachers</option>'+teachers.map(v=>'<option '+((f.teacher||'')===v?'selected':'')+' value="'+esc(v)+'">'+esc(v)+'</option>').join('')+'</select></div>'+
+      '<div class="form-group"><label>Mode</label><select class="form-select" id="cbt-f-mode" onchange="CBTUI.setFilter(\'mode\',this.value)"><option value="all">All modes</option><option value="open" '+(f.mode==='open'?'selected':'')+'>Anonymous / Open</option><option value="registered" '+(f.mode==='registered'?'selected':'')+'>Registered</option></select></div>'+
+      '<div class="form-group"><label>Group</label><select class="form-select" id="cbt-f-group" onchange="CBTUI.setFilter(\'group\',this.value)"><option value="all">All exams</option><option value="ordinary" '+(f.group==='ordinary'?'selected':'')+'>Single-subject</option><option value="multi" '+(f.group==='multi'?'selected':'')+'>Multi-subject</option></select></div>'+
+      '</div></div>';
+    let rows = exams.filter(e => {
+      if (f.q) {
+        const hay = [e.title,e.code,e.subject,e.class,e.teacher_name].join(' ').toLowerCase();
+        if (!hay.includes(String(f.q).toLowerCase())) return false;
+      }
+      if (f.class && String(e.class||'') !== f.class) return false;
+      if (f.subject && String(e.subject||'') !== f.subject) return false;
+      if (f.teacher && String(e.teacher_name||'') !== f.teacher) return false;
+      if (f.mode !== 'all' && String(e.exam_mode||'').toLowerCase() !== f.mode) return false;
+      if (f.group === 'multi' && !isMulti(e)) return false;
+      if (f.group === 'ordinary' && isMulti(e)) return false;
+      return true;
+    });
+    const ordinary = rows.filter(e=>!isMulti(e)), multi = rows.filter(isMulti), open = rows.filter(isAnon), registered = rows.filter(e=>!isAnon(e));
+    const tableFor = (rows, label, badge) => !rows.length ? '' :
+      '<h3 style="margin:14px 0 6px">'+label+' <span class="badge" style="background:'+(badge||'#eef2ff')+'">'+rows.length+'</span></h3>'+
+      '<div class="table-wrap"><table><thead><tr><th>Code</th><th>Subject</th><th>Type</th><th>Class</th><th>Teacher</th><th>Mode</th><th>Report column</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+
+      rows.map(e=>'<tr><td><strong>'+esc(e.code)+'</strong></td><td>'+(isMulti(e)?'<span class=\'badge\' style=\'background:#ede9fe;color:#5b21b6;margin-right:4px\'>UTME</span>':'')+esc(e.subject)+'</td><td>'+esc(e.assessment_type)+'</td><td>'+esc(e.class||'-')+'</td><td>'+esc(e.teacher_name||'-')+'</td><td>'+(isAnon(e)?'Anonymous/Open':'Registered')+'</td><td>'+esc(e.report_column||'-')+'</td><td>'+(e.is_open?'<span class=\'badge badge-success\'>Open</span>':'<span class=\'badge\'>Closed</span>')+'</td>'+
+        '<td style="white-space:nowrap">'+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.toggle(\''+e.id+'\','+(!e.is_open)+')">'+(e.is_open?'Close':'Open')+'</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.share(\''+esc(e.code)+'\')">Share</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.results(\''+e.id+'\',\''+esc(e.code)+'\')">Results</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.preview(\''+e.id+'\')">Preview</button> '+
+          (CBTUI.canManageExam(e) ? '<button class="btn btn-sm btn-primary" onclick="CBTUI.edit(\''+e.id+'\')">✏️ Edit</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.editQuestions(\''+e.id+'\')">Edit Questions</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.appendCSV(\''+e.id+'\')">Attach CSV</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.diagnoseScoring(\''+e.id+'\')">Diagnose Scoring</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.repairScoring(\''+e.id+'\')">Repair Scoring</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.regradeResults(\''+e.id+'\')">Regrade Saved Results</button> '+
+          '<button class="btn btn-sm btn-outline" onclick="CBTUI.repairTabs(\''+e.id+'\')">Repair Tabs</button> '+
+          '<button class="btn btn-sm btn-outline" data-admin-only onclick="CBTUI.del(\''+e.id+'\')">Delete</button>' : '<span class="badge" title="Only the creator teacher or an admin can edit this exam">Read-only</span>')+
+        '</td></tr>').join('')+'</tbody></table></div>';
+    box.innerHTML = controls + tableFor(ordinary,'📝 Ordinary CBT (single subject)') + tableFor(multi,'🧪 Multi-Subject / UTME packages','#ede9fe') + tableFor(open,'🙈 Anonymous / Open Exams','#fef3c7') + tableFor(registered,'🪪 Registered Exams','#dcfce7') +
+      (rows.length? '' : '<div class="card">No CBT matches the current filters.</div>') +
+      (multi.length?'' : '<p style="color:var(--gray-500);font-size:.85rem">Create UTME-style packages on the <a href="cbt-multi.html">Multi-Subject CBT Builder</a> page.</p>');
+  },
+  setFilter(key,val){ this._filters = this._filters || {}; this._filters[key]=val; this.refresh(); },
+  newExam(){
+    const subj = (window.SCHOOL&&window.SCHOOL.modules)?'':'';
+    openModal('New Exam / Test', `
+      <div class="form-group"><label>Title</label><input class="form-input" id="ex-title" placeholder="First Term Maths Test"></div>
+      <div class="grid grid-2">
+        <div class="form-group"><label>Subject</label><select class="form-select" id="ex-subject"><option value="">— select subject —</option></select></div>
+        <div class="form-group"><label>Class</label><select class="form-select" id="ex-class"><option value="">— select class —</option></select></div>
+        <div class="form-group"><label>Term</label><select class="form-select" id="ex-term"><option value="">— select term —</option></select></div>
+        <div class="form-group"><label>Session</label><select class="form-select" id="ex-session"><option value="">— select session —</option></select></div>
+        <div class="form-group"><label>UTME / multi-subject package (optional)</label><input class="form-input" id="ex-package" placeholder="e.g. UTME 2026: English, Maths, Physics, Chemistry"></div><div class="form-group"><label>Assessment type</label><select class="form-select" id="ex-type"><option value="exam">Exam</option><option value="test">Test</option><option value="ca">CA</option><option value="assignment">Assignment</option><option value="project">Project</option><option value="quiz">Quiz</option><option value="practical">Practical</option></select></div>
+        <div class="form-group"><label>Report-card column (auto-maps results)</label><select class="form-select" id="ex-col"><option value="">— select a report-card column —</option></select><small>Only columns configured in Report Cards for the selected class, subject, term and session are shown.</small></div>
+        <div class="form-group"><label>Exam access mode</label><select class="form-select" id="ex-mode"><option value="registered">Registered students only — identity required</option><option value="open">Open / anonymous candidates — public code access</option></select><small>Use Registered for school tests; Open for entrance or anonymous assessments.</small></div>
+        <div class="form-group"><label>Max score in report card</label><input class="form-input" type="number" id="ex-max" value="100"></div>
+        <div class="form-group"><label>Duration (minutes)</label><input class="form-input" type="number" id="ex-dur" value="45"></div>
+        <div class="form-group"><label>Negative mark / wrong</label><input class="form-input" type="number" step="0.01" id="ex-neg" value="0"></div>
+        <div class="form-group"><label>Questions to deliver (0 = all)</label><input class="form-input" type="number" id="ex-sel" value="0"></div>
+      </div>
+
+      <div class="card" style="background:#fff7ed;border-color:#fed7aa;margin:12px 0">
+        <h3 style="margin-top:0">🛡️ Anti-cheat and exam security</h3>
+        <div class="grid grid-2">
+          <label><input type="checkbox" id="ac-tab" checked> Detect tab/app switching</label>
+          <label><input type="checkbox" id="ac-blur" checked> Detect window focus loss</label>
+          <label><input type="checkbox" id="ac-copy" checked> Block copy / paste / cut</label>
+          <label><input type="checkbox" id="ac-right" checked> Block right-click</label>
+          <label><input type="checkbox" id="ac-full" checked> Encourage fullscreen mode</label>
+          <label><input type="checkbox" id="ac-watermark" checked> Show candidate watermark</label>
+          <div class="form-group"><label>Violation limit before auto-submit</label><input class="form-input" type="number" id="ac-max" value="5" min="0" max="10"><small>0 disables auto-submit.</small></div>
+        </div>
+      </div>
+      <div class="form-group"><label>Instructions</label><textarea class="form-input" id="ex-instr" rows="2" placeholder="Read each question carefully…"></textarea></div>
+      <div class="form-group"><label>Questions CSV (paste or choose a .csv file)</label>
+        <input type="file" id="ex-file" accept=".csv" class="form-input" onchange="CBTUI._readFile(event)">
+        <textarea class="form-input" id="ex-csv" rows="5" style="margin-top:8px;font-family:monospace;font-size:.8rem" placeholder="Question,A,B,C,D,CorrectAnswer,..."></textarea>
+        <small style="color:var(--gray-500)">Need the format? Click "CSV Template" on the page.</small>
+      </div>
+      <div class="form-group" style="grid-column:1/-1;border-top:1px solid var(--gray-200,#e2e8f0);padding-top:14px">
+        <label style="font-weight:800;font-size:1rem">✍️ Or Add Questions Manually</label>
+        <p style="color:var(--gray-500);font-size:.85rem;margin-bottom:10px">Type questions one by one. They will be added to the CSV above.</p>
+        <div id="manual-q-builder" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px">
+          <div class="grid grid-2" style="gap:10px">
+            <div class="form-group"><label>Question *</label><textarea class="form-input" id="mq-question" rows="2" placeholder="Type the question text"></textarea></div>
+            <div class="form-group"><label>Question Type</label><select class="form-select" id="mq-type"><option value="mcq">Multiple Choice (MCQ)</option><option value="true_false">True/False</option><option value="short_answer">Short Answer</option><option value="fill_blank">Fill in the Blank</option></select></div>
+            <div class="form-group"><label>Option A</label><input class="form-input" id="mq-a" placeholder="Option A"></div>
+            <div class="form-group"><label>Option B</label><input class="form-input" id="mq-b" placeholder="Option B"></div>
+            <div class="form-group"><label>Option C</label><input class="form-input" id="mq-c" placeholder="Option C"></div>
+            <div class="form-group"><label>Option D</label><input class="form-input" id="mq-d" placeholder="Option D"></div>
+            <div class="form-group"><label>Correct Answer *</label><input class="form-input" id="mq-answer" placeholder="e.g. A or True or the answer text"></div>
+            <div class="form-group"><label>Mark</label><input class="form-input" type="number" id="mq-mark" value="1" min="1"></div>
+            <div class="form-group"><label>Explanation (optional)</label><input class="form-input" id="mq-explain" placeholder="Why this is the answer"></div>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button type="button" class="btn btn-primary btn-sm" onclick="CBTUI.addManualQuestion()">➕ Add Question</button>
+            <span id="mq-count" style="color:var(--gray-500);font-size:.85rem;line-height:2.4"></span>
+          </div>
+        </div>
+      </div>
+    `, '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CBTUI.save()">Create exam</button>');
+    CBTUI.loadPickers();
+  },
+  _readFile(ev){ const f=ev.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{document.getElementById('ex-csv').value=r.result;}; r.readAsText(f); },
+  _manualCount:0,
+  addManualQuestion(){
+    const q=document.getElementById('mq-question')?.value?.trim();
+    const type=document.getElementById('mq-type')?.value||'mcq';
+    const a=document.getElementById('mq-a')?.value?.trim()||'';
+    const b=document.getElementById('mq-b')?.value?.trim()||'';
+    const c=document.getElementById('mq-c')?.value?.trim()||'';
+    const d=document.getElementById('mq-d')?.value?.trim()||'';
+    const ans=document.getElementById('mq-answer')?.value?.trim();
+    const mark=document.getElementById('mq-mark')?.value||'1';
+    const explain=document.getElementById('mq-explain')?.value?.trim()||'';
+    if(!q){toast('Enter a question.','warning');return;}
+    if(!ans){toast('Enter the correct answer.','warning');return;}
+    const csvEl=document.getElementById('ex-csv');
+    const existing=csvEl.value.trim();
+    // Build CSV row: question,type,a,b,c,d,answer,explanation,mark
+    const esc=v=>'"'+String(v||'').replace(/"/g,'""')+'"';
+    const row=[esc(q),esc(type),esc(a),esc(b),esc(c),esc(d),esc(ans),esc(explain),mark].join(',');
+    if(!existing || !existing.includes('question')){
+      csvEl.value='question,type,a,b,c,d,answer,explanation,mark\n'+row;
+    } else {
+      csvEl.value=existing+'\n'+row;
+    }
+    this._manualCount++;
+    document.getElementById('mq-count').textContent=this._manualCount+' question(s) added manually';
+    // Clear inputs for next question
+    document.getElementById('mq-question').value='';
+    ['mq-a','mq-b','mq-c','mq-d','mq-answer','mq-explain'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    document.getElementById('mq-mark').value='1';
+    toast('Question added! Add more or create the exam.','success',2000);
+  },
+  async save(){
+    if(!sb){ toast('Database not configured.','warning'); return; }
+    const csv = document.getElementById('ex-csv').value.trim();
+    const questions = csv ? CBT.parseCSV(csv) : [];
+    if(!questions.length){ toast('Add at least one question (CSV).','warning'); return; }
+    const bankCheck=CBT.validateQuestionBank(questions);
+    if(!bankCheck.ok){ toast('Cannot publish this exam: '+bankCheck.errors.slice(0,5).join(' | '),'danger',12000); return; }
+    const exam = {
+      title: document.getElementById('ex-title').value,
+      subject: document.getElementById('ex-package').value ? ('MULTI-SUBJECT: '+document.getElementById('ex-package').value) : (document.getElementById('ex-subject').value || 'General'),
+      class: document.getElementById('ex-class').value,
+      term: document.getElementById('ex-term').value,
+      session: document.getElementById('ex-session').value,
+      assessment_type: document.getElementById('ex-type').value,
+      exam_mode: document.getElementById('ex-mode')?.value || 'registered',
+      topic: document.getElementById('ex-package').value,
+      report_column: document.getElementById('ex-col').value,
+      max_score: parseFloat(document.getElementById('ex-max').value)||0,
+      duration: parseInt(document.getElementById('ex-dur').value)||45,
+      negative_mark: parseFloat(document.getElementById('ex-neg').value)||0,
+      select_count: parseInt(document.getElementById('ex-sel').value)||0,
+      instructions: document.getElementById('ex-instr').value,
+      is_open: true,
+      anti_cheat_config: {tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,max_violations:parseInt(document.getElementById('ac-max')?.value||'5')},
+      csv_data: questions
+    };
+    const { data, error } = await CBT.createExam(exam);
+    if(error){ toast('Could not create: '+error.message,'danger'); return; }
+    if(typeof App!=='undefined' && App.logActivity) App.logActivity('create','cbt_exam', data && data.code);
+    closeModal(); toast('✅ Exam created. Code: '+(data&&data.code),'success',6000); CBTUI.refresh();
+  },
+  async toggle(id,open){ if(!sb)return; const {data,error}=await sb.from('cbt_exams').update({is_open:open,updated_at:new Date().toISOString()}).eq('id',id).select('id,code,is_open').maybeSingle(); if(error){toast('Could not '+(open?'open':'close')+' exam: '+error.message,'danger',9000);return;} if(!data||data.is_open!==open){toast('Exam status was not confirmed. Check your role/RLS permissions.','danger',9000);return;} try{localStorage.removeItem('cbt-exam-cache-'+String(data.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''));}catch(_){} toast('Exam '+(open?'opened':'closed')+' successfully.','success'); CBTUI.refresh(); },
+  async preview(id){ const {data:e}=await sb.from('cbt_exams').select('*').eq('id',id).maybeSingle(); const bank=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]); const qs=bank.map((q,i)=>CBT.normalizeQuestion(q,i)); openModal('Preview Questions — '+esc(e&&e.title||''), '<p><b>'+qs.length+'</b> question(s). First 20 shown.</p><div class="table-wrap"><table><thead><tr><th>#</th><th>Section</th><th>Type</th><th>Question</th><th>Recognised answer</th></tr></thead><tbody>'+qs.slice(0,20).map((q,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(q.section||q.subject||'')+'</td><td>'+esc(q.type||'mcq')+'</td><td>'+esc(q.question||'')+'</td><td>'+(q.answer==null||String(q.answer)===''?'<span style="color:#dc2626;font-weight:800">MISSING</span>':esc(Array.isArray(q.answer)?q.answer.join(', '):q.answer))+'</td></tr>').join('')+'</tbody></table></div>'); },
+  /* ENTERPRISE V8 (issue 8): import an offline exam backup JSON downloaded by a
+     candidate whose submission failed. Saves via cbt_import_backup RPC with
+     duplicate protection. */
+  importBackup(){
+    var inp=document.createElement('input'); inp.type='file'; inp.accept='.json,application/json';
+    inp.onchange=function(){
+      var f=inp.files[0]; if(!f) return;
+      var r=new FileReader();
+      r.onload=async function(){
+        var obj; try{ obj=JSON.parse(String(r.result)); }catch(e){ toast('Not a valid backup JSON file.','danger'); return; }
+        var payload=obj.payload||obj;
+        if(!payload || !payload.exam_id){ toast('This file is not a School Connect exam backup.','danger'); return; }
+        if(!sb){ toast('Database not configured.','warning'); return; }
+        var res; try{ res=await sb.rpc('cbt_import_backup',{p_payload:payload}); }catch(e){ res={error:e}; }
+        if(res.error || !res.data || !res.data.saved){ toast('Import failed: '+((res.data&&res.data.error)||(res.error&&res.error.message)||'run database/update-v8-schema.sql first'),'danger',8000); return; }
+        toast('✅ Backup imported — '+(payload.student_name||'candidate')+' result saved to '+(res.data.title||'exam')+'.','success',7000);
+      };
+      r.readAsText(f);
+    };
+    inp.click();
+  },
+  appendCSV(id){ openModal('Attach / Append CSV', '<p>Paste an additional CSV question bank. The questions will be appended to the existing exam.</p><textarea id="append-cbt-csv" class="form-input" rows="8" style="font-family:monospace"></textarea>', '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CBTUI.saveAppendCSV(\''+id+'\')">Append questions</button>'); },
+  /* ============================================================
+     ENTERPRISE V6 (issue 4): FULL EXAM EDITING AFTER CREATION.
+     Teachers can now edit every setting of an exam, edit/delete
+     individual questions, append another CSV, or replace the whole
+     question bank — at any time after creation.
+     ============================================================ */
+  async edit(id){
+    if(!sb) return;
+    const {data:e}=await sb.from('cbt_exams').select('*').eq('id',id).maybeSingle();
+    if(!e){ toast('Exam not found','warning'); return; }
+    openModal('✏️ Edit Exam — '+esc(e.title||''), `
+      <div class="form-group"><label>Title</label><input class="form-input" id="ed-title" value="${esc(e.title||'')}"></div>
+      <div class="grid grid-2">
+        <div class="form-group"><label>Subject</label><input class="form-input" id="ed-subject" value="${esc(e.subject||'')}"></div>
+        <div class="form-group"><label>Class</label><input class="form-input" id="ed-class" value="${esc(e.class||'')}"></div>
+        <div class="form-group"><label>Duration (minutes)</label><input class="form-input" type="number" id="ed-dur" value="${e.duration||45}"></div>
+        <div class="form-group"><label>Report column</label><input class="form-input" id="ed-col" value="${esc(e.report_column||'')}"></div>
+        <div class="form-group"><label>Max score contribution</label><input class="form-input" type="number" id="ed-max" value="${e.max_score||0}"></div>
+        <div class="form-group"><label>Negative mark / wrong</label><input class="form-input" type="number" step="0.25" id="ed-neg" value="${e.negative_mark||0}"></div>
+        <div class="form-group"><label>Select N questions (0=all)</label><input class="form-input" type="number" id="ed-sel" value="${e.select_count||0}"></div>
+        <div class="form-group"><label>Attempt limit (0=unlimited)</label><input class="form-input" type="number" id="ed-att" value="${e.attempt_limit||0}"></div>
+      </div>
+      <div class="form-group"><label>Candidate instructions</label><textarea class="form-input" id="ed-instr" rows="2">${esc(e.instructions||'')}</textarea></div>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ed-open" ${e.is_open?'checked':''}> Open for candidates</label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ed-rand" ${e.randomise?'checked':''}> Randomise questions</label>
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ed-rel" ${e.release_results!==false?'checked':''}> Release results instantly</label>`,
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CBTUI.saveEdit(\''+id+'\')">Save changes</button>');
+  },
+  async saveEdit(id){
+    const v=(x)=>document.getElementById(x).value, c=(x)=>document.getElementById(x).checked;
+    const patch={ title:v('ed-title'), subject:v('ed-subject'), class:v('ed-class'), duration:parseInt(v('ed-dur'))||45,
+      report_column:v('ed-col'), max_score:parseFloat(v('ed-max'))||0, negative_mark:parseFloat(v('ed-neg'))||0,
+      select_count:parseInt(v('ed-sel'))||0, attempt_limit:parseInt(v('ed-att'))||0, instructions:v('ed-instr'),
+      is_open:c('ed-open'), randomise:c('ed-rand'), release_results:c('ed-rel') };
+    const {error}=await sb.from('cbt_exams').update(patch).eq('id',id);
+    if(error){ toast(error.message,'danger'); return; }
+    toast('✅ Exam updated.','success'); closeModal(); CBTUI.refresh();
+  },
+  async editQuestions(id){
+    if(!sb) return;
+    const {data:e}=await sb.from('cbt_exams').select('*').eq('id',id).maybeSingle();
+    if(!e){ toast('Exam not found','warning'); return; }
+    let qs=(Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:(Array.isArray(e.questions)?e.questions:[]); if(typeof qs==='string'){ try{qs=JSON.parse(qs);}catch(_){qs=[];} }
+    qs=qs.map((q,i)=>CBT.normalizeQuestion(q,i));
+    CBTUI._eq={id, qs};
+    const rows=qs.map((q,i)=>'<tr><td>'+(i+1)+'</td><td style="max-width:340px">'+esc((q.question||'').slice(0,90))+'</td><td>'+esc(q.type||'mcq')+'</td><td>'+(q.answer==null||String(q.answer)===''?'<span style="color:#dc2626;font-weight:800">MISSING</span>':esc(Array.isArray(q.answer)?q.answer.join(', '):q.answer))+'</td>'+
+      '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="CBTUI.editQ('+i+')">Edit</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.delQ('+i+')">Delete</button></td></tr>').join('');
+    openModal('🛠️ Edit Questions — '+esc(e.title||'')+' ('+qs.length+')',
+      '<div class="table-wrap" style="max-height:380px;overflow:auto"><table><thead><tr><th>#</th><th>Question</th><th>Type</th><th>Answer</th><th></th></tr></thead><tbody>'+ (rows||'<tr><td colspan=5>No questions — use Attach CSV.</td></tr>') +'</tbody></table></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-outline" onclick="CBTUI.appendCSV(\''+id+'\')">＋ Attach another CSV</button><button class="btn btn-primary" onclick="CBTUI.saveQuestions()">Save all changes</button>');
+  },
+  editQ(i){
+    const q=CBTUI._eq.qs[i]||{};
+    openModal('Edit Question '+(i+1), `
+      <div class="form-group"><label>Question</label><textarea class="form-input" id="eq-q" rows="2">${esc(q.question||q.prompt||'')}</textarea></div>
+      <div class="grid grid-2">
+        <div class="form-group"><label>Type</label><select class="form-select" id="eq-type">${['mcq','true_false','multi_select','fill_blank','short_answer','numeric','essay'].map(t=>'<option '+((q.type||'mcq')===t?'selected':'')+'>'+t+'</option>').join('')}</select></div>
+        <div class="form-group"><label>Mark</label><input class="form-input" type="number" id="eq-mark" value="${q.mark||1}"></div>
+        <div class="form-group"><label>Option A</label><input class="form-input" id="eq-a" value="${esc(q.a||(q.options&&q.options[0])||'')}"></div>
+        <div class="form-group"><label>Option B</label><input class="form-input" id="eq-b" value="${esc(q.b||(q.options&&q.options[1])||'')}"></div>
+        <div class="form-group"><label>Option C</label><input class="form-input" id="eq-c" value="${esc(q.c||(q.options&&q.options[2])||'')}"></div>
+        <div class="form-group"><label>Option D</label><input class="form-input" id="eq-d" value="${esc(q.d||(q.options&&q.options[3])||'')}"></div>
+        <div class="form-group"><label>Correct answer (text or letter)</label><input class="form-input" id="eq-ans" value="${esc(String(q.answer||q.correct||''))}"></div>
+        <div class="form-group"><label>Subject/Section (multi-subject)</label><input class="form-input" id="eq-sec" value="${esc(q.section||q.subject||'')}"></div>
+      </div>
+      <div class="form-group"><label>Explanation (shown after grading)</label><input class="form-input" id="eq-exp" value="${esc(q.explanation||'')}"></div>`,
+      '<button class="btn btn-outline" onclick="CBTUI.editQuestions(\''+CBTUI._eq.id+'\')">← Back</button><button class="btn btn-primary" onclick="CBTUI.saveQ('+i+')">Apply</button>');
+  },
+  saveQ(i){
+    const v=(x)=>document.getElementById(x).value;
+    const q=CBTUI._eq.qs[i]||{};
+    Object.assign(q,{ question:v('eq-q'), type:v('eq-type'), a:v('eq-a'), b:v('eq-b'), c:v('eq-c'), d:v('eq-d'),
+      answer:v('eq-ans'), mark:Number(v('eq-mark'))||1, section:v('eq-sec'), subject:v('eq-sec'), explanation:v('eq-exp') });
+    if(q.options) delete q.options; // rebuild from a-d on normalisation
+    CBTUI._eq.qs[i]=q; toast('Question updated in draft — press “Save all changes”.','info'); CBTUI.editQuestions(CBTUI._eq.id);
+  },
+  delQ(i){ if(!confirm('Delete question '+(i+1)+'?'))return; CBTUI._eq.qs.splice(i,1); CBTUI.editQuestions(CBTUI._eq.id); },
+  async saveQuestions(){
+    const {id,qs}=CBTUI._eq||{}; if(!id)return;
+    const bank=(qs||[]).map((q,i)=>CBT.normalizeQuestion(q,i));
+    const check=CBT.validateQuestionBank(bank); if(!check.ok){toast('Cannot save: '+check.errors.slice(0,6).join(' | '),'danger',12000);return;}
+    const {error}=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id);
+    if(error){ toast(error.message,'danger'); return; }
+    toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions).','success'); closeModal(); CBTUI.refresh();
+  },
+  async saveAppendCSV(id){ const txt=document.getElementById('append-cbt-csv').value.trim(); const qs=CBT.parseCSV(txt); if(!qs.length){toast('No valid questions found','warning');return;} const check=CBT.validateQuestionBank(qs);if(!check.ok){toast('Cannot append: '+check.errors.slice(0,5).join(' | '),'danger',12000);return;} const {data:e}=await sb.from('cbt_exams').select('csv_data,questions').eq('id',id).maybeSingle(); const old=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]); const bank=old.concat(qs); const {error}=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id); if(error){toast(error.message,'danger');return;} closeModal(); toast('Questions appended and scoring keys validated.','success'); CBTUI.refresh(); },
+  async del(id){ if(!sb)return; if(!confirm('Delete this exam and all its results?'))return; await sb.from('cbt_exams').delete().eq('id',id); if(App&&App.logActivity)App.logActivity('delete','cbt_exam',id); toast('Deleted.','info'); CBTUI.refresh(); },
+  share(code){
+    const url = location.origin + location.pathname.replace(/cbt\.html$/,'cbt-exam.html') + '?code=' + code;
+    const wa = 'https://wa.me/?text='+encodeURIComponent('Take the exam ('+code+'): '+url);
+    openModal('Share exam '+code, '<p>Direct link:</p><input class="form-input" value="'+esc(url)+'" onclick="this.select()"><p style="margin-top:12px">Access code: <strong style="font-size:1.4rem">'+esc(code)+'</strong></p>', '<a class="btn btn-outline" target="_blank" href="'+wa+'">Share on WhatsApp</a><button class="btn btn-primary" onclick="navigator.clipboard.writeText(\''+url+'\');toast(\'Link copied\',\'success\')">Copy link</button>');
+  },
+  async results(id,code){
+    if(!sb)return;
+    const { data } = await sb.from('cbt_results').select('*').eq('exam_id',id).order('score',{ascending:false});
+    const rows=(data||[]).map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.student_name)+'</td><td>'+esc(r.student_id_ref||'-')+'</td><td><b>'+r.score+'/'+r.total+'</b></td><td>'+(r.percent||0)+'%</td><td>'+Number(r.correct_count||0)+' / '+Number(r.wrong_count||0)+' / '+Number(r.skipped_count||0)+'</td><td><span class="badge" style="background:'+(String(r.engine_version||'').startsWith('v5.1')?'#dcfce7':'#fee2e2')+'">'+esc(r.engine_version||'legacy')+'</span><br><small>'+esc(r.grading_status||'unknown')+'</small></td><td>'+esc(r.cert_code||'-')+'</td></tr>').join('');
+    openModal('Results — '+code, '<div style="margin-bottom:10px"><button class="btn btn-sm btn-outline" onclick="CBTUI.exportCSV(\''+id+'\')">⬇ Export CSV</button> <button class="btn btn-sm btn-primary" onclick="closeModal();CBTUI.regradeResults(\''+id+'\')">Regrade Saved Results with V5.1</button></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>%</th><th>Correct/Wrong/Skipped</th><th>Engine / Status</th><th>Cert</th></tr></thead><tbody>'+(rows||'<tr><td colspan=8>No submissions yet.</td></tr>')+'</tbody></table></div>');
+  },
+  async exportCSV(id){
+    const { data } = await sb.from('cbt_results').select('*').eq('exam_id',id);
+    const head='Name,StudentID,Class,Score,Total,Percent,Correct,Wrong,Skipped,Ungraded,GradingStatus,EngineVersion,Cert,SubmittedAt\n';
+    const body=(data||[]).map(r=>[r.student_name,r.student_id_ref,r.student_class,r.score,r.total,r.percent,r.correct_count,r.wrong_count,r.skipped_count,r.ungraded_count,r.grading_status,r.engine_version,r.cert_code,r.submitted_at||r.created_at].map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\n');
+    const blob=new Blob([head+body],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cbt-results.csv'; a.click();
+  },
+  downloadTemplate(){
+    const csv='Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section\n"What is 5 + 7?",10,11,12,13,C,"Addition.",mcq,,,,,,,Easy,Arithmetic,Numbers\n"Capital of Nigeria?",,,,,Abuja,"FCT.",short,,,FCT,,,,Easy,Geography,Nigeria\n';
+    const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cbt-template.csv'; a.click();
+  }
+};
+document.addEventListener('DOMContentLoaded', CBTUI.refresh); CBTUI.refresh();
+</script><script>
+// School Connect v5: real UTME-style multi-subject CBT package builder.
+(function(){
+  if(!window.CBTUI) return;
+  CBTUI._subjects=[]; CBTUI._classes=[]; CBTUI._terms=[]; CBTUI._sessions=[];
+  CBTUI.loadPickers = async function(){
+    if(!sb) return; try{
+      const [sub,cls,term,ses]=await Promise.all([
+        sb.from('subjects').select('name').order('name'), sb.from('classes').select('name').order('name'),
+        sb.from('lookups').select('value').eq('kind','term').order('position'), sb.from('lookups').select('value').eq('kind','session').order('position')]);
+      const uniq=(a)=>{const s=new Set();return (a||[]).filter(v=>{const k=String(v==null?'':v).trim().toLowerCase();if(!k||s.has(k))return false;s.add(k);return true;});};
+      this._subjects=uniq((sub.data||[]).map(x=>x.name)); this._classes=uniq((cls.data||[]).map(x=>x.name)); this._terms=uniq((term.data||[]).map(x=>x.value)); this._sessions=uniq((ses.data||[]).map(x=>x.value));
+      const fill=(id,arr)=>{const el=document.getElementById(id); if(el) el.innerHTML='<option value="">— select —</option>'+arr.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');};
+      fill('ex-subject',this._subjects); fill('ex-class',this._classes); fill('ex-term',this._terms); fill('ex-session',this._sessions);
+      ;['ex-subject','ex-class','ex-term','ex-session'].forEach(id=>document.getElementById(id)?.addEventListener('change',()=>CBTUI.loadReportColumns?.()));
+      await CBTUI.loadReportColumns?.();
+    }catch(e){ console.warn('CBT dropdown load failed',e); }
+  };
+  CBTUI.loadReportColumns = async function(){
+    const out=document.getElementById('ex-col'); if(!out) return;
+    const cls=document.getElementById('ex-class')?.value||'', sub=document.getElementById('ex-subject')?.value||'', term=document.getElementById('ex-term')?.value||'', session=document.getElementById('ex-session')?.value||'';
+    out.innerHTML='<option value="">— select a report-card column —</option>';
+    if(!window.sb || !cls || !sub || !term || !session) return;
+    try { const {data,error}=await window.sb.from('assessment_columns').select('name,max_mark,position').eq('class',cls).in('subject',['*',sub]).eq('term',term).eq('session',session).order('position'); if(error) throw error;
+      (data||[]).forEach(c=>{const o=document.createElement('option');o.value=String(c.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_');o.textContent=c.name+(c.max_mark!=null?' (max '+c.max_mark+')':'');out.appendChild(o);});
+      if(!(data||[]).length) out.innerHTML+='<option value="" disabled>No report-card columns yet — create them in Report Cards first</option>';
+    } catch(e){ console.warn('Report-card column lookup failed',e); }
+  };
+  CBTUI._oldNewExam = CBTUI.newExam;
+  CBTUI.newExam = function(){
+    this._oldNewExam();
+    const pkg = document.getElementById('ex-package');
+    if(pkg && !document.getElementById('ex-ms-box')){
+      pkg.closest('.form-group').insertAdjacentHTML('afterend', '<div id="ex-ms-box" class="card" style="grid-column:1/-1;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📚 Multiple subjects in one exam package (UTME style)</h3><p style="color:var(--gray-600)">If this is a UTME/common entrance package, enter how many subjects the teacher is setting. Each subject gets its own CSV question bank. Students will see all subjects at once and can jump between them.</p><div class="form-group"><label>How many subjects is this exam setting at once?</label><input class="form-input" type="number" id="ex-ms-count" min="0" max="12" value="0" onchange="CBTUI.renderSubjectBlocks()"></div><div id="ex-ms-subjects"></div></div>');
+    }
+    this.loadPickers();
+  };
+  CBTUI.renderSubjectBlocks = function(){
+    const n = Number(document.getElementById('ex-ms-count')?.value||0); const box=document.getElementById('ex-ms-subjects'); if(!box)return;
+    const opts = this._subjects.map(s=>'<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');
+    box.innerHTML = Array.from({length:n},(_,i)=>'<div class="card" style="margin:10px 0;background:#fff"><h4>Subject '+(i+1)+'</h4><div class="form-group"><label>Subject</label><select class="form-select ms-subject"><option value="">— select subject —</option>'+opts+'</select></div><div class="form-group"><label>CSV questions for this subject</label><input class="form-input" type="file" accept=".csv" onchange="CBTUI.readMultiFile(event,'+i+')"><textarea class="form-input ms-csv" rows="5" style="margin-top:6px;font-family:monospace;font-size:.78rem" placeholder="Question,A,B,C,D,CorrectAnswer,..."></textarea></div></div>').join('');
+  };
+  CBTUI.readMultiFile = function(ev,i){ const f=ev.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=()=>{ const t=document.querySelectorAll('.ms-csv')[i]; if(t)t.value=r.result; }; r.readAsText(f); };
+  CBTUI.inferBreakdown = function(questions){
+    const out=[]; let cur='', start=0, count=0;
+    (questions||[]).forEach((q,i)=>{ const sec=String(q.section||q.subject||q.subject_section||q.exam_subject||'').trim(); if(!sec)return; if(!cur){ cur=sec; start=i; count=1; } else if(sec===cur){ count++; } else { out.push({name:cur,start:start,count:count,end:start+count-1}); cur=sec; start=i; count=1; } });
+    if(cur) out.push({name:cur,start:start,count:count,end:start+count-1});
+    return out;
+  };
+  CBTUI.applyBreakdown = function(questions, breakdown){
+    const qs=(questions||[]).slice();
+    (breakdown||[]).forEach(b=>{ const start=Number(b.start)||0; const end=b.end!=null?Number(b.end):(start+(Number(b.count)||0)-1); for(let i=start;i<=end && i<qs.length;i++){ qs[i]=qs[i]||{}; qs[i].section=b.name; qs[i].subject=b.name; qs[i].subject_section=b.name; qs[i].exam_subject=b.name; } });
+    return qs;
+  };
+  CBTUI.diagnoseScoring = async function(id){
+    if(!sb){toast('Database not configured.','warning');return;}
+    const {data,error}=await sb.rpc('cbt_diagnose_exam',{p_exam_id:id});
+    if(error){toast('Scoring diagnostic is not installed. Run the latest database/complete-schema.sql. '+error.message,'danger',10000);return;}
+    const d=data||{}, missing=Array.isArray(d.missing_answer_indexes)?d.missing_answer_indexes:[];
+    openModal('CBT Scoring Diagnostic — Engine '+esc(d.engine_version||'unknown'),
+      '<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+Number(d.question_count||0)+'</div><div class="stat-label">Questions</div></div><div class="stat-card"><div class="stat-value">'+Number(d.gradable_count||0)+'</div><div class="stat-label">Auto-gradable</div></div><div class="stat-card"><div class="stat-value" style="color:'+(missing.length?'#dc2626':'#16a34a')+'">'+missing.length+'</div><div class="stat-label">Missing keys</div></div></div>'+
+      (missing.length?'<div class="notice notice-error"><b>Missing correct answer keys at question indexes:</b> '+missing.join(', ')+'. Repair aliases automatically, then edit any still missing.</div>':'<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534">✅ Every objective question has a recognised answer key.</div>')+
+      '<p><b>Question bank source:</b> '+esc(d.bank_source||'unknown')+' · <b>Stored results engine:</b> '+esc(d.engine_version||'')+'</p>',
+      '<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="closeModal();CBTUI.repairScoring(\''+id+'\')">Repair Scoring</button>');
+  };
+  CBTUI.repairScoring = async function(id){
+    if(!sb){toast('Database not configured.','warning');return;}
+    if(!confirm('Normalise legacy answer keys/options and synchronise both question-bank columns? Original question fields are preserved.'))return;
+    const {data,error}=await sb.rpc('cbt_repair_exam_scoring',{p_exam_id:id});
+    if(error){toast('Scoring repair is not installed. Run the latest database/complete-schema.sql. '+error.message,'danger',10000);return;}
+    if(!data||data.ok===false){toast('Repair failed: '+esc((data&&data.message)||'Unknown error'),'danger',10000);return;}
+    toast('✅ Scoring bank repaired with engine '+(data.engine_version||'v5.1')+'. Recognised keys: '+Number(data.gradable_count||0)+'/'+Number(data.question_count||0)+'.','success',9000);
+    this.refresh();
+  };
+  CBTUI.regradeResults = async function(id){
+    if(!sb){toast('Database not configured.','warning');return;}
+    if(!confirm('Recalculate every saved result for this exam from its retained answers_data using V5.1? Rows without answers or with missing bank keys are left unchanged and reported.'))return;
+    const {data,error}=await sb.rpc('cbt_regrade_exam_results_v5',{p_exam_id:id});
+    if(error){toast('Regrade function unavailable. Run database/cbt-v5.1-zero-score-hotfix.sql. '+error.message,'danger',12000);return;}
+    if(!data||data.ok===false){toast('Regrade failed: '+((data&&data.message)||'Unknown error'),'danger',10000);return;}
+    toast('✅ Regraded '+Number(data.regraded_count||0)+' result(s). Unchanged: '+Number(data.skipped_no_answer_rows||0)+' without saved answers, '+Number(data.skipped_missing_key_rows||0)+' with missing keys.','success',12000);
+    this.results(id,'');
+  };
+  CBTUI.repairTabs = async function(id){
+    if(!sb){ toast('Database not configured.','warning'); return; }
+    const { data: exam, error } = await sb.from('cbt_exams').select('*').eq('id', id).maybeSingle();
+    if(error || !exam){ toast('Exam not found.','danger'); return; }
+    let questions = Array.isArray(exam.csv_data) && exam.csv_data.length ? exam.csv_data.slice() : (Array.isArray(exam.questions) ? exam.questions.slice() : []);
+    if(!questions.length){ toast('This exam has no question bank in csv_data or questions. Upload questions before repairing tabs.','danger',7000); return; }
+    let cfg = Object.assign({}, exam.anti_cheat_config || {});
+    let breakdown = Array.isArray(cfg.subject_breakdown) ? cfg.subject_breakdown.slice() : [];
+    if (breakdown.length < 2) breakdown = this.inferBreakdown(questions);
+    if (breakdown.length < 2) {
+      const raw = prompt('Could not infer subject tabs automatically. Enter subject segments as Subject:count, Subject2:count', (String(exam.subject||'').replace(/^MULTI-SUBJECT:\s*/,'')||''));
+      if(!raw) return;
+      let pos=0;
+      breakdown = raw.split(',').map(x=>x.trim()).filter(Boolean).map(pair=>{ const m=pair.match(/^(.+?)\s*:\s*(\d+)$/); if(!m) return null; const name=m[1].trim(); const count=Number(m[2]); const item={name,start:pos,count,end:pos+count-1}; pos+=count; return item; }).filter(Boolean);
+      if(!breakdown.length || breakdown.reduce((a,b)=>a+Number(b.count||0),0)!==questions.length){ toast('Subject counts must add up exactly to total questions ('+questions.length+').','danger',7000); return; }
+    }
+    questions = this.applyBreakdown(questions, breakdown);
+    cfg.subject_breakdown = breakdown;
+    cfg.subjects = breakdown.map(b=>b.name);
+    cfg.multi_subject = breakdown.length > 1;
+    // Keep both legacy question-bank columns in sync. Older exams stored only
+    // `questions`, while the former repair button inspected/updated only
+    // `csv_data`, so it reported success without changing what candidates saw.
+    const upd = await sb.from('cbt_exams').update({ csv_data: questions, questions: questions, anti_cheat_config: cfg, subject: breakdown.length>1 ? ('MULTI-SUBJECT: '+breakdown.map(b=>b.name).join(', ')) : (exam.subject || ''), updated_at:new Date().toISOString() }).eq('id', id);
+    if(upd.error){ toast('Repair failed: '+upd.error.message, 'danger', 7000); return; }
+    toast('✅ Subject-tab metadata repaired. Students will now see subject tabs for this exam.', 'success', 7000);
+    this.refresh();
+  };
+  CBTUI.save = async function(){
+    if(!sb){ toast('Database not configured.','warning'); return; }
+    let questions=[]; const subject_breakdown=[]; const blocks=[...document.querySelectorAll('#ex-ms-subjects .card')];
+    blocks.forEach((b,idx)=>{ const sub=b.querySelector('.ms-subject')?.value || ('Subject '+(idx+1)); const csv=b.querySelector('.ms-csv')?.value.trim()||''; if(csv){ const qs=CBT.parseCSV(csv); qs.forEach(q=>{q.section=sub;q.subject=sub;q.subject_section=sub;q.exam_subject=sub;}); subject_breakdown.push({name:sub,start:questions.length,count:qs.length,end:questions.length+qs.length-1}); questions=questions.concat(qs); } });
+    if(!questions.length){ const csv=document.getElementById('ex-csv').value.trim(); questions=csv?CBT.parseCSV(csv):[]; const sub=document.getElementById('ex-subject').value; questions.forEach(q=>{ if(!q.section) q.section=sub; }); }
+    if(!questions.length){ toast('Add at least one question CSV.','warning'); return; }
+    const bankCheck=CBT.validateQuestionBank(questions);
+    if(!bankCheck.ok){toast('Cannot publish this exam: '+bankCheck.errors.slice(0,5).join(' | '),'danger',12000);return;}
+    const multiSubjects=[...new Set(questions.map(q=>q.section).filter(Boolean))];
+    const exam={ title:document.getElementById('ex-title').value, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(document.getElementById('ex-subject').value||multiSubjects[0]||'General'), class:document.getElementById('ex-class').value, term:document.getElementById('ex-term').value, session:document.getElementById('ex-session').value, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:document.getElementById('ex-col').value, max_score:parseFloat(document.getElementById('ex-max').value)||0, duration:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions:document.getElementById('ex-instr').value, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
+    const {data,error}=await CBT.createExam(exam); if(error){toast('Could not create: '+error.message,'danger');return;} if(typeof App!=='undefined'&&App.logActivity)App.logActivity('create','cbt_exam',data&&data.code); closeModal(); toast('✅ Exam created. Code: '+(data&&data.code),'success',6000); CBTUI.refresh();
+  };
+})();
+</script>
+</body></html>

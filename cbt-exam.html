@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Take Exam • School Portal</title>
+<meta name="description" content="Take an online CBT exam. Multi-subject support with subject tabs, anti-cheat monitoring, automatic grading, and printable certificates.">
+<meta name="keywords" content="CBT, online exam, multi-subject, UTME, school, HMG Concepts">
+<meta name="theme-color" content="#0506ae">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Take Exam • School Portal">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+:root{--sc-primary:#0506ae;--sc-accent:#964eec;--primary:#0506ae;--accent:#964eec}
+body{font-family:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;background:#f8fafc;margin:0;padding:0;color:#0f172a;min-height:100vh}
+.login-shell{min-height:100vh;background:linear-gradient(135deg,#eef2ff 0%,#f5f3ff 100%);padding:24px}
+.login-shell .card{background:white;border-radius:18px;box-shadow:0 4px 24px rgba(15,23,42,.08);padding:24px;max-width:840px;margin:0 auto}
+.login-shell .hero-card{text-align:center;margin-bottom:18px;background:linear-gradient(135deg,var(--sc-primary),var(--sc-accent));color:white;padding:24px}
+.exam-school-head{display:grid;grid-template-columns:78px minmax(0,1fr);gap:16px;align-items:center;text-align:left;max-width:720px;margin:0 auto}
+.login-shell .hero-card img{width:72px;height:72px;border-radius:14px;object-fit:contain;background:white;padding:7px;box-sizing:border-box;box-shadow:0 3px 12px rgba(0,0,0,.18)}
+.login-shell h1{display:block!important;margin:0!important;font-size:1.45rem!important;font-weight:900!important;line-height:1.2!important;color:#fff!important;opacity:1!important;visibility:visible!important}
+.exam-school-name-banner{display:block;margin:0 0 10px;padding:8px 12px;border:1px solid rgba(255,255,255,.38);border-radius:10px;background:rgba(0,0,0,.16);color:#fff;font-size:1.05rem;font-weight:900;text-align:center}
+.exam-school-motto{margin:5px 0 0;font-size:.84rem;font-weight:700;opacity:.96}
+.exam-school-contact{margin:5px 0 0;font-size:.76rem;line-height:1.5;opacity:.92}
+.exam-portal-label{margin:10px 0 0;padding-top:9px;border-top:1px solid rgba(255,255,255,.3);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;font-weight:900;text-align:center}
+.exam-context{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px;margin-bottom:12px;padding:10px;border:1px solid #dbeafe;background:#eff6ff;border-radius:12px;font-size:.78rem}
+.exam-context span{display:block;color:#475569}.exam-context b{display:block;color:#0f172a;margin-top:2px}
+@media(max-width:560px){.exam-school-head{grid-template-columns:58px minmax(0,1fr);gap:10px}.login-shell .hero-card img{width:58px;height:58px}.login-shell h1{font-size:1.14rem}.exam-school-contact{font-size:.69rem}}
+.login-shell h2{margin:0 0 8px;font-size:1.15rem;font-weight:800;color:#0f172a}
+.login-shell .form-group{margin-bottom:12px}
+.login-shell .form-group label{display:block;font-weight:600;font-size:.85rem;color:#475569;margin-bottom:5px}
+.login-shell .form-input{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.92rem;font-family:inherit;box-sizing:border-box;background:white}
+.login-shell .form-input:focus{outline:0;border-color:#0506ae;box-shadow:0 0 0 3px rgba(28,114,231,.15)}
+.login-shell .btn{padding:10px 18px;border-radius:10px;font-weight:700;font-size:.9rem;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.login-shell .btn-primary{background:linear-gradient(135deg,#0506ae,#964eec);color:white}
+.login-shell .btn-outline{background:transparent;border:1px solid #0506ae;color:#0506ae}
+.login-shell .btn:disabled{opacity:.5;cursor:not-allowed}
+.cbt-subject-tabs{position:sticky;top:0;z-index:20;background:white;display:flex;gap:8px;flex-wrap:wrap;margin:-4px -4px 14px;padding:10px 4px;border-bottom:2px solid #e2e8f0}
+.cbt-subject-tabs .btn{font-weight:800}
+.cbt-subject-tabs .btn-primary{background:linear-gradient(135deg,#0506ae,#964eec);color:white;border:0}
+.pulse{display:inline-block;animation:pulse 1.4s ease-in-out infinite;color:#94a3b8}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+#exam-root .card{border-radius:18px;border:1px solid #e2e8f0;background:white;padding:20px;margin-bottom:14px;box-shadow:0 2px 8px rgba(15,23,42,.04)}
+.q-palette{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.q-palette button{width:34px;height:34px;border-radius:6px;border:1px solid #e2e8f0;background:white;font-weight:700;cursor:pointer;font-size:.82rem}
+.q-palette button.current{background:#0506ae;color:white;border-color:#0506ae}
+.q-palette button.answered{background:#dcfce7;border-color:#86efac}
+.q-palette button.flagged{background:#fef08a;border-color:#fde047}
+.q-palette .label{font-size:.75rem;color:#64748b;width:100%;margin-bottom:4px}
+.clock{font-weight:800;font-size:1.05rem;color:#0506ae}
+.clock.urgent{color:#dc2626;animation:pulse 1s ease-in-out infinite}
+.viol{color:#dc2626;margin-left:10px;font-size:.85rem;font-weight:700}
+.option-label{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;margin:6px 0;cursor:pointer;transition:all .15s}
+.option-label:hover{background:#f1f5f9;border-color:#cbd5e1}
+.option-label.selected{background:linear-gradient(135deg,rgba(28,114,231,.08),rgba(94,33,116,.08));border-color:#0506ae}
+.option-letter{width:28px;height:28px;border-radius:50%;background:#0506ae;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;flex-shrink:0}
+.option-label.selected .option-letter{background:#964eec}
+.option-text{flex:1;line-height:1.5}
+textarea.form-input{min-height:80px;resize:vertical}
+.score-circle{width:120px;height:120px;border-radius:50%;background:linear-gradient(135deg,#0506ae,#964eec);color:white;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto 16px;font-weight:900}
+.score-circle .pct{font-size:2.4rem;line-height:1}
+.score-circle .lbl{font-size:.7rem;letter-spacing:.1em;opacity:.9;text-transform:uppercase}
+#exam-root .actions{display:flex;justify-content:space-between;margin-top:14px;gap:8px;flex-wrap:wrap}
+#exam-root .actions .btn-outline{background:white;border:1px solid #e2e8f0;color:#0f172a}
+#exam-root .actions .btn-primary{background:linear-gradient(135deg,#0506ae,#964eec);color:white;border:0}
+.notice{background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:10px 14px;font-size:.88rem;color:#92400e;margin:10px 0}
+.notice-error{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+</style>
+
+    <meta name="description" content="Take an online CBT exam. Multi-subject support with subject tabs, anti-cheat monitoring, automatic grading, and printable certificates.">
+    <meta name="keywords" content="CBT, online exam, multi-subject, UTME, school, HMG Concepts">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./cbt-exam.html">
+    <meta property="og:title" content="Take Exam • School Portal">
+    <meta property="og:description" content="Take an online CBT exam. Multi-subject support with subject tabs, anti-cheat monitoring, automatic grading, and printable certificates.">
+    <meta property="og:url" content="./cbt-exam.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Take Exam • School Portal">
+    <meta name="twitter:description" content="Take an online CBT exam. Multi-subject support with subject tabs, anti-cheat monitoring, automatic grading, and printable certificates.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head>
+<body>
+<main class="login-shell">
+  <div style="max-width:840px;margin:0 auto">
+    <header class="card hero-card" aria-label="School examination identity">
+      <div class="exam-school-name-banner" id="exam-school-name-banner">School</div>
+      <div class="exam-school-head">
+        <img id="exam-school-logo" src="assets/img/logo.png" alt="School logo">
+        <div>
+          <h1 id="exam-school-name">School</h1>
+          <p class="exam-school-motto" id="exam-school-motto">Excellence in Education</p>
+          <p class="exam-school-contact" id="exam-school-contact">Official school CBT examination portal</p>
+        </div>
+      </div>
+      <p class="exam-portal-label">Official Computer-Based Examination Portal</p>
+    </header>
+    <div id="exam-root">
+      <div class="card"><span class="pulse">Initialising exam system…</span></div>
+    </div>
+    <p style="text-align:center;margin-top:20px;font-size:.78rem;color:#64748b">
+      Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" style="color:#0506ae">HMG Concepts</a> ·
+      <a href="cbt.html" style="color:#0506ae">Back to CBT Manager</a>
+    </p>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/cbt-engine.js"></script>
+<script>
+/* ===================================================================
+   CBT Exam Runner v15 — Final Stable
+   - Multi-subject tabs (UTME-style) always appear when the question
+     bank contains per-question section/subject metadata
+   - Per-subject progress counters (answered/total)
+   - Subject-aware previous/next within current subject
+   - Defensive against missing fields, bad question banks, lost Supabase
+     - Anonymous + registered candidates
+     - Anti-cheat with watermark, focus loss, copy/paste blocks
+     - Robust submit with 6 retries and a pending-queue fallback
+   =================================================================== */
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const FREE_TYPES_NO_OPTIONS = ['short','short_answer','numeric','essay','code','cloze','multinumeric','fill_blank','math_equation','fill'];
+
+  function toast(m, t, ms) {
+    if (window.toast) return window.toast(m, t, ms);
+    // Fallback: use the global toast from app.js if loaded
+    if (window.Notifications && window.Notifications.showInApp) { window.Notifications.showInApp(m, '', t); return; }
+    if (t === 'danger' || t === 'warning') console.warn('[toast]', m);
+  }
+
+  function openModal(){}
+  function closeModal(){}
+
+  /* School identity is available before login from generated config.js. The
+     public exam RPC may return a newer, safe subset from school_settings; those
+     values win without exposing any private configuration. */
+  function applySchoolIdentity(remoteSchool){
+    const cfg = window.SCHOOL || {};
+    const db = remoteSchool && typeof remoteSchool === 'object' ? remoteSchool : {};
+    const school = {
+      name: db.name || db.school_name || cfg.name || 'School',
+      motto: db.motto || cfg.motto || 'Excellence in Education',
+      address: db.address || cfg.address || '',
+      phone: db.phone || cfg.phone || '',
+      email: db.email || cfg.email || '',
+      logo: db.logo_url || cfg.logoUrl || cfg.logo_url || ('assets/img/logo.' + (cfg.logoExt || 'svg')),
+      primary: (cfg.theme && cfg.theme.primary) || cfg.primary || '#0506ae',
+      accent: (cfg.theme && cfg.theme.accent) || cfg.accent || '#964eec'
+    };
+    document.documentElement.style.setProperty('--sc-primary', school.primary);
+    document.documentElement.style.setProperty('--sc-accent', school.accent);
+    const set = (id, value) => { const el=$(id); if(el) el.textContent=value; };
+    set('exam-school-name', school.name);
+    set('exam-school-name-banner', school.name);
+    set('exam-school-motto', school.motto);
+    const contact = [school.address, school.phone ? 'Tel: '+school.phone : '', school.email].filter(Boolean).join(' · ');
+    set('exam-school-contact', contact || 'Official school CBT examination portal');
+    const logo=$('exam-school-logo');
+    if(logo){
+      logo.onerror=function(){ if(!this.dataset.fallback){this.dataset.fallback='1';this.src='assets/img/logo.png';}else{this.style.display='none';} };
+      logo.src=school.logo;
+      logo.alt=school.name+' logo';
+    }
+    document.title='Take Exam • '+school.name;
+    return school;
+  }
+  applySchoolIdentity();
+
+  /* ---------- State ---------- */
+  const Exam = {
+    data: null,
+    answers: [],
+    idx: 0,
+    timer: null,
+    deadline: 0,
+    monitor: null,
+    flags: {},
+    startTs: 0,
+    violations: 0,
+    violationLog: [],
+    student: null,
+    clientRef: '',
+    school: null,
+    _done: false,
+  };
+
+  Exam.qs = function(){ return (this.data && (this.data._questions || this.data.questions || this.data.csv_data)) || []; };
+  Exam.param = function(){
+    const u = new URLSearchParams(location.search);
+    return (u.get('code') || u.get('exam') || u.get('c') || '').toUpperCase().trim();
+  };
+  Exam.root = function(){ return document.getElementById('exam-root'); };
+
+  // ENTERPRISE V13 / V5: robust UTME-style multi-subject experience.
+  /* ---------- Subject tab logic ---------- */
+  Exam.subjectOf=function(q){
+
+    if (!q) return 'General';
+    if (q.section) return String(q.section);
+    if (q.subject) return String(q.subject);
+    if (q.subject_section) return String(q.subject_section);
+    if (q.exam_subject) return String(q.exam_subject);
+    // Fall back to subject_breakdown metadata
+    const bd = ((this.data && this.data.anti_cheat_config && this.data.anti_cheat_config.subject_breakdown) || []);
+    const oi = Number(q && q._orig_index != null ? q._orig_index : -1);
+    if (oi >= 0 && bd.length > 1) {
+      for (const b of bd) {
+        const start = Number(b.start) || 0;
+        const end = b.end != null ? Number(b.end) : (start + (Number(b.count) || 0) - 1);
+        if (oi >= start && oi <= end) return b.name || 'General';
+      }
+    }
+    return 'General';
+  };
+
+  Exam.sections=function(){
+    const seen = []; const add = (s) => { const v = String(s || '').trim(); if (v && !seen.includes(v)) seen.push(v); };
+    const bd = ((this.data && this.data.anti_cheat_config && this.data.anti_cheat_config.subject_breakdown) || []);
+    if (Array.isArray(bd) && bd.length > 1) bd.forEach(b => add(b.name));
+    this.qs().forEach(q => add(this.subjectOf(q)));
+    return seen.length ? seen : ['General'];
+  };
+
+  Exam.currentSubject=function(){
+    const q = this.qs()[this.idx];
+    return this.subjectOf(q || { section: 'General' });
+  };
+
+  Exam.indexesForSubject=function(sec){
+    const out = [];
+    this.qs().forEach((q, i) => { if (this.subjectOf(q) === sec) out.push(i); });
+    return out;
+  };
+
+  Exam.sectionStats=function(sec){
+    let t = 0, a = 0;
+    this.qs().forEach((q, i) => {
+      if (this.subjectOf(q) === sec) {
+        t++;
+        const v = this.answers[i];
+        if (v != null && String(v).trim() !== '') a++;
+      }
+    });
+    return { t, a };
+  };
+
+  Exam.goSubject=function(sec){
+    const i = this.qs().findIndex(q => this.subjectOf(q) === sec);
+    if (i >= 0) { this.idx = i; this.render(); }
+  };
+
+  Exam.nextInSubject=function(){
+    const list = this.indexesForSubject(this.currentSubject());
+    const p = list.indexOf(this.idx);
+    if (p >= 0 && p < list.length - 1) { this.idx = list[p + 1]; this.render(); }
+  };
+  Exam.prevInSubject=function(){
+    const list = this.indexesForSubject(this.currentSubject());
+    const p = list.indexOf(this.idx);
+    if (p > 0) { this.idx = list[p - 1]; this.render(); }
+  };
+
+  // v2: renderTabs=function — multi-subject CBT tab renderer
+  Exam.renderTabs=function(current){
+    const secs = this.sections();
+    if (secs.length <= 1) return '';
+    return '<div class="cbt-subject-tabs">' + secs.map(sec => {
+      const st = this.sectionStats(sec);
+      const key = encodeURIComponent(sec);
+      const isActive = sec === current;
+      return '<button type="button" class="btn ' + (isActive ? 'btn-primary' : 'btn-outline') + '" data-sec="' + esc(key) + '" style="font-weight:800;background:' + (isActive ? 'linear-gradient(135deg,#0506ae,#964eec);color:white;border:0' : 'white;color:#0506ae;border:1px solid #0506ae') + '">' + esc(sec) + ' <span style="font-size:.68rem;opacity:.85">(' + st.a + '/' + st.t + ')</span></button>';
+    }).join('') + '</div>';
+  };
+
+  Exam.renderPalette=function(current){
+    let localNo = 0;
+    return '<div class="q-palette"><div class="label">' + esc(current) + ' — question map</div>' + this.qs().map((qq, i) => {
+      if (this.subjectOf(qq) !==current) return '';
+      localNo++;
+      const cls = i === this.idx ? 'current' : (this.answers[i] != null && String(this.answers[i]).trim() !== '' ? 'answered' : (this.flags[i] ? 'flagged' : ''));
+      return '<button type="button" class="' + cls + '" data-i="' + i + '" title="' + esc(current) + ' question ' + localNo + '">' + localNo + '</button>';
+    }).join('') + '</div>';
+  };
+
+  Exam.render=function(){
+    const FREE_TYPES_NO_OPTIONS = ['short','short_answer','numeric','essay','code','cloze','multinumeric','fill_blank','math_equation','fill'];
+    const q = this.qs()[this.idx];
+    if (!q) return;
+    const current = this.currentSubject();
+    const subjectIndexes = this.indexesForSubject(current);
+    const localPos = subjectIndexes.indexOf(this.idx);
+    const localNo = localPos + 1;
+    const qType = String(q.type || 'mcq').toLowerCase();
+    const hasOptions = (q.options || []).length > 0 && !FREE_TYPES_NO_OPTIONS.includes(qType);
+    const isMultiSelect = qType === 'multi_select';
+    const selectedValues = Array.isArray(this.answers[this.idx]) ? this.answers[this.idx] : (this.answers[this.idx] == null ? [] : [String(this.answers[this.idx])]);
+
+    const opts = hasOptions ? (q.options || []).map((o, i) => {
+      const L = String.fromCharCode(65 + i);
+      const checked = selectedValues.includes(L);
+      return '<label class="option-label' + (checked ? ' selected' : '') + '" data-option="' + L + '"><input type="' + (isMultiSelect ? 'checkbox' : 'radio') + '" name="opt" value="' + L + '" ' + (checked ? 'checked' : '') + ' style="display:none"><span class="option-letter">' + L + '</span><span class="option-text">' + esc(o) + '</span></label>';
+    }).join('') : '';
+
+    const existingText = Array.isArray(this.answers[this.idx]) ? this.answers[this.idx].join(', ') : (this.answers[this.idx] || '');
+    const free = !hasOptions ? '<textarea class="form-input" rows="3" placeholder="Type your answer here">' + esc(existingText) + '</textarea>' : '';
+    const passage = q.passage ? '<div class="notice" style="background:#f8fafc;border-color:#cbd5e1;color:#334155"><strong>Passage / Case:</strong><br>' + esc(q.passage) + '</div>' : '';
+    const media = q.media_url ? (/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(q.media_url) ? '<audio controls style="width:100%;margin:8px 0" src="'+esc(q.media_url)+'"></audio>' : (/\.(mp4|webm|mov)(\?|$)/i.test(q.media_url) ? '<video controls style="max-width:100%;max-height:360px;margin:8px auto;display:block" src="'+esc(q.media_url)+'"></video>' : '<img src="'+esc(q.media_url)+'" alt="Question media" style="max-width:100%;max-height:360px;object-fit:contain;margin:8px auto;display:block" referrerpolicy="no-referrer">')) : '';
+    const m = Math.floor(this.remaining / 60), ss = this.remaining % 60;
+    const urgent = this.remaining <= 60;
+
+    const html = '<div class="card">' +
+      '<div class="exam-context" aria-label="Current examination details">' +
+        '<span>Examination<b>'+esc((this.data&&this.data.title)||'CBT Examination')+'</b></span>' +
+        '<span>Candidate<b>'+esc((this.student&&this.student.name)||'Anonymous')+'</b></span>' +
+        '<span>Class<b>'+esc((this.student&&this.student.class)||(this.data&&this.data.class)||'—')+'</b></span>' +
+        '<span>Term / Session<b>'+esc([this.data&&this.data.term,this.data&&this.data.session].filter(Boolean).join(' · ')||'—')+'</b></span>' +
+      '</div>' +
+      this.renderTabs(current) +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">' +
+        '<strong>' + esc(current) + ' · Q ' + localNo + ' / ' + subjectIndexes.length + ' <span style="color:#64748b;font-weight:600">(overall ' + (this.idx + 1) + ' / ' + this.qs().length + ')</span></strong>' +
+        '<div><span class="clock' + (urgent ? ' urgent' : '') + '" id="clock">' + m + ':' + String(ss).padStart(2, '0') + '</span> <span id="viol" class="viol"></span></div>' +
+      '</div>' +
+      passage + media +
+      '<p style="font-size:1.05rem;margin:0 0 12px;line-height:1.5">' + esc(q.question || '(no question text)') + (q.mark ? ' <span style="color:#64748b;font-size:.85rem">[' + q.mark + ' mark' + (q.mark > 1 ? 's' : '') + ']</span>' : '') + '</p>' +
+      (isMultiSelect ? '<p style="font-size:.78rem;color:#475569;margin:-4px 0 8px">Select every correct option.</p>' : '') +
+      opts + free +
+      '<div class="actions">' +
+        '<button type="button" class="btn btn-outline" data-act="prev-in" ' + (localPos <= 0 ? 'disabled' : '') + '>← Prev in ' + esc(current) + '</button>' +
+        '<button type="button" class="btn btn-outline" data-act="flag">' + (this.flags[this.idx] ? '🚩 Unflag' : '🚩 Flag') + '</button>' +
+        (localPos < subjectIndexes.length - 1
+          ? '<button type="button" class="btn btn-primary" data-act="next-in">Next in ' + esc(current) + ' →</button>'
+          : '<button type="button" class="btn btn-outline" disabled>End of ' + esc(current) + '</button>') +
+        '<button type="button" class="btn btn-primary" data-act="submit">Submit Exam ✓</button>' +
+      '</div>' +
+      this.renderPalette(current) +
+    '</div>';
+
+    this.root().innerHTML = html;
+
+    // Wire up the buttons
+    if (this.root().querySelectorAll) this.root().querySelectorAll('.option-label').forEach((label) => {
+      label.addEventListener('click', (event) => {
+        event.preventDefault();
+        const L = label.dataset.option;
+        if (isMultiSelect) {
+          const next = Array.isArray(this.answers[this.idx]) ? this.answers[this.idx].slice() : [];
+          const at = next.indexOf(L); if (at >= 0) next.splice(at, 1); else next.push(L);
+          next.sort(); this.answer(next);
+        } else this.answer(L);
+        // Re-render to update selected state and the per-subject progress badge.
+        this.render();
+      });
+    });
+    if (this.root().querySelectorAll) {
+      this.root().querySelectorAll('.q-palette button').forEach(btn => {
+        btn.addEventListener('click', () => { this.idx = Number(btn.dataset.i); this.render(); });
+      });
+      this.root().querySelectorAll('.cbt-subject-tabs button').forEach(btn => {
+        btn.addEventListener('click', () => { this.goSubject(decodeURIComponent(btn.dataset.sec)); });
+      });
+      this.root().querySelectorAll('[data-act]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const a = btn.dataset.act;
+          if (a === 'prev-in') this.prevInSubject();
+          else if (a === 'next-in') this.nextInSubject();
+          else if (a === 'flag') { this.flags[this.idx] = !this.flags[this.idx]; this.render(); }
+          else if (a === 'submit') this.confirmSubmit();
+        });
+      });
+      const ta = this.root().querySelector('textarea');
+      if (ta) ta.addEventListener('input', () => this.answer(ta.value));
+    }
+  };
+
+  Exam.answer = function(v){
+    this.answers[this.idx] = v;
+    this.saveDraft();
+  };
+
+  Exam.saveDraft = function(){
+    try {
+      const keyed = this.qs().map((q,i) => ({ index:(q._orig_index != null ? q._orig_index : i), answer:this.answers[i] }));
+      const current = this.qs()[this.idx] || {};
+      localStorage.setItem('cbt-draft-' + (this.data && this.data.code), JSON.stringify({ version:2, answers:keyed, index:(current._orig_index != null ? current._orig_index : this.idx), client_ref:this.clientRef, t:Date.now() }));
+    } catch(e) {}
+  };
+
+  Exam.confirmSubmit = function(){
+    const unanswered = this.answers.filter(a => a == null || String(a).trim() === '').length;
+    if (unanswered > 0 && !confirm(unanswered + ' question(s) unanswered. Submit anyway?')) return;
+    this.submit();
+  };
+
+  /* ---------- Lifecycle ---------- */
+  Exam.start = function(){
+    const code = this.param();
+    this.codeEntry(code || '');
+  };
+
+  Exam.codeEntry = function(prefill){
+    this.root().innerHTML =
+      '<div class="card">' +
+        '<h2>📝 Enter exam details</h2>' +
+        '<p style="margin:0 0 6px;color:var(--sc-primary);font-weight:900">School: '+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</p>'+
+        '<p style="color:#64748b;margin:0 0 16px;font-size:.9rem">Ask your teacher for the exam code. Spaces and hyphens in the code are accepted.</p>' +
+        '<div class="form-group"><label>Exam code *</label><input class="form-input" id="e-code" value="' + esc(prefill) + '" placeholder="e.g. ABC123" autofocus></div>' +
+        '<div class="form-group"><label>Your full name <span style="color:#94a3b8;font-weight:400">(optional for anonymous exams)</span></label><input class="form-input" id="e-name" placeholder="Surname First-name"></div>' +
+        '<div class="form-group"><label>Your student / staff ID (if registered)</label><input class="form-input" id="e-id" placeholder="e.g. GoSA/2024/001"></div>' +
+        '<div class="form-group"><label>Class</label><input class="form-input" id="e-class" placeholder="e.g. JSS 1A"></div>' +
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">' +
+          '<button type="button" class="btn btn-primary" id="e-start">Start Exam ▶</button>' +
+          '<button type="button" class="btn btn-outline" id="e-guest">👤 Continue as Guest (anonymous)</button>' +
+        '</div>' +
+        '<p style="color:#94a3b8;font-size:.8rem;margin-top:12px">By starting the exam you consent to anti-cheat monitoring: window focus, copy/paste and fullscreen events are logged. Your teacher sees the integrity log with your result.</p>' +
+      '</div>';
+
+    $('e-start').addEventListener('click', () => Exam.load(false));
+    $('e-guest').addEventListener('click', () => Exam.load(true));
+  };
+
+  Exam.load = async function(anon){
+    if (!window.sb) {
+      this.root().innerHTML = '<div class="card"><div class="notice notice-error">⚠ Database not configured. Open <code>assets/js/config.js</code> and add your Supabase URL and anon key.</div></div>';
+      return;
+    }
+    const code = ($('e-code') || {}).value ? $('e-code').value.toUpperCase().trim() : '';
+    const canonicalCode = code.replace(/[^A-Z0-9]/g,'');
+    let nm = ($('e-name') || {}).value ? $('e-name').value.trim() : '';
+    if (anon && !nm) nm = 'Anonymous-' + Math.random().toString(36).slice(2, 7).toUpperCase();
+    this.student = {
+      name: nm || 'Anonymous-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
+      id_ref: ($('e-id') || {}).value ? $('e-id').value.trim() : '',
+      class: ($('e-class') || {}).value ? $('e-class').value.trim() : '',
+      anonymous: !!anon
+    };
+    if (!code) { toast('Enter the exam code.', 'warning'); return; }
+
+    // Network-first with an offline fallback. The former cache-first flow kept a
+    // repaired multi-subject exam stale for ten minutes, which made “Repair
+    // Tabs” appear ineffective on candidate devices.
+    let data = null, error = null, cached = null;
+    const cacheKey = 'cbt-exam-cache-' + canonicalCode;
+    try {
+      const c = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+      if (c && (Date.now() - Number(c.at||0)) < 86400000) cached = c.exam;
+    } catch (_) {}
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const r = await window.sb.rpc('cbt_get_public_exam_v5', { p_code: canonicalCode });
+        data = r.data; error = r.error;
+      } catch (e) { error = e; }
+      if (data && !error) break; // includes explicit not-open/not-found diagnostics
+      if(error && /cbt_get_public_exam_v5|schema cache|function/i.test(String(error.message||error))) break;
+      const wait = Math.min(6000, (400 * Math.pow(2, attempt))) + Math.floor(Math.random() * 500);
+      if (attempt < 4) toast('Network busy — retrying (' + (attempt + 1) + '/5)…', 'info', 1500);
+      await new Promise(r => setTimeout(r, wait));
+    }
+    const cachedIsV5=cached&&cached.ok!==false&&String(cached.engine_version||'').startsWith('v5.1');
+    if ((!data || error) && cachedIsV5 && !(error&&/cbt_get_public_exam_v5|schema cache|function/i.test(String(error.message||error)))) { data=cached; error=null; toast('Network unavailable — using the latest verified saved exam copy on this device.','warning',5000); }
+    if (data && !error && data.ok!==false && !data.wait && !data.closed) {
+      try { localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), exam: data })); } catch (_) {}
+    }
+
+    if (error || !data) {
+      const missingRpc=error&&/cbt_get_public_exam_v5|schema cache|function/i.test(String(error.message||error));
+      const msg=missingRpc?'The V5.1 exam reader is not installed in Supabase. The administrator must run database/cbt-v5.1-zero-score-hotfix.sql.':('Could not contact the exam service. '+esc(error&&error.message||''));
+      this.root().innerHTML = '<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">❌ Exam service unavailable</h2><p>'+msg+'</p><p><b>Code entered:</b> '+esc(code)+'</p></div>' + this.codeEntryHTML(code) + '</div>';
+      return;
+    }
+    if(data.ok===false && !data.wait && !data.closed){
+      const hints={exam_not_found:'Confirm the code in CBT Manager and use Share to copy it.',not_open:'CBT Manager → locate the exam → click Open. Refresh the candidate page afterward.',archived:'Unarchive or recreate this exam.',not_started:'Wait until the configured start time.',closed:'The exam officer must extend the close time or reopen a new attempt.'};
+      this.root().innerHTML='<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">❌ '+esc(data.message||'Exam unavailable')+'</h2><p><b>Code entered:</b> '+esc(code)+' &nbsp; <b>Matched code:</b> '+esc(data.code||'—')+'</p><p>'+esc(hints[data.error]||'Ask the exam officer to check the exam status and schedule.')+'</p><small>Diagnostic: '+esc(data.error||'unknown')+' · Engine '+esc(data.engine_version||'unknown')+'</small></div>'+this.codeEntryHTML(code)+'</div>';
+      return;
+    }
+    if (data.wait) {
+      this.root().innerHTML = '<div class="card"><h2>⏳ Please wait</h2><p>'+esc(data.message||'This exam has not started yet.')+'</p><p>Opens at <strong>' + (window.fmtDMYT ? fmtDMYT(data.start_at) : new Date(data.start_at).toLocaleString()) + '</strong>.</p></div>';
+      return;
+    }
+    if (data.closed) {
+      this.root().innerHTML = '<div class="card"><h2>🚫 Closed</h2><p>'+esc(data.message||'This exam is no longer accepting submissions.')+'</p></div>';
+      return;
+    }
+    if(!String(data.engine_version||'').startsWith('v5.1')){
+      this.root().innerHTML='<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">⚠️ Exam temporarily unavailable</h2><p>This database is still using an obsolete CBT grading engine that can record incorrect zero marks. The exam has been stopped before you begin.</p><p><strong>Administrator:</strong> back up Supabase, then run the latest <code>database/complete-schema.sql</code>. Confirm the final message says CBT V5.1 is installed, then reload this page.</p></div></div>';
+      return;
+    }
+    this.data = data;
+    this.school = applySchoolIdentity(data.school || null);
+    if (window.CBT && typeof window.CBT.prepareForStudent === 'function') window.CBT.prepareForStudent(this.data);
+    if (!this.qs().length) {
+      this.root().innerHTML = '<div class="card"><h2>No questions</h2><p>This CBT exam has no valid questions. Ask your teacher to re-upload the CSV question bank. Make sure the CSV has a header row and at least one data row.</p></div>';
+      return;
+    }
+    this.answers = new Array(this.qs().length).fill(null);
+    this.flags = {};
+    this._done = false;
+    this.clientRef = (window.crypto && typeof window.crypto.randomUUID === 'function') ? window.crypto.randomUUID() : ('cbt-'+Date.now()+'-'+Math.random().toString(36).slice(2,10));
+    // Restore a recent draft by ORIGINAL question index, so randomisation and
+    // multi-subject grouping cannot attach an answer to the wrong question.
+    try {
+      const draft = JSON.parse(localStorage.getItem('cbt-draft-' + data.code) || 'null');
+      if (draft && (Date.now() - Number(draft.t||0)) < 86400000) {
+        if (Array.isArray(draft.answers)) {
+          const byIndex = new Map(draft.answers.map(x => [Number(x.index), x.answer]));
+          this.qs().forEach((q,i) => { const oi=Number(q._orig_index != null?q._orig_index:i); if(byIndex.has(oi)) this.answers[i]=byIndex.get(oi); });
+          const wanted=Number(draft.index); const at=this.qs().findIndex((q,i)=>Number(q._orig_index!=null?q._orig_index:i)===wanted); if(at>=0)this.idx=at;
+        } else if (Array.isArray(draft.a) && draft.a.length === this.answers.length) { this.answers=draft.a; this.idx=Math.max(0,Math.min(Number(draft.i)||0,this.answers.length-1)); }
+        if (draft.client_ref) this.clientRef=String(draft.client_ref);
+      }
+    } catch(_) {}
+    this.startTs = Date.now();
+    this.deadline = Date.now() + ((data.duration || 45) * 60 * 1000);
+    this.remaining = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
+
+    if (data.instructions) {
+      if (!confirm('Instructions:\n\n' + data.instructions + '\n\nClick OK to begin. You cannot pause the timer once started.')) {
+        this.codeEntry(code);
+        return;
+      }
+    }
+
+    this.beginMonitor();
+    this.tick();
+    this.render();
+  };
+
+  Exam.codeEntryHTML = function(code) {
+    return '<div style="margin-top:12px"><a class="btn btn-outline" href="cbt-exam.html">Try a different code</a></div>';
+  };
+
+  Exam.beginMonitor = function(){
+    const cfg = (this.data && this.data.anti_cheat_config) || {};
+    if (window.CBT && typeof window.CBT.startAntiCheat === 'function') {
+      this.monitor = window.CBT.startAntiCheat(cfg, (type, n) => {
+        this.violations = n;
+        this.violationLog = this.monitor.log;
+        const v = document.getElementById('viol');
+        if (v) v.textContent = '⚠ ' + n + ' integrity flag(s)';
+        if ((cfg.max_violations || 5) && n >= (cfg.max_violations || 5)) {
+          toast('Too many integrity violations — submitting.', 'danger');
+          this.submit();
+        }
+      });
+    }
+  };
+
+  Exam.tick = function(){
+    if (this.timer) clearInterval(this.timer);
+    const update = () => {
+      this.remaining = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
+      const t = document.getElementById('clock');
+      if (t) {
+        const m = Math.floor(this.remaining / 60), ss = this.remaining % 60;
+        t.textContent = m + ':' + String(ss).padStart(2, '0');
+        if (this.remaining <= 60) t.classList.add('urgent');
+      }
+      if (this.remaining <= 0) { clearInterval(this.timer); this.timer = null; toast('Time up — submitting.', 'warning'); this.submit(); }
+    };
+    update();
+    this.timer = setInterval(update, 1000);
+  };
+
+  Exam.submit = async function(){
+    if (this._done) return;
+    this._done = true;
+    clearInterval(this.timer);
+    if (this.monitor) try { this.monitor.stop(); } catch (e) {}
+    const graded = (window.CBT && window.CBT.gradeSubmission) ? window.CBT.gradeSubmission(this.data, this.answers) : { score: 0, total: 0, percent: 0, grade: 'F', correct: 0, wrong: 0, skipped: 0 };
+    const timeTaken = Math.round((Date.now() - this.startTs) / 1000);
+    const payload = {
+      exam_id: this.data.id,
+      student_name: this.student.name,
+      student_class: this.student.class,
+      student_id_ref: this.student.id_ref,
+      student_type: this.data.exam_mode,
+      client_ref: this.clientRef,
+      client_engine: 'v5.1',
+      // Client grading is only a resilience preview. The canonical RPC ignores
+      // these values and re-grades against the private server-side answer key.
+      score: graded.score, total: graded.total, percent: graded.percent,
+      correct_count: graded.correct, wrong_count: graded.wrong, skipped_count: graded.skipped,
+      time_taken: timeTaken, violations: this.violations || 0, violation_log: this.violationLog || [],
+      answers_data: this.qs().map((q, i) => ({
+        index: (q._orig_index != null ? q._orig_index : i),
+        subject: (q.section || q.subject || 'General'),
+        answer: this.answers[i]
+      }))
+    };
+    let resp = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try { resp = await window.sb.rpc('cbt_submit_v5', { p_payload: payload }); } catch (e) { resp = { error: e }; }
+      if (resp && !resp.error && resp.data && resp.data.saved && String(resp.data.engine_version||'').startsWith('v5.1')) break;
+      if (resp && !resp.error && resp.data && ['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty'].includes(resp.data.error)) break;
+      if(resp && resp.error && /cbt_submit_v5|schema cache|function/i.test(String(resp.error.message||resp.error))) break;
+      const wait = Math.min(8000, (500 * Math.pow(2, attempt))) + Math.floor(Math.random() * 600);
+      this.root().insertAdjacentHTML('beforeend', '<p style="text-align:center;color:#64748b">Submitting… retry ' + (attempt + 1) + ' of 6</p>');
+      await new Promise(r => setTimeout(r, wait));
+    }
+    const confirmed=!!(resp&&!resp.error&&resp.data&&resp.data.saved&&String(resp.data.engine_version||'').startsWith('v5.1'));
+    const terminalError=resp&&resp.data&&['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty'].includes(resp.data.error);
+    if (!confirmed && !terminalError) {
+      try { const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]'); q.push(payload); localStorage.setItem('cbt-pending-queue', JSON.stringify(q.slice(-10))); } catch (_) {}
+    } else if (confirmed) {
+      try { localStorage.removeItem('cbt-pending-queue'); localStorage.removeItem('cbt-draft-' + (this.data && this.data.code)); } catch (_) {}
+    }
+    if (!confirmed) {
+      const blob = new Blob([JSON.stringify({ payload, graded }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const rpcMissing=resp&&resp.error&&/cbt_submit_v5|schema cache|function/i.test(String(resp.error.message||resp.error));
+      const message=rpcMissing?'The V5.1 grading engine is not installed in this database. An administrator must run the latest database/complete-schema.sql before results can be accepted.':((resp&&resp.data&&(resp.data.message||resp.data.error))||'The server could not confirm this submission.');
+      this.root().innerHTML =
+        '<div class="card"><h2>⚠️ Submission not confirmed</h2>' +
+        '<p>'+esc(message)+'</p><p>Your answers remain saved locally. If your teacher asks for proof, download the encrypted-safe answer payload below; it contains no answer key.</p>' +
+        '<a class="btn btn-primary" href="' + url + '" download="exam-backup-' + this.data.code + '.json">⬇ Download backup</a> <a class="btn btn-outline" href="cbt-exam.html">Return</a></div>';
+      return;
+    }
+    const d = resp.data;
+    if (d.release_results === false) {
+      this.root().innerHTML =
+        '<div class="card" style="text-align:center;padding:40px">' +
+        '<div style="font-size:3rem;margin-bottom:12px">✅</div>' +
+        '<h2>Submission Received</h2>' +
+        '<p style="color:#64748b">Your answers were recorded. Results will be released by your teacher.</p>' +
+        '<p style="margin-top:20px"><a class="btn btn-outline" href="cbt.html">Back to CBT Manager</a></p>' +
+        '</div>';
+      return;
+    }
+    const pct = d.percent != null ? d.percent : graded.percent;
+    const gradeColor = pct >= 75 ? '#0506ae' : (pct >= 50 ? '#059669' : (pct >= 40 ? '#f59e0b' : '#dc2626'));
+    const subjectSummary = d.subject_scores && Object.keys(d.subject_scores).length > 1 ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;max-width:620px;margin:16px auto 0">'+Object.entries(d.subject_scores).map(([name,s])=>{const sp=Number(s.total)>0?Math.round(Number(s.score||0)/Number(s.total)*10000)/100:0;return '<div style="padding:10px;background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px"><b>'+esc(name)+'</b><div style="font-size:1.2rem;font-weight:900;color:var(--sc-primary)">'+sp+'%</div><small>'+Number(s.score||0)+' / '+Number(s.total||0)+' · '+Number(s.correct||0)+' correct</small></div>';}).join('')+'</div>' : '';
+    this.root().innerHTML =
+      '<div class="card" style="text-align:center;padding:40px">' +
+      '<div class="score-circle" style="background:linear-gradient(135deg,' + gradeColor + ',var(--sc-accent))"><div class="pct">' + (pct || 0) + '%</div><div class="lbl">Grade ' + (d.grade || graded.grade || 'F') + '</div></div>' +
+      '<h2 style="margin:0 0 8px">🎉 Exam Complete</h2>' +
+      '<p style="color:#64748b;margin:0 0 6px">' + esc(this.student.name) + ' · ' + esc(this.data.title || 'Exam') + '</p>' +
+      '<p style="color:#16a34a;font-size:.72rem;font-weight:800;margin:0 0 16px">SERVER VERIFIED · GRADING ENGINE '+esc(d.engine_version||'v5.1')+'</p>' +
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;max-width:520px;margin:0 auto">' +
+      '<div style="padding:10px;background:#f8fafc;border-radius:10px"><div style="font-size:1.4rem;font-weight:900">' + (d.score != null ? d.score : graded.score) + '</div><div style="font-size:.7rem;color:#64748b;text-transform:uppercase">Score</div></div>' +
+      '<div style="padding:10px;background:#f8fafc;border-radius:10px"><div style="font-size:1.4rem;font-weight:900">' + (d.correct_count != null ? d.correct_count : graded.correct) + '</div><div style="font-size:.7rem;color:#64748b;text-transform:uppercase">Correct</div></div>' +
+      '<div style="padding:10px;background:#f8fafc;border-radius:10px"><div style="font-size:1.4rem;font-weight:900">' + (d.wrong_count != null ? d.wrong_count : graded.wrong) + '</div><div style="font-size:.7rem;color:#64748b;text-transform:uppercase">Wrong</div></div>' +
+      '<div style="padding:10px;background:#f8fafc;border-radius:10px"><div style="font-size:1.4rem;font-weight:900">' + (d.skipped_count != null ? d.skipped_count : graded.skipped) + '</div><div style="font-size:.7rem;color:#64748b;text-transform:uppercase">Skipped</div></div>' +
+      '</div>' + subjectSummary +
+      (d.cert_code ? '<p style="margin-top:20px">Certificate code: <strong style="font-size:1.1rem;color:#0506ae">' + esc(d.cert_code) + '</strong></p>' : '') +
+      (d.report_column ? '<p style="color:#64748b;font-size:.88rem">This result was added to the <strong>' + esc(d.report_column) + '</strong> column of your report card.</p>' : '') +
+      '<p style="margin-top:20px"><a class="btn btn-primary" href="cbt.html">Back to CBT Manager</a> <a class="btn btn-outline" href="verify-certificate.html">Verify Certificate</a></p>' +
+      '</div>';
+  };
+
+  // ENTERPRISE V8: flush any queued (failed) submissions from a previous session
+  /* Flush any queued (failed) submissions from a previous session */
+  (async function flushPending() {
+    try {
+      const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]');
+      if (q.length && window.sb) {
+        const rest = [];
+        for (const p of q) {
+          try {
+            const r = await window.sb.rpc('cbt_submit_v5', { p_payload: Object.assign({client_engine:'v5.1'},p) });
+            if (!(r && !r.error && r.data && r.data.saved && String(r.data.engine_version||'').startsWith('v5.1'))) rest.push(p);
+          } catch (_) { rest.push(p); }
+        }
+        localStorage.setItem('cbt-pending-queue', JSON.stringify(rest));
+        if (q.length !== rest.length) {
+          const msg = (q.length - rest.length) + ' queued submission(s) delivered.';
+          if (window.toast) window.toast(msg, 'success');
+        }
+      }
+    } catch (_) {}
+  })();
+
+  // Exposed for accessibility tooling, automated regression tests and the
+  // manager's safe preview—not for grading (grading remains server-authoritative).
+  window.Exam = Exam;
+
+  // Start the exam
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => Exam.start());
+  else Exam.start();
+})();
+</script>
+</body>
+</html>

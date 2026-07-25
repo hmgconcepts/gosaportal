@@ -1,0 +1,136 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Site License &amp; Subscription</title><meta name="description" content="View and manage this portal's School Connect license: ownership model, subscription status, expiry, grace period and renewal."><meta name="robots" content="noindex"><link rel="stylesheet" href="assets/css/style.css"></head><body>
+<main style="max-width:960px;margin:30px auto;padding:20px" id="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <h1 style="margin:0;font-size:1.5rem">🔑 Site License &amp; Subscription</h1>
+    <div><a class="btn btn-outline btn-sm" href="settings.html">⚙️ Settings</a> <a class="btn btn-outline btn-sm" href="dashboard.html">Dashboard</a></div>
+  </div>
+
+  <div class="card" id="status-card"><span class="pulse">Checking license…</span></div>
+
+  <div class="grid grid-2" style="margin-top:16px">
+    <div class="card">
+      <h3 style="margin-top:0">💎 One-time payment (Lifetime)</h3>
+      <p style="color:var(--gray-700);font-size:.9rem;line-height:1.6">The client pays once and <b>owns the site forever</b> — no recurring fees. The portal runs 100% on the client's own free Supabase + free hosting. HMG is only paid again if the client asks for <b>services</b> (maintenance, troubleshooting, training, new features).</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">🔄 Subscription</h3>
+      <p style="color:var(--gray-700);font-size:.9rem;line-height:1.6">For clients who cannot pay at once: a monthly / termly / annual plan. When the paid term ends, a <b>grace period</b> begins; if it lapses without renewal, every page of the portal shows a renewal screen until HMG extends the subscription. <b>All data stays intact</b> — nothing is deleted; access simply resumes on renewal.</p>
+    </div>
+  </div>
+
+  <div class="card" id="manage-card" style="margin-top:16px;display:none">
+    <h3 style="margin-top:0">🛠 Manage license (HMG / Super Admin)</h3>
+    <p style="color:var(--gray-600);font-size:.85rem">Changes write directly to <code>public.site_license</code> (row 1) and are re-signed automatically. The portal re-checks every 15 minutes and on tab refocus — no redeploy needed.</p>
+    <div class="grid grid-2">
+      <div class="form-group"><label>Model</label><select id="lic-model" class="form-input"><option value="lifetime">lifetime (one-time ownership)</option><option value="subscription">subscription</option></select></div>
+      <div class="form-group"><label>Plan label</label><input id="lic-plan" class="form-input" placeholder="e.g. Termly plan · 2026/2027"></div>
+      <div class="form-group"><label>Billing cycle</label><select id="lic-cycle" class="form-input"><option value="">—</option><option value="monthly">monthly</option><option value="termly">termly</option><option value="annual">annual</option><option value="custom">custom</option></select></div>
+      <div class="form-group"><label>Expires on (subscription)</label><input id="lic-exp" type="date" class="form-input"></div>
+      <div class="form-group"><label>Grace days after expiry</label><input id="lic-grace" type="number" min="0" class="form-input" value="7"></div>
+      <div class="form-group"><label>Status</label><select id="lic-status" class="form-input"><option value="active">active</option><option value="suspended">suspended</option></select></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Renewal link (WhatsApp/payment URL)</label><input id="lic-renew" class="form-input" placeholder="https://wa.me/2348100866322?text=…"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Custom lock-screen message (optional)</label><textarea id="lic-msg" class="form-input" rows="2" placeholder="Shown on the renewal screen. If empty, the standard message is used."></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" onclick="saveLicense()">💾 Save &amp; re-sign license</button>
+      <button class="btn btn-outline" onclick="quickExtend(30)">+30 days</button>
+      <button class="btn btn-outline" onclick="quickExtend(90)">+1 term (≈90 days)</button>
+      <button class="btn btn-outline" onclick="quickExtend(365)">+1 year</button>
+      <span id="lic-save-msg" style="font-size:.85rem;color:var(--gray-600)"></span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">❓ How enforcement works</h3>
+    <ol style="margin:0;padding-left:20px;color:var(--gray-700);font-size:.88rem;line-height:1.7">
+      <li>Every page loads <code>assets/js/license.js</code>, which reads the state from the HMG license registry (if configured) → the <code>site_license</code> table → the build config.</li>
+      <li><b>30 days before expiry</b>: a gentle gold banner reminds everyone to renew.</li>
+      <li><b>During grace</b>: a red banner with a renewal link stays on top of every page.</li>
+      <li><b>After expiry + grace (or suspension)</b>: a full renewal screen covers the portal. It re-appears even if removed, and cannot be dismissed.</li>
+      <li>License rows written here carry a SHA-256 signature; a hand-edited database row fails verification and raises a tamper notice.</li>
+      <li>With the optional HMG registry (a JSON on HMG-controlled hosting), the authoritative status lives outside the client's control — local edits cannot suspend or extend the term.</li>
+    </ol>
+    <p style="font-size:.8rem;color:var(--gray-500);margin:10px 0 0">Honest note: any software hosted by the client can ultimately be modified by its owner; these layers make bypassing the subscription impractical for non-experts, keep the authoritative status with HMG, and keep everything transparent for both sides.</p>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script>
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+var __lic=null,__isAdmin=false,__user=null;
+async function roleCheck(){
+  if(!window.sb){document.getElementById('status-card').innerHTML='Database not configured.';return false;}
+  var r=await sb.auth.getUser();__user=r&&r.data&&r.data.user;
+  if(!__user){location.href='login.html';return false;}
+  var p=await sb.from('profiles').select('role,status,full_name').eq('id',__user.id).maybeSingle();
+  var role=String((p&&p.data&&p.data.role)||'').toLowerCase();
+  __isAdmin=['super_admin','admin','principal','proprietor'].indexOf(role)>-1;
+  return true;
+}
+function render(){
+  var card=document.getElementById('status-card');
+  if(!__lic){card.innerHTML='Could not read license state.';return;}
+  var lic=__lic.lic,res=__lic.result,src=__lic.source;
+  var badge={lifetime:'💎 Lifetime ownership',active:'✅ Active',warning:'🔔 Expiring soon',grace:'⚠️ Grace period',expired:'🔴 Expired — locked',suspended:'⛔ Suspended'}[res.state]||res.state;
+  var rows='';
+  rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Model</td><td style="padding:6px 10px"><b>'+esc(lic.model)+'</b> — '+esc(lic.plan)+'</td></tr>';
+  if(lic.model==='subscription'){
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Cycle</td><td style="padding:6px 10px">'+esc(lic.cycle||'—')+'</td></tr>';
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">State</td><td style="padding:6px 10px"><b>'+badge+'</b>'+(res.daysLeft!=null?' · '+res.daysLeft+' day(s)':'')+(res.daysOver?' · '+res.daysOver+' day(s) past grace':'')+'</td></tr>';
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Expires</td><td style="padding:6px 10px">'+esc(lic.expires_on||'—')+' · grace '+lic.grace_days+' day(s)</td></tr>';
+  } else {
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">State</td><td style="padding:6px 10px"><b>'+badge+'</b> — no recurring payments, the client owns this portal.</td></tr>';
+  }
+  rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Source</td><td style="padding:6px 10px">'+esc(src)+(__lic.tampered?' · <b style="color:#b91c1c">signature mismatch (tamper check failed)</b>':' · signature OK/not required')+'</td></tr>';
+  if(lic.renew_url)rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Renewal</td><td style="padding:6px 10px"><a href="'+esc(lic.renew_url)+'" target="_blank" rel="noopener">'+esc(lic.renew_url)+'</a></td></tr>';
+  card.innerHTML='<table style="width:100%;border-collapse:collapse">'+rows+'</table>';
+}
+async function load(){
+  if(!(await roleCheck()))return;
+  __lic=await window.License.status();
+  // prefer the DB row for editing
+  try{var r=await sb.from('site_license').select('*').eq('id',1).maybeSingle();if(r&&r.data){__lic.lic=window.License.normalize(r.data);}}catch(e){}
+  render();
+  if(__isAdmin){
+    document.getElementById('manage-card').style.display='';
+    var l=__lic.lic;
+    document.getElementById('lic-model').value=l.model;
+    document.getElementById('lic-plan').value=l.plan||'';
+    document.getElementById('lic-cycle').value=l.cycle||'';
+    document.getElementById('lic-exp').value=l.expires_on||'';
+    document.getElementById('lic-grace').value=(l.grace_days==null?7:l.grace_days);
+    document.getElementById('lic-status').value=l.status||'active';
+    document.getElementById('lic-renew').value=l.renew_url||'';
+    document.getElementById('lic-msg').value=l.lock_message||'';
+  }
+}
+async function saveLicense(){
+  var msg=document.getElementById('lic-save-msg');
+  if(!__isAdmin){msg.textContent='Admins only.';return;}
+  var lic={id:1,
+    model:document.getElementById('lic-model').value,
+    plan:document.getElementById('lic-plan').value.trim(),
+    cycle:document.getElementById('lic-cycle').value,
+    expires_on:document.getElementById('lic-exp').value||null,
+    grace_days:Math.max(0,+document.getElementById('lic-grace').value||0),
+    status:document.getElementById('lic-status').value,
+    renew_url:document.getElementById('lic-renew').value.trim(),
+    lock_message:document.getElementById('lic-msg').value.trim()};
+  lic.signature=await window.License.signature(lic);
+  var r=await sb.from('site_license').upsert(lic,{onConflict:'id'});
+  msg.textContent=r.error?('Error: '+r.error.message):'Saved ✔ — the whole portal picks this up within 15 minutes (or on next page load).';
+  if(!r.error){__lic=await window.License.refresh();try{var rr=await sb.from('site_license').select('*').eq('id',1).maybeSingle();if(rr&&rr.data)__lic.lic=window.License.normalize(rr.data);}catch(e){}render();}
+}
+function quickExtend(days){
+  var base=document.getElementById('lic-exp').value?new Date(document.getElementById('lic-exp').value+'T12:00:00'):new Date();
+  var today=new Date();if(base<today)base=today;
+  base.setDate(base.getDate()+days);
+  document.getElementById('lic-exp').value=base.toISOString().slice(0,10);
+  document.getElementById('lic-model').value='subscription';
+  document.getElementById('lic-status').value='active';
+  saveLicense();
+}
+load();
+</script></body></html>

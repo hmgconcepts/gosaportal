@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>My Profile • School Connect</title>
+<meta name="description" content="Manage your account profile, profile picture, password and personal information on the school portal. Every role can set their photo via Google Drive.">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .profile-hero{display:flex;gap:18px;align-items:center;padding:20px;border-radius:18px;background:linear-gradient(135deg,#0506ae,#964eec);color:white;margin-bottom:18px}
+  .profile-hero .avatar{width:96px;height:96px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:2.4rem;color:#0506ae;overflow:hidden;flex:0 0 96px;border:4px solid rgba(255,255,255,.4)}
+  .profile-hero .avatar img{width:100%;height:100%;object-fit:cover;display:block}
+  .profile-hero h1{margin:0;font-size:1.4rem}
+  .profile-hero p{margin:4px 0 0;opacity:.92;font-size:.9rem}
+  .card-profile{padding:20px;border-radius:16px;background:#fff;border:1px solid #e2e8f0;box-shadow:0 4px 16px rgba(15,23,42,.04);margin-bottom:14px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:600px){.grid-2,.grid-3{grid-template-columns:1fr}}
+  .form-group{margin-bottom:12px}
+  .form-group label{display:block;font-weight:600;font-size:.85rem;color:#475569;margin-bottom:5px}
+  .form-input,.form-select{width:100%;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:.92rem;font-family:inherit;box-sizing:border-box;background:white;color:#0f172a}
+  .form-input:focus,.form-select:focus{outline:0;border-color:#0506ae;box-shadow:0 0 0 3px rgba(5,6,174,.15)}
+  .btn{padding:10px 18px;border-radius:10px;font-weight:700;font-size:.9rem;border:0;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:all .15s}
+  .btn-primary{background:linear-gradient(135deg,#0506ae,#964eec);color:white}
+  .btn-primary:hover{box-shadow:0 6px 18px rgba(5,6,174,.3);transform:translateY(-1px)}
+  .btn-outline{background:transparent;border:1px solid #0506ae;color:#0506ae}
+  .drive-pill{display:inline-flex;align-items:center;gap:6px;background:#ecfdf5;border:1px solid #86efac;color:#065f46;border-radius:99px;padding:4px 10px;font-size:.78rem;margin-top:6px}
+  .help{color:#64748b;font-size:.78rem;margin-top:4px}
+  .role-card{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:14px;padding:14px;margin-top:14px}
+  .role-card h3{margin:0 0 8px;font-size:1rem;color:#0c4a6e}
+  .role-card p{margin:4px 0;font-size:.88rem}
+  .badge{display:inline-block;padding:3px 8px;border-radius:99px;font-size:.72rem;font-weight:700;background:#dbeafe;color:#1e40af}
+  .badge-admin{background:#fef3c7;color:#92400e}
+  .badge-staff{background:#dcfce7;color:#166534}
+  .badge-parent{background:#ede9fe;color:#5b21b6}
+  .badge-student{background:#fee2e2;color:#991b1b}
+  .section-title{font-size:1rem;font-weight:800;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid #0506ae;color:#0506ae}
+  .toast-fixed{position:fixed;top:24px;right:24px;z-index:99999;background:#ecfdf5;border:1px solid #86efac;color:#065f46;padding:14px 20px;border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.15);max-width:380px;animation:slideIn .3s ease}
+  .toast-fixed.error{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
+  .toast-fixed.warn{background:#fef3c7;border-color:#fde047;color:#92400e}
+  @keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:translateX(0);opacity:1}}
+  .photo-preview{width:80px;height:80px;border-radius:50%;overflow:hidden;background:#f1f5f9;display:flex;align-items:center;justify-content:center;margin-top:8px;border:2px solid #e2e8f0}
+  .photo-preview img{width:100%;height:100%;object-fit:cover}
+</style>
+
+    <meta name="description" content="Manage your account profile, profile picture, password and personal information on the school portal. Every role can set their photo via Google Drive.">
+    <meta name="keywords" content="school, my profile • school connect, school management, HMG Concepts, School Connect">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./profile.html">
+    <meta property="og:title" content="My Profile • School Connect">
+    <meta property="og:description" content="Manage your account profile, profile picture, password and personal information on the school portal. Every role can set their photo via Google Drive.">
+    <meta property="og:url" content="./profile.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="My Profile • School Connect">
+    <meta name="twitter:description" content="Manage your account profile, profile picture, password and personal information on the school portal. Every role can set their photo via Google Drive.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head>
+<body>
+<main style="max-width:840px;margin:20px auto;padding:20px">
+
+  <div class="profile-hero">
+    <div class="avatar" id="profile-avatar"><span>👤</span></div>
+    <div style="flex:1;min-width:0">
+      <h1 id="profile-hero-name">Loading…</h1>
+      <p id="profile-hero-meta">Fetching your account details…</p>
+      <div style="margin-top:8px"><span class="badge" id="profile-hero-role">…</span></div>
+    </div>
+  </div>
+
+  <!-- FAMILY ROLE CARD (students, parents) -->
+  <div class="role-card" id="role-card" style="display:none">
+    <h3>👪 Family Account</h3>
+    <div id="role-card-body"></div>
+  </div>
+
+  <!-- PROFILE PHOTO VIA GOOGLE DRIVE -->
+  <div class="card-profile">
+    <h2 class="section-title">🖼️ Profile picture via Google Drive</h2>
+    <p class="help">Paste a Google Drive <em>share link</em> for a photo. School Connect converts it to a direct-view URL automatically so the picture shows in the top bar, dashboard and report card header. <b>Live preview appears below the input as you type.</b></p>
+    <div class="form-group">
+      <label>Profile photo (Google Drive link)</label>
+      <input class="form-input" id="photo-url" placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing" autocomplete="off">
+      <div id="photo-pill" class="drive-pill" style="display:none">✅ Drive link detected</div>
+      <div class="photo-preview" id="photo-preview"><span style="color:#94a3b8">No photo</span></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn btn-primary" id="btn-save-photo">💾 Save photo</button>
+      <button type="button" class="btn btn-outline" id="btn-clear-photo">🗑️ Remove photo</button>
+    </div>
+    <p class="help">📌 <b>How to get a Drive share link:</b> in Google Drive, right-click the photo → "Share" → "Anyone with the link" → "Viewer" → copy the link. The system auto-converts the share link to a direct-view image URL.</p>
+  </div>
+
+  <!-- BASIC PROFILE FIELDS -->
+  <div class="card-profile">
+    <h2 class="section-title">👤 Personal information</h2>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Full name</label>
+        <input class="form-input" id="fn" placeholder="Your full name">
+      </div>
+      <div class="form-group">
+        <label>Email (read-only)</label>
+        <input class="form-input" id="em" readonly>
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input class="form-input" id="ph" placeholder="+234 800 000 0000" inputmode="tel">
+      </div>
+      <div class="form-group">
+        <label>Role / status</label>
+        <input class="form-input" id="role-status" readonly>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn btn-primary" id="btn-save-profile">💾 Save changes</button>
+      <a class="btn btn-outline" href="change-password.html">🔒 Change password</a>
+      <a class="btn btn-outline" href="dashboard.html">← Dashboard</a>
+    </div>
+  </div>
+
+  <div id="profile-out" style="margin-top:10px"></div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+/* ====================================================================
+   Profile page — School Connect v3
+   - Race-free role load via sc_current_role() RPC (with fallback)
+   - Google Drive link → direct-view URL conversion
+   - Per-role context card (student, parent, staff)
+   - Updates profiles.photo_url, full_name, phone
+   - Inline event handlers (no inline onclick) for CSP safety
+   - Inline toast notification (works even without toast container)
+   - Live photo preview as user types
+   - Robust against missing RLS function / RPC
+   ==================================================================== */
+
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+  /* Drive share link → direct-view thumbnail URL. */
+  function driveDirect(url) {
+    if (!url) return '';
+    const s = String(url).trim();
+    if (!/drive\.google\.com/i.test(s)) return s;
+    let m = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+    m = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+    return s;
+  }
+
+  function showToast(msg, type) {
+    type = type || 'success';
+    // Try to use the global toast() helper
+    try { if (typeof window.toast === 'function') { window.toast(msg, type === 'success' ? 'success' : (type === 'error' ? 'danger' : 'warning'), 4000); return; } } catch (_) {}
+    // Fallback: inline toast
+    const existing = document.querySelector('.toast-fixed');
+    if (existing) existing.remove();
+    const div = document.createElement('div');
+    div.className = 'toast-fixed ' + type;
+    div.textContent = msg;
+    document.body.appendChild(div);
+    setTimeout(() => { if (div.parentNode) div.remove(); }, 4000);
+  }
+
+  let _currentUser = null;
+  let _currentProfile = null;
+
+  async function load() {
+    const sb = window.sb;
+    const out = $('profile-out');
+    if (!sb) {
+      out.innerHTML = '<div class="card-profile" style="background:#fff7ed;border-color:#fdba74">⚠️ Database not configured. Edit <code>assets/js/config.js</code> with your Supabase URL and anon key.</div>';
+      return;
+    }
+    let user = null;
+    try { const { data } = await sb.auth.getUser(); user = data && data.user; } catch (e) { user = null; }
+    if (!user) { location.href = 'login.html'; return; }
+    _currentUser = user;
+
+    // Try sc_current_role() RPC first; fall back to direct select.
+    let profile = null;
+    try {
+      const rpc = await sb.rpc('sc_current_role');
+      if (rpc && rpc.data && !rpc.error) profile = rpc.data;
+    } catch (_) {}
+    if (!profile) {
+      try { const { data } = await sb.from('profiles').select('*').eq('id', user.id).maybeSingle(); profile = data || {}; } catch (e) { profile = {}; }
+    }
+    _currentProfile = profile;
+    window.SC_PROFILE = Object.assign({ id: user.id, email: user.email }, profile);
+
+    $('fn').value = profile.full_name || '';
+    $('em').value = user.email || '';
+    $('ph').value = profile.phone || '';
+    const role = String(profile.role || 'student').toLowerCase();
+    const status = String(profile.status || 'active');
+    $('role-status').value = role + ' · ' + status;
+    $('profile-hero-name').textContent = profile.full_name || user.email || 'Account';
+    $('profile-hero-meta').textContent = user.email || '';
+    const badge = $('profile-hero-role');
+    badge.textContent = role.toUpperCase();
+    badge.className = 'badge badge-' + role;
+
+    const photoUrl = driveDirect(profile.photo_url || '');
+    renderAvatar(photoUrl, profile.full_name || user.email);
+    $('photo-url').value = profile.photo_url || '';
+    $('photo-pill').style.display = profile.photo_url && /drive\.google\.com/i.test(profile.photo_url) ? '' : 'none';
+    updatePhotoPreview();
+
+    renderRoleCard(profile, user, role);
+  }
+
+  function renderAvatar(photoUrl, name) {
+    if (photoUrl) {
+      $('profile-avatar').innerHTML = '<img src="' + esc(photoUrl) + '" referrerpolicy="no-referrer" alt="Profile photo" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'👤\'}))">';
+    } else {
+      const initial = (name || '?').charAt(0).toUpperCase();
+      $('profile-avatar').innerHTML = '<span>' + esc(initial) + '</span>';
+    }
+  }
+
+  function updatePhotoPreview() {
+    const url = driveDirect($('photo-url').value);
+    const prev = $('photo-preview');
+    if (url) {
+      prev.innerHTML = '<img src="' + esc(url) + '" referrerpolicy="no-referrer" alt="preview" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'🖼️ no preview available\',style:\'color:#94a3b8;font-size:.78rem;padding:10px;text-align:center\'}))">';
+    } else {
+      prev.innerHTML = '<span style="color:#94a3b8">No photo</span>';
+    }
+  }
+
+  function renderRoleCard(profile, user, role) {
+    const sb = window.sb;
+    const host = $('role-card');
+    if (!host) return;
+    if (role === 'student') {
+      host.style.display = '';
+      sb.from('students').select('*').eq('user_id', user.id).maybeSingle().then(({ data: st }) => {
+        $('role-card-body').innerHTML = st
+          ? '<p><b>Student:</b> ' + esc(st.full_name) + ' · Admission No: ' + esc(st.admission_no || '—') + '</p>' +
+            '<p><b>Class:</b> ' + esc(((st.class || '') + ' ' + (st.arm || '')).trim()) + ' · D.O.B.: ' + esc((st.date_of_birth || '').slice(0,10)) + '</p>' +
+            '<p style="margin-top:8px"><a class="btn btn-outline" href="student-profile.html">Full academic dashboard →</a> <a class="btn btn-outline" href="results.html">My results</a> <a class="btn btn-outline" href="report-cards.html">My report card</a></p>'
+          : '<p style="color:#92400e">⚠️ Your account is not yet linked to a student record. Ask the school admin to link it (Students → Edit → Student login account).</p>';
+      }).catch(() => { $('role-card-body').innerHTML = '<p style="color:#92400e">Could not load student record.</p>'; });
+    } else if (role === 'parent') {
+      host.style.display = '';
+      sb.from('parent_child').select('student_id').eq('parent_id', user.id).then(({ data: links }) => {
+        const ids = (links || []).map(l => l.student_id).filter(Boolean);
+        if (!ids.length) { $('role-card-body').innerHTML = '<p style="color:#92400e">No children linked yet — ask the school admin to link you (Parent–Child Mapping page).</p>'; return; }
+        sb.from('students').select('full_name,class,arm,admission_no').in('id', ids).then(({ data: kids }) => {
+          $('role-card-body').innerHTML =
+            '<p><b>Your children:</b></p><ul style="margin:6px 0">' + (kids||[]).map(k => '<li><b>' + esc(k.full_name) + '</b> — ' + esc(((k.class||'')+' '+(k.arm||'')).trim()) + ' (' + esc(k.admission_no || '') + ')</li>').join('') + '</ul>' +
+            '<p style="margin-top:8px"><a class="btn btn-outline" href="report-cards.html">📄 Report cards (read-only)</a> <a class="btn btn-outline" href="fees.html">💳 My children\'s fees</a> <a class="btn btn-outline" href="results.html">📊 My children\'s results</a></p>';
+        });
+      }).catch(() => { $('role-card-body').innerHTML = '<p style="color:#92400e">Could not load linked children.</p>'; });
+    } else if (['staff','teacher'].includes(role)) {
+      host.style.display = '';
+      sb.from('staff').select('*').eq('user_id', user.id).maybeSingle().then(({ data: stf }) => {
+        $('role-card-body').innerHTML = stf
+          ? '<p><b>Staff:</b> ' + esc(stf.full_name) + ' · ' + esc(stf.role || '') + ' · Staff No: ' + esc(stf.staff_no || '') + '</p>' +
+            '<p style="margin-top:8px"><a class="btn btn-outline" href="teacher-overview.html">My teaching overview →</a> <a class="btn btn-outline" href="leave.html">Request leave</a></p>'
+          : '<p style="color:#92400e">No staff record linked to this account yet.</p>';
+      }).catch(() => { $('role-card-body').innerHTML = '<p style="color:#92400e">Could not load staff record.</p>'; });
+    } else {
+      host.style.display = 'none';
+    }
+  }
+
+  async function saveProfile() {
+    const sb = window.sb;
+    if (!sb || !_currentUser) { showToast('Not signed in. Please log in first.', 'error'); return; }
+    const full_name = $('fn').value.trim();
+    const phone = $('ph').value.trim();
+    if (!full_name) { showToast('Please enter your full name.', 'error'); return; }
+    try {
+      const { error } = await sb.from('profiles').update({ full_name, phone }).eq('id', _currentUser.id);
+      if (error) throw error;
+      showToast('✅ Profile updated.', 'success');
+      $('profile-hero-name').textContent = full_name || _currentUser.email;
+      if (window.App) { try { App.currentUserName = full_name; } catch(_){} }
+      if (window.SC_PROFILE) { window.SC_PROFILE.full_name = full_name; window.SC_PROFILE.phone = phone; }
+    } catch (e) {
+      showToast('Save failed: ' + (e.message || e), 'error');
+      console.error('saveProfile error:', e);
+    }
+  }
+
+  async function savePhoto() {
+    const sb = window.sb;
+    if (!sb || !_currentUser) { showToast('Not signed in. Please log in first.', 'error'); return; }
+    const raw = $('photo-url').value.trim();
+    if (raw && !/^https?:\/\//i.test(raw)) { showToast('Please paste a full URL (start with https://).', 'error'); return; }
+    const direct = driveDirect(raw);
+    try {
+      const { error } = await sb.from('profiles').update({ photo_url: direct || raw || null }).eq('id', _currentUser.id);
+      if (error) throw error;
+      renderAvatar(direct, $('fn').value || _currentUser.email);
+      $('photo-pill').style.display = raw && /drive\.google\.com/i.test(raw) ? '' : 'none';
+      showToast('✅ Photo updated. It will appear in the top bar on next page load.', 'success');
+      if (window.App && App.currentProfile) { App.currentProfile.photo_url = direct; }
+      if (window.SC_PROFILE) window.SC_PROFILE.photo_url = direct;
+    } catch (e) {
+      showToast('Photo save failed: ' + (e.message || e), 'error');
+      console.error('savePhoto error:', e);
+    }
+  }
+
+  async function clearPhoto() {
+    const sb = window.sb;
+    if (!sb || !_currentUser) return;
+    if (!confirm('Remove your profile photo?')) return;
+    try {
+      const { error } = await sb.from('profiles').update({ photo_url: null }).eq('id', _currentUser.id);
+      if (error) throw error;
+      $('photo-url').value = '';
+      $('photo-pill').style.display = 'none';
+      $('photo-preview').innerHTML = '<span style="color:#94a3b8">No photo</span>';
+      const initial = (_currentProfile && _currentProfile.full_name || _currentUser.email || '?').charAt(0).toUpperCase();
+      $('profile-avatar').innerHTML = '<span>' + esc(initial) + '</span>';
+      showToast('Photo removed.', 'success');
+      if (window.App && App.currentProfile) App.currentProfile.photo_url = null;
+    } catch (e) {
+      showToast('Could not remove: ' + (e.message || e), 'error');
+    }
+  }
+
+  // Wire up the buttons via addEventListener (CSP-safe)
+  document.addEventListener('DOMContentLoaded', function() {
+    const btnSaveProfile = $('btn-save-profile');
+    const btnSavePhoto = $('btn-save-photo');
+    const btnClearPhoto = $('btn-clear-photo');
+    if (btnSaveProfile) btnSaveProfile.addEventListener('click', saveProfile);
+    if (btnSavePhoto) btnSavePhoto.addEventListener('click', savePhoto);
+    if (btnClearPhoto) btnClearPhoto.addEventListener('click', clearPhoto);
+    const photoInput = $('photo-url');
+    if (photoInput) photoInput.addEventListener('input', updatePhotoPreview);
+    // Initial load
+    load();
+  });
+
+  // If DOM is already ready, attach immediately
+  if (document.readyState !== 'loading') {
+    const btnSaveProfile = $('btn-save-profile');
+    const btnSavePhoto = $('btn-save-photo');
+    const btnClearPhoto = $('btn-clear-photo');
+    if (btnSaveProfile) btnSaveProfile.addEventListener('click', saveProfile);
+    if (btnSavePhoto) btnSavePhoto.addEventListener('click', savePhoto);
+    if (btnClearPhoto) btnClearPhoto.addEventListener('click', clearPhoto);
+    const photoInput = $('photo-url');
+    if (photoInput) photoInput.addEventListener('input', updatePhotoPreview);
+    load();
+  }
+})();
+</script>
+</body>
+</html>
