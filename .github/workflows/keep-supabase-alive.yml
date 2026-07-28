@@ -1,0 +1,58 @@
+# ============================================================
+# Keep Supabase Alive — automated free-tier protection
+# ------------------------------------------------------------
+# Supabase pauses FREE-tier projects after ~7 days without
+# database activity. This workflow performs a REAL database
+# write (via the sc_keep_alive() RPC installed by
+# database/complete-schema.sql) twice a week, so the project
+# never crosses the 7-day inactivity window.
+#
+# ONE-TIME SETUP (2 minutes):
+#   GitHub repo → Settings → Secrets and variables → Actions →
+#   add two repository secrets:
+#     SUPABASE_URL        e.g. https://abcdefgh.supabase.co
+#     SUPABASE_ANON_KEY   your project's anon/public key
+#
+# NOTE: GitHub disables scheduled workflows in repos with no
+# commits for 60 days. The site-visit heartbeat built into
+# assets/js/app.js and the optional UptimeRobot monitor cover
+# that gap — see SUPABASE_FREE_TIER_PROTECTION.md.
+# ============================================================
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # 06:17 UTC every Monday and Thursday (max gap = 4 days, well inside the 7-day window)
+    - cron: '17 6 * * 1,4'
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Heartbeat write to Supabase (sc_keep_alive RPC)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -e
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::SUPABASE_URL / SUPABASE_ANON_KEY secrets are not set. Add them in Settings → Secrets and variables → Actions to activate keep-alive."
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/resp.txt -w '%{http_code}' \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/sc_keep_alive" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"src":"github-actions"}')
+          echo "Response: $(cat /tmp/resp.txt)"
+          if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+            echo "✅ Keep-alive heartbeat written (HTTP $code). Supabase inactivity timer reset."
+          else
+            echo "::error::Keep-alive failed (HTTP $code). If the RPC is missing, run database/keep-alive.sql (or the full database/complete-schema.sql) in the Supabase SQL Editor."
+            exit 1
+          fi
