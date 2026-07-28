@@ -54,9 +54,12 @@ const Enterprise = {
     async grid(cls, session, term) {
       if (!Enterprise.sb) return { data: [] };
       let q = Enterprise.sb.from('timetable').select('*').eq('class', cls);
-      const { data } = await q;
-      return { data: data || [] };
-    }
+      if(session!=null)q=q.eq('session',session||'');if(term!=null)q=q.eq('term',term||'');
+      const { data,error } = await q.order('day').order('period');
+      return { data: data || [],error };
+    },
+    async removeRequirement(id){if(!Enterprise.sb)return{error:'No DB'};return await Enterprise.sb.from('timetable_requirements').delete().eq('id',id);},
+    async clearGenerated(cls,session,term){if(!Enterprise.sb)return{error:'No DB'};let q=Enterprise.sb.from('timetable').delete().eq('class',cls);q=q.eq('session',session||'').eq('term',term||'');return await q;}
   },
 
   /* ================= 2) QR / code self check-in ================= */

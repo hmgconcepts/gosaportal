@@ -94,7 +94,7 @@ const App = {
         window.SC_SETTINGS = data;
         try {
           if (data.signature_url && !localStorage.getItem('sc-signature-url')) localStorage.setItem('sc-signature-url', data.signature_url);
-          if (data.principal_name && !localStorage.getItem('sc-principal-name')) localStorage.setItem('sc-principal-name', data.principal_name);
+          if(data.principal_name)localStorage.setItem('sc-principal-name',data.principal_name);if(data.signature_url)localStorage.setItem('sc-signature-url',data.signature_url);if(data.proprietor_name)localStorage.setItem('sc-proprietor-name',data.proprietor_name);if(data.proprietor_signature_url)localStorage.setItem('sc-proprietor-signature',data.proprietor_signature_url);if(data.examination_officer_name)localStorage.setItem('sc-exam-officer-name',data.examination_officer_name);if(data.examination_officer_signature_url)localStorage.setItem('sc-exam-officer-signature',data.examination_officer_signature_url);
           if (data.terms)        window.SC_TERMS    = data.terms;
           if (data.sessions)     window.SC_SESSIONS = data.sessions;
           // V12: expose admin-configured geofence to check-in pages.
@@ -315,7 +315,7 @@ const App = {
 
   applyRoleDashboard(role, profile) {
     const name = (profile && (profile.full_name || profile.email)) || 'User';
-    const prettyRole = String(role || 'user').replace(/_/g,' ').replace(/\bw/g, c => c.toUpperCase());
+    const prettyRole = String(role || 'user').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 
     const roleMap = {
       super_admin: ['admin'], admin: ['admin'], principal: ['admin'], proprietor: ['admin'],
@@ -375,7 +375,7 @@ const App = {
       ];
       const filteredLinks = links.filter(link => {
         const href = link[1];
-        if (href.startsWith('#')) return true;
+        if(href.startsWith('#'))return App.isOwnerRole(role);
         return App.canAccessPage(href, role);
       });
       q.innerHTML = filteredLinks.map(x => '<a class="btn btn-outline btn-sm" href="'+x[1]+'">'+x[0]+'</a>').join('');
@@ -428,16 +428,16 @@ const App = {
     }
   },
 
-  isAdminRole(role) {
-    return ['super_admin','superadmin','admin','administrator','owner','director','principal','proprietor','head_teacher','headteacher','bursar'].includes(String(role || '').toLowerCase().replace(/\s+/g,'_'));
-  },
+  isOwnerRole(role){return ['super_admin','superadmin','admin','administrator','owner','director','proprietor'].includes(String(role||'').toLowerCase().replace(/\s+/g,'_'));},
+  isAdminRole(role) {return ['super_admin','superadmin','admin','administrator','owner','director','principal','proprietor','head_teacher','headteacher','bursar'].includes(String(role || '').toLowerCase().replace(/\s+/g,'_'));},
+  isManagerRole(role){return App.isAdminRole(role);},
 
   roleSet(role) {
     const r = String(role || '').toLowerCase();
     const set = new Set([r]);
     if (r === 'teacher') set.add('staff');
     if (r === 'staff') set.add('teacher');
-    if (App.isAdminRole(r)) ['admin','staff','teacher','parent','student'].forEach(x => set.add(x));
+    if(App.isOwnerRole(r))['admin','staff','teacher','parent','student'].forEach(x=>set.add(x));
     return set;
   },
 
@@ -470,6 +470,9 @@ const App = {
     parent: ['parent'],
     student: ['student']
   },
+  BURSAR_WHITELIST:new Set(['dashboard','profile','change_password','notifications','students','parents','classes','fees','school_fees','school_products','payment_history','payments_online','finance','payroll','financial_aid','donations','reports','analytics','inbox','messages','directory','feature_guide','about','contact']),
+  PRINCIPAL_DENY:new Set(['site_license','license','status_manager','admin_data','developer','storage','activity_log']),
+  HEADTEACHER_DENY:new Set(['site_license','license','status_manager','admin_data','developer','storage','activity_log','finance','payroll','hr','staff_loans','staff_bonus','donations','payments_online','school_products','inventory','approvals','settings']),
 
   /* Modules that parents/students should NEVER see. The whitelist
      (PARENT_WHITELIST / STUDENT_WHITELIST) handles everything else.
@@ -586,19 +589,11 @@ const App = {
       if (App.STUDENT_WHITELIST.has(id)) return true;
       return false;
     }
-    if (['staff','teacher'].includes(r)) {
-      // Staff/teacher: see everything except admin-only modules
-      // (admin-only is enforced by data-role-allow on the link)
-      return true;
-    }
-    return true; // admin
+    if(r==='bursar')return App.BURSAR_WHITELIST.has(id);if(r==='principal'&&App.PRINCIPAL_DENY.has(id))return false;if(['head_teacher','headteacher'].includes(r)&&App.HEADTEACHER_DENY.has(id))return false;if(['staff','teacher'].includes(r))return true;return true;
   },
 
   /* Can the role WRITE (add/edit/delete) on this module? */
-  canWriteModule(moduleId, role) {
-    if (App.isAdminRole(role)) return true;
-    const id = App.normalizeModuleId(moduleId);
-    const r = String(role || '').toLowerCase();
+  canWriteModule(moduleId,role){const id=App.normalizeModuleId(moduleId),r=String(role||'').toLowerCase();if(App.isOwnerRole(r))return true;if(r==='bursar')return App.BURSAR_WHITELIST.has(id);if(r==='principal')return !App.PRINCIPAL_DENY.has(id);if(['head_teacher','headteacher'].includes(r))return !App.HEADTEACHER_DENY.has(id);
     if (r === 'parent' || r === 'student') return false; // family-safe
     if (['staff','teacher'].includes(r)) {
       // Staff can write the academic modules they own. CRUD.remove checks
@@ -620,9 +615,7 @@ const App = {
   roleAccessMap: null,
   roleWriteMap: null,
 
-  canAccessPage(pageFileName, role) {
-    if (App.isAdminRole(role)) return true;
-    const id = this.normalizeModuleId(pageFileName);
+  canAccessPage(pageFileName,role){if(App.isOwnerRole(role))return true;const id=this.normalizeModuleId(pageFileName);if(!App.moduleAllowedForRole(id,role))return false;
     const map = this.roleAccessMap || {};
     if (map[id] && Array.isArray(map[id])) {
       return map[id].includes(role) || (role === 'teacher' && map[id].includes('staff')) || (role === 'staff' && map[id].includes('teacher'));
@@ -646,8 +639,7 @@ const App = {
       try {
         supabase.from('school_settings').select('role_access,role_write').eq('id', 1).maybeSingle().then(({data}) => {
           if (data) {
-            if (data.role_access && typeof data.role_access === 'object') { this.roleAccessMap = data.role_access; try { localStorage.setItem('sc-role-access-map', JSON.stringify(data.role_access)); } catch(e) {} }
-            if (data.role_write && typeof data.role_write === 'object') { this.roleWriteMap = data.role_write; try { localStorage.setItem('sc-role-write-map', JSON.stringify(data.role_write)); } catch(e) {} }
+            if(data.role_access&&typeof data.role_access==='object'){this.roleAccessMap=data.role_access;localStorage.setItem('sc-role-access-map',JSON.stringify(data.role_access))}else{this.roleAccessMap=null;localStorage.removeItem('sc-role-access-map')}if(data.role_write&&typeof data.role_write==='object'){this.roleWriteMap=data.role_write;localStorage.setItem('sc-role-write-map',JSON.stringify(data.role_write))}else{this.roleWriteMap=null;localStorage.removeItem('sc-role-write-map')}
             if (this.currentRole) { 
               this.applyRoleNav(this.currentRole); 
               this.applyRoleDashboard(this.currentRole, this.currentProfile);
@@ -663,7 +655,7 @@ const App = {
     const id = this.normalizeModuleId(rawId);
     const map = this.roleAccessMap || {};
     if (map[id] && Array.isArray(map[id])) {
-      return ['super_admin','admin','principal','proprietor','head_teacher','bursar'].concat(map[id]).join(' ');
+      return ['super_admin','admin','proprietor'].concat(map[id]).join(' ');
     }
     return (el && el.getAttribute('data-role-allow')) || '';
   },
@@ -684,7 +676,7 @@ const App = {
   },
 
   injectAccessManager(role) {
-    if (!App.isAdminRole(role) || currentPage() !== 'dashboard') return;
+    if(!App.isOwnerRole(role)||currentPage()!=='dashboard')return;
     const content = document.querySelector('.app-content');
     if (!content || document.getElementById('role-access-manager')) return;
     const rows = this.collectAccessRows();
@@ -854,7 +846,7 @@ const App = {
     App.markActiveNav();
     App.injectNavSearch();
     const links = [...document.querySelectorAll('[data-role-allow]')];
-    const isAdmin = App.isAdminRole(role);
+    const isAdmin=App.isOwnerRole(role);
     /* v5: per-role nav-visibility map (admin can override per-page per-role) */
     let navShowMap = {};
     try { navShowMap = JSON.parse(localStorage.getItem('sc-nav-show-map') || '{}'); } catch(_){}
@@ -952,12 +944,12 @@ const App = {
   applyVisibilityTokens(role) {
     const allow = (selector, yes) => document.querySelectorAll(selector).forEach(el => el.style.display = yes ? '' : 'none');
     const r = String(role || '').toLowerCase();
-    const isAdmin = App.isAdminRole(r);
+    const isAdmin=App.isManagerRole(r),isOwner=App.isOwnerRole(r);
     const isStaff = ['staff','teacher'].includes(r);
     const isParent = r === 'parent';
     const isStudent = r === 'student';
 
-    allow('[data-admin-only]', isAdmin);
+    allow('[data-admin-only]',isAdmin);allow('[data-owner-only]',isOwner);
     allow('[data-staff-only]', isAdmin || isStaff);
     allow('[data-parent-only]', isParent);
     allow('[data-student-only]', isStudent);
@@ -1029,8 +1021,8 @@ const App = {
       // its own public state.
       return;
     }
-    if (App.isAdminRole(role)) return;
-    const shell = document.querySelector('.app-layout[data-require-role]');
+    if(App.isOwnerRole(role))return;
+    const shell=document.querySelector('.app-layout[data-require-role]');
     if (!shell) return;
     const active = document.querySelector('.app-nav a.active');
     const required = active ? App.allowTextForElement(active) : shell.getAttribute('data-require-role');
@@ -1416,6 +1408,11 @@ const App = {
   }
 };
 
+/* Verified deletion helper: Supabase can return no error with zero affected rows
+   under RLS. Every custom page can use this to avoid false “Deleted” messages
+   and stale session-cache resurrection. */
+window.SCDelete={async byId(client,table,id){if(!client)return{ok:false,error:'Database not configured'};const{data,error}=await client.from(table).delete().eq('id',id).select('id');if(error)return{ok:false,error:error.message||String(error)};if(!data||!data.length)return{ok:false,error:'No row was deleted. It may already be removed or your role lacks permission.'};try{Object.keys(sessionStorage).filter(k=>k.startsWith('sc-table-cache:')).forEach(k=>sessionStorage.removeItem(k));}catch(_){}const v=await client.from(table).select('id').eq('id',id).maybeSingle();return v.data?{ok:false,error:'Delete verification failed; the row still exists.'}:{ok:true,deleted:data.length};}};
+
 /* ----- Modal helpers ----- */
 function openModal(title, body, footer) {
   const b = document.getElementById('modal-backdrop');
@@ -1449,7 +1446,36 @@ function toast(msg, type='info', ms=3500) {
 function handleSignIn(e){ return App.handleSignIn(e); }
 function handleSignUp(e){ return App.handleSignUp(e); }
 
+// Load the portable archive engine on every operational page so any CSV/data
+// export has a single re-import path without uploading source files to Supabase.
+(function(){if(window.DataPortability)return;const s=document.createElement('script');s.src='assets/js/data-portability.js';s.defer=true;document.head.appendChild(s);})();
+(function(){if(window.ReportCommentBands)return;const s=document.createElement('script');s.src='assets/js/v57-enhancements.js';s.defer=true;document.head.appendChild(s);})();
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', App.init);
 else App.init();
+
+
+/* --------------------------------------------------------------------
+   SUPABASE FREE-TIER KEEP-ALIVE (Layer 1 — site-visit heartbeat)
+   Supabase pauses free projects after ~7 days without DB activity.
+   Every visitor automatically triggers ONE real database write per
+   24 hours via the sc_keep_alive() RPC (installed by
+   database/complete-schema.sql or database/keep-alive.sql).
+   Zero setup, zero cost, fully automated for the client.
+   Layers 2-4 (GitHub Actions, UptimeRobot/edge ping, pg_cron) are
+   documented in SUPABASE_FREE_TIER_PROTECTION.md.
+   -------------------------------------------------------------------- */
+(function(){
+  try{
+    if(!window.sb) return;                            // Supabase not configured yet
+    var KEY='sc-keepalive-at';
+    var last=+(localStorage.getItem(KEY)||0);
+    if(Date.now()-last < 24*60*60*1000) return;       // at most once per day per device
+    window.sb.rpc('sc_keep_alive',{src:'site-visit'}).then(function(r){
+      if(!r.error){ localStorage.setItem(KEY,String(Date.now()));
+        console.log('[School Connect] Supabase keep-alive heartbeat ok.'); }
+      else console.warn('[School Connect] keep-alive RPC missing — run database/keep-alive.sql:',r.error.message);
+    }).catch(function(){});
+  }catch(_){/* never break the page for a heartbeat */}
+})();
 
 console.log('%c[School Connect v15] app.js loaded — RBAC, family-safe nav, fixed notifications.', 'color:#10b981;font-weight:bold');

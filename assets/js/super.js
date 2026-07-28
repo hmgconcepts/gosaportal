@@ -179,8 +179,8 @@ const Super = {
       "reports":{purpose:"Custom administrative and departmental summaries.",does:"A flexible reporting log where heads of department and administrators file official termly summaries, inspection notes, and executive status briefs for institutional governance.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
       "directory":{purpose:"Searchable contact registry for staff and students.",does:"Aggregates active database profiles into a searchable, read-only contact directory. Displays full names, institutional email addresses, phone contacts, roles, and current academic standing.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
       "departments":{purpose:"Academic faculty and HOD structure setup.",does:"Defines the institutional academic architecture by establishing distinct academic departments (e.g., Sciences, Arts, Languages) and assigning official Heads of Department (HOD) for faculty governance.",who:"Admin and Super Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
-      "rubrics":{purpose:"Standardized student conduct evaluation matrices.",does:"Provides standardized grading criteria for evaluating student affective traits and behavioral conduct. Establishes uniform benchmarks for punctuality, respect, neatness, and teamwork across all class arms.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
-      "transcripts":{purpose:"Comprehensive multi-term academic record synthesis.",does:"Compiles student continuous assessments and examination results across multiple academic terms and sessions into official, printable academic transcripts suitable for university applications and transfers.",who:"Admin and Staff.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "rubrics":{purpose:"Reusable, standards-based marking guides for assignments, projects, practicals, behaviour or skills.",does:"Define the skill, subject/class, measurable criteria and scale before marking. Teachers apply the same descriptors consistently, total the achieved rubric levels and convert the result to the configured Report Card assignment/project maximum. A rubric is guidance—not an automatic student score.",who:"HOD/admin define common rubrics; teachers use them while marking.",advantages:["Worked criteria reduce subjective marking","One rubric can be exported/re-imported and reused","Learners can see expectations before the task","Consistent scoring across teachers/classes"],benefit:"Fairer, explainable assessment with less marker variation."},
+      "transcripts":{purpose:"Approved cumulative academic-history register for transfers, admissions and external applications.",does:"After source report cards are verified, staff pick the student and record the exact sessions/terms, cumulative average or GPA, subject-grade summary and official remark. Missing source grades must be corrected in Report Cards first; the transcript register never invents them.",who:"Authorised academic admin/exams staff prepare; school leadership approves.",advantages:["Identity and session checklist","Portable CSV/JSON archive","Printable official summary","Clear distinction from a one-term report card"],benefit:"Produces traceable cumulative records suitable for transfer or application review."},
       "transfer_cert":{purpose:"Official student departure and clearance documentation.",does:"Generates official school leaving certificates and clearance documentation for departing students. Records academic standing, final attendance summaries, conduct ratings, and official release authorization.",who:"Admin and Staff.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
       "counselling":{purpose:"Confidential academic and psychological guidance tracking.",does:"A secure logging facility where school guidance counsellors record confidential student guidance sessions, psychological intervention notes, university placement advice, and career action plans.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
       "hostel":{purpose:"Student accommodation and dormitory wing management.",does:"Manages residential student housing by tracking dormitory wings, specific room numbers, bed allocations, and supervising boarding housemasters/mistresses.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
@@ -299,29 +299,32 @@ const Super = {
       this.ensurePageInfoCoverage();
       const i = this.PAGE_INFO[id] || this.PAGE_INFO[id.replace(/-/g,'_')];
       if (!i) return this.PAGE_HELP[id] || ('This is the **' + id.replace(/-/g, ' ') + '** page. Ask me anything specific about it!');
+      const live=this.dynamicPageInfo(id,document.querySelector('.app-page-title,h1')?.textContent);
       return '📖 **' + (id.charAt(0).toUpperCase() + id.slice(1)).replace(/-/g, ' ').replace(/_/g, ' ') + ' page**\n\n' +
         '**What it is:** ' + i.purpose + '\n\n' +
         '**What it does:** ' + i.does + '\n\n' +
         '**Who uses it:** ' + i.who + '\n\n' +
         '**Advantages:** ' + i.advantages.map(a => '• ' + a).join('  ') + '\n\n' +
+        '**Visible workflow and controls on this page:** ' + live.advantages.slice(0,3).map(a=>'• '+a).join('  ')+'\n\n'+
+        '**Data safety:** Use portable JSON/CSV before purge or major edits. Hidden/read-only controls are role protected; PostgreSQL RLS remains authoritative.\n\n'+
         '**Benefit to the school:** ' + i.benefit;
     },
     currentPageId() { return (location.pathname.split('/').pop() || 'dashboard').replace('.html', '') || 'dashboard'; },
+    dynamicPageInfo(id,label){
+      const clean=s=>String(s||'').replace(/\s+/g,' ').trim(),title=clean(label||document.querySelector('.app-page-title,h1')?.textContent||id.replace(/[-_]/g,' '));
+      const guide=[...document.querySelectorAll('.app-content .card p,.app-content .card li,main .card p,main .card li')].map(x=>clean(x.textContent)).filter(x=>x.length>20).slice(0,6);
+      const actions=[...document.querySelectorAll('button,a.btn')].map(x=>clean(x.textContent)).filter(x=>x&&!/sign out|theme|help/i.test(x)).slice(0,10);
+      const fields=[...document.querySelectorAll('.form-group label')].map(x=>clean(x.textContent)).filter(Boolean).slice(0,12);
+      const roleAttr=document.body.getAttribute('data-require-role')||document.body.getAttribute('data-role-allow')||'';
+      return {purpose:title+' — a connected School Connect operational workspace.',does:(guide.join(' ')||'Use this page to view and manage '+title.toLowerCase()+' records.')+' The page reads/writes structured Supabase records; files remain external links where supported to conserve free-tier storage.',who:roleAttr?('Authorised roles: '+roleAttr.replace(/_/g,' ')+'.'):'The menu and database RLS determine who can view or change these records.',advantages:['Main actions: '+(actions.join(', ')||'view, add, update and review'),'Key fields: '+(fields.join(', ')||'shown in the page form'),'Dropdowns reuse school setup values to prevent spelling errors','CSV/portable JSON export and re-import are available through the module or Admin Data','Changes remain protected by role checks and PostgreSQL RLS'],benefit:'Provides an orderly, auditable workflow for '+title.toLowerCase()+' while helping first-time users understand what to do next.'};
+    },
     ensurePageInfoCoverage() {
       try {
-        const navs = Array.from(document.querySelectorAll('[data-module-id]'));
-        navs.forEach(a => {
-          const id = (a.getAttribute('data-module-id') || '').replace(/-/g,'_');
-          const label = (a.textContent || id).trim().replace(/\s+/g,' ');
-          if (!id || this.PAGE_INFO[id] || this.PAGE_INFO[id.replace(/_/g,'-')]) return;
-          this.PAGE_INFO[id] = {
-            purpose: label + ' module.',
-            does: 'This page is part of the School Connect platform. It is connected to role-based access, Supabase security policies, notifications, audit logs and the school dashboard. Use the form/table actions shown on the page; if a control is hidden or read-only, your role is intentionally protected from changing that record.',
-            who: 'Available only to the roles shown in the menu and access policy.',
-            advantages: ['Role-aware access', 'Connected records', 'Export/search where available', 'Free browser-based workflow'],
-            benefit: 'Gives first-time users a clear, safe and guided digital workflow.'
-          };
-        });
+        const items=new Map(),add=(id,label)=>{id=String(id||'').replace(/-/g,'_');if(id)items.set(id,label||id);};
+        document.querySelectorAll('[data-module-id]').forEach(a=>add(a.getAttribute('data-module-id'),a.textContent));
+        ((window.SC&&SC.MODULES)||[]).forEach(m=>add(m.id,m.name));
+        add(this.currentPageId(),document.querySelector('.app-page-title,h1')?.textContent);
+        items.forEach((label,id)=>{if(!this.PAGE_INFO[id]&&!this.PAGE_INFO[id.replace(/_/g,'-')])this.PAGE_INFO[id]=this.dynamicPageInfo(id,label);});
       } catch(e) {}
     },
 

@@ -58,7 +58,9 @@ const SiteHelp = {
   },
   
   showHelp() {
-    const desc = this.descriptions[this.currentPage] || this.descriptions['default'];
+    let desc=this.descriptions[this.currentPage];
+    if(!desc&&window.Super&&Super.chatbot){try{Super.chatbot.ensurePageInfoCoverage();desc=Super.chatbot.renderPageInfo(this.currentPage);}catch(_){}}
+    desc=desc||this.descriptions['default'];
     const modal = document.createElement('div');
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
     modal.innerHTML = '<div style="background:white;border-radius:16px;max-width:600px;width:100%;max-height:80vh;overflow-y:auto;padding:24px;position:relative">' +

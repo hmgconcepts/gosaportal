@@ -13,18 +13,18 @@ const CRUD = {
   WRITE_RULES: {
     // Admin/Super Admin is always full read/write in canWrite(). These rules define
     // non-admin write capability only; read access is controlled by app.js + RLS.
-    students:['staff','teacher'],
+    students:[],
     staff:[], parents:[], parent_child:[],
-    classes:['staff','teacher'], subjects:['staff','teacher'], attendance:['staff','teacher'],
+    classes:[], subjects:[], attendance:['staff','teacher'],
     results:['staff','teacher'], academic_records:['staff','teacher'], report_cards:['staff','teacher'],
     cbt:['staff','teacher'], cbt_prompts:['staff','teacher'], assignments:['staff','teacher'],
-    timetable:['staff','teacher'], timetable_generator:['staff','teacher'], sow:['staff','teacher'],
-    lesson_plans:['staff','teacher'], announcements:['staff','teacher'], events:['staff','teacher'],
-    gallery:['staff','teacher'], library:['staff','teacher'], digital_library:['staff','teacher'],
-    eresources:['staff','teacher'], directory:['staff','teacher'], broadcast:['staff','teacher'],
+    timetable:[], timetable_generator:[], sow:['staff','teacher'],
+    lesson_plans:['staff','teacher'], announcements:[], events:[],
+    gallery:[], library:[], digital_library:['staff','teacher'],
+    eresources:['staff','teacher'], directory:[], broadcast:[],
     complaints:['staff','teacher','parent','student'], inbox:['staff','teacher','parent'],
     messages:['staff','teacher','parent','student'], leave:['staff','teacher'], visitors:['staff','teacher'],
-    hostel:['staff','teacher'], transport:['staff','teacher'], certificates:['staff','teacher'],
+    hostel:[], transport:[], certificates:[],
     behaviour:['staff','teacher'], conduct:['staff','teacher'], health:['staff','teacher'],
     support_plans:['staff','teacher'], diary:['staff','teacher'], checkin:['staff','teacher'],
     rubrics:['staff','teacher'], counselling:['staff','teacher'], substitutions:['staff','teacher'],
@@ -58,7 +58,7 @@ const CRUD = {
     ]},
     staff: { table:'staff', title:'Staff', cols:[
       {key:'full_name',label:'Full name',type:'text',required:true},
-      {key:'user_id',label:'Staff login account (optional)',type:'ref',refTable:'profiles',refValue:'full_name',refExtra:['email'],refStore:'id',refFilter:{role:'staff'},searchable:true,help:'Link this staff record to the staff/teacher login so Teacher Overview works.'},
+      {key:'user_id',label:'Staff/teacher login account (optional)',type:'ref',refTable:'profiles',refValue:'full_name',refExtra:['email','role'],refStore:'id',searchable:true,help:'Link this staff record to the correct staff or teacher login. This link is required for the teacher profile signature to appear on assigned class report cards.'},
       {key:'staff_no',label:'Staff No',type:'text',readonly:true,help:'AUTO-GENERATED on save — leave blank',placeholder:'(auto)'},
       {key:'email',label:'Email',type:'email'},
       {key:'phone',label:'Phone',type:'tel'},
@@ -609,7 +609,7 @@ const CRUD = {
     financial_aid:{ title:'Scholarship/Aid',cols:[['title','Scheme','text',true],['data.student','Student','ref-students'],['amount','Amount/Waiver','number'],['status','Status','select',['applied','approved','renewed','ended']],['body','Notes','textarea']] },
     front_desk:  { title:'Front-desk log',cols:[['title','Subject','text',true],['data.kind','Type','select',['call','dispatch','walk-in','inquiry']],['body','Details','textarea'],['data.contact','Contact','text'],['ref_date','Date','date']] },
     career_counseling:{ title:'Career record',cols:[['title','Title','text',true],['data.student','Student','ref-students'],['body','Guidance / offers','textarea'],['data.university','University/Placement','text']] },
-    document_builder:{ title:'Custom Document', help:'Build any official school document (hall ticket, bonafide letter, testimonial…): 1) Pick the document type. 2) Choose who it is for. 3) Type the body text — use [NAME], [CLASS], [DATE] placeholders. 4) Save, then press Print on the row to output a letterheaded, signed document.', cols:[['title','Document title (e.g. Bonafide Letter — Ada Obi)','text',true],['data.type','Document type','select',['hall ticket','bonafide certificate','recommendation letter','transfer letter','testimonial','invitation letter','fee clearance','custom']],['data.student','For (student — optional)','ref-students'],['data.recipient','Addressed to (e.g. The Embassy, Parent)','text'],['body','Body text — placeholders [NAME] [CLASS] [DATE] are replaced at print time','textarea',true],['status','Status','select',['draft','final','issued']]] },
+    document_builder:{title:'Custom Document',help:'Choose a preset or enter any custom document type; select the correct institutional signatory.',cols:[['title','Document title / subject','text',true],['data.type','Document type preset','select',['hall ticket','bonafide certificate','recommendation letter','transfer letter','testimonial','invitation letter','fee clearance','admission letter','appointment letter','memorandum','certificate','custom']],['data.custom_type','Custom document type (if not listed above)','text'],['data.reference','Reference number','text'],['data.student','For student','ref-students'],['data.class','Class','ref-classes'],['data.term','Term','lookup','term'],['data.session','Session','lookup','session'],['data.recipient','Recipient / addressee','text'],['data.signatory_role','Official signatory','select',['Principal','Proprietor','Examination Officer','Head Teacher','Custom']],['data.custom_signatory_name','Custom signatory name','text'],['data.custom_signatory_title','Custom designation','text'],['body','Body — tokens [NAME] [CLASS] [TERM] [SESSION] [DATE] [REFERENCE] [SCHOOL] [PRINCIPAL] [PROPRIETOR] [EXAM_OFFICER]','textarea',true],['status','Status','select',['draft','reviewed','approved','final','issued','revoked']]] },
     fleet_tracking:{ title:'Fleet log',cols:[['title','Vehicle/Route','text',true],['data.driver','Driver','text'],['body','Notes / location','textarea'],['ref_date','Date','date']] },
     facility_booking:{ title:'Facility booking',cols:[['title','Facility','text',true],['ref_date','Date','date',true],['data.time','Time','time'],['data.bookedby','Booked by','text'],['status','Status','select',['requested','approved','cancelled']]] },
     compliance:  { title:'Compliance item',cols:[['title','Item','text',true],['data.category','Category','select',['accreditation','fire drill','inspection','statutory']],['ref_date','Date','date'],['status','Status','select',['pending','passed','failed','due']],['body','Notes','textarea']] },
@@ -629,9 +629,9 @@ const CRUD = {
     return map[moduleId] || String(moduleId || '').replace(/-/g,'_');
   },
 
+  registeredField(c){c=Object.assign({},c);const k=String(c.key||'').split('.').pop();if(String(c.type||'text')!=='text')return c;if(['class','student_class','candidate_class','last_class'].includes(k))Object.assign(c,{type:'ref',refTable:'classes',refValue:'name',refStore:'value'});else if(k==='term')Object.assign(c,{type:'lookup',lookupKind:'term'});else if(k==='session')Object.assign(c,{type:'lookup',lookupKind:'session'});else if(['subject','subject_name'].includes(k))Object.assign(c,{type:'ref',refTable:'subjects',refValue:'name',refStore:'value'});else if(k==='department')Object.assign(c,{type:'ref',refTable:'departments',refValue:'name',refStore:'value'});else if(k==='arm')Object.assign(c,{type:'lookup',lookupKind:'arm'});else if(k==='campus')Object.assign(c,{type:'lookup',lookupKind:'campus'});return c;},
   def(moduleId){
-    const key = this.canonicalId(moduleId);
-    if (this.SCHEMA[key]) return this.SCHEMA[key];
+    const key=this.canonicalId(moduleId);if(this.SCHEMA[key]){const d=this.SCHEMA[key];return Object.assign({},d,{cols:(d.cols||[]).map(c=>this.registeredField(c))});}
     const g = this.GENERIC[key] || this.GENERIC[moduleId];
     if (!g) return null;
     const cols = g.cols.map(t => {
@@ -644,7 +644,7 @@ const CRUD = {
       else if (type === 'ref-subjects') { c.type='ref'; c.refTable='subjects'; c.refValue='name'; c.refStore='value'; }
       else if (type === 'ref-profiles') { c.type='ref'; c.refTable='profiles'; c.refValue='full_name'; c.refExtra=['email','role']; c.refStore='id'; c.searchable=true; }
       if (extra === true || extra2 === true) c.required = true;
-      return c;
+      return this.registeredField(c);
     });
     return { table:'module_records', title:g.title, generic:true, module:(this.canonicalId(moduleId)), cols };
   },
@@ -661,10 +661,12 @@ const CRUD = {
     ).toLowerCase().replace(/\s+/g,'_');
     const key = this.canonicalId(moduleId);
     const allow = this.WRITE_RULES[key];
-    const adminAliases = ['super_admin','superadmin','admin','administrator','owner','director','principal','proprietor','head_teacher','headteacher','bursar'];
-    if (adminAliases.includes(role) || (window.App && App.isAdminRole && App.isAdminRole(role))) return true;
+    const owners=['super_admin','superadmin','admin','administrator','owner','director','proprietor'];if(owners.includes(role)||(window.App&&App.isOwnerRole&&App.isOwnerRole(role)))return true;if(['principal','head_teacher','headteacher','bursar'].includes(role))return !!(window.App&&App.canWriteModule&&App.canWriteModule(key,role));
+    // An explicit empty rule is a hard admin-only boundary and cannot be opened
+    // accidentally by a stale/custom browser access map. Database RLS mirrors it.
+    if (Array.isArray(allow) && allow.length===0) return false;
     if (window.App && App.canWriteByAccess) { const mapped = App.canWriteByAccess(key, role); if (mapped !== null) return mapped; }
-    if (!allow) return ['staff','teacher'].includes(role);
+    if (!allow) return false;
     return allow.includes(role);
   },
 
@@ -675,6 +677,8 @@ const CRUD = {
      - Staff/Admin see all data (no filter)
   */
   // The last visible records are session-scoped by user/role/module; never use a shared cache.
+  invalidateTableCaches(moduleId){try{const key=':'+String(moduleId)+':';Object.keys(sessionStorage).filter(k=>k.startsWith('sc-table-cache:')&&(k.includes(key)||k.includes(':'+this.canonicalId(moduleId)+':'))).forEach(k=>sessionStorage.removeItem(k));}catch(_){}},
+
   stableTableCacheKey(moduleId, suffix='') {
     const uid = (window.SC_PROFILE && SC_PROFILE.id) || 'guest';
     const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.App && App.currentRole) || 'guest';
@@ -686,6 +690,7 @@ const CRUD = {
     const key = this.canonicalId(moduleId);
     const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(key + '-table');
     if (!tableEl) return;
+    this.ensurePortableButton(moduleId);
     if (!d) { tableEl.querySelector('thead').innerHTML = '<tr><th>Not available</th></tr>'; return; }
     if (!this.sb) {
       tableEl.querySelector('thead').innerHTML = '<tr><th>Database not configured</th></tr>';
@@ -741,7 +746,7 @@ const CRUD = {
     const tb = tableEl.querySelector('tbody');
     if (error) {
       let cached = null; try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch(_) {}
-      if (cached && cached.html) { tb.innerHTML = cached.html + '<tr><td colspan="' + (cols.length + (writable ? 1 : 0)) + '" style="color:#b45309;background:#fffbeb">Live refresh failed; showing the last visible records so they do not disappear. ' + esc(error.message) + '</td></tr>'; return; }
+      if(cached&&cached.html&&Date.now()-Number(cached.at||0)<60000){tb.innerHTML=cached.html+'<tr><td colspan="'+(cols.length+(writable?1:0))+'" style="color:#b45309;background:#fffbeb">Live refresh failed; showing a cache less than one minute old. It will not be reused after that to prevent deleted records reappearing. '+esc(error.message)+'</td></tr>';return;}
       tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0)) + '">' + esc(error.message) + '</td></tr>'; return;
     }
 
@@ -956,7 +961,7 @@ const CRUD = {
     if (!row) return true;
     const uid = window.SC_PROFILE?.id || '';
     const uname = String(window.SC_PROFILE?.full_name || '').toLowerCase();
-    const checks = [row.teacher_id, row.posted_by, row.recorded_by_id, row.created_by, row.submitted_by, row.generated_by, row.assignee];
+    const checks = [row.teacher_id, row.posted_by, row.recorded_by_id, row.created_by, row.submitted_by, row.generated_by, row.assignee, row.uploaded_by, row.awarded_by, row.updated_by, row.recorded_by];
     if (checks.some(v => v && uid && String(v) === String(uid))) return true;
     if (row.teacher && uname && String(row.teacher).toLowerCase() === uname) return true;
     if (row.recorded_by && uname && String(row.recorded_by).toLowerCase() === uname) return true;
@@ -966,7 +971,7 @@ const CRUD = {
 
   hasOwnershipMarker(row) {
     if (!row) return false;
-    return !!(row.teacher_id || row.posted_by || row.recorded_by_id || row.created_by || row.submitted_by || row.generated_by || row.assignee || row.teacher || row.recorded_by || (row.data && row.data.created_by));
+    return !!(row.teacher_id || row.posted_by || row.recorded_by_id || row.created_by || row.submitted_by || row.generated_by || row.assignee || row.uploaded_by || row.awarded_by || row.updated_by || row.teacher || row.recorded_by || (row.data && row.data.created_by));
   },
 
   async openForm(moduleId, id) {
@@ -975,7 +980,7 @@ const CRUD = {
     if (!this.canWrite(moduleId)) { toast('Read-only for your role on this page.', 'warning', 5000); return; }
     if (!this.sb) { toast('Database not configured (add Supabase keys in assets/js/config.js).', 'warning', 6000); return; }
     let row = {};
-    if (id) { const { data } = await this.sb.from(d.table).select('*').eq('id', id).maybeSingle(); row = data || {}; }
+    if (id) { const { data,error } = await this.sb.from(d.table).select('*').eq('id', id).maybeSingle();if(error||!data){toast('Access denied or record unavailable. Teachers can edit only records assigned to their subject/class and owned by them.','danger',8000);return;}row=data; }
     if (window.App && !App.isAdminRole(App.currentRole) && row && this.hasOwnershipMarker(row) && !this.isOwnedByCurrent(row)) {
       toast('Access Denied: You can read this record, but only the creator/assigned owner or an admin can edit it.', 'danger', 7000);
       return;
@@ -1079,9 +1084,11 @@ const CRUD = {
     if (!id && ['complaints','helpdesk_tickets'].includes(d.table) && window.SC_PROFILE && SC_PROFILE.id) payload.submitted_by = SC_PROFILE.id;
     if (!id && d.table === 'health' && window.SC_PROFILE && SC_PROFILE.id) { payload.recorded_by_id = SC_PROFILE.id; if (!payload.recorded_by && SC_PROFILE.full_name) payload.recorded_by = SC_PROFILE.full_name; }
     if (!id && ['academic_print_records','reports'].includes(d.table) && window.SC_PROFILE && SC_PROFILE.id) payload.generated_by = SC_PROFILE.id;
+    if(d.table==='report_comments'){payload.comment_source='manual';payload.comment_locked=true;payload.comment_band_id=null;payload.applied_percent=null;}
+    if(window.SC_PROFILE&&SC_PROFILE.id){if(d.table==='digital_library')payload.teacher_id=SC_PROFILE.id;if(d.table==='eresources')payload.uploaded_by=SC_PROFILE.id;if(d.table==='conduct')payload.recorded_by_id=SC_PROFILE.id;if(d.table==='behaviour_points')payload.awarded_by=SC_PROFILE.id;if(d.table==='support_plans')payload.created_by=SC_PROFILE.id;if(d.table==='student_diary')payload.created_by=SC_PROFILE.id;if(['affective_traits','psychomotor_traits','report_comments'].includes(d.table))payload.teacher_id=SC_PROFILE.id;}
     // V6/V4: teacher-owned academic records. Admin can supervise all, but subject teachers
     // should not edit/delete another teacher's records.
-    if (!id && window.SC_PROFILE && SC_PROFILE.id && !(window.App && App.isAdminRole && App.isAdminRole(App.currentRole))) {
+    if (window.SC_PROFILE && SC_PROFILE.id && !(window.App && App.isAdminRole && App.isAdminRole(App.currentRole))) {
       const ownedTables = ['results','assignments','scheme_of_work','lesson_plans','cbt_exams','attendance','health','helpdesk_tickets','reports'];
       if (ownedTables.includes(d.table)) {
         if (!payload.teacher_id) payload.teacher_id = SC_PROFILE.id;
@@ -1098,6 +1105,7 @@ const CRUD = {
     // trigger). Sending it caused: cannot insert a non-DEFAULT value into
     // column "net_pay". We now NEVER send it — the database computes it.
     if (d.table === 'payroll') { delete payload.net_pay; }
+    if(d.table==='fee_payments'&&window.SC_PROFILE){if(!id&&!payload.received_by)payload.received_by=SC_PROFILE.id||null;if(!payload.received_by_name)payload.received_by_name=SC_PROFILE.full_name||SC_PROFILE.email||'';if(!payload.payment_date)payload.payment_date=new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});}
     // ENTERPRISE V11 (issue 13): auto-compute fee balance when blank
     if (d.table === 'fee_payments' && payload.balance == null && payload.fee_total != null) {
       payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
@@ -1116,43 +1124,11 @@ const CRUD = {
     }
     // (res declared below by the self-healing save wrapper)
     
-    // === v5 FIX: Auto-generate admission_no and staff_no starting with school acronym ===
-    const getAcronym = () => {
-      try {
-        const cfg = window.SCHOOL || {};
-        let ac = (cfg.admissionAcronym || cfg.shortName || cfg.name || 'SCH').toString().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8) || 'SCH';
-        return ac;
-      } catch(_) { return 'SCH'; }
-    };
-    if (d.table === 'students' && !id && (!payload.admission_no || String(payload.admission_no).trim()==='')) {
-      try {
-        const ac = getAcronym();
-        // v12: unified with the server-side trigger public.sc_generate_admission_no()
-        // —same <ACR>-NNNNN dash format, same "<ACR>-%" search scope—so UI-created
-        // and DB-triggered (CSV import / SQL) admission numbers share one sequence.
-        const { data: maxRows } = await this.sb.from('students').select('admission_no').ilike('admission_no', ac+'-%').limit(2000);
-        let nextNum = 1;
-        (maxRows || []).forEach(r => {
-          const m = String(r.admission_no || '').match(/(\d+)$/);
-          if (m) nextNum = Math.max(nextNum, parseInt(m[1], 10) + 1);
-        });
-        payload.admission_no = ac + '-' + String(nextNum).padStart(5,'0');
-      } catch(e) { console.warn('auto-admission failed', e.message); }
-    }
-    if (d.table === 'staff' && !id && (!payload.staff_no || String(payload.staff_no).trim()==='')) {
-      try {
-        const ac = getAcronym();
-        // v12: <ACR>-STF-NNNNN — acronym-prefixed, consistent with the DB trigger.
-        // "<ACR>-%" also matches "<ACR>-STF-%", so one query covers legacy and new formats.
-        const { data: maxRows } = await this.sb.from('staff').select('staff_no').ilike('staff_no', ac+'-%').limit(4000);
-        let nextNum = 1;
-        (maxRows || []).forEach(r => {
-          const m = String(r.staff_no || '').match(/(\d+)$/);
-          if (m) nextNum = Math.max(nextNum, parseInt(m[1], 10) + 1);
-        });
-        payload.staff_no = ac + '-STF-' + String(nextNum).padStart(5,'0');
-      } catch(e) {}
-    }
+    // Admission/staff IDs are generated only by PostgreSQL triggers from the
+    // saved school_settings format. Browser-side generation formerly used stale
+    // config.js acronyms (e.g. GSA) and ignored GOSA/YYYY/NNNN settings.
+    if(d.table==='students'&&!id)delete payload.admission_no;
+    if(d.table==='staff'&&!id)delete payload.staff_no;
     // Auto-fill changed_by for role_status_log
     if (d.table === 'role_status_log' && !payload.changed_by) {
       try { payload.changed_by = (window.SC_PROFILE && SC_PROFILE.full_name) || (window.SC_PROFILE && SC_PROFILE.email) || ''; } catch(_){}
@@ -1164,7 +1140,7 @@ const CRUD = {
       const ex = await this.sb.from('parent_child').select('id').eq('parent_id', payload.parent_id).eq('student_id', payload.student_id).maybeSingle().then(r=>r, ()=>({data:null}));
       if (ex.data) { toast('This parent is already linked to this child. Choose another child or update the existing link.', 'warning', 7000); return; }
     }
-    const sharedTables = ['library', 'digital_library', 'gallery', 'eresources', 'events', 'announcements'];
+    const sharedTables = []; // Shared visibility never implies shared edit/delete ownership.
     if (id && window.App && !App.isAdminRole(App.currentRole) && !sharedTables.includes(d.table)) {
       const { data: row } = await this.sb.from(d.table).select('*').eq('id', id).maybeSingle();
       if (row && this.hasOwnershipMarker(row) && !this.isOwnedByCurrent(row)) {
@@ -1172,7 +1148,10 @@ const CRUD = {
         return;
       }
     }
-    const runSave = async (pl) => id ? await this.sb.from(d.table).update(pl).eq('id', id) : await this.sb.from(d.table).insert(pl);
+    // Free-tier guard: operational records store external links, never embedded
+    // file/base64 payloads. CSV/JSON imports are parsed locally and only rows save.
+    const packed=JSON.stringify(payload);if(/data:(?:image|video|audio|application)\//i.test(packed)||/;base64,/i.test(packed)){toast('Direct/embedded file data is disabled. Upload the file to Google Drive or another external host and paste its public link.','danger',9000);return;}
+    const runSave=async(pl)=>{if(id)return await this.sb.from(d.table).update(pl).eq('id',id).select('id').maybeSingle();if(d.table==='students')return await this.sb.from(d.table).insert(pl).select('id,admission_no').single();if(d.table==='staff')return await this.sb.from(d.table).insert(pl).select('id,staff_no').single();return await this.sb.from(d.table).insert(pl);};
     let res = await runSave(payload);
     // ENTERPRISE V6 (issues 16, 26, 32, 35): self-healing writes. If the target
     // database is missing a column (older schema), strip the unknown column —
@@ -1231,6 +1210,7 @@ const CRUD = {
         }
       }
     } catch(e) { console.warn('Notification hook skipped:', e.message || e); }
+    this.invalidateTableCaches(moduleId);
     closeModal();
     if (!id && (moduleId === 'students' || moduleId === 'staff')) {
       const email = moduleId === 'students' ? payload.guardian_email : payload.email;
@@ -1238,8 +1218,8 @@ const CRUD = {
         const role = moduleId === 'students' ? 'student/parent' : 'staff';
         const invite = 'Login invitation for '+(payload.full_name||d.title)+'\nEmail: '+email+'\nRole: '+role+'\nOpen login.html → Request access → use this email → create password → admin approves in Approvals.';
         try { navigator.clipboard && navigator.clipboard.writeText(invite); } catch(e) {}
-        toast('✅ Saved. Login invitation copied. The user must request access, then admin approves.', 'success', 8000);
-      } else toast('✅ Saved. Add an email to generate login invitation details.', 'success', 6000);
+        toast('✅ Saved'+(res.data?.admission_no?' · Admission No: '+res.data.admission_no:res.data?.staff_no?' · Staff ID: '+res.data.staff_no:'')+'. Login invitation copied. The user must request access, then admin approves.','success',8000);
+      }else toast('✅ Saved'+(res.data?.admission_no?' · Admission No: '+res.data.admission_no:res.data?.staff_no?' · Staff ID: '+res.data.staff_no:'')+'. Add an email to generate login invitation details.','success',6000);
     } else toast('✅ Saved.', 'success');
     this.renderList(moduleId);
   },
@@ -1251,18 +1231,14 @@ const CRUD = {
     if (!this.sb) return;
     const { data: doc } = await this.sb.from('module_records').select('*').eq('id', id).maybeSingle();
     if (!doc) { toast('Document not found', 'warning'); return; }
-    const d = doc.data || {}; const sc = window.SCHOOL || {}; const st = window.SC_SETTINGS || {};
+    const d=doc.data||{},sc=window.SCHOOL||{},st=window.SC_SETTINGS||{},docType=(d.custom_type||d.type||doc.title||'Official Document').trim();
     let studentName = d.student || '', studentClass = '';
     if (studentName) {
       try { const { data: stu } = await this.sb.from('students').select('full_name,class').ilike('full_name', studentName).maybeSingle(); if (stu) { studentName = stu.full_name; studentClass = stu.class || ''; } } catch(_){}
     }
     const today = CRUD.formatDate(new Date().toISOString());
     let body = String(doc.body || '').replace(/\[NAME\]/g, studentName || '[NAME]').replace(/\[CLASS\]/g, studentClass || '[CLASS]').replace(/\[DATE\]/g, today);
-    const rawSig = (function(){ try { return localStorage.getItem('sc-signature-url') || ''; } catch(_) { return ''; } })() || st.signature_url || '';
-    const sig = (window.Super && Super.idcard && Super.idcard.driveDirect) ? Super.idcard.driveDirect(rawSig) : rawSig;
-    const pn = (function(){ try { return localStorage.getItem('sc-principal-name') || ''; } catch(_) { return ''; } })() || st.principal_name || 'Principal';
-    const sign = sig ? '<div style="margin-top:34px;text-align:right"><img src="' + esc(sig) + '" referrerpolicy="no-referrer" style="max-width:150px;max-height:70px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><br><b>' + esc(pn) + '</b><br><span style="font-size:.8rem">' + esc(d.type || 'Authorised') + '</span></div>'
-                     : '<div style="margin-top:44px;text-align:right">____________________<br><b>' + esc(pn) + '</b></div>';
+    const role=d.signatory_role||'Principal',people={Principal:[st.principal_name||localStorage.getItem('sc-principal-name')||'Principal',st.signature_url||localStorage.getItem('sc-signature-url')||'','Principal',st.principal_signature_bg_removed!==false],Proprietor:[st.proprietor_name||localStorage.getItem('sc-proprietor-name')||'Proprietor',st.proprietor_signature_url||localStorage.getItem('sc-proprietor-signature')||'','Proprietor',st.proprietor_signature_bg_removed!==false],'Examination Officer':[st.examination_officer_name||localStorage.getItem('sc-exam-officer-name')||'Examination Officer',st.examination_officer_signature_url||localStorage.getItem('sc-exam-officer-signature')||'','Examination Officer',st.examination_officer_signature_bg_removed!==false],Custom:[d.custom_signatory_name||'Authorised Signatory','',d.custom_signatory_title||'Authorised Signatory',true]};const who=people[role]||[role,'',role,true],rawSig=who[1],sig=(window.SCSignature?await SCSignature.prepare(rawSig,who[3]):(window.Super&&Super.idcard?Super.idcard.driveDirect(rawSig):rawSig)),pn=who[0];let tokens={'[NAME]':studentName,'[CLASS]':studentClass,'[TERM]':d.term||'','[SESSION]':d.session||'','[DATE]':today,'[REFERENCE]':d.reference||'','[SCHOOL]':sc.name||'School','[PRINCIPAL]':st.principal_name||'Principal','[PROPRIETOR]':st.proprietor_name||'Proprietor','[EXAM_OFFICER]':st.examination_officer_name||'Examination Officer'};Object.keys(tokens).forEach(k=>body=body.split(k).join(tokens[k]));const sign='<div style="margin-top:34px;text-align:right">'+(sig?'<img src="'+esc(sig)+'" style="max-width:150px;max-height:70px;object-fit:contain;'+(who[3]?'mix-blend-mode:multiply;filter:contrast(1.3)':'')+'"><br>':'')+'<b>'+esc(pn)+'</b><br><span style="font-size:.8rem">'+esc(who[2])+'</span></div>';
     const html = '<div style="max-width:720px;margin:0 auto;font-family:Georgia,serif;color:#111">' +
       '<div style="display:flex;align-items:center;gap:14px;border-bottom:3px double ' + (sc.primary || '#1e2a5e') + ';padding-bottom:12px;margin-bottom:6px">' +
       '<img src="assets/img/logo.' + (sc.logoExt || 'svg') + '" style="width:70px;height:70px;object-fit:contain" onerror="this.style.display=\'none\'">' +
@@ -1271,7 +1247,7 @@ const CRUD = {
       (sc.motto ? '<div style="font-size:.78rem;font-style:italic;color:#7c2d12">Motto: ' + esc(sc.motto) + '</div>' : '') + '</div></div>' +
       '<div style="text-align:right;font-size:.85rem">Date: ' + esc(today) + '</div>' +
       (d.recipient ? '<p style="margin:14px 0 4px"><b>To:</b> ' + esc(d.recipient) + '</p>' : '') +
-      '<h2 style="text-align:center;text-decoration:underline;margin:22px 0 14px;font-size:1.15rem;letter-spacing:1px">' + esc((d.type || doc.title || 'DOCUMENT').toUpperCase()) + '</h2>' +
+      '<h2 style="text-align:center;text-decoration:underline;margin:22px 0 14px;font-size:1.15rem;letter-spacing:1px">' + esc(docType.toUpperCase()) + '</h2>' +
       '<div style="line-height:1.9;white-space:pre-wrap;text-align:justify">' + esc(body) + '</div>' + sign +
       '<p style="margin-top:30px;font-size:.68rem;color:#94a3b8;text-align:center">Generated electronically by ' + esc(sc.name || '') + ' · School Connect</p></div>';
     const w = window.open('', '_blank');
@@ -1380,7 +1356,7 @@ const CRUD = {
     // ENTERPRISE V6 (issue 15): library books are SHARED resources — any staff
     // member with write access may delete them; ownership lock only applies to
     // personal academic records (results, lesson plans, CBT…).
-    const sharedTables = ['library', 'digital_library', 'gallery', 'eresources', 'events', 'announcements'];
+    const sharedTables = []; // Shared visibility never implies shared edit/delete ownership.
     if (window.App && !App.isAdminRole(App.currentRole) && !sharedTables.includes(d.table)) {
       const { data: row } = await this.sb.from(d.table).select('*').eq('id', id).maybeSingle();
       if (row && this.hasOwnershipMarker(row) && !this.isOwnedByCurrent(row)) {
@@ -1389,10 +1365,11 @@ const CRUD = {
       }
     }
     if (!confirm('Delete this ' + d.title.toLowerCase() + '?')) return;
-    const { error } = await this.sb.from(d.table).delete().eq('id', id);
-    if (error) { toast(error.message, 'danger'); return; }
-    if (window.App && App.logActivity) App.logActivity('delete', d.table, id);
-    toast('Deleted.', 'info'); this.renderList(moduleId);
+    const { data:deleted,error } = await this.sb.from(d.table).delete().eq('id', id).select('id');
+    if (error) { toast(error.message, 'danger'); return; }if(!deleted||!deleted.length){toast('Nothing was deleted. You may not own this subject/class record.','danger',7000);return;}
+    this.invalidateTableCaches(moduleId);
+    if(window.App&&App.logActivity)App.logActivity('delete',d.table,id);
+    toast('Deleted permanently and verified.','success');await this.renderList(moduleId);
   },
 
   /* Issue 10: bulk-import student birthdays from the students table */
@@ -1543,8 +1520,10 @@ const CRUD = {
     closeModal(); this.renderList('students'); this.renderList('promotion');
   },
 
+  ensurePortableButton(moduleId){const existing=document.querySelector('[data-portable-export="'+moduleId+'"]');if(existing)return;const csv=[...document.querySelectorAll('button')].find(b=>String(b.getAttribute('onclick')||'').includes("CRUD.exportCSV('"+moduleId+"')"));if(!csv)return;const btn=document.createElement('button');btn.className='btn btn-outline';btn.dataset.portableExport=moduleId;btn.textContent='♻️ Portable JSON';btn.title='Re-importable archive with UUIDs, arrays, JSON and dates preserved';btn.addEventListener('click',()=>this.exportPortable(moduleId));csv.insertAdjacentElement('afterend',btn);},
+  async exportPortable(moduleId){const d=this.def(moduleId);if(!d||!this.sb)return;if(!window.DataPortability){toast('Portable engine is loading; try again in a moment.','info');return;}DataPortability.init(this.sb);try{let filter=d.generic?{column:'module',value:d.module}:null,n=await DataPortability.exportTable(d.table,filter);toast('✅ '+n+' row(s) exported as re-importable portable JSON.','success',7000);}catch(e){toast(e.message||e,'danger');}},
   exportCSV(moduleId) {
-    const d = this.def(moduleId); if (!d || !this.sb) return;
+    this.ensurePortableButton(moduleId);const d = this.def(moduleId); if (!d || !this.sb) return;
     let q = this.sb.from(d.table).select('*');
     if (d.generic) q = q.eq('module', d.module);
     q.then(({ data }) => {

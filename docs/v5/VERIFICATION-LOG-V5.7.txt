@@ -1,0 +1,415 @@
+School Connect V5.7 — cumulative release verification
+==================================================
+[0/6] Installing development-only test dependencies
+[1/6] JavaScript syntax
+Inline JavaScript: 335 script blocks checked, 0 failures
+[2/6] SQL, links, cross-repository parity and critical contracts
+OK   PostgreSQL parses complete-schema.sql — 1220 statements
+OK   PostgreSQL parses demo-seed.sql — 44 top-level statements
+OK   Every demo-seed INSERT column exists in complete schema
+OK   Complete schema contains every focused-upgrade table, column and index
+OK   Complete schema has one authoritative definition per function
+OK   Complete schema contains every focused-upgrade RPC
+OK   Complete schema contains every statically named client RPC — 22 RPCs checked
+OK   Complete schema ends with V5.7 self-sufficiency check
+OK   school-connect-generator: static HTML href/src targets exist
+OK   gosa: static HTML href/src targets exist
+OK   demo-site: static HTML href/src targets exist
+OK   Runtime parity: assets/css/style.css
+OK   Runtime parity: assets/js/cbt-engine.js
+OK   Runtime parity: assets/js/report-engine.js
+OK   Runtime parity: assets/js/crud.js
+OK   Runtime parity: assets/js/site-help.js
+OK   Runtime parity: assets/js/v57-enhancements.js
+OK   Runtime parity: database/complete-schema.sql
+OK   Runtime parity: database/cbt-v5.1-zero-score-hotfix.sql
+OK   Runtime parity: database/cbt-v5.1.1-getter-school-settings-fix.sql
+OK   Runtime parity: database/v5.3-platform-enhancements.sql
+OK   Runtime parity: database/v5.4-portability-cbt-metrics.sql
+OK   Runtime parity: database/v5.5-registered-cbt-identity.sql
+OK   Runtime parity: database/v5.6-daily-fees-cbt-reset-teacher-scope.sql
+OK   Runtime parity: database/demo-seed.sql
+OK   Generator source/template parity: cbt-exam.html
+OK   Generator source/template parity: cbt-multi.html
+OK   Generator source/template parity: cbt.html
+OK   Generator source/template parity: report-cards.html
+OK   Generator source/template parity: student-profile.html
+OK   Generator source/template parity: academic-records.html
+OK   Generator source/template parity: profile.html
+OK   Generator source/template parity: timetable-generator.html
+OK   Generator source/template parity: settings.html
+OK   Generator source/template parity: entrance.html
+OK   Generator source/template parity: exam-register.html
+OK   CBT page displays dynamic school logo/name/motto/contact
+OK   CBT uses explicit V6 getter diagnostics and normalised codes
+OK   V5.1.1 getter tolerates missing optional school settings
+OK   CBT submission is idempotent and original-index aware
+OK   CBT uses admission-enforcing V6 server RPCs and network-first refresh
+OK   Server-authoritative matcher handles legacy aliases, option text and multi-select
+OK   Canonical and v2 compatibility RPCs delegate to V5.1
+OK   Missing answer keys cannot be saved as silent zero
+OK   Public exam removes case-insensitive answer aliases
+OK   Focused existing-database CBT hotfix is present
+OK   Historical saved answers can be regraded with V5.1
+OK   UTME subject tabs + repair persist both question columns
+OK   Report outputs use sample layout classes
+OK   Report Cards routes all three print actions through ReportEngine
+OK   Official reports exclude implicit raw CBT/LMS data and preserve blank cells
+OK   Report grid scopes scores by subject and does not save blank as zero
+OK   Report card prints explicit promotion decision
+OK   Bulk CBT push filters and writes canonical report_scores
+OK   Teachers can own a profile signature used by assigned class reports
+OK   CBT full edit uses platform dropdowns and covers full settings
+OK   Timetable wizard uses controlled dropdowns and clear four-step workflow
+OK   Timetable backend checks availability and cross-class teacher conflicts
+OK   Demo generic amount is explicitly numeric
+OK   Portable JSON/CSV archives are paginated and re-importable
+OK   Every CRUD module exposes a portable JSON companion export
+OK   CBT library is single-list grouped, filterable and archivable
+OK   Student term metrics are enterable and printed on reports
+OK   Report assessment headings and maxima are dynamic admin settings
+OK   Registered CBT mode uses admission-only official identity
+OK   Open/multi-subject CBT never dereferences an unassigned record
+OK   Forgot-password recovery is available and redirects securely
+OK   Navigation icon size is normalized across layouts
+OK   Assistant builds detailed coverage for every current/catalog page
+OK   Rubrics and transcripts have first-user operational guidance
+OK   Term/session academic decision center analyses official report scores
+OK   Daily fees dashboard provides date totals and management breakdowns
+OK   CBT results can be exported then securely reset for reuse
+OK   Teacher edits are subject/class scoped in UI and PostgreSQL RLS
+OK   Demo coverage completion and audit tool exist
+OK   Demo specialised seed has no exam_id ambiguity
+OK   E-receipt matches sample class structure
+OK   Demo alumni seed uses current_occupation (42703 fixed)
+OK   Demo contains multi-subject live test exam
+OK   Demo page-coverage pack exists
+OK   Generator loads binary flyers without UTF-8 corruption
+OK   Modern scaffold copies portal only after logo is generated
+OK   No paid AI API dependency introduced
+
+V5 AUDIT: 83 passed, 0 failed
+{
+  "ok": true,
+  "schema_runs": 2,
+  "public_tables": 100,
+  "required_rpcs": 11,
+  "open_multi_subject": {
+    "ok": true,
+    "candidate": null,
+    "questions": 2
+  },
+  "public_registration": {
+    "reference": "EXREG-C04A0B6AF5"
+  },
+  "demo_seed_runs": 2,
+  "demo_counts": {
+    "students": 18,
+    "roster": 5,
+    "admission_letters": 3,
+    "comment_bands": 6,
+    "campaigns": 1
+  }
+}
+[3/6] Generator packaging contract
+OK  - dedicatedPages declares student-profile
+OK  - dedicatedPages declares cbt-exam
+OK  - dedicatedPages declares cbt-prompts
+OK  - dedicatedPages declares cbt-multi
+OK  - dedicatedPages declares verify-certificate
+OK  - dedicatedPages declares teacher-overview
+OK  - dedicatedPages declares feature-guide
+OK  - dedicatedPages declares about
+OK  - dedicatedPages declares contact
+OK  - dedicatedPages declares apply
+OK  - dedicatedPages declares profile
+OK  - dedicatedPages declares change-password
+OK  - dedicatedPages declares notifications
+OK  - dedicatedPages declares developer
+OK  - dedicatedPages declares voting
+OK  - dedicatedPages declares timetable-generator
+OK  - Generator has dedicated page emitter (zip.file(p.id + '.html'))
+OK  - Generator has module page emitter (pageFileName)
+OK  - Generator has index.html emitter
+OK  - Generator has login.html emitter
+OK  - Generator has dashboard.html emitter
+OK  - Generator has offline.html emitter
+OK  - Generator has service worker emitter
+OK  - Generator has manifest emitter
+OK  - Generator has robots.txt emitter
+OK  - Generator has sitemap.xml emitter
+OK  - Generator has _headers emitter
+OK  - Generator has vercel.json emitter
+OK  - Generator has README emitter
+OK  - Generator bundles assets/js/app.js
+OK  - Present on disk: assets/js/app.js
+OK  - Generator bundles assets/js/crud.js
+OK  - Present on disk: assets/js/crud.js
+OK  - Generator bundles assets/js/cbt-engine.js
+OK  - Present on disk: assets/js/cbt-engine.js
+OK  - Generator bundles assets/js/report-engine.js
+OK  - Present on disk: assets/js/report-engine.js
+OK  - Generator bundles assets/js/notifications.js
+OK  - Present on disk: assets/js/notifications.js
+OK  - Generator bundles assets/js/voting.js
+OK  - Present on disk: assets/js/voting.js
+OK  - Generator bundles assets/js/site-help.js
+OK  - Present on disk: assets/js/site-help.js
+OK  - Generator bundles assets/js/super.js
+OK  - Present on disk: assets/js/super.js
+OK  - Generator bundles assets/js/enterprise.js
+OK  - Present on disk: assets/js/enterprise.js
+OK  - Generator bundles assets/js/pwa-install.js
+OK  - Present on disk: assets/js/pwa-install.js
+OK  - Generator bundles assets/js/analytics.js
+OK  - Present on disk: assets/js/analytics.js
+OK  - Generator bundles database/complete-schema.sql
+OK  - Present on disk: database/complete-schema.sql
+OK  - Generator bundles database/README.md
+OK  - Present on disk: database/README.md
+OK  - Generator bundles database/students_import_template.csv
+OK  - Present on disk: database/students_import_template.csv
+OK  - Generator bundles database/sample-question-bank.csv
+OK  - Present on disk: database/sample-question-bank.csv
+OK  - templates.js exposes T.headconfig()
+OK  - templates.js exposes T.loginPage()
+OK  - templates.js exposes T.dashboard()
+OK  - templates.js exposes T.modulePage()
+OK  - templates.js exposes T.voting()
+OK  - templates.js exposes T.shell()
+OK  - No stray placeholder: assets/css/a
+OK  - No stray placeholder: assets/css/A
+OK  - No stray placeholder: assets/img/a
+OK  - No stray placeholder: assets/img/A
+OK  - No stray placeholder: assets/js/a
+OK  - No stray placeholder: assets/js/A
+OK  - No stray placeholder: database/a
+OK  - No stray placeholder: tools/a
+OK  - No stray placeholder: assets/templates/pages/a
+OK  - Regression guard: manifest uses relative start_url (sub-path safe)
+OK  - Regression guard: service worker precaches ./offline.html (relative)
+OK  - Regression guard: offline.html generation function present
+OK  - Regression guard: uploaded logo is embedded into the ZIP
+OK  - Regression guard: siteUrl flows into SEO files
+OK  - pageFileName map has no duplicate keys
+WARN- MAINTAINER_NOTES.md not found
+
+Summary:
+Verification completed successfully with no failures.
+[4/6] Role navigation/RLS-facing UI contract
+[School Connect Gen v3] catalog loaded — 86 themes, 45 fonts, 7 presets, 97 modules (CBT engine + super features: chatbot, command palette, ID cards, certificates, flyer).
+[School Connect Gen v8] templates loaded.
+Counts: {
+  admin: 109,
+  proprietor: 109,
+  principal: 104,
+  head: 93,
+  bursar: 22,
+  staff: 49,
+  parent: 28,
+  student: 27,
+  total: 109
+}
+OK   - Admin has full oversight
+OK   - Proprietor/owner has full oversight
+OK   - Principal is separated from owner-only pages
+OK   - Head Teacher menu is narrower than Principal
+OK   - Bursar menu is finance-focused, not full admin
+OK   - Principal cannot manage owner identities/system data
+OK   - Head Teacher cannot access finance/settings
+OK   - Bursar retains fees, finance and payroll
+OK   - Bursar cannot access unrelated owner/academic management
+OK   - Staff menu is smaller than owner menu
+OK   - Family menus are smaller than staff menu
+OK   - Parent cannot see approvals
+OK   - Student cannot see approvals
+OK   - Parent cannot see admin-data
+OK   - Student cannot see admin-data
+OK   - Parent cannot see storage
+OK   - Student cannot see storage
+OK   - Parent cannot see payroll
+OK   - Student cannot see payroll
+OK   - Parent cannot see settings
+OK   - Student cannot see settings
+OK   - Student sees cbt-exam
+OK   - Student sees assignments
+OK   - Student sees results
+OK   - Student sees timetable
+OK   - Student sees student-profile
+OK   - Student sees feature-guide
+OK   - Runtime contains separated leadership navigation contract
+OK   - Stale browser role map is cleared when database map is empty
+Role navigation verification passed.
+OK - schema proprietor_signature_url
+OK - schema examination_officer_signature_url
+OK - schema principal_signature_bg_removed
+OK - signature background removal
+OK - exam officer signature saves globally
+OK - principal signature on reports
+OK - public campaign SQL
+OK - public campaign UI
+OK - registration CSV extraction
+OK - custom document type/signatory
+OK - document type absent beneath signature
+OK - performance comment automation/manual lock
+OK - separated role navigation
+OK - stale role map cleanup
+OK - registered values become dropdowns
+OK - owner SQL boundary
+V5.7 professional audit: 16 passed
+[5/6] CBT scoring/tabs and sample-document workflows
+OK  - multi builder stores subject_breakdown fallback metadata
+OK  - CBT engine can recover tabs from subject_breakdown metadata
+OK  - two subjects detected
+OK  - tabs contain both subjects
+OK  - math palette excludes English question text and has two buttons
+OK  - english palette excludes Mathematics label and has two buttons
+OK  - goSubject switches to first English question
+OK  - nextInSubject stays inside English
+OK  - prevInSubject stays inside English
+
+CBT V5 subject tab simulation: 9 passed, 0 failed.
+OK  - MCQ letter matches
+OK  - MCQ option text matches stored letter
+OK  - stored option text matches selected letter
+OK  - true/false aliases normalise and grade
+OK  - numeric tolerance grades
+OK  - multi-select requires full set
+OK  - mixed exam scores every correct answer
+OK  - legacy/case-insensitive answer keys normalise
+OK  - published CorrectAnswer CSV format parses and validates
+OK  - missing answer key is blocked before publish
+OK  - subject metadata recovery creates two stable groups
+CBT scoring tests: 11 passed
+{
+  "ok": true,
+  "engine": "v5.1.0",
+  "score": 10,
+  "total": 10,
+  "percent": 100,
+  "correct": 5,
+  "normalised_code_getter": "TEST-V51",
+  "explicit_not_open_diagnostic": "not_open",
+  "open_multi_subject_identity": {
+    "ok": true,
+    "candidate": null,
+    "questions": 5
+  },
+  "registered_identity": {
+    "required": "admission_required",
+    "name": "Official Student",
+    "stored_name": "Official Student"
+  },
+  "diagnostic": {
+    "ok": true,
+    "code": "TEST-V51",
+    "exam_id": "33333333-3333-4333-8333-333333333333",
+    "bank_source": "csv_data",
+    "engine_version": "v5.1.0",
+    "gradable_count": 5,
+    "question_count": 5,
+    "manual_review_count": 0,
+    "missing_answer_indexes": []
+  },
+  "idempotent": true,
+  "historical_regrade": {
+    "ok": true,
+    "exam_id": "33333333-3333-4333-8333-333333333333",
+    "engine_version": "v5.1.0",
+    "regraded_count": 1,
+    "skipped_no_answer_rows": 0,
+    "skipped_missing_key_rows": 0
+  },
+  "missing_key_guard": "answer_key_missing",
+  "public_answer_keys_redacted": true,
+  "school_name": "Test School"
+}
+OK  - sample grading threshold is exact
+OK  - unentered assessment cells print dash, not zero
+OK  - report card has identity/domains/signatures and explicit promotion
+OK  - CBT-only report adapts active maximum without manual CA/exam
+OK  - report headings follow flexible admin column settings
+OK  - class broadsheet has rotated subjects and automatic positions
+OK  - subject broadsheet has all four statistics and seal
+Report output tests: 7 passed
+OK  - bulk push skips legacy unverified result
+OK  - single result scales percent to destination maximum
+OK  - multi-subject breakdown creates separate subject rows
+OK  - bulk writes canonical report_scores fields only
+Bulk CBT report push tests: 4 passed
+{
+  "ok": true,
+  "placed": 5,
+  "unplaced": 0,
+  "restricted_days_respected": true,
+  "cross_class_teacher_conflict_avoided": true,
+  "break_period_type": "numeric"
+}
+{
+  "ok": true,
+  "inserted": 12,
+  "amount_type": "numeric",
+  "null_amount_cast_passed": true
+}
+Demo coverage: 80/80 CRUD modules plus 16 specialised datasets covered
+{
+  "ok": true,
+  "scope": {
+    "own_subject": true,
+    "foreign_record": false,
+    "own_class": true,
+    "other_subject": false
+  },
+  "non_owner_clear_denied": true,
+  "owner_clear_deleted": 1
+}
+OK  - CSV round-trip preserves quoted commas/quotes
+OK  - CSV round-trip restores booleans/numbers/JSON
+OK  - portable envelope is self-identifying and table-aware
+OK  - generated columns are removed before re-import
+OK  - dependency import order puts identities/parents first
+Data portability tests: 5 passed
+OK  - entrance page has examination officer signature fields
+OK  - entrance outputs use examination officer signature/name
+OK  - e-receipt print uses sample receipt CSS/classes
+OK  - e-receipt includes a clear authenticity/sample note
+OK  - fee balance auto-computed in JS and persisted
+OK  - fee balance DB trigger present
+OK  - report engine uses sample report class names
+OK  - class broadsheet uses sample landscape classes
+OK  - subject broadsheet uses sample stats/signature layout
+OK  - sample files are bundled/present
+OK  - information drop notification map includes family/staff/student modules
+OK  - phone notification pathway remains PWA push capable
+
+SchoolConnect V6 enterprise verification: 12 passed, 0 failed.
+[6/6] Real traditional + modern ZIP generation
+[School Connect Gen v3] catalog loaded — 86 themes, 45 fonts, 7 presets, 97 modules (CBT engine + super features: chatbot, command palette, ID cards, certificates, flyer).
+[School Connect Gen v8] templates loaded.
+[School Connect Gen v8] Generator loaded — full page generation pipeline.
+[Generator] SKIP duplicate page file "cbt-prompts.html" from module "cbt-prompts" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "timetable-generator.html" from module "timetable-generator" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "settings.html" from module "settings" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "voting.html" from module "voting" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "ecosystem.html" from module "ecosystem_products" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "school-fees.html" from module "school_fees" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "school-products.html" from module "school_products" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "status-manager.html" from module "status_manager" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "hmg-digital-products.html" from module "hmg_digital_products" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "developer.html" from module "developer" — already emitted. Catalog alias collision.
+[Generator] Build complete. ZIP entries: 185 | orphans: 0 | broken links: 0
+{"kind":"traditional","entries":185,"bytes":4236678,"orphans":0,"brokenLinks":0,"missing":[]}
+[Generator] SKIP duplicate page file "cbt-prompts.html" from module "cbt-prompts" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "timetable-generator.html" from module "timetable-generator" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "settings.html" from module "settings" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "voting.html" from module "voting" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "ecosystem.html" from module "ecosystem_products" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "school-fees.html" from module "school_fees" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "school-products.html" from module "school_products" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "status-manager.html" from module "status_manager" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "hmg-digital-products.html" from module "hmg_digital_products" — already emitted. Catalog alias collision.
+[Generator] SKIP duplicate page file "developer.html" from module "developer" — already emitted. Catalog alias collision.
+[Generator] Build complete. ZIP entries: 391 | orphans: 0 | broken links: 0
+{"kind":"modern","entries":391,"bytes":8482839,"orphans":0,"brokenLinks":0,"missing":[]}
+==================================================
+School Connect V5.7 verification PASSED

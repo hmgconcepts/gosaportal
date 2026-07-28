@@ -97,8 +97,8 @@
 - Modern scaffold copied the portal before logo/README creation, leaving `modern/public` incomplete. Copy now occurs last.
 - Generator template drift could emit its own marketing index and dead builder links into a client ZIP. Client templates were restored; rich critical templates are parity-tested.
 - Integrity auditor did not normalise `./` paths in modern output. Fixed path normalisation.
-- Traditional build: 183 entries, 0 broken links, 0 orphans.
-- Modern build: 387 entries, 0 broken links, 0 orphans.
+- Traditional build: 190 entries, 0 broken links, 0 orphans.
+- Modern build: 401 entries, 0 broken links, 0 orphans.
 - Module counter was corrected from 96 to the actual 97 catalogue records.
 
 ## Other runtime faults
@@ -106,6 +106,34 @@
 - `site-help.js` contained two unescaped single-quote syntax errors; the help assistant could fail on every page. Fixed and removed the inline close handler.
 - Static service workers reused an old literal cache and JavaScript could remain stale. Cache version was bumped and JS/HTML now revalidate.
 - Browser/schema contract columns were reconciled additively for staff, parents, conduct, health, promotion, complaints, birthdays, behaviour, inventory, substitutions, trait data and admission links.
+
+## V5.6 daily fees, CBT reuse, teacher permissions and demo completeness
+
+### Root causes
+
+- Fees exposed cumulative figures and receipts but had no authoritative school-day field or day-by-day reconciliation view.
+- Reusing an exam left previous `cbt_results` in place, so attempt limits and result lists still treated old candidates as active; there was no safe export-first reset.
+- Several legacy RLS policies treated all staff as broad writers, while browser-only access maps could become stale. Teachers could therefore reach records beyond their actual subject/class assignment, or the UI could report a successful update when PostgreSQL changed no row.
+- Demo coverage depended on a generic seed but specialised pages such as QR check-in, roster, letters, timetable runs, LMS and security/audit views still lacked purpose-built examples.
+
+### Fix
+
+- Added `fee_payments.payment_date`, Lagos-time backfill/indexes and collector identity. Fees now shows selected day, previous day, month-to-date, transaction/average figures, method/class/collector breakdowns, ledger and date-specific CSV.
+- Added `cbt_clear_exam_results`. The UI first downloads an exam/roster/result package, then requires the exact exam code and final confirmation. Only admin-like roles or the exam creator can clear. Previously pushed `report_scores` deliberately remain for separate audit.
+- Added `teacher_can_manage_subject_class` and `teacher_can_manage_student`; rebuilt write policies for academic, CBT, report, trait, resource, conduct, support, diary and term-metric records. Teacher ownership is stamped automatically, unauthorized zero-row writes are reported, and admin roles retain full control.
+- Locked school structure to administrators and added an explicit one-time claim path for genuinely unowned legacy rows by the assigned teacher.
+- Added specialised demo rows and `tools/audit-demo-coverage.py`. Verification reports **80/80 CRUD modules plus 16 specialised datasets covered**.
+
+## V5.6.1 complete-schema and SQL runtime repairs
+
+- Consolidated `complete-schema.sql` so every public function has one authoritative definition and every focused-upgrade RPC is included.
+- Added a final self-sufficiency assertion for critical V5.6.1 tables/RPCs and a final PostgREST cache reload.
+- Executed the complete schema twice against the same PostgreSQL-compatible database to prove re-run safety.
+- Fixed `cbt_get_public_exam_v6`: open/multi-subject examinations with no admission number now return `candidate: null` rather than reading an unassigned PL/pgSQL record.
+- Hardened `cbt_submit_v6` with typed rows and qualified identity/roster lookups while preserving registered-exam enforcement.
+- Fixed demo PostgreSQL `42702` by renaming the local `exam_id` variable to `v_exam_id` and qualifying roster/result references.
+- Executed `demo-users.sql` and `demo-seed.sql` twice; roster and admission-letter data remain populated.
+- Generated clients now contain only `complete-schema.sql` as production SQL; demo mode adds only `demo-users.sql` and `demo-seed.sql`.
 
 ## Files requiring redeployment
 
@@ -120,3 +148,20 @@ At minimum deploy the complete repositories. The critical runtime set is:
 - `sw.js`, `_headers`, `vercel.json`
 
 Running the new frontend without rerunning `complete-schema.sql` leaves the old scorer in the database and will not solve zero marks.
+
+## V5.7 final professional audit
+
+- Added principal/proprietor/examination-officer school-wide Drive signature links and background-removal flags/tooling.
+- Replaced the broken public-link prompt/direct insert with editable campaign records, public RPCs, deadline handling, export, deactivate and delete.
+- Corrected Custom Document Builder's signatory block and added custom type, institutional signatory, references and placeholders.
+- Added educator-approved performance comment bands calculated from official report totals, with manual-comment locks.
+- Separated proprietor, principal, head teacher and bursar navigation; removed broad direct-page bypass and stale access-map persistence.
+- Normalized registered class/subject/department/arm/campus/term/session form fields to dropdowns.
+- Added owner-only site-license/role-status policy and leadership-managed settings/campaign policy.
+
+## V5.8 deletion, IDs and free-tier fixes
+- Default lookups now bootstrap once only; schema reruns do not resurrect deleted sessions.
+- Verified affected-row deletes, post-delete checks, cache invalidation and one-minute cache expiry added across CRUD and custom pages.
+- Admission/staff IDs are generated only by PostgreSQL from current school settings.
+- Storage Efficiency Centre, quota/retention policy, external-media audit and safe candidate analysis added.
+- New embedded media/Base64 writes are blocked; certificate/drawn signatures are link/local-download based.
