@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Analytics • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Analytics. Comprehensive school management platform.">
-<meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -62,13 +62,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Analytics. Comprehensive school management platform.">
-    <meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://2gosaportal.pages.dev/analytics.html">
+    <link rel="canonical" href="https://gosasite.vercel.app/analytics.html">
     <meta property="og:title" content="Analytics • God of Seed Academy">
     <meta property="og:description" content="God of Seed Academy — Analytics. Comprehensive school management platform.">
-    <meta property="og:url" content="https://2gosaportal.pages.dev/analytics.html">
+    <meta property="og:url" content="https://gosasite.vercel.app/analytics.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
     <meta name="twitter:card" content="summary_large_image">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -493,6 +493,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="card"><h3>📊 Income vs Expense Monthly Trend</h3><div style="height:240px"><canvas id="an-finance-trend"></canvas></div></div>
       <div class="card"><h3>⏰ Staff Check-In & Lateness Analysis</h3><div style="height:240px"><canvas id="an-staff-lateness"></canvas></div></div>
     </div>
+    <div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe">
+      <h2 style="margin-top:0">🎓 Term / Session Academic Performance Decision Center</h2>
+      <p>Analyse official pushed/entered report scores across all students, subjects and classes. Use this after each term/session examination to identify strengths, weak subjects, class gaps and learners needing support.</p>
+      <div class="grid grid-4"><div class="form-group"><label>Session</label><select class="form-select" id="ai-session"><option value="">All sessions</option></select></div><div class="form-group"><label>Term</label><select class="form-select" id="ai-term"><option value="">All terms</option></select></div><div class="form-group"><label>Class</label><select class="form-select" id="ai-class"><option value="">All classes</option></select></div><div class="form-group"><label>Subject</label><select class="form-select" id="ai-subject"><option value="">All subjects</option></select></div></div>
+      <button class="btn btn-primary" onclick="AN.loadAcademicInsights()">Analyse performance</button> <button class="btn btn-outline" onclick="AN.exportAcademicInsights()">Export analysis JSON</button>
+      <div id="ai-output" style="margin-top:14px"><span class="pulse">Loading official academic performance…</span></div>
+    </div>
     <div class="card" style="margin-bottom:16px">
       <h3>🏆 Top 10 students</h3>
       <div id="an-top-students">Loading…</div>
@@ -567,7 +574,7 @@ const AN={
       set('an-news', (news||[]).filter(n=> (n.created_at||'') >= new Date(Date.now()-7*86400000).toISOString()).length);
       set('an-unread', (unread||[]).filter(n=>!n.read_by || n.read_by.length===0).length);
       this.renderAll(fees||[], att||[], cbt||[], classes||[], staff||[], subjects||[], students||[], finance||[], checkins||[]);
-      await this.renderTopStudents();
+      await this.initAcademicFilters();await this.loadAcademicInsights();
     }catch(e){
       console.warn('Analytics load failed', e);
       document.querySelectorAll('[id^="an-"]').forEach(el => el.textContent = '—');
@@ -622,6 +629,9 @@ const AN={
     if(this.charts[id]) try{this.charts[id].destroy();}catch(_){}
     this.charts[id] = new Chart(cv, {type, data, options: Object.assign({responsive:true, maintainAspectRatio:false}, opts||{})});
   },
+  async initAcademicFilters(){if(this._academicFiltersReady)return;const [p,c,s]=await Promise.all([sb.from('academic_periods').select('term,session').order('starts_on',{ascending:false}),sb.from('classes').select('name').order('name'),sb.from('subjects').select('name').order('name')]);const fill=(id,vals,label)=>{const e=document.getElementById(id);if(e)e.innerHTML='<option value="">All '+label+'</option>'+[...new Set(vals.filter(Boolean))].map(v=>'<option value="'+this.esc(v)+'">'+this.esc(v)+'</option>').join('');};fill('ai-session',(p.data||[]).map(x=>x.session),'sessions');fill('ai-term',(p.data||[]).map(x=>x.term),'terms');fill('ai-class',(c.data||[]).map(x=>x.name),'classes');fill('ai-subject',(s.data||[]).map(x=>x.name),'subjects');this._academicFiltersReady=true;},
+  async loadAcademicInsights(){const val=id=>(document.getElementById(id)||{}).value||'',session=val('ai-session'),term=val('ai-term'),cls=val('ai-class'),subject=val('ai-subject'),host=document.getElementById('ai-output');let q=sb.from('report_subject_totals').select('*').limit(20000);if(session)q=q.eq('session',session);if(term)q=q.eq('term',term);if(cls)q=q.eq('class',cls);if(subject)q=q.eq('subject',subject);const r=await q;if(r.error){host.innerHTML='<div class="notice notice-error">'+this.esc(r.error.message)+'</div>';return;}const rows=r.data||[];this.academicExport={filters:{session,term,class:cls,subject},rows,generated_at:new Date().toISOString()};if(!rows.length){host.innerHTML='<div class="notice">No official report scores match these filters. Bulk-push CBT scores or enter assessment scores first.</div>';document.getElementById('an-top-students').innerHTML='<p>No official scores.</p>';document.getElementById('an-low-students').innerHTML='<p>No official scores.</p>';return;}const avg=a=>a.length?a.reduce((x,y)=>x+Number(y.percent||0),0)/a.length:0,schoolAvg=avg(rows),pass=rows.filter(x=>Number(x.percent)>=50).length/rows.length*100,studentMap={},classMap={},subjectMap={};rows.forEach(x=>{const sk=x.student_id||x.student_id_ref||x.student_name;(studentMap[sk]||(studentMap[sk]={name:x.student_name||sk,class:x.class,values:[]})).values.push(Number(x.percent||0));(classMap[x.class]||(classMap[x.class]=[])).push(Number(x.percent||0));(subjectMap[x.subject]||(subjectMap[x.subject]=[])).push(Number(x.percent||0));});const students=Object.values(studentMap).map(x=>({...x,avg:avg(x.values)})).sort((a,b)=>b.avg-a.avg),classes=Object.entries(classMap).map(([name,v])=>({name,avg:avg(v)})).sort((a,b)=>b.avg-a.avg),subjects=Object.entries(subjectMap).map(([name,v])=>({name,avg:avg(v),pass:v.filter(x=>x>=50).length/v.length*100})).sort((a,b)=>b.avg-a.avg);this.academicExport.summary={school_average:schoolAvg,pass_rate:pass,student_count:students.length,class_count:classes.length,subject_count:subjects.length,students,classes,subjects};const table=(title,data,extra)=>'<div><h4>'+title+'</h4><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Average</th>'+(extra?'<th>Pass rate</th>':'')+'</tr></thead><tbody>'+data.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+this.esc(x.name)+'</td><td><b>'+x.avg.toFixed(1)+'%</b></td>'+(extra?'<td>'+x.pass.toFixed(1)+'%</td>':'')+'</tr>').join('')+'</tbody></table></div></div>';host.innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+schoolAvg.toFixed(1)+'%</div><div class="stat-label">School average</div></div><div class="stat-card"><div class="stat-value">'+pass.toFixed(1)+'%</div><div class="stat-label">Subject pass rate</div></div><div class="stat-card"><div class="stat-value">'+students.length+'</div><div class="stat-label">Students analysed</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Student-subject records</div></div></div><div class="grid grid-2">'+table('Class performance',classes,false)+table('Subject performance',subjects,true)+'</div><div class="notice" style="margin-top:10px">Decision guide: prioritise subjects/classes below 50%; compare pass rate and average; review learners in the at-risk table; document intervention and re-check next term.</div>';const studentRows=(arr,status)=>'<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Student</th><th>Class</th><th>Average</th><th>Status</th></tr></thead><tbody>'+arr.map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+this.esc(x.name)+'</b></td><td>'+this.esc(x.class||'')+'</td><td>'+x.avg.toFixed(1)+'%</td><td>'+status(x.avg)+'</td></tr>').join('')+'</tbody></table></div>';document.getElementById('an-top-students').innerHTML=studentRows(students.slice(0,10),x=>x>=80?'Excellent':x>=70?'Very good':'Good');document.getElementById('an-low-students').innerHTML=studentRows(students.slice().sort((a,b)=>a.avg-b.avg).slice(0,10),x=>x<40?'Critical':x<50?'At risk':'Monitor');},
+  exportAcademicInsights(){if(!this.academicExport){toast('Run the academic analysis first.','warning');return;}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(this.academicExport,null,2)],{type:'application/json'}));a.download='academic-performance-'+new Date().toISOString().slice(0,10)+'.json';a.click();},
   async renderTopStudents(){
     const box = document.getElementById('an-top-students');
     try{

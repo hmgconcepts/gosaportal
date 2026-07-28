@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Admin Data • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Admin Data. Comprehensive school management platform.">
-<meta name="keywords" content="$1">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Admin Data • God of Seed Academy">
-<meta property="og:description" content="$1 — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -62,7 +62,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Admin Data. Comprehensive school management platform.">
-    <meta name="keywords" content="$1">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./admin-data.html">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -473,6 +473,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <label class="btn btn-outline">⬆ Restore from backup<input type="file" accept=".json" hidden onchange="DataTools.restore(event)"></label>
         </div>
       </div>
+      <div class="card" style="margin-bottom:16px" data-admin-only>
+        <h3>♻️ Portable Data Archive Center</h3>
+        <p style="color:var(--gray-600)"><b>Every machine-readable export can come back.</b> Portable JSON preserves UUIDs, dates, arrays and JSON fields for later restoration/analysis; CSV remains available for spreadsheets and can be re-imported into the selected table. Files are processed locally and are never stored in Supabase.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="DataTools.portableFull()">⬇ Export all portable JSON</button><button class="btn btn-outline" onclick="DataTools.portableSelected()">⬇ Export selected table JSON</button><button class="btn btn-outline" onclick="DataTools.choosePortableImport()">⬆ Import JSON / CSV with preview</button></div>
+        <div class="notice" style="margin-top:10px;background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>Auth note:</b> profile UUIDs belong to Supabase Auth users. A full archive restores most reliably into the same project. On a new project, create/adopt users first, then import operational tables.</div>
+        <div id="dt-portable-report"></div>
+      </div>
       <div class="card">
         <h3>🔎 Browse & delete a table</h3>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:10px">
@@ -495,6 +502,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
+<script src="assets/js/data-portability.js"></script>
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
@@ -515,7 +523,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </script>
 <script>
 const DataTools = {
-  TABLES: ["students","staff","classes","subjects","attendance","results","fee_payments","finance_entries","cbt_exams","cbt_results","assessment_columns","report_scores","report_cards","polls","poll_votes","announcements","events","messages","complaints","admissions","donations","activity_log","profiles","parent_child","academic_periods","certificates"],
+  TABLES: (window.DataPortability&&DataPortability.TABLES)||["students","staff","classes","subjects","attendance","results","fee_payments","cbt_exams","cbt_results","assessment_columns","report_scores","report_cards"],
+  init(){if(window.DataPortability)DataPortability.init(sb);const sel=document.getElementById('dt-table');if(sel){const keep=sel.value;sel.innerHTML=this.TABLES.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');if(this.TABLES.includes(keep))sel.value=keep;}},
+  async portableFull(){try{toast('Preparing paginated portable archive…','info');const env=await DataPortability.exportFull(this.TABLES);toast('✅ Exported '+env.meta.row_count+' rows from '+env.meta.table_count+' tables.','success',7000);}catch(e){toast(e.message||e,'danger',9000);}},
+  async portableSelected(){const t=document.getElementById('dt-table').value;try{const n=await DataPortability.exportTable(t);toast('✅ '+n+' '+t+' row(s) exported as re-importable JSON.','success');}catch(e){toast(e.message||e,'danger');}},
+  choosePortableImport(){const inp=document.createElement('input');inp.type='file';inp.accept='.json,.csv,application/json,text/csv';inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{const archive=await DataPortability.inspectFile(f,document.getElementById('dt-table').value),summary=Object.entries(archive.tables).map(([t,r])=>'<tr><td>'+esc(t)+'</td><td>'+r.length+'</td></tr>').join('');DataTools._pendingArchive=archive;openModal('Preview portable import','<p><b>File:</b> '+esc(f.name)+'</p><div class="table-wrap"><table><thead><tr><th>Table</th><th>Rows</th></tr></thead><tbody>'+summary+'</tbody></table></div><p>No file is uploaded. Import uses chunked upserts and reports every failed table.</p>','<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-outline" onclick="DataTools.analysePendingArchive()">Analyse locally (no import)</button><button class="btn btn-primary" onclick="DataTools.runPortableImport()">Import / update these rows</button>');}catch(e){toast('Cannot read archive: '+(e.message||e),'danger',10000);}};inp.click();},
+  analysePendingArchive(){const a=this._pendingArchive;if(!a)return;const summaries=Object.entries(a.tables).map(([t,rows])=>{const nums={};(rows||[]).forEach(r=>Object.entries(r).forEach(([k,v])=>{if(typeof v==='number'&&Number.isFinite(v)){const x=nums[k]||(nums[k]={sum:0,min:v,max:v,n:0});x.sum+=v;x.min=Math.min(x.min,v);x.max=Math.max(x.max,v);x.n++;}}));const metrics=Object.entries(nums).slice(0,5).map(([k,x])=>esc(k)+': avg '+(x.sum/x.n).toFixed(2)+' · '+x.min+'–'+x.max).join('<br>');return'<tr><td>'+esc(t)+'</td><td>'+rows.length+'</td><td>'+metrics+'</td></tr>';}).join('');openModal('Local archive analysis','<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534">The archive is analysed in this browser only. No rows have been uploaded to Supabase.</div><div class="table-wrap"><table><thead><tr><th>Dataset</th><th>Rows</th><th>Numeric overview</th></tr></thead><tbody>'+summaries+'</tbody></table></div>','<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="DataTools.runPortableImport()">Import archive</button>');},
+  async runPortableImport(){if(!this._pendingArchive)return;closeModal();toast('Importing archive in dependency order…','info');const report=await DataPortability.importArchive(this._pendingArchive,'upsert');document.getElementById('dt-portable-report').innerHTML=DataPortability.reportHTML(report);if(App&&App.logActivity)App.logActivity('portable-import','platform',report.reduce((a,x)=>a+x.saved,0)+' rows');toast('Portable import completed. Review the table report.','success',7000);this._pendingArchive=null;this.view();},
   async view(){
     if(!sb){ toast('Database not configured.','warning'); return; }
     const t=document.getElementById('dt-table').value;
@@ -530,20 +544,10 @@ const DataTools = {
   },
   async del(table,id){
     if(!confirm('Permanently delete this record from '+table+'?'))return;
-    const { error } = await sb.from(table).delete().eq('id',id);
-    if(error){ toast(error.message,'danger'); return; }
-    if(App&&App.logActivity)App.logActivity('delete',table,id);
-    toast('Deleted.','info'); DataTools.view();
+    const r=await SCDelete.byId(sb,table,id);if(!r.ok){toast(r.error,'danger');return;}if(App&&App.logActivity)App.logActivity('delete',table,id);toast('Deleted permanently and verified.','success');DataTools.view();
   },
-  async exportTable(){
-    const t=document.getElementById('dt-table').value;
-    const { data } = await sb.from(t).select('*');
-    if(!data||!data.length){ toast('Nothing to export.','warning'); return; }
-    const cols=Object.keys(data[0]);
-    const csv=[cols.join(',')].concat(data.map(r=>cols.map(c=>'"'+String(r[c]==null?'':JSON.stringify(r[c])).replace(/^"|"$/g,'').replace(/"/g,'""')+'"').join(','))).join('\n');
-    const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=t+'.csv'; a.click();
-  },
-  importCSV(){ const t=document.getElementById('dt-table').value; const inp=document.createElement('input'); inp.type='file'; inp.accept='.csv,text/csv'; inp.onchange=()=>{const f=inp.files[0]; if(!f)return; const r=new FileReader(); r.onload=async()=>{const rows=DataTools.parseCSV(String(r.result)); if(rows.length<2){toast('CSV is empty','warning');return;} const head=rows[0]; const recs=rows.slice(1).filter(x=>x.some(v=>v)).map(row=>{const o={}; head.forEach((h,i)=>{let v=row[i]; if(v==='')return; try{ if((v||'').match(/^[[{]/)) v=JSON.parse(v); }catch(e){} o[h]=v;}); return o;}); const {error}=await sb.from(t).upsert(recs); if(error){toast(error.message,'danger');return;} toast('Imported '+recs.length+' row(s) into '+t,'success'); DataTools.view();}; r.readAsText(f);}; inp.click();},
+  async exportTable(){const t=document.getElementById('dt-table').value;try{const n=await DataPortability.exportCSV(t);toast('✅ '+n+' row(s) exported. Select the same table and use Import to restore this CSV.','success',7000);}catch(e){toast(e.message||e,'danger');}},
+  importCSV(){this.choosePortableImport();},
   parseCSV(text){
     const rows=[]; let r=[],c='',q=false;
     for(let i=0;i<text.length;i++){
@@ -557,16 +561,7 @@ const DataTools = {
     if(c||r.length){ r.push(c); rows.push(r); }
     return rows;
   },
-  async backupAll(){
-    if(!sb){ toast('Database not configured.','warning'); return; }
-    toast('Backing up… this may take a moment.','info');
-    const dump={ _meta:{ school:(window.SCHOOL&&window.SCHOOL.name)||'', at:new Date().toISOString(), version:'gen-v2' } };
-    for(const t of this.TABLES){ try{ const { data } = await sb.from(t).select('*'); dump[t]=data||[]; }catch(e){ dump[t]=[]; } }
-    const blob=new Blob([JSON.stringify(dump,null,2)],{type:'application/json'});
-    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='school-backup-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
-    if(App&&App.logActivity)App.logActivity('backup','platform','full');
-    toast('✅ Backup downloaded.','success');
-  },
+  async backupAll(){return this.portableFull();},
   restore(ev){
     const f=ev.target.files[0]; if(!f)return;
     const r=new FileReader();
@@ -582,4 +577,5 @@ const DataTools = {
     r.readAsText(f);
   }
 };
+document.addEventListener('DOMContentLoaded',()=>DataTools.init());if(document.readyState!=='loading')DataTools.init();
 </script></body></html>

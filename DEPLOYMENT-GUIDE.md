@@ -7,14 +7,12 @@ This guide has **two parts**:
 
 Everything uses **free tools only**. No credit card, no monthly fees, no AI APIs.
 
-> ## CBT V5.1 existing-database requirement
-> If correct attempts currently record zero, stop new sittings, back up Supabase,
-> run **`database/cbt-v5.1-zero-score-hotfix.sql`**, then deploy the matching V5.1
-> CBT pages/engine. The candidate page deliberately refuses to start against an
-> old engine. In CBT Manager use **Diagnose Scoring** and **Repair Scoring** on
-> legacy exams. If the getter specifically reports `column "motto" does not exist`,
-> run `database/cbt-v5.1.1-getter-school-settings-fix.sql`. Fresh projects run only
-> `complete-schema.sql`, which includes both repairs.
+> **V5.6.1 ONE-SQL RULE:** back up Supabase and run the entire
+> `database/complete-schema.sql` for a fresh install or any upgrade. It includes
+> every earlier focused pack and is safe to re-run. Do not run versioned/focused
+> SQL afterward. Only a separate demo project additionally runs `demo-users.sql`
+> and `demo-seed.sql`.
+
 
 ---
 
@@ -140,3 +138,9 @@ Run `database/complete-schema.sql` once in Supabase SQL Editor for a fresh deplo
 > eliminating all "table not found in schema cache" and "ON CONFLICT" errors permanently.
 > The former merged file is kept for reference as `database/complete-schema-v11-LEGACY-MERGED.sql`.
 > Do not run legacy/migration SQL files after the v12 schema — they are superseded.
+
+## V5.5 authentication/report setup
+After deployment, add `https://YOUR-DOMAIN/change-password.html?recovery=1` to Supabase Authentication Redirect URLs. Registered CBT exams use admission number only and resolve official learner identity. Report headings/maxima come directly from Report Cards assessment-column settings; review/edit unusual maxima before publishing reports.
+
+## V5.6.1 complete schema / CBT / demo SQL repair
+Run the full updated `database/complete-schema.sql`; it now includes all V5.1–V5.6.1 SQL, the open/multi-subject unassigned-record repair, Lagos daily fees, CBT reset and teacher RLS. Do not run any focused SQL afterward. The demo seed `exam_id` ambiguity is fixed; run demo users/seed only in the demo project.

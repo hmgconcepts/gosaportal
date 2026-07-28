@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Academic Setup • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Academic Setup. Comprehensive school management platform.">
-<meta name="keywords" content="$1">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Academic Setup • God of Seed Academy">
-<meta property="og:description" content="$1 — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Comprehensive school management platform">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -62,7 +62,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Academic Setup. Comprehensive school management platform.">
-    <meta name="keywords" content="$1">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./academic_setup.html">
@@ -468,7 +468,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="grid grid-2">
         <div class="card"><h3>🏢 Departments</h3><div class="form-group"><label>Department name</label><input class="form-input" id="as-dept" placeholder="Science"></div><div class="form-group"><label>Head of department</label><input class="form-input" id="as-head" placeholder="optional"></div><button class="btn btn-primary" onclick="AS.addDepartment()">Add Department</button><div id="as-depts" style="margin-top:12px"></div></div>
         <div class="card"><h3>📅 Terms / Sessions / Arms</h3><div class="grid grid-2"><div class="form-group"><label>Kind</label><select class="form-select" id="as-kind"><option value="term">Term</option><option value="session">Session</option><option value="arm">Arm</option><option value="assessment">Assessment Column</option><option value="audience">Audience</option></select></div><div class="form-group"><label>Value</label><input class="form-input" id="as-value" placeholder="First Term / 2026/2027 / A"></div></div><button class="btn btn-primary" onclick="AS.addLookup()">Add Lookup</button><div id="as-lookups" style="margin-top:12px"></div></div>
-        <div class="card" style="grid-column:1/-1"><h3>🗓️ Academic Period</h3><div class="grid grid-4"><div class="form-group"><label>Session</label><input class="form-input" id="as-p-session" placeholder="2026/2027"></div><div class="form-group"><label>Term</label><input class="form-input" id="as-p-term" placeholder="First Term"></div><div class="form-group"><label>Starts</label><input class="form-input" type="date" id="as-start"></div><div class="form-group"><label>Ends</label><input class="form-input" type="date" id="as-end"></div></div><label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="as-current"> Set as current term/session</label><button class="btn btn-primary" onclick="AS.addPeriod()">Save Academic Period</button><div id="as-periods" style="margin-top:12px"></div></div>
+        <div class="card" style="grid-column:1/-1"><h3>🗓️ Academic Period</h3><div class="grid grid-4"><div class="form-group"><label>Session</label><select class="form-select" id="as-p-session"><option value="">— select registered session —</option></select></div><div class="form-group"><label>Term</label><select class="form-select" id="as-p-term"><option value="">— select registered term —</option></select></div><div class="form-group"><label>Starts</label><input class="form-input" type="date" id="as-start"></div><div class="form-group"><label>Ends</label><input class="form-input" type="date" id="as-end"></div></div><label style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><input type="checkbox" id="as-current"> Set as current term/session</label><button class="btn btn-primary" onclick="AS.addPeriod()">Save Academic Period</button><div id="as-periods" style="margin-top:12px"></div></div>
       </div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
@@ -501,13 +501,14 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </script>
 <script>
 const AS={
+ _loadSeq:0,
  async init(){ await this.load(); },
- async load(){ if(!sb){return;} const [d,l,p]=await Promise.all([sb.from('departments').select('*').order('name'),sb.from('lookups').select('*').order('kind').order('position'),sb.from('academic_periods').select('*').order('created_at',{ascending:false}).limit(50)]); document.getElementById('as-depts').innerHTML=this.list(d.data||[],['name','head'],'departments'); document.getElementById('as-lookups').innerHTML=this.list(l.data||[],['kind','value'],'lookups'); document.getElementById('as-periods').innerHTML=this.list(p.data||[],['session','term','starts_on','ends_on','is_current'],'academic_periods'); },
+ async load(){ if(!sb){return;} const seq=++this._loadSeq, [d,l,p]=await Promise.all([sb.from('departments').select('*').order('name'),sb.from('lookups').select('*').order('kind').order('position'),sb.from('academic_periods').select('*').order('created_at',{ascending:false}).limit(50)]); if(seq!==this._loadSeq)return; document.getElementById('as-depts').innerHTML=this.list(d.data||[],['name','head'],'departments'); document.getElementById('as-lookups').innerHTML=this.list(l.data||[],['kind','value'],'lookups'); document.getElementById('as-periods').innerHTML=this.list(p.data||[],['session','term','starts_on','ends_on','is_current'],'academic_periods'); const fill=(id,kind)=>{const e=document.getElementById(id);if(!e)return;const cur=e.value;e.innerHTML='<option value="">— select registered '+kind+' —</option>'+[...new Set((l.data||[]).filter(x=>x.kind===kind).map(x=>x.value))].map(x=>'<option>'+esc(x)+'</option>').join('');if(cur)e.value=cur;}; fill('as-p-session','session'); fill('as-p-term','term'); },
  list(rows,cols,table){ if(!rows.length)return '<p style="color:var(--gray-500)">No records yet.</p>'; return '<div class="table-wrap"><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+(table?'<th>Action</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c]??'')+'</td>').join('')+(table?'<td><button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="AS.del(\''+table+'\',\''+r.id+'\')">🗑 Delete</button></td>':'')+'</tr>').join('')+'</tbody></table></div>'; },
  async addDepartment(){ if(!sb)return; const name=document.getElementById('as-dept').value.trim(); if(!name){toast('Enter department name','warning');return;} const {error}=await sb.from('departments').insert({name,head:document.getElementById('as-head').value.trim()||null}); if(error){toast(error.message,'danger');return;} toast('Department added','success'); this.load(); },
  async addLookup(){ if(!sb)return; const kind=document.getElementById('as-kind').value, value=document.getElementById('as-value').value.trim(); if(!value){toast('Enter value','warning');return;} const {error}=await sb.from('lookups').insert({kind,value,position:0}); if(error){toast(error.message,'danger');return;} toast('Lookup added','success'); this.load(); },
  async del(table,id){ if(!confirm('Delete this setup item?'))return; const {error}=await sb.from(table).delete().eq('id',id); if(error){toast(error.message,'danger');return;} toast('Deleted.','info'); this.load(); },
- async addPeriod(){ if(!sb)return; const row={session:document.getElementById('as-p-session').value.trim(),term:document.getElementById('as-p-term').value.trim(),starts_on:document.getElementById('as-start').value||null,ends_on:document.getElementById('as-end').value||null,is_current:document.getElementById('as-current').checked}; if(!row.session||!row.term){toast('Enter session and term','warning');return;} if(row.is_current) await sb.from('academic_periods').update({is_current:false}).neq('id','00000000-0000-0000-0000-000000000000'); const {error}=await sb.from('academic_periods').upsert(row,{onConflict:'session,term'}); if(error){toast(error.message,'danger');return;} toast('Academic period saved','success'); this.load(); }
+ async addPeriod(){ if(!sb)return; const row={session:document.getElementById('as-p-session').value.trim(),term:document.getElementById('as-p-term').value.trim(),starts_on:document.getElementById('as-start').value||null,ends_on:document.getElementById('as-end').value||null,is_current:document.getElementById('as-current').checked}; if(!row.session||!row.term){toast('Select a registered session and term (add them in the Terms / Sessions / Arms card above first)','warning');return;} if(row.is_current) await sb.from('academic_periods').update({is_current:false}).neq('id','00000000-0000-0000-0000-000000000000'); const {error}=await sb.from('academic_periods').upsert(row,{onConflict:'session,term'}); if(error){toast(error.message,'danger');return;} toast('Academic period saved','success'); this.load(); }
 };
 document.addEventListener('DOMContentLoaded',()=>AS.init()); AS.init();
 </script></body></html>

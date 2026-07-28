@@ -4,7 +4,7 @@
 
 - Candidate fetch: `cbt_get_public_exam` reports `engine_version: v5.1.0` and strips answer/explanation aliases case-insensitively.
 - Candidate submit: `cbt-exam.html` calls only `cbt_submit_v5` and accepts a result only when the server returns V5.1.
-- Existing database repair: back up Supabase, run `database/cbt-v5.1-zero-score-hotfix.sql`, then deploy matching CBT pages/engine. Fresh projects run `complete-schema.sql` only.
+- V5.6.1 production repair: back up Supabase and run the full `database/complete-schema.sql` for both existing and fresh projects. It includes all historical CBT hotfixes; do not run them separately afterward.
 - The browser sends answers and original bank indexes; it does not decide the official mark.
 - Server matching supports letter↔option text, true/false aliases, numeric tolerance, multi-select sets, accepted alternatives, legacy option indexes and case-insensitive fields such as `CorrectAnswer`, `Correct Answer`, `answer_key`, `correct_option` and `rightAnswer`.
 - If an objective answer key is missing, the server returns `answer_key_missing` and inserts no false-zero result.
@@ -30,3 +30,7 @@ A failed submission retains its local draft and downloadable answer payload. Aut
 ## Required test
 
 After deployment, create a disposable exam containing a letter key, exact option-text key, true/false, numeric tolerance and multi-select. Submit it, then confirm the row shows `engine_version='v5.1.0'`, a nonzero score and correct counts.
+
+
+## V5.6.1 open/multi-subject repair
+Open and multi-subject examinations can start without an admission number. The V6 getter returns a null optional candidate instead of dereferencing an unassigned PL/pgSQL record. Registered examinations still require the official admission number and roster.

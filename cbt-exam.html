@@ -147,8 +147,9 @@ textarea.form-input{min-height:80px;resize:vertical}
   function applySchoolIdentity(remoteSchool){
     const cfg = window.SCHOOL || {};
     const db = remoteSchool && typeof remoteSchool === 'object' ? remoteSchool : {};
+    const dbName=String(db.name||db.school_name||'').trim(),usableDbName=dbName&&!/^(my school|school|school portal)$/i.test(dbName)?dbName:'';
     const school = {
-      name: db.name || db.school_name || cfg.name || 'School',
+      name: usableDbName || cfg.name || dbName || 'School',
       motto: db.motto || cfg.motto || 'Excellence in Education',
       address: db.address || cfg.address || '',
       phone: db.phone || cfg.phone || '',
@@ -408,24 +409,12 @@ textarea.form-input{min-height:80px;resize:vertical}
   };
 
   Exam.codeEntry = function(prefill){
-    this.root().innerHTML =
-      '<div class="card">' +
-        '<h2>📝 Enter exam details</h2>' +
-        '<p style="margin:0 0 6px;color:var(--sc-primary);font-weight:900">School: '+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</p>'+
-        '<p style="color:#64748b;margin:0 0 16px;font-size:.9rem">Ask your teacher for the exam code. Spaces and hyphens in the code are accepted.</p>' +
-        '<div class="form-group"><label>Exam code *</label><input class="form-input" id="e-code" value="' + esc(prefill) + '" placeholder="e.g. ABC123" autofocus></div>' +
-        '<div class="form-group"><label>Your full name <span style="color:#94a3b8;font-weight:400">(optional for anonymous exams)</span></label><input class="form-input" id="e-name" placeholder="Surname First-name"></div>' +
-        '<div class="form-group"><label>Your student / staff ID (if registered)</label><input class="form-input" id="e-id" placeholder="e.g. GoSA/2024/001"></div>' +
-        '<div class="form-group"><label>Class</label><input class="form-input" id="e-class" placeholder="e.g. JSS 1A"></div>' +
-        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">' +
-          '<button type="button" class="btn btn-primary" id="e-start">Start Exam ▶</button>' +
-          '<button type="button" class="btn btn-outline" id="e-guest">👤 Continue as Guest (anonymous)</button>' +
-        '</div>' +
-        '<p style="color:#94a3b8;font-size:.8rem;margin-top:12px">By starting the exam you consent to anti-cheat monitoring: window focus, copy/paste and fullscreen events are logged. Your teacher sees the integrity log with your result.</p>' +
-      '</div>';
-
-    $('e-start').addEventListener('click', () => Exam.load(false));
-    $('e-guest').addEventListener('click', () => Exam.load(true));
+    this._identityReady=false;this._pendingCode='';this.root().innerHTML='<div class="card"><h2>📝 Find your examination</h2><p style="margin:0 0 6px;color:var(--sc-primary);font-weight:900">School: '+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</p><p style="color:#64748b">Enter the exam code first. The platform will show the correct identity form for Registered or Open mode.</p><div class="form-group"><label>Exam code *</label><input class="form-input" id="e-code" value="'+esc(prefill)+'" placeholder="e.g. ABC123" autofocus></div><button type="button" class="btn btn-primary" id="e-start">Continue →</button></div>';
+    $('e-start').addEventListener('click',()=>Exam.load(false));
+  };
+  Exam.identityEntry=function(data,code,message){this._pendingCode=code;this._identityReady=true;applySchoolIdentity(data&&data.school||null);const registered=String(data&&data.exam_mode||data&&data.identity_mode||'').toLowerCase()==='registered';
+    this.root().innerHTML='<div class="card"><h2>'+(registered?'🪪 Registered student verification':'🌐 Open examination identity')+'</h2><p><b>'+esc(data&&data.title||'Examination')+'</b> · '+esc(data&&data.class||'')+' · '+esc(data&&data.term||'')+' '+esc(data&&data.session||'')+'</p>'+(message?'<div class="notice notice-error">'+esc(message)+'</div>':'')+(registered?'<div class="notice" style="background:#eff6ff;border-color:#93c5fd;color:#1e3a8a">Enter only your admission number. Your official name and class will be loaded from the school register; there is no editable name field.</div><div class="form-group"><label>Admission number *</label><input class="form-input" id="e-admission" placeholder="e.g. GoSA/2024/001" autofocus></div><button class="btn btn-primary" id="e-identity-start">Verify and start exam</button>':'<p>Registered students may enter an admission number to load their official identity. Other candidates can enter a display name.</p><div class="form-group"><label>Admission number (optional)</label><input class="form-input" id="e-admission" placeholder="Registered students only"></div><div class="form-group"><label>Candidate name *</label><input class="form-input" id="e-open-name" placeholder="Your full name"></div><div class="form-group"><label>Class / category (optional)</label><input class="form-input" id="e-open-class" placeholder="e.g. JSS 1A or External"></div><button class="btn btn-primary" id="e-identity-start">Start open exam</button> <button class="btn btn-outline" id="e-guest">Continue anonymously</button>')+' <button class="btn btn-outline" id="e-back-code">Change code</button></div>';
+    $('e-identity-start').addEventListener('click',()=>Exam.load(false));if($('e-guest'))$('e-guest').addEventListener('click',()=>Exam.load(true));$('e-back-code').addEventListener('click',()=>Exam.codeEntry(code));
   };
 
   Exam.load = async function(anon){
@@ -433,17 +422,10 @@ textarea.form-input{min-height:80px;resize:vertical}
       this.root().innerHTML = '<div class="card"><div class="notice notice-error">⚠ Database not configured. Open <code>assets/js/config.js</code> and add your Supabase URL and anon key.</div></div>';
       return;
     }
-    const code = ($('e-code') || {}).value ? $('e-code').value.toUpperCase().trim() : '';
-    const canonicalCode = code.replace(/[^A-Z0-9]/g,'');
-    let nm = ($('e-name') || {}).value ? $('e-name').value.trim() : '';
-    if (anon && !nm) nm = 'Anonymous-' + Math.random().toString(36).slice(2, 7).toUpperCase();
-    this.student = {
-      name: nm || 'Anonymous-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
-      id_ref: ($('e-id') || {}).value ? $('e-id').value.trim() : '',
-      class: ($('e-class') || {}).value ? $('e-class').value.trim() : '',
-      anonymous: !!anon
-    };
-    if (!code) { toast('Enter the exam code.', 'warning'); return; }
+    const code = (($('e-code')||{}).value||this._pendingCode||'').toUpperCase().trim(),canonicalCode=code.replace(/[^A-Z0-9]/g,''),admission=(($('e-admission')||{}).value||'').trim();
+    let nm=(($('e-open-name')||{}).value||'').trim();if(anon&&!nm)nm='Anonymous-'+Math.random().toString(36).slice(2,7).toUpperCase();
+    this.student={name:nm,id_ref:admission,class:(($('e-open-class')||{}).value||'').trim(),anonymous:!!anon};
+    if(!code){toast('Enter the exam code.','warning');return;}
 
     // Network-first with an offline fallback. The former cache-first flow kept a
     // repaired multi-subject exam stale for ten minutes, which made “Repair
@@ -457,27 +439,29 @@ textarea.form-input{min-height:80px;resize:vertical}
 
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const r = await window.sb.rpc('cbt_get_public_exam_v5', { p_code: canonicalCode });
+        const r = await window.sb.rpc('cbt_get_public_exam_v6', { p_code: canonicalCode, p_admission_no: admission });
         data = r.data; error = r.error;
       } catch (e) { error = e; }
       if (data && !error) break; // includes explicit not-open/not-found diagnostics
-      if(error && /cbt_get_public_exam_v5|schema cache|function/i.test(String(error.message||error))) break;
+      if(error && /cbt_get_public_exam_v6|schema cache|function/i.test(String(error.message||error))) break;
       const wait = Math.min(6000, (400 * Math.pow(2, attempt))) + Math.floor(Math.random() * 500);
       if (attempt < 4) toast('Network busy — retrying (' + (attempt + 1) + '/5)…', 'info', 1500);
       await new Promise(r => setTimeout(r, wait));
     }
     const cachedIsV5=cached&&cached.ok!==false&&String(cached.engine_version||'').startsWith('v5.1');
-    if ((!data || error) && cachedIsV5 && !(error&&/cbt_get_public_exam_v5|schema cache|function/i.test(String(error.message||error)))) { data=cached; error=null; toast('Network unavailable — using the latest verified saved exam copy on this device.','warning',5000); }
+    if ((!data || error) && cachedIsV5 && !(error&&/cbt_get_public_exam_v6|schema cache|function/i.test(String(error.message||error)))) { data=cached; error=null; toast('Network unavailable — using the latest verified saved exam copy on this device.','warning',5000); }
     if (data && !error && data.ok!==false && !data.wait && !data.closed) {
       try { localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), exam: data })); } catch (_) {}
     }
 
     if (error || !data) {
-      const missingRpc=error&&/cbt_get_public_exam_v5|schema cache|function/i.test(String(error.message||error));
-      const msg=missingRpc?'The V5.1 exam reader is not installed in Supabase. The administrator must run database/cbt-v5.1-zero-score-hotfix.sql.':('Could not contact the exam service. '+esc(error&&error.message||''));
+      const missingRpc=error&&/cbt_get_public_exam_v6|schema cache|function/i.test(String(error.message||error));
+      const msg=missingRpc?'The registered/open V5.5 exam reader is not installed in Supabase. The administrator must run database/cbt-v5.1-zero-score-hotfix.sql.':('Could not contact the exam service. '+esc(error&&error.message||''));
       this.root().innerHTML = '<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">❌ Exam service unavailable</h2><p>'+msg+'</p><p><b>Code entered:</b> '+esc(code)+'</p></div>' + this.codeEntryHTML(code) + '</div>';
       return;
     }
+    if(data&&['admission_required','invalid_admission','not_on_roster'].includes(data.error)){this.identityEntry(data,code,data.error==='admission_required'?'':data.message);return;}
+    if(data&&data.ok===true&&String(data.exam_mode||'').toLowerCase()==='open'&&!this._identityReady){this.identityEntry(data,code,'');return;}
     if(data.ok===false && !data.wait && !data.closed){
       const hints={exam_not_found:'Confirm the code in CBT Manager and use Share to copy it.',not_open:'CBT Manager → locate the exam → click Open. Refresh the candidate page afterward.',archived:'Unarchive or recreate this exam.',not_started:'Wait until the configured start time.',closed:'The exam officer must extend the close time or reopen a new attempt.'};
       this.root().innerHTML='<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">❌ '+esc(data.message||'Exam unavailable')+'</h2><p><b>Code entered:</b> '+esc(code)+' &nbsp; <b>Matched code:</b> '+esc(data.code||'—')+'</p><p>'+esc(hints[data.error]||'Ask the exam officer to check the exam status and schedule.')+'</p><small>Diagnostic: '+esc(data.error||'unknown')+' · Engine '+esc(data.engine_version||'unknown')+'</small></div>'+this.codeEntryHTML(code)+'</div>';
@@ -495,6 +479,11 @@ textarea.form-input{min-height:80px;resize:vertical}
       this.root().innerHTML='<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">⚠️ Exam temporarily unavailable</h2><p>This database is still using an obsolete CBT grading engine that can record incorrect zero marks. The exam has been stopped before you begin.</p><p><strong>Administrator:</strong> back up Supabase, then run the latest <code>database/complete-schema.sql</code>. Confirm the final message says CBT V5.1 is installed, then reload this page.</p></div></div>';
       return;
     }
+    if(String(data.exam_mode||'').toLowerCase()==='registered'){
+      if(!data.candidate){this.identityEntry(data,code,'Admission number verification is required.');return;}
+      this.student={name:data.candidate.full_name,id_ref:data.candidate.admission_no,class:data.candidate.class,id:data.candidate.id,anonymous:false};
+    }else if(data.candidate){this.student={name:data.candidate.full_name,id_ref:data.candidate.admission_no,class:data.candidate.class,id:data.candidate.id,anonymous:false};}
+    else {if(!this.student.name&&!anon){this.identityEntry(data,code,'Enter a candidate name or choose Continue anonymously.');return;}this.student.name=this.student.name||('Anonymous-'+Math.random().toString(36).slice(2,7).toUpperCase());}
     this.data = data;
     this.school = applySchoolIdentity(data.school || null);
     if (window.CBT && typeof window.CBT.prepareForStudent === 'function') window.CBT.prepareForStudent(this.data);
@@ -580,6 +569,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     const timeTaken = Math.round((Date.now() - this.startTs) / 1000);
     const payload = {
       exam_id: this.data.id,
+      student_id: this.student.id || null,
       student_name: this.student.name,
       student_class: this.student.class,
       student_id_ref: this.student.id_ref,
@@ -599,10 +589,10 @@ textarea.form-input{min-height:80px;resize:vertical}
     };
     let resp = null;
     for (let attempt = 0; attempt < 6; attempt++) {
-      try { resp = await window.sb.rpc('cbt_submit_v5', { p_payload: payload }); } catch (e) { resp = { error: e }; }
+      try { resp = await window.sb.rpc('cbt_submit_v6', { p_payload: payload }); } catch (e) { resp = { error: e }; }
       if (resp && !resp.error && resp.data && resp.data.saved && String(resp.data.engine_version||'').startsWith('v5.1')) break;
       if (resp && !resp.error && resp.data && ['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty'].includes(resp.data.error)) break;
-      if(resp && resp.error && /cbt_submit_v5|schema cache|function/i.test(String(resp.error.message||resp.error))) break;
+      if(resp && resp.error && /cbt_submit_v6|schema cache|function/i.test(String(resp.error.message||resp.error))) break;
       const wait = Math.min(8000, (500 * Math.pow(2, attempt))) + Math.floor(Math.random() * 600);
       this.root().insertAdjacentHTML('beforeend', '<p style="text-align:center;color:#64748b">Submitting… retry ' + (attempt + 1) + ' of 6</p>');
       await new Promise(r => setTimeout(r, wait));
@@ -617,7 +607,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     if (!confirmed) {
       const blob = new Blob([JSON.stringify({ payload, graded }, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
-      const rpcMissing=resp&&resp.error&&/cbt_submit_v5|schema cache|function/i.test(String(resp.error.message||resp.error));
+      const rpcMissing=resp&&resp.error&&/cbt_submit_v6|schema cache|function/i.test(String(resp.error.message||resp.error));
       const message=rpcMissing?'The V5.1 grading engine is not installed in this database. An administrator must run the latest database/complete-schema.sql before results can be accepted.':((resp&&resp.data&&(resp.data.message||resp.data.error))||'The server could not confirm this submission.');
       this.root().innerHTML =
         '<div class="card"><h2>⚠️ Submission not confirmed</h2>' +
@@ -666,7 +656,7 @@ textarea.form-input{min-height:80px;resize:vertical}
         const rest = [];
         for (const p of q) {
           try {
-            const r = await window.sb.rpc('cbt_submit_v5', { p_payload: Object.assign({client_engine:'v5.1'},p) });
+            const r = await window.sb.rpc('cbt_submit_v6', { p_payload: Object.assign({client_engine:'v5.5'},p) });
             if (!(r && !r.error && r.data && r.data.saved && String(r.data.engine_version||'').startsWith('v5.1'))) rest.push(p);
           } catch (_) { rest.push(p); }
         }

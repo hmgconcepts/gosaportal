@@ -93,6 +93,22 @@
     <p class="help">📌 <b>How to get a Drive share link:</b> in Google Drive, right-click the photo → "Share" → "Anyone with the link" → "Viewer" → copy the link. The system auto-converts the share link to a direct-view image URL.</p>
   </div>
 
+  <!-- TEACHER SIGNATURE — visible only to linked staff/teacher accounts -->
+  <div class="card-profile" id="teacher-signature-card" style="display:none">
+    <h2 class="section-title">✍️ My teacher signature</h2>
+    <p class="help">If you are assigned as a class teacher, this signature and your profile name will appear on your class students’ report cards. Paste a transparent PNG/JPG or Google Drive share link. Only your own profile signature can be changed here.</p>
+    <div class="form-group">
+      <label>Signature image link</label>
+      <input class="form-input" id="teacher-signature-url" placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing" autocomplete="off">
+      <div class="photo-preview" id="teacher-signature-preview" style="width:220px;height:90px;border-radius:10px"><span style="color:#94a3b8">No signature</span></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" class="btn btn-primary" id="btn-save-signature">💾 Save my signature</button>
+      <button type="button" class="btn btn-outline" id="btn-clear-signature">Remove signature</button>
+    </div>
+    <p class="help">Administrator: assign this person in <b>Classes → Class teacher</b> and ensure the Staff record is linked to this login account. Report cards resolve the assigned teacher automatically.</p>
+  </div>
+
   <!-- BASIC PROFILE FIELDS -->
   <div class="card-profile">
     <h2 class="section-title">👤 Personal information</h2>
@@ -217,6 +233,10 @@
     $('photo-url').value = profile.photo_url || '';
     $('photo-pill').style.display = profile.photo_url && /drive\.google\.com/i.test(profile.photo_url) ? '' : 'none';
     updatePhotoPreview();
+    const sigCard=$('teacher-signature-card');
+    if(sigCard) sigCard.style.display=['staff','teacher'].includes(role)?'':'none';
+    const sigInput=$('teacher-signature-url');if(sigInput)sigInput.value=profile.signature_url||'';
+    updateSignaturePreview();
 
     renderRoleCard(profile, user, role);
   }
@@ -238,6 +258,20 @@
     } else {
       prev.innerHTML = '<span style="color:#94a3b8">No photo</span>';
     }
+  }
+
+  function updateSignaturePreview(){
+    const input=$('teacher-signature-url'),prev=$('teacher-signature-preview');if(!input||!prev)return;const url=driveDirect(input.value);
+    prev.innerHTML=url?'<img src="'+esc(url)+'" referrerpolicy="no-referrer" alt="Teacher signature preview" style="width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'Signature preview unavailable\',style:\'color:#94a3b8;font-size:.78rem\'}))">':'<span style="color:#94a3b8">No signature</span>';
+  }
+  async function saveTeacherSignature(clear){
+    const sb=window.sb;if(!sb||!_currentUser){showToast('Not signed in.','error');return;}const role=String((_currentProfile&&_currentProfile.role)||'').toLowerCase();if(!['staff','teacher'].includes(role)){showToast('Only a staff/teacher account can save a teacher signature.','error');return;}
+    const raw=clear?'':$('teacher-signature-url').value.trim();if(raw&&!/^https?:\/\//i.test(raw)){showToast('Paste a full https:// signature image or Drive link.','error');return;}const direct=driveDirect(raw);
+    try{const {error}=await sb.from('profiles').update({signature_url:direct||''}).eq('id',_currentUser.id);if(error)throw error;
+      // Keep the linked staff mirror current for legacy report installations.
+      try{await sb.from('staff').update({signature_url:direct||''}).eq('user_id',_currentUser.id);}catch(_){}
+      $('teacher-signature-url').value=direct||'';_currentProfile.signature_url=direct||'';if(window.SC_PROFILE)SC_PROFILE.signature_url=direct||'';updateSignaturePreview();showToast(clear?'Signature removed.':'✅ Teacher signature saved. It will appear when you are the assigned class teacher.','success');
+    }catch(e){showToast('Signature save failed: '+(e.message||e)+'. Ask the administrator to run the latest complete-schema.sql.','error');}
   }
 
   function renderRoleCard(profile, user, role) {
@@ -343,6 +377,10 @@
     if (btnSaveProfile) btnSaveProfile.addEventListener('click', saveProfile);
     if (btnSavePhoto) btnSavePhoto.addEventListener('click', savePhoto);
     if (btnClearPhoto) btnClearPhoto.addEventListener('click', clearPhoto);
+    const btnSaveSignature=$('btn-save-signature'),btnClearSignature=$('btn-clear-signature'),signatureInput=$('teacher-signature-url');
+    if(btnSaveSignature)btnSaveSignature.addEventListener('click',()=>saveTeacherSignature(false));
+    if(btnClearSignature)btnClearSignature.addEventListener('click',()=>{if(confirm('Remove your teacher signature?'))saveTeacherSignature(true);});
+    if(signatureInput)signatureInput.addEventListener('input',updateSignaturePreview);
     const photoInput = $('photo-url');
     if (photoInput) photoInput.addEventListener('input', updatePhotoPreview);
     // Initial load
@@ -357,6 +395,10 @@
     if (btnSaveProfile) btnSaveProfile.addEventListener('click', saveProfile);
     if (btnSavePhoto) btnSavePhoto.addEventListener('click', savePhoto);
     if (btnClearPhoto) btnClearPhoto.addEventListener('click', clearPhoto);
+    const btnSaveSignature=$('btn-save-signature'),btnClearSignature=$('btn-clear-signature'),signatureInput=$('teacher-signature-url');
+    if(btnSaveSignature)btnSaveSignature.addEventListener('click',()=>saveTeacherSignature(false));
+    if(btnClearSignature)btnClearSignature.addEventListener('click',()=>{if(confirm('Remove your teacher signature?'))saveTeacherSignature(true);});
+    if(signatureInput)signatureInput.addEventListener('input',updateSignaturePreview);
     const photoInput = $('photo-url');
     if (photoInput) photoInput.addEventListener('input', updatePhotoPreview);
     load();

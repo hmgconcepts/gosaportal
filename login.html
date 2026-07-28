@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Sign in • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Sign in. Comprehensive school management platform.">
-<meta name="keywords" content="$1">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="canonical" href="./login.html">
 <meta property="og:url" content="./login.html">
@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Sign in • God of Seed Academy">
-<meta property="og:description" content="$1 — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -118,9 +118,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <button class="btn btn-outline" id="tab-signup" onclick="App.switchAuthTab('signup')" style="flex:1">Request access</button>
     </div>
     <form id="signin-form" onsubmit="App.handleSignIn(event)" class="form">
-      <div class="form-group"><label>Email or Student/Staff ID</label><input class="form-input" type="text" name="email" placeholder="you@example.com or GOSA/2026/0001" autocapitalize="none" required></div>
+      <div class="form-group"><label>Email or Student/Staff ID</label><input class="form-input" type="text" name="email" placeholder="you@example.com or GoSA/2026/0001" autocapitalize="none" required></div>
       <div class="form-group"><label>Password</label><input class="form-input" type="password" name="password" required minlength="8"></div>
       <button type="submit" class="btn btn-primary" style="width:100%">Sign in</button>
+      <p style="text-align:right;margin:10px 0 0"><a href="forgot-password.html">Forgot password?</a></p>
     </form>
     <form id="signup-form" onsubmit="App.handleSignUp(event)" class="form" style="display:none">
       <div class="form-group"><label>Full name</label><input class="form-input" name="full_name" required></div>
