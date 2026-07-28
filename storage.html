@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Storage Manager • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Storage Manager. Comprehensive school management platform.">
-<meta name="keywords" content="$1">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Storage Manager • God of Seed Academy">
-<meta property="og:description" content="$1 — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -62,7 +62,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Storage Manager. Comprehensive school management platform.">
-    <meta name="keywords" content="$1">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./storage.html">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -471,19 +471,27 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <button class="btn btn-primary" onclick="ST.load()">📊 Show table sizes</button>
         <div id="st-sizes" style="margin-top:12px"></div>
       </div>
+      <div class="card" data-owner-only style="margin-bottom:16px;border:2px solid #86efac">
+        <h3>🌿 Free-Tier Database Efficiency Centre</h3>
+        <p style="color:#475569">No files are stored in Supabase. Configure a database quota target and retention periods, analyse eligible rows, export portable JSON, then purge only when approved. Nothing is auto-deleted.</p>
+        <div id="st-health" style="margin:10px 0">Click “Analyse health”.</div>
+        <div class="grid grid-3"><div><label>Planning quota (MB)</label><input class="form-input" id="rt-quota" type="number" value="500"></div><div><label>Warning %</label><input class="form-input" id="rt-warning" type="number" value="75"></div><div><label>Critical %</label><input class="form-input" id="rt-critical" type="number" value="90"></div></div>
+        <div class="grid grid-4"><div><label>Audit log days</label><input class="form-input" id="rt-activity" type="number" value="365"></div><div><label>Notifications days</label><input class="form-input" id="rt-notifications" type="number" value="180"></div><div><label>Check-in days</label><input class="form-input" id="rt-checkins" type="number" value="365"></div><div><label>CBT results days</label><input class="form-input" id="rt-cbt" type="number" value="730"></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-primary" onclick="ST.savePolicy()">💾 Save retention policy</button><button class="btn btn-outline" onclick="ST.health()">📈 Analyse health</button><button class="btn btn-outline" onclick="ST.candidates()">🔎 Find expired candidates</button></div><div id="st-candidates" style="margin-top:12px"></div>
+      </div>
       <div class="card" data-admin-only>
         <h3>🧹 Purge old rows (after exporting!)</h3>
         <div class="grid grid-2">
           <div class="form-group"><label>Table</label><select class="form-select" id="st-table">
-            <option value="activity_log">activity_log (audit trail)</option>
+            <option value="activity_log">activity_log (audit trail)</option><option value="login_audit">login_audit (login history)</option>
             <option value="cbt_results">cbt_results (old exam attempts)</option>
             <option value="notifications">notifications (read alerts)</option>
             <option value="reading_scores">reading_scores (already pulled)</option>
-            <option value="attendance_checkins">attendance_checkins (old scans)</option>
+            <option value="attendance_checkins">attendance_checkins (old scans)</option><option value="staff_clock">staff_clock (old staff clock rows)</option><option value="student_clock">student_clock (old learner clock rows)</option>
           </select></div>
           <div class="form-group"><label>Older than (days)</label><input class="form-input" type="number" id="st-days" value="180"></div>
         </div>
-        <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="ST.purge()">🗑 Purge old rows</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="ST.exportBeforePurge()">⬇ Export selected table first (portable JSON)</button><button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="ST.purge()">🗑 Purge old rows</button><a class="btn btn-outline" href="admin-data.html">♻️ Re-import / analyse an archive</a></div>
       </div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
@@ -496,6 +504,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
+<script src="assets/js/data-portability.js"></script>
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
@@ -516,6 +525,12 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </script>
 <script>
 const ST={
+  async loadPolicy(){if(!sb)return;const{data}=await sb.from('data_retention_settings').select('*').eq('id',1).maybeSingle();if(!data)return;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};set('rt-quota',data.quota_mb);set('rt-warning',data.warning_percent);set('rt-critical',data.critical_percent);set('rt-activity',data.activity_log_days);set('rt-notifications',data.notification_days);set('rt-checkins',data.checkin_days);set('rt-cbt',data.cbt_result_days);},
+  async savePolicy(){const row={id:1,quota_mb:Number(document.getElementById('rt-quota').value)||500,warning_percent:Number(document.getElementById('rt-warning').value)||75,critical_percent:Number(document.getElementById('rt-critical').value)||90,activity_log_days:Number(document.getElementById('rt-activity').value)||365,notification_days:Number(document.getElementById('rt-notifications').value)||180,checkin_days:Number(document.getElementById('rt-checkins').value)||365,cbt_result_days:Number(document.getElementById('rt-cbt').value)||730,updated_by:window.SC_PROFILE?.id||null,updated_at:new Date().toISOString()};const{error}=await sb.from('data_retention_settings').upsert(row,{onConflict:'id'});if(error)return toast(error.message,'danger');toast('Retention policy saved. No rows were deleted.','success');ST.health();ST.candidates();},
+  async health(){if(!sb)return;const{data,error}=await sb.rpc('storage_health');const b=document.getElementById('st-health');if(error){b.innerHTML='<span style="color:#b91c1c">'+esc(error.message)+'</span>';return;}const p=Math.min(100,Number(data.percent||0)),color=data.status==='critical'?'#dc2626':data.status==='warning'?'#d97706':'#16a34a';b.innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+esc(data.used_pretty)+'</div><div class="stat-label">Public tables used</div></div><div class="stat-card"><div class="stat-value">'+p+'%</div><div class="stat-label">of '+esc(data.quota_mb)+' MB planning target</div></div><div class="stat-card"><div class="stat-value">'+esc(data.embedded_media_rows)+'</div><div class="stat-label">Legacy embedded-media rows</div></div></div><div style="height:14px;background:#e2e8f0;border-radius:99px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:'+color+'"></div></div><p><b>Status: '+esc(data.status)+'</b> · Policy: external links only. '+(data.embedded_media_rows?'Replace legacy embedded signatures/photos with Drive links when those records are next edited.':'No embedded media detected.')+'</p>';},
+  async candidates(){const{data,error}=await sb.rpc('retention_candidates');const b=document.getElementById('st-candidates');if(error){b.textContent=error.message;return;}b.innerHTML='<div class="table-wrap"><table><thead><tr><th>Table</th><th>Keep days</th><th>Eligible rows</th><th>Action</th></tr></thead><tbody>'+(data||[]).map(r=>'<tr><td>'+esc(r.table_name)+'</td><td>'+r.keep_days+'</td><td><b>'+r.eligible_rows+'</b></td><td><button class="btn btn-sm btn-outline" onclick="ST.selectCandidate(\''+r.table_name+'\','+r.keep_days+')">Select for export/purge</button></td></tr>').join('')+'</tbody></table></div>';},
+  selectCandidate(t,d){document.getElementById('st-table').value=t;document.getElementById('st-days').value=d;document.getElementById('st-table').scrollIntoView({behavior:'smooth'});},
+  async exportBeforePurge(){if(!window.DataPortability){toast('Data portability engine unavailable.','danger');return;}DataPortability.init(sb);const t=document.getElementById('st-table').value;try{const n=await DataPortability.exportTable(t);toast('✅ '+n+' rows exported. Keep the JSON; it can be restored from Admin Data.','success',7000);}catch(e){toast(e.message||e,'danger');}},
   async load(){ if(!sb){toast('DB not configured','warning');return;}
     var {data,error}=await sb.rpc('table_sizes'); if(error){document.getElementById('st-sizes').innerHTML='<p style="color:#dc2626">'+esc(error.message)+'</p>';return;}
     var total=(data||[]).find(r=>r.table_name==='TOTAL_DATABASE_USED') || {pretty:'0 bytes',row_estimate:0,total_bytes:0};
@@ -525,5 +540,5 @@ const ST={
     if(!confirm('Permanently delete rows in '+t+' older than '+d+' days? Make sure you exported them first.'))return;
     var {data,error}=await sb.rpc('purge_old',{p_table:t,p_days:d}); if(error){toast(error.message,'danger',6000);return;}
     toast('Purged '+(data||0)+' row(s) from '+t+' ✓','success',5000); ST.load(); }
-};
+};document.addEventListener('DOMContentLoaded',()=>{ST.loadPolicy();ST.health();});
 </script></body></html>

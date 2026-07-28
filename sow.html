@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Scheme of Work • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Scheme of Work. Comprehensive school management platform.">
-<meta name="keywords" content="$1">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Scheme of Work • God of Seed Academy">
-<meta property="og:description" content="$1 — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -62,7 +62,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Scheme of Work. Comprehensive school management platform.">
-    <meta name="keywords" content="$1">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./sow.html">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -532,6 +532,6 @@ const SOWUI={ rows:[],
   render(){ const box=document.getElementById('sow-list'), cbox=document.getElementById('sow-confirm-list'); if(!box||!cbox)return; if(!this.rows.length){box.innerHTML='<p style="color:var(--gray-500)">No scheme of work recorded yet.</p>';cbox.innerHTML='<p style="color:var(--gray-500)">No scheme of work recorded yet.</p>';return;} box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Week</th><th>Subject</th><th>Class</th><th>Topic</th><th>Teacher</th><th>Status</th><th>Confirmed</th><th>Actions</th></tr></thead><tbody>'+this.rows.map(r=>'<tr><td>Week '+r.week+'</td><td>'+esc(r.subject)+'</td><td>'+esc(r.class)+'</td><td>'+esc(r.topic)+'</td><td>'+esc(r.teacher)+'</td><td><span class="badge">'+esc(r.status||'pending')+'</span></td><td>'+(r.confirmed?'✅ Yes':'—')+'</td><td><button class="btn btn-sm btn-outline" onclick="SOWUI.del(\''+r.id+'\')">Delete</button></td></tr>').join('')+'</tbody></table></div>'; cbox.innerHTML='<div class="table-wrap"><table><thead><tr><th>Week</th><th>Subject</th><th>Class</th><th>Topic</th><th>Teacher</th><th>Status</th><th>Confirmation Action</th></tr></thead><tbody>'+this.rows.map(r=>'<tr><td>Week '+r.week+'</td><td>'+esc(r.subject)+'</td><td>'+esc(r.class)+'</td><td>'+esc(r.topic)+'</td><td>'+esc(r.teacher)+'</td><td><span class="badge '+(r.confirmed?'badge-success':'')+'">'+esc(r.status||'pending')+'</span></td><td>'+(r.confirmed?'<span style="color:#16a34a;font-weight:bold">✅ Confirmed Taught</span>':'<button class="btn btn-sm btn-primary" onclick="SOWUI.confirmTaught(\''+r.id+'\')">Confirm Taught ✅</button>')+'</td></tr>').join('')+'</tbody></table></div>'; },
   async saveContent(){ if(!sb){toast('Database not configured','warning');return;} const row={subject:document.getElementById('sow-sub').value,class:document.getElementById('sow-cls').value,week:parseInt(document.getElementById('sow-wk').value)||1,term:document.getElementById('sow-term').value,session:document.getElementById('sow-session').value,teacher:document.getElementById('sow-teacher').value,topic:document.getElementById('sow-topic').value.trim(),status:'pending',confirmed:false}; if(!row.subject||!row.class||!row.topic){toast('Enter subject, class and topic','warning');return;} const {error}=await sb.from('scheme_of_work').insert(row); if(error){toast(error.message,'danger');return;} toast('Scheme content saved successfully','success'); document.getElementById('sow-topic').value=''; this.load(); },
   async confirmTaught(id){ if(!sb)return; const {error}=await sb.from('scheme_of_work').update({status:'covered',confirmed:true,covered_at:new Date().toISOString().slice(0,10)}).eq('id',id); if(error){toast(error.message,'danger');return;} toast('✅ Topic confirmed as taught!','success'); this.load(); },
-  async del(id){ if(!sb)return; if(!confirm('Delete this scheme row?'))return; await sb.from('scheme_of_work').delete().eq('id',id); toast('Deleted','info'); this.load(); }
+  async del(id){if(!sb||!confirm('Delete this scheme row?'))return;const r=await SCDelete.byId(sb,'scheme_of_work',id);if(!r.ok){toast(r.error,'danger');return;}toast('Scheme row deleted permanently.','success');this.load();}
 }; document.addEventListener('DOMContentLoaded',()=>SOWUI.init()); SOWUI.init();
 </script></body></html>

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Timetable Generator • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Timetable Generator. Comprehensive school management platform.">
-<meta name="keywords" content="$1">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Timetable Generator • God of Seed Academy">
-<meta property="og:description" content="$1 — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -62,7 +62,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Timetable Generator. Comprehensive school management platform.">
-    <meta name="keywords" content="$1">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./timetable-generator.html">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -461,49 +461,38 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     </header>
     <div class="app-content">
       
-      <div class="card" style="margin-bottom:16px"><p style="color:var(--gray-600);margin:0">
-        <strong>Step 1:</strong> set the daily periods, their times and breaks. <strong>Step 2:</strong> add each
-        subject's weekly demand. <strong>Step 3:</strong> generate a <strong>conflict-free</strong> timetable
-        (deterministic, no AI) — part-time teachers are only scheduled on the days they attend.</p></div>
+      <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#eff6ff,#f5f3ff);border-color:#93c5fd">
+        <h2 style="margin-top:0">🗓️ Admin Timetable Wizard</h2>
+        <p style="color:#334155">Complete the four numbered steps. All classes, subjects, teachers, terms and sessions come from platform dropdowns—no spelling variations. Generation is deterministic and checks a teacher is not placed in two classes at the same time.</p>
+        <div class="grid grid-4"><div class="card"><b>1 · School day</b><br><small>Set periods, times and breaks.</small></div><div class="card"><b>2 · Context</b><br><small>Pick class, term and session.</small></div><div class="card"><b>3 · Demand</b><br><small>Add every subject, teacher and weekly frequency.</small></div><div class="card"><b>4 · Generate</b><br><small>Validate, build, review, print.</small></div></div>
+        <div id="tt-checklist" class="notice" style="margin-top:10px">Loading setup checklist…</div>
+      </div>
       <div class="card" style="margin-bottom:16px" data-staff-only>
-        <h3>🕐 Step 1 · Period & break configuration</h3>
+        <h3>🕐 Step 1 · Build the school-day schedule</h3>
         <div class="grid grid-2" style="margin:8px 0">
-          <div class="form-group"><label>Number of teaching periods per day</label><input class="form-input" type="number" id="pc-count" value="6" min="1" max="12"></div>
-          <div class="form-group"><label>Default period length (minutes)</label><input class="form-input" type="number" id="pc-len" value="40"></div>
-          <div class="form-group"><label>Day starts at</label><input class="form-input" type="time" id="pc-start" value="08:00"></div>
-          <div class="form-group"><label>Short break after period</label><input class="form-input" type="number" id="pc-sb" value="2" placeholder="e.g. 2"></div>
-          <div class="form-group"><label>Short break length (min)</label><input class="form-input" type="number" id="pc-sbl" value="15"></div>
-          <div class="form-group"><label>Long break after period</label><input class="form-input" type="number" id="pc-lb" value="4" placeholder="e.g. 4"></div>
-          <div class="form-group"><label>Long break length (min)</label><input class="form-input" type="number" id="pc-lbl" value="30"></div>
+          <div class="form-group"><label>Teaching periods per day</label><input class="form-input" type="number" id="pc-count" value="6" min="1" max="12"></div>
+          <div class="form-group"><label>Each period length (minutes)</label><input class="form-input" type="number" id="pc-len" value="40" min="10"></div>
+          <div class="form-group"><label>First period starts</label><input class="form-input" type="time" id="pc-start" value="08:00"></div>
+          <div class="form-group"><label>Short break after period</label><input class="form-input" type="number" id="pc-sb" value="2" min="0"></div>
+          <div class="form-group"><label>Short break minutes</label><input class="form-input" type="number" id="pc-sbl" value="15" min="0"></div>
+          <div class="form-group"><label>Long break after period</label><input class="form-input" type="number" id="pc-lb" value="4" min="0"></div>
+          <div class="form-group"><label>Long break minutes</label><input class="form-input" type="number" id="pc-lbl" value="30" min="0"></div>
         </div>
-        <button class="btn btn-primary" onclick="PC.build()">🕐 Build period schedule</button>
-        <button class="btn btn-outline" onclick="PC.save()">💾 Save schedule</button>
+        <button class="btn btn-outline" onclick="PC.build()">Preview schedule</button> <button class="btn btn-primary" onclick="PC.save()">💾 Save school-day schedule</button>
         <div id="pc-preview" style="margin-top:12px"></div>
       </div>
       <div class="card" style="margin-bottom:16px" data-staff-only>
-        <h3>📚 Step 2 · Subject demand &amp; generation</h3>
-        <div class="grid grid-2">
-          <div class="form-group"><label>Class</label><input class="form-input" id="tt-class" placeholder="JSS1"></div>
-          <div class="form-group"><label>Periods per day</label><input class="form-input" type="number" id="tt-ppd" value="6"></div>
-          <div class="form-group"><label>Subject</label><input class="form-input" id="tt-subject" placeholder="Mathematics"></div>
-          <div class="form-group"><label>Teacher</label><input class="form-input" id="tt-teacher" placeholder="Mr. Eze"></div>
-          <div class="form-group"><label>Periods / week</label><input class="form-input" type="number" id="tt-ppw" value="5"></div>
-          <div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time teacher (attends only certain days)</label></div>
-        </div>
-        <div id="tt-days" style="display:none;margin:4px 0 12px">
-          <label style="font-size:.85rem;color:var(--gray-600);display:block;margin-bottom:6px">Days this teacher attends:</label>
-          <div style="display:flex;gap:14px;flex-wrap:wrap">
-            <label><input type="checkbox" class="tt-day" value="Monday"> Mon</label>
-            <label><input type="checkbox" class="tt-day" value="Tuesday"> Tue</label>
-            <label><input type="checkbox" class="tt-day" value="Wednesday"> Wed</label>
-            <label><input type="checkbox" class="tt-day" value="Thursday"> Thu</label>
-            <label><input type="checkbox" class="tt-day" value="Friday"> Fri</label>
-          </div>
-        </div>
-        <button class="btn btn-outline" onclick="TTG.add()">+ Add subject demand</button>
-        <button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate timetable</button>
+        <h3>🏫 Step 2 · Select the timetable context</h3>
+        <div class="grid grid-2"><div class="form-group"><label>Class *</label><select class="form-select" id="tt-class" onchange="TTG.contextChanged()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Periods per day</label><input class="form-input" type="number" id="tt-ppd" value="6" min="1" max="12"></div><div class="form-group"><label>Term *</label><select class="form-select" id="tt-term" onchange="TTG.contextChanged()"><option value="">— choose term —</option></select></div><div class="form-group"><label>Session *</label><select class="form-select" id="tt-session" onchange="TTG.contextChanged()"><option value="">— choose session —</option></select></div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px" data-staff-only>
+        <h3>📚 Step 3 · Add subject demand</h3><p class="help">For the selected class, add each subject once. “Periods/week” means how many times that subject must appear from Monday to Friday.</p>
+        <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject"><option value="">— choose subject —</option></select></div><div class="form-group"><label>Teacher *</label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div></div>
+        <div id="tt-days" style="display:none;margin:4px 0 12px"><b>Days this teacher is available:</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px"><label><input type="checkbox" class="tt-day" value="Monday"> Mon</label><label><input type="checkbox" class="tt-day" value="Tuesday"> Tue</label><label><input type="checkbox" class="tt-day" value="Wednesday"> Wed</label><label><input type="checkbox" class="tt-day" value="Thursday"> Thu</label><label><input type="checkbox" class="tt-day" value="Friday"> Fri</label></div></div>
+        <button class="btn btn-primary" onclick="TTG.add()">＋ Add / update this subject demand</button>
       </div>
       <div id="tt-reqs"></div>
+      <div class="card" style="margin-bottom:16px" data-staff-only><h3>⚙️ Step 4 · Validate and generate</h3><div id="tt-summary" class="notice">Select a context and add subject demand.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="TTG.validate()">✅ Validate demand</button><button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate / regenerate timetable</button><button class="btn btn-outline" onclick="TTG.printGrid()">🖨️ Print timetable</button><button class="btn btn-outline" onclick="TTG.clearGenerated()">Clear generated timetable</button></div></div>
       <div id="tt-grid"></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
@@ -553,29 +542,26 @@ const PC={ rows:[],
   },
   async save(){ if(!PC.rows.length){PC.build();} if(!sb){toast('Configured (DB not connected to persist)','info');return;}
     try{ await sb.from('timetable_config').delete().eq('class','ALL'); var pos=0;
-      for(const r of PC.rows){ pos++; await sb.from('timetable_config').insert({class:'ALL',period_no:Math.floor(r.period_no),label:r.label,start_time:r.start_time,end_time:r.end_time,is_break:r.is_break,position:pos}); }
+      for(const r of PC.rows){ pos++; await sb.from('timetable_config').insert({class:'ALL',period_no:Number(r.period_no),label:r.label,start_time:r.start_time,end_time:r.end_time,is_break:r.is_break,position:pos}); }
       toast('Period schedule saved ✓','success'); if(window.App&&App.logActivity)App.logActivity('config','timetable_config','ALL');
     }catch(e){ toast(e.message,'danger'); } }
 };
-document.addEventListener('DOMContentLoaded',()=>{ try{PC.build();}catch(e){} });
-const TTG={
-  async add(){ const c=document.getElementById('tt-class').value.trim(); if(!c){toast('Enter a class','warning');return;}
-    var pt=document.getElementById('tt-pt').checked;
-    var days=pt?[].slice.call(document.querySelectorAll('.tt-day:checked')).map(function(x){return x.value;}):null;
-    if(pt && (!days||!days.length)){toast('Select the days this part-time teacher attends','warning');return;}
-    const r=await Enterprise.timetable.addRequirement(c,document.getElementById('tt-subject').value.trim(),document.getElementById('tt-teacher').value.trim(),document.getElementById('tt-ppw').value, days, pt);
-    if(r&&r.error){toast(r.error.message||'Error','danger');return;} toast('Added'+(pt?' (part-time: '+days.join(', ')+')':''),'success'); TTG.loadReqs(c); },
-  async loadReqs(c){ const {data}=await Enterprise.timetable.listRequirements(c); const box=document.getElementById('tt-reqs');
-    box.innerHTML='<div class="card"><h3>Subject demand — '+esc(c)+'</h3><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/wk</th><th>Attends</th></tr></thead><tbody>'+(data||[]).map(r=>'<tr><td>'+esc(r.subject)+'</td><td>'+esc(r.teacher||'-')+'</td><td>'+r.periods_per_week+'</td><td>'+(r.available_days&&r.available_days.length?'<span class="badge">'+esc(r.available_days.join(', '))+'</span>':'All week')+'</td></tr>').join('')+'</tbody></table></div></div>'; },
-  async generate(){ const c=document.getElementById('tt-class').value.trim(); if(!c){toast('Enter a class','warning');return;}
-    const {data,error}=await Enterprise.timetable.generate(c,(window.SCHOOL&&window.SCHOOL.session)||'',(window.SCHOOL&&window.SCHOOL.term)||'',document.getElementById('tt-ppd').value);
-    if(error){toast(error.message,'danger');return;}
-    var msg='Generated '+((data&&data.placed)||0)+' periods ✓'+((data&&data.unplaced)?' · ⚠ '+data.unplaced+' could not fit (check part-time days/periods-per-day)':'');
-    toast(msg,(data&&data.unplaced)?'warning':'success',6000); if(window.App&&App.logActivity)App.logActivity('generate','timetable',c); TTG.grid(c); },
-  async grid(c){ const {data}=await Enterprise.timetable.grid(c); const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
-    const periods=[...new Set((data||[]).map(r=>r.period))].sort((a,b)=>a-b);
-    let h='<div class="card"><h3>Generated timetable — '+esc(c)+'</h3><div class="table-wrap"><table><thead><tr><th>Period</th>'+days.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>';
-    periods.forEach(p=>{ h+='<tr><td><strong>'+esc(p)+'</strong></td>'+days.map(d=>{const cell=(data||[]).find(r=>r.day===d&&String(r.period)===String(p));return '<td>'+(cell?esc(cell.subject)+'<br><small>'+esc(cell.teacher||'')+'</small>':'-')+'</td>';}).join('')+'</tr>'; });
-    h+='</tbody></table></div></div>'; document.getElementById('tt-grid').innerHTML=h; }
+const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions:[]},
+  val(id){return(document.getElementById(id)||{}).value||'';},context(){return{class:this.val('tt-class'),term:this.val('tt-term'),session:this.val('tt-session'),ppd:Number(this.val('tt-ppd'))||6};},
+  fill(id,items,label,key='name'){const el=document.getElementById(id);if(!el)return;const keep=el.value,vals=[...new Set((items||[]).map(x=>typeof x==='string'?x:x[key]).filter(Boolean))].sort();el.innerHTML='<option value="">— '+label+' —</option>'+vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(vals.includes(keep))el.value=keep;},
+  async init(){if(!sb)return;const [cl,su,st,lo,ap,cfg]=await Promise.all([sb.from('classes').select('name').order('name'),sb.from('subjects').select('name').order('name'),sb.from('staff').select('full_name,staff_type,status').eq('status','active').order('full_name'),sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'),sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false}),sb.from('timetable_config').select('*').eq('class','ALL').order('position')]);
+    this.lookups.classes=cl.data||[];this.lookups.subjects=su.data||[];this.lookups.teachers=st.data||[];this.lookups.terms=[...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value),...(ap.data||[]).map(x=>x.term)];this.lookups.sessions=[...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value),...(ap.data||[]).map(x=>x.session)];this.fill('tt-class',this.lookups.classes,'choose class');this.fill('tt-subject',this.lookups.subjects,'choose subject');this.fill('tt-teacher',this.lookups.teachers,'choose teacher','full_name');this.fill('tt-term',this.lookups.terms,'choose term','');this.fill('tt-session',this.lookups.sessions,'choose session','');const current=(ap.data||[]).find(x=>x.is_current);if(current){document.getElementById('tt-term').value=current.term||'';document.getElementById('tt-session').value=current.session||'';}if(cfg.data&&cfg.data.length){PC.rows=cfg.data.map(x=>({period_no:Number(x.period_no),label:x.label,start_time:x.start_time,end_time:x.end_time,is_break:x.is_break}));document.getElementById('pc-count').value=PC.rows.filter(x=>!x.is_break).length;PC.preview();}else PC.build();this.updateChecklist();},
+  updateChecklist(){const c=this.context(),teaching=PC.rows.filter(x=>!x.is_break).length||c.ppd,req=this.reqs.length,total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),capacity=5*(teaching||6),host=document.getElementById('tt-checklist');if(host)host.innerHTML='<b>Setup status:</b> '+(PC.rows.length?'✅ Day schedule':'❌ Day schedule')+' · '+(c.class&&c.term&&c.session?'✅ Context selected':'❌ Pick class/term/session')+' · '+(req?'✅ '+req+' subject demand(s)':'❌ Add subjects')+' · Requested '+total+' / capacity '+capacity;const sum=document.getElementById('tt-summary');if(sum)sum.innerHTML='<b>'+esc(c.class||'No class selected')+'</b> · '+esc(c.term||'No term')+' · '+esc(c.session||'No session')+' · '+req+' subjects · '+total+' requested periods · '+capacity+' weekly slots'+(total>capacity?' <b style="color:#dc2626">OVER CAPACITY</b>':'');},
+  async contextChanged(){const c=this.context();if(c.class)await Promise.all([this.loadReqs(c.class),this.grid(c.class)]);else{this.reqs=[];document.getElementById('tt-reqs').innerHTML='';document.getElementById('tt-grid').innerHTML='';}this.updateChecklist();},
+  async add(){const c=this.context(),subject=this.val('tt-subject'),teacher=this.val('tt-teacher'),ppw=Number(this.val('tt-ppw'))||0;if(!c.class||!c.term||!c.session){toast('Step 2: choose class, term and session first.','warning');return;}if(!subject||!teacher||ppw<1){toast('Pick a subject and teacher, then enter periods per week.','warning');return;}const pt=document.getElementById('tt-pt').checked,days=pt?[...document.querySelectorAll('.tt-day:checked')].map(x=>x.value):null;if(pt&&!days.length){toast('Select at least one available day for this restricted-day teacher.','warning');return;}const r=await Enterprise.timetable.addRequirement(c.class,subject,teacher,ppw,days,pt);if(r&&r.error){toast(r.error.message||r.error,'danger');return;}toast('Demand saved: '+subject+' · '+ppw+' periods/week · '+teacher,'success');await this.loadReqs(c.class);},
+  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td><b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="5">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div></div>';this.updateChecklist();},
+  async removeReq(id){if(!confirm('Remove this subject demand?'))return;const r=await Enterprise.timetable.removeRequirement(id);if(r.error){toast(r.error.message||r.error,'danger');return;}await this.loadReqs(this.context().class);},
+  validate(){const c=this.context(),total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),capacity=5*c.ppd,missing=this.reqs.filter(x=>!x.teacher);if(!c.class||!c.term||!c.session){toast('Choose class, term and session.','warning');return false;}if(!this.reqs.length){toast('Add at least one subject demand.','warning');return false;}if(total>capacity){toast('Requested '+total+' periods but only '+capacity+' slots exist. Reduce demand or increase periods/day.','danger',9000);return false;}if(missing.length){toast('Every subject must have a teacher.','danger');return false;}toast('✅ Demand is valid: '+total+' of '+capacity+' weekly slots requested.','success');return true;},
+  async generate(){if(!this.validate())return;const c=this.context();if(!confirm('Regenerate '+c.class+' for '+c.term+' '+c.session+'? Existing generated rows for this exact context will be replaced.'))return;const {data,error}=await Enterprise.timetable.generate(c.class,c.session,c.term,c.ppd);if(error){toast(error.message,'danger');return;}if(!data||data.ok===false){toast((data&&data.error)||'Generation failed','danger',10000);return;}const msg=(data.message||'Generated')+' Placed '+Number(data.placed||0)+' of '+Number(data.requested||0)+'.';toast(msg,Number(data.unplaced)?'warning':'success',10000);if(window.App&&App.logActivity)App.logActivity('generate','timetable',c.class+'|'+c.term+'|'+c.session);await this.grid(c.class);if(data.unplaced_items&&data.unplaced_items.length)openModal('Timetable needs attention','<p>'+esc(msg)+'</p><ul>'+data.unplaced_items.map(x=>'<li>'+esc(x.subject)+' — '+esc(x.teacher||'')+': '+esc(x.reason)+'</li>').join('')+'</ul>');},
+  async grid(cls){const c=this.context(),r=await Enterprise.timetable.grid(cls||c.class,c.session,c.term),data=r.data||[],days=['Monday','Tuesday','Wednesday','Thursday','Friday'],periods=[...new Set(data.map(x=>Number(x.period)))].sort((a,b)=>a-b);let h='<div class="card" id="tt-print-area"><h2 style="text-align:center">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center">Class Timetable · '+esc(c.class)+' · '+esc(c.term)+' · '+esc(c.session)+'</h3><div class="table-wrap"><table><thead><tr><th>Period / Time</th>'+days.map(d=>'<th>'+d+'</th>').join('')+'</tr></thead><tbody>';periods.forEach(per=>{const cfg=PC.rows.find(x=>!x.is_break&&Number(x.period_no)===per);h+='<tr><td><b>'+per+'</b>'+(cfg?'<br><small>'+esc(cfg.start_time)+'–'+esc(cfg.end_time)+'</small>':'')+'</td>'+days.map(d=>{const x=data.find(y=>y.day===d&&Number(y.period)===per);return '<td>'+(x?'<b>'+esc(x.subject)+'</b><br><small>'+esc(x.teacher||'')+'</small>':'—')+'</td>';}).join('')+'</tr>';});h+='</tbody></table></div><p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+' · Teacher conflicts checked across existing timetables in this term/session.</p></div>';document.getElementById('tt-grid').innerHTML=data.length?h:'<div class="card">No timetable generated for this exact class, term and session yet.</div>';},
+  printGrid(){const el=document.getElementById('tt-print-area');if(!el){toast('Generate or load a timetable first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Class Timetable</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #111;padding:8px;text-align:center}th{background:#e2e8f0}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
+  async clearGenerated(){const c=this.context();if(!c.class||!c.term||!c.session){toast('Select the exact context first.','warning');return;}if(!confirm('Clear generated timetable for '+c.class+' · '+c.term+' · '+c.session+'? Subject demand is retained.'))return;const r=await Enterprise.timetable.clearGenerated(c.class,c.session,c.term);if(r.error){toast(r.error.message||r.error,'danger');return;}toast('Generated timetable cleared; subject demand retained.','success');this.grid(c.class);}
 };
+PC.preview=function(){document.getElementById('pc-preview').innerHTML='<div class="table-wrap"><table><thead><tr><th>#</th><th>Label</th><th>Start</th><th>End</th></tr></thead><tbody>'+PC.rows.map(r=>'<tr style="'+(r.is_break?'background:var(--gray-100);font-style:italic':'')+'"><td>'+(r.is_break?'—':r.period_no)+'</td><td>'+esc(r.label)+'</td><td>'+esc(r.start_time)+'</td><td>'+esc(r.end_time)+'</td></tr>').join('')+'</tbody></table></div>';};
+document.addEventListener('DOMContentLoaded',()=>TTG.init());TTG.init();
 </script></body></html>

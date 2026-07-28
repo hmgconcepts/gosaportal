@@ -166,3 +166,29 @@ Run `database/complete-schema.sql` once in Supabase SQL Editor for a fresh deplo
 ## School Connect V5.1 definitive CBT repair
 
 The maintained V5.1 repair documentation is in `docs/v5/`. Before deployment read `BUG-FIX-REPORT.md` and `DEPLOYMENT-GUIDE-V5.md`. For an existing database, the CBT zero-score fix requires `database/cbt-v5.1-zero-score-hotfix.sql` (the full new schema already includes it); frontend-only deployment is insufficient. No paid AI API is used.
+
+## School Connect V5.3 update
+
+V5.3 adds teacher-owned profile signatures on assigned class reports, controlled full CBT editing, adaptive CBT-only report cards, a four-step timetable wizard and the demo numeric-amount correction. Back up and run the latest `database/complete-schema.sql`, then deploy all files and hard-refresh. See `docs/v5/V5.3-TEACHER-CBT-TIMETABLE-DEMO.md`.
+
+## School Connect V5.4 update
+
+V5.4 adds re-importable paginated portable archives, local archive analysis, export-before-purge, an orderly session/term CBT library with archive/restore, adaptive CBT-only reports and beginning-of-term student physical metrics. Back up and run the latest `database/complete-schema.sql`, deploy all files and hard-refresh. See `docs/v5/V5.4-PORTABILITY-CBT-ORGANIZATION-METRICS.md`.
+
+## School Connect V5.5 update
+
+V5.5 adds fully dynamic admin-defined report headings/maxima, admission-only registered CBT identity, password recovery, consistent navigation icons, comprehensive per-page assistant guidance, clearer Rubrics/Transcripts and term/session academic-performance insights. Back up and run the latest `database/complete-schema.sql`, deploy all files, configure the Supabase recovery redirect and hard-refresh. See `docs/v5/V5.5-FLEXIBLE-REPORTS-REGISTERED-CBT-RECOVERY-INSIGHTS.md`.
+
+## School Connect V5.7 final professional audit
+
+V5.7 adds institutional principal/proprietor/examination-officer Drive signatures
+with background removal, editable/deletable public examination campaigns, enhanced
+custom documents, performance-based bulk report comments, separated leadership
+navigation and registered-value dropdowns. Back up and run only the full updated
+`database/complete-schema.sql`, deploy every file and hard-refresh. See
+`docs/v5/V5.7-FINAL-PROFESSIONAL-AUDIT-AND-ENHANCEMENTS.md`.
+
+## School Connect V5.8
+V5.8 fixes deleted-record resurrection, makes PostgreSQL authoritative for saved
+admission/staff ID formats, and adds external-link-only database/storage efficiency
+controls. Run only the full updated complete schema, deploy all files and hard-refresh.

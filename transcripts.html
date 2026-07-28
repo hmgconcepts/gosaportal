@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Academic Transcripts • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Academic Transcripts. Comprehensive school management platform.">
-<meta name="keywords" content="$1">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Academic Transcripts • God of Seed Academy">
-<meta property="og:description" content="$1 — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -62,7 +62,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Academic Transcripts. Comprehensive school management platform.">
-    <meta name="keywords" content="$1">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./transcripts.html">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -461,19 +461,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     </header>
     <div class="app-content">
       
-      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer" onclick="var b=document.getElementById('pg-more');b.style.display=b.style.display==='none'?'block':'none'">
-        <div><strong>ℹ️ What is this page?</strong> <span style="color:var(--gray-700)">Comprehensive multi-term academic record synthesis. Compiles student continuous assessments and examination results across multiple academic terms and sessions into official, printable academic transcripts suitable for university applications and transfers.</span></div>
-        <span style="color:var(--primary)">▼</span>
-      </div>
-      <div id="pg-more" style="display:none;margin-top:10px">
-        <p style="margin:4px 0;color:var(--gray-700)"><strong>Who uses it:</strong> Admin and Staff.</p>
-        <p style="margin:8px 0 4px;color:var(--gray-700)"><strong>How to use it:</strong></p>
-        <ol style="margin:0;padding-left:20px;color:var(--gray-700);line-height:1.7"><li>Select student profile.</li><li>Specify academic terms and sessions to include.</li><li>Generate comprehensive transcript grid.</li><li>Click Print/Save PDF for official watermarked export.</li></ol>
-        
-        
-        <p style="margin:10px 0 0;font-size:.85rem;color:var(--gray-500)">Tip: click the <strong>ℹ️ Help</strong> button in the top bar, or the 💬 assistant, for the full explanation of any page.</p>
-      </div></div>
+      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h2 style="margin-top:0">🎓 Academic Transcripts — cumulative official history</h2><p>A transcript summarises a learner’s completed subjects and grades across multiple terms/sessions. It is different from a term report card and should be issued only after checking identity and published academic records.</p><ol style="line-height:1.75"><li>Confirm the student’s admission number and full name in Students.</li><li>Confirm report scores/results for every term/session to be included.</li><li>Click Add new, pick the student, state the session/year and term, then enter the verified cumulative average/GPA and subject-grade summary.</li><li>Review spelling, missing terms and grading scale; mark final only after approval.</li><li>Export portable JSON/CSV for future re-import and print the approved transcript for the recipient.</li></ol><div class="notice"><b>Important:</b> this register records the approved transcript summary. It does not invent missing grades. Use Report Cards/Academic Records to correct source scores first.</div></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary" onclick="CRUD.openForm('transcripts')" data-staff-only>+ Add new</button>
         <button class="btn btn-outline" onclick="CRUD.renderList('transcripts')">↻ Refresh</button>
