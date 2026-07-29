@@ -3488,4 +3488,92 @@ $cronsetup$;
 
 -- (keep-alive heartbeat installed)
 
+
+-- =============== FILE-STORAGE ARCHIVE VAULT (auto-installed) ===============
+-- ============================================================
+-- FILE-STORAGE ARCHIVE VAULT (idempotent — safe to re-run)
+-- ------------------------------------------------------------
+-- Purpose: keep the limited 500 MB FREE-TIER DATABASE small by
+-- moving OLD/COLD rows (audit logs, old CBT attempts, read
+-- notifications, old check-ins…) into the SEPARATE 1 GB Supabase
+-- FILE STORAGE as portable JSON archives, then purging them from
+-- the database. Archives can be listed, downloaded and RESTORED
+-- back into the database at any time from the Storage Manager page.
+--
+-- This creates a PRIVATE bucket called `archives` that only
+-- owner-level admins (super_admin / admin / proprietor) can use.
+-- This file is ALREADY embedded inside complete-schema.sql; run it
+-- standalone only on databases installed before this feature.
+-- ============================================================
+do $offload$
+begin
+  if to_regclass('storage.buckets') is null then
+    raise notice 'storage schema not present (local test database) — archive bucket skipped.';
+    return;
+  end if;
+
+  -- 1. Private bucket (50 MB per single archive file is far more than needed)
+  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  values ('archives', 'archives', false, 52428800, array['application/json'])
+  on conflict (id) do nothing;
+
+  -- 2. Owner-only policies on storage.objects for this bucket
+  execute 'drop policy if exists "sc archives owner select" on storage.objects';
+  execute 'create policy "sc archives owner select" on storage.objects for select to authenticated using (bucket_id=''archives'' and public.is_owner(auth.uid()))';
+  execute 'drop policy if exists "sc archives owner insert" on storage.objects';
+  execute 'create policy "sc archives owner insert" on storage.objects for insert to authenticated with check (bucket_id=''archives'' and public.is_owner(auth.uid()))';
+  execute 'drop policy if exists "sc archives owner update" on storage.objects';
+  execute 'create policy "sc archives owner update" on storage.objects for update to authenticated using (bucket_id=''archives'' and public.is_owner(auth.uid())) with check (bucket_id=''archives'' and public.is_owner(auth.uid()))';
+  execute 'drop policy if exists "sc archives owner delete" on storage.objects';
+  execute 'create policy "sc archives owner delete" on storage.objects for delete to authenticated using (bucket_id=''archives'' and public.is_owner(auth.uid()))';
+
+  raise notice 'File-storage archive vault ready: private bucket "archives" (owner-only).';
+exception when others then
+  raise notice 'Archive bucket setup skipped (%). You can create a private bucket named "archives" from Dashboard → Storage instead.', sqlerrm;
+end
+$offload$;
+
+-- (archive vault installed)
+
+
+-- =============== GOOGLE DRIVE BACKUP & SYNC SETTINGS (auto-installed) ===============
+-- ============================================================
+-- GOOGLE DRIVE BACKUP & SYNC SETTINGS (idempotent — safe to re-run)
+-- ------------------------------------------------------------
+-- Stores the school's Google OAuth Client ID and the automatic
+-- backup schedule so every admin device shares one configuration.
+-- The Client ID is PUBLIC by design (it is not a secret); backups
+-- themselves go to the school's own Google Drive via the
+-- drive.file scope and never touch Supabase.
+-- This file is ALREADY embedded inside complete-schema.sql; run it
+-- standalone only on databases installed before this feature.
+-- ============================================================
+alter table if exists public.school_settings add column if not exists drive_client_id text default '';
+alter table if exists public.school_settings add column if not exists drive_sync_enabled boolean not null default false;
+alter table if exists public.school_settings add column if not exists drive_sync_days int not null default 7;
+alter table if exists public.school_settings add column if not exists drive_folder_id text default '';
+alter table if exists public.school_settings add column if not exists drive_last_backup timestamptz;
+
+-- (drive sync settings installed)
+
+
+-- =============== SECURITY HARDENING SETTINGS (auto-installed) ===============
+-- ============================================================
+-- SECURITY HARDENING SETTINGS — V6.0 (idempotent, safe to re-run)
+-- ------------------------------------------------------------
+-- Powers assets/js/security-guard.js:
+--   • idle_lock_minutes : auto sign-out after N idle minutes (0 = off)
+--   • lockdown_mode     : emergency switch — locks the portal for all
+--                         non-admin roles instantly
+--   • lockdown_message  : friendly notice shown to locked-out users
+-- Managed from the Platform Health Console (health-check.html).
+-- This file is ALREADY embedded inside complete-schema.sql; run it
+-- standalone only on databases installed before this feature.
+-- ============================================================
+alter table if exists public.school_settings add column if not exists idle_lock_minutes int not null default 30;
+alter table if exists public.school_settings add column if not exists lockdown_mode boolean not null default false;
+alter table if exists public.school_settings add column if not exists lockdown_message text default '';
+
+-- (security hardening installed)
+
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;

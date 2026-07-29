@@ -224,7 +224,7 @@ const CRUD = {
     ]},
     complaints: { table:'complaints', title:'Complaint / Grievance', help:'Anyone (parent, student, staff) can lodge a complaint. It is routed to the admin team, tracked through statuses and closed with a resolution note. Attach evidence with a Drive link.', cols:[
       {key:'type',label:'Category',type:'select',options:['academic','welfare','bullying','fees/billing','facility','staff conduct','transport','other']},
-      {key:'subject',label:'Subject (short summary)',type:'text',required:true},
+      {key:'subject',label:'Subject (short summary)',type:'text',plain:true,required:true},
       {key:'body',label:'Full details — what happened, when, who was involved',type:'textarea',required:true},
       {key:'attachment_link',label:'Evidence link (photo/doc on Google Drive — optional)',type:'text',help:'Paste a Drive/web link. No upload needed.'},
       {key:'urgency',label:'Urgency',type:'select',options:['low','normal','high','critical']},
@@ -404,7 +404,7 @@ const CRUD = {
       {key:'status',label:'Status',type:'select',options:['planned','done','cancelled']}
     ]},
     helpdesk: { table:'helpdesk_tickets', title:'Help-desk ticket', cols:[
-      {key:'category',label:'Category',type:'text'},{key:'subject',label:'Subject',type:'text',required:true},
+      {key:'category',label:'Category',type:'select',options:['IT / computer','network / internet','electrical','plumbing','furniture','building / maintenance','equipment','security','cleaning','admin request','other']},{key:'subject',label:'Ticket title (short summary of the issue)',type:'text',plain:true,required:true},
       {key:'body',label:'Details',type:'textarea'},
       {key:'priority',label:'Priority',type:'select',options:['low','normal','high','urgent']},
       {key:'status',label:'Status',type:'select',options:['open','in_progress','resolved','closed']}
@@ -629,7 +629,8 @@ const CRUD = {
     return map[moduleId] || String(moduleId || '').replace(/-/g,'_');
   },
 
-  registeredField(c){c=Object.assign({},c);const k=String(c.key||'').split('.').pop();if(String(c.type||'text')!=='text')return c;if(['class','student_class','candidate_class','last_class'].includes(k))Object.assign(c,{type:'ref',refTable:'classes',refValue:'name',refStore:'value'});else if(k==='term')Object.assign(c,{type:'lookup',lookupKind:'term'});else if(k==='session')Object.assign(c,{type:'lookup',lookupKind:'session'});else if(['subject','subject_name'].includes(k))Object.assign(c,{type:'ref',refTable:'subjects',refValue:'name',refStore:'value'});else if(k==='department')Object.assign(c,{type:'ref',refTable:'departments',refValue:'name',refStore:'value'});else if(k==='arm')Object.assign(c,{type:'lookup',lookupKind:'arm'});else if(k==='campus')Object.assign(c,{type:'lookup',lookupKind:'campus'});return c;},
+  registeredField(c){c=Object.assign({},c);const k=String(c.key||'').split('.').pop();if(String(c.type||'text')!=='text')return c;if(c.plain)return c; // FIX HD-01: plain:true opts a text field out of auto ref/lookup conversion (e.g. help-desk ticket 'subject' is a title, NOT an academic subject)
+if(['class','student_class','candidate_class','last_class'].includes(k))Object.assign(c,{type:'ref',refTable:'classes',refValue:'name',refStore:'value'});else if(k==='term')Object.assign(c,{type:'lookup',lookupKind:'term'});else if(k==='session')Object.assign(c,{type:'lookup',lookupKind:'session'});else if(['subject','subject_name'].includes(k))Object.assign(c,{type:'ref',refTable:'subjects',refValue:'name',refStore:'value'});else if(k==='department')Object.assign(c,{type:'ref',refTable:'departments',refValue:'name',refStore:'value'});else if(k==='arm')Object.assign(c,{type:'lookup',lookupKind:'arm'});else if(k==='campus')Object.assign(c,{type:'lookup',lookupKind:'campus'});return c;},
   def(moduleId){
     const key=this.canonicalId(moduleId);if(this.SCHEMA[key]){const d=this.SCHEMA[key];return Object.assign({},d,{cols:(d.cols||[]).map(c=>this.registeredField(c))});}
     const g = this.GENERIC[key] || this.GENERIC[moduleId];
