@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Platform Health Console • God of Seed Academy</title>
+<meta name="description" content="Owner cockpit: keep-alive, storage, backups, security lockdown and login audit in one place.">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>.ph-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}.ph-badge{display:inline-block;padding:3px 12px;border-radius:99px;font-size:.8rem;font-weight:700}.ok{background:#dcfce7;color:#166534}.warn{background:#fef3c7;color:#92400e}.bad{background:#fee2e2;color:#991b1b}.muted{color:var(--gray-500);font-size:.85rem}</style>
+</head>
+<body>
+<main style="max-width:1080px;margin:30px auto;padding:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+    <div><h1 style="margin:0">🛡️ Platform Health Console</h1>
+    <p class="muted" style="margin:4px 0 0">One page to confirm the school portal is alive, backed up, within free-tier limits and secure. Owner/admin only.</p></div>
+    <div style="display:flex;gap:8px"><a class="btn btn-outline" href="dashboard.html">← Dashboard</a><button class="btn btn-primary" onclick="PH.refresh()">🔄 Refresh all</button></div>
+  </div>
+
+  <div class="ph-grid">
+    <div class="card"><h3>💓 Keep-Alive (anti-pause)</h3><div id="ph-heartbeat">Loading…</div>
+      <p class="muted">Layers: site-visit · GitHub Actions · edge ping · pg_cron. Details: <code>SUPABASE_FREE_TIER_PROTECTION.md</code></p></div>
+    <div class="card"><h3>🗄️ Database Space (500 MB free tier)</h3><div id="ph-storage">Loading…</div>
+      <p class="muted">Manage old rows on the <a href="storage.html">Storage Manager</a> (Archive Vault → 1 GB File Storage).</p></div>
+    <div class="card"><h3>☁️ Google Drive Backup</h3><div id="ph-drive">Loading…</div>
+      <p class="muted">Backups & restore: <a href="admin-data.html">Admin Data → Google Drive Backup & Sync</a>.</p></div>
+    <div class="card"><h3>📜 Site License</h3><div id="ph-license">Loading…</div>
+      <p class="muted">One-time (lifetime) licenses never expire — the HMG Concepts promise.</p></div>
+  </div>
+
+  <div class="card" style="margin-top:16px" id="ph-security-card">
+    <h3>🔐 Security Controls (owner only)</h3>
+    <div class="grid grid-3">
+      <div class="form-group"><label>Idle auto sign-out (minutes, 0 = off)</label><input class="form-input" id="ph-idle" type="number" min="0" value="30"></div>
+      <div class="form-group"><label>🚨 Emergency lockdown (non-admins locked out)</label><select class="form-select" id="ph-lockdown"><option value="false">Off — portal open</option><option value="true">ON — locked</option></select></div>
+      <div style="display:flex;align-items:end"><button class="btn btn-primary" onclick="PH.saveSecurity()">💾 Save security settings</button></div>
+    </div>
+    <div class="form-group"><label>Lockdown notice shown to locked-out users</label><input class="form-input" id="ph-lockmsg" placeholder="The portal is temporarily locked by the administration…"></div>
+    <p class="muted">Idle lock protects shared school computers. Lockdown is for incidents (exam leak, compromised account): admins keep working, everyone else sees a professional notice instantly. Older databases: run <code>database/security-hardening.sql</code> once.</p>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3>🕵️ Recent sign-in activity (login audit)</h3>
+    <div id="ph-audit">Loading…</div>
+    <p class="muted">Every sign-in/sign-out/idle-lock is recorded automatically. Old rows are purgeable from the Storage Manager (default retention 180 days).</p>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/data-portability.js"></script>
+<script src="assets/js/drive-sync.js"></script>
+<script src="assets/js/security-guard.js"></script>
+<script src="assets/js/site-help.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+const PH={
+  esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
+  badge(t,cls){return '<span class="ph-badge '+cls+'">'+this.esc(t)+'</span>';},
+  async heartbeat(){const b=document.getElementById('ph-heartbeat');if(!window.sb){b.textContent='Database not configured.';return;}
+    try{const{data,error}=await sb.from('sc_heartbeat').select('*').eq('id',1).maybeSingle();
+      if(error||!data){b.innerHTML=this.badge('Keep-alive not installed','warn')+'<p class="muted">Run <code>database/keep-alive.sql</code> once in the Supabase SQL Editor.</p>';return;}
+      const age=(Date.now()-Date.parse(data.last_ping))/86400000;
+      b.innerHTML=this.badge(age<4?'Healthy — never pausing':'⚠ Last ping '+age.toFixed(1)+' days ago',age<4?'ok':(age<6?'warn':'bad'))+
+      '<p style="margin:8px 0 0">Last ping: <b>'+this.esc(new Date(data.last_ping).toLocaleString())+'</b><br>Source: <b>'+this.esc(data.last_source||'—')+'</b> · Total pings: <b>'+this.esc(data.ping_count)+'</b></p>';
+    }catch(e){b.textContent=e.message;}},
+  async storage(){const b=document.getElementById('ph-storage');if(!window.sb){b.textContent='Database not configured.';return;}
+    try{const{data,error}=await sb.rpc('storage_health');
+      if(error){b.innerHTML='<p class="muted">'+this.esc(error.message)+' (owner role required)</p>';return;}
+      const p=Math.min(100,Number(data.percent||0)),cls=data.status==='critical'?'bad':data.status==='warning'?'warn':'ok';
+      b.innerHTML=this.badge(this.esc(data.used_pretty)+' used — '+p+'% of '+this.esc(data.quota_mb)+' MB',cls)+
+      '<div style="height:10px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:10px"><div style="height:100%;width:'+p+'%;background:'+(cls==='ok'?'#16a34a':cls==='warn'?'#d97706':'#dc2626')+'"></div></div>'+
+      '<p class="muted" style="margin-top:6px">Embedded-media rows: '+this.esc(data.embedded_media_rows)+' · Policy: external links only</p>';
+    }catch(e){b.textContent=e.message;}},
+  async drive(){const b=document.getElementById('ph-drive');try{await DriveSync.loadCfg();const c=DriveSync.cfg;
+      const last=c.lastBackup?Date.parse(c.lastBackup):0,days=last?((Date.now()-last)/86400000):null;
+      b.innerHTML=(c.clientId?this.badge(c.enabled?'Auto-sync ON — every '+c.days+' day(s)':'Configured — manual only',c.enabled?'ok':'warn'):this.badge('Not configured','warn'))+
+      '<p style="margin:8px 0 0">Last Drive backup: <b>'+(last?this.esc(new Date(last).toLocaleString())+(days>c.days?' ⚠ overdue':''):'never')+'</b></p>'+
+      (c.clientId?'':'<p class="muted">Setup guide: <code>docs/GOOGLE-DRIVE-SYNC-GUIDE.md</code></p>');
+    }catch(e){b.textContent=e.message;}},
+  license(){const b=document.getElementById('ph-license'),L=(window.SCHOOL&&window.SCHOOL.license)||{};
+    b.innerHTML=(L.model==='lifetime'?this.badge('Lifetime license — no recurring fees ✓','ok'):this.badge((L.model||'unknown')+' · '+(L.plan||''),L.status==='active'?'ok':'bad'))+
+    '<p style="margin:8px 0 0">Model: <b>'+this.esc(L.model||'—')+'</b>'+(L.expires_on?' · Expires: <b>'+this.esc(L.expires_on)+'</b>':'')+'</p>';},
+  async loadSecurity(){try{const{data}=await sb.from('school_settings').select('idle_lock_minutes,lockdown_mode,lockdown_message').eq('id',1).maybeSingle();
+      if(!data)return;document.getElementById('ph-idle').value=data.idle_lock_minutes==null?30:data.idle_lock_minutes;
+      document.getElementById('ph-lockdown').value=String(!!data.lockdown_mode);
+      document.getElementById('ph-lockmsg').value=data.lockdown_message||'';
+      if(data.lockdown_mode)document.getElementById('ph-security-card').style.border='2px solid #ef4444';
+    }catch(_){}},
+  async saveSecurity(){const lock=document.getElementById('ph-lockdown').value==='true';
+    if(lock&&!confirm('Turn ON emergency lockdown?\n\nEvery teacher, parent and student will be locked out immediately (admins keep access) until you turn it off.'))return;
+    const row={id:1,idle_lock_minutes:Math.max(0,Number(document.getElementById('ph-idle').value)||0),lockdown_mode:lock,lockdown_message:document.getElementById('ph-lockmsg').value.trim()};
+    const{error}=await sb.from('school_settings').upsert(row,{onConflict:'id'});
+    if(error){toast('Could not save: '+error.message+' (admin role required; older DBs: run database/security-hardening.sql)','danger',9000);return;}
+    toast(lock?'🚨 LOCKDOWN IS ON — non-admin users are now locked out.':'Security settings saved ✓',lock?'warning':'success',7000);this.loadSecurity();},
+  async audit(){const b=document.getElementById('ph-audit');try{const{data,error}=await sb.from('login_audit').select('email,event,user_agent,created_at').order('created_at',{ascending:false}).limit(25);
+      if(error){b.innerHTML='<p class="muted">'+this.esc(error.message)+' (admin role required)</p>';return;}
+      if(!data||!data.length){b.innerHTML='<p class="muted">No sign-in events recorded yet. Events appear from the next sign-in after this update is deployed.</p>';return;}
+      b.innerHTML='<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Event</th><th>Device</th></tr></thead><tbody>'+data.map(r=>'<tr><td>'+this.esc(new Date(r.created_at).toLocaleString())+'</td><td>'+this.esc(r.email||'—')+'</td><td>'+this.esc(r.event)+'</td><td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+this.esc(r.user_agent||'')+'</td></tr>').join('')+'</tbody></table></div>';
+    }catch(e){b.textContent=e.message;}},
+  refresh(){this.heartbeat();this.storage();this.drive();this.license();this.loadSecurity();this.audit();}
+};
+document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>PH.refresh(),900);});
+</script>
+</body></html>
