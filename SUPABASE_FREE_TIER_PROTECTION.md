@@ -19,38 +19,181 @@
 **Layer 1 — Site-visit heartbeat (automatic, nothing to configure)**
 `assets/js/app.js` on every page calls `sc_keep_alive('site-visit')` at most **once per device per 24 hours**. As long as *anyone* (a teacher, a parent, even you) opens the site once a week, the project never pauses. This is fully automated the moment the site is deployed.
 
-Because school traffic can stop during long holidays, add the independent external layers below. **Total setup time: under 10 minutes, once, at handover. After that everything is automatic.**
+Because school traffic can stop during long holidays, add the independent external layers below. **Total setup time: under 15 minutes, once, at handover. After that everything is automatic.**
 
 ---
 
-## Layer 2 — GitHub Actions heartbeat (5 minutes, recommended)
+## Layer 2 — GitHub Actions heartbeat (recommended, ~5 minutes)
 
-File already included: `.github/workflows/keep-supabase-alive.yml`
-It calls the `sc_keep_alive` RPC **every Monday and Thursday** (max gap 4 days — safely inside the 7-day window) and can be run manually from the Actions tab.
+The file `.github/workflows/keep-supabase-alive.yml` is already in this package. Once activated, GitHub's servers automatically call your database **every Monday and Thursday** (maximum gap = 4 days, safely inside the 7-day window). You never touch it again.
 
-**Setup (exact steps):**
-1. Push this site to a GitHub repository (you already do this to deploy on Vercel).
-2. Open the repo → **Settings → Secrets and variables → Actions → New repository secret**.
-3. Add **two** secrets:
-   - `SUPABASE_URL` → e.g. `https://abcdefgh.supabase.co` (Dashboard → Project Settings → API)
-   - `SUPABASE_ANON_KEY` → the **anon / public** key from the same page (never the service-role key)
-4. Open the **Actions** tab → select **Keep Supabase Alive** → **Run workflow** once to confirm you see `✅ Keep-alive heartbeat written`.
+To activate it, GitHub needs to know your Supabase URL and anon key. You store them as **repository secrets**. A "secret" in GitHub is simply a **named value**: the **Name** field is a label the workflow uses to find the value, and the **Secret** field is the value itself. You will create **two separate secrets** — one named `SUPABASE_URL` and one named `SUPABASE_ANON_KEY`. The names must be typed **exactly** as shown (all capitals, underscores, no spaces), because the workflow file looks them up by those exact names.
 
-> ⚠️ GitHub disables schedules in repos with **no commits for 60 days**. Layers 1, 3 and 4 cover that gap; or simply push any commit every couple of months.
+### Step A — Copy your two values from Supabase first
 
-## Layer 3 — UptimeRobot + Edge Function (5 minutes, also free)
+1. Open [supabase.com/dashboard](https://supabase.com/dashboard) and open your project.
+2. Click the ⚙️ **Project Settings** (bottom of the left sidebar) → **API** (on some dashboards this is now called **Data API** / **API Keys**).
+3. You will see:
+   - **Project URL** — looks like `https://abcdefghijklmnop.supabase.co`. Copy it into a notepad.
+   - **anon / public** key — a very long text starting with `eyJ...`. Click the copy icon next to it and paste it into your notepad too.
+4. ⚠️ On the same page there is also a **service_role** key. **Never use that one anywhere** — it bypasses all security.
 
-The edge function `supabase/functions/ping/index.ts` now performs a **real database write** (it calls `sc_keep_alive('edge-ping')`), not just a JSON reply.
+### Step B — Create the first secret (`SUPABASE_URL`)
 
-1. Install the Supabase CLI and deploy once:
-   ```bash
-   supabase functions deploy ping --no-verify-jwt
+1. Open your site's repository on **github.com**.
+2. Click the **Settings** tab (top of the repo — if you don't see it, you are not an admin of the repo).
+3. In the left sidebar scroll to **Security** → click **Secrets and variables** → click **Actions**.
+4. Make sure you are on the **Secrets** tab (not "Variables"), then click the green **New repository secret** button.
+5. You now see the two fields you asked about. Fill them like this:
+
+   | Field on the GitHub form | What you type |
+   |---|---|
+   | **Name** | `SUPABASE_URL` (exactly this, in capitals) |
+   | **Secret** | paste your Project URL, e.g. `https://abcdefghijklmnop.supabase.co` |
+
+6. Click **Add secret**.
+
+### Step C — Create the second secret (`SUPABASE_ANON_KEY`)
+
+1. Click **New repository secret** again (each secret is added one at a time — that is why you saw only one Name/Secret pair).
+2. Fill the form:
+
+   | Field on the GitHub form | What you type |
+   |---|---|
+   | **Name** | `SUPABASE_ANON_KEY` (exactly this) |
+   | **Secret** | paste the long **anon / public** key (`eyJ...`) |
+
+3. Click **Add secret**. You should now see both `SUPABASE_URL` and `SUPABASE_ANON_KEY` listed. (GitHub hides the values after saving — that is normal; you can only *update* or *remove* them, never re-read them.)
+
+### Step D — Test it once (do not skip)
+
+1. Click the **Actions** tab at the top of the repo.
+   - If you see a button like **"I understand my workflows, go ahead and enable them"**, click it.
+2. In the left list click **Keep Supabase Alive**.
+3. On the right, click the **Run workflow** dropdown → keep the default branch → click the green **Run workflow** button.
+4. Wait ~20 seconds, refresh, and click the new run. Open the **heartbeat** job.
+   - ✅ Success looks like: `✅ Keep-alive heartbeat written (HTTP 200). Supabase inactivity timer reset.`
+   - ❌ If it says the RPC is missing, run `database/keep-alive.sql` once in the Supabase **SQL Editor** and re-run the workflow.
+   - ❌ If it warns that secrets are not set, re-check Step B/C — the names must match exactly.
+5. Optional double-check inside Supabase → SQL Editor:
+   ```sql
+   select last_ping, last_source, ping_count from public.sc_heartbeat;
    ```
-2. Create a free account at [uptimerobot.com](https://uptimerobot.com) → **Add New Monitor**:
-   - Type: **HTTP(s)**
-   - URL: `https://YOUR-PROJECT.supabase.co/functions/v1/ping`
-   - Interval: **every 12 hours** is plenty (5-minute intervals waste your monthly Edge-Function quota)
-3. Bonus: add a second monitor pointing at your Vercel site URL — it keeps the site warm **and** triggers Layer 1 in some setups.
+   `last_source` should now say `github-actions`.
+
+> ⚠️ **One caveat:** GitHub automatically disables *scheduled* workflows in repositories with **no commits for 60 days** (it emails you first, and you can re-enable with one click on the Actions tab). Layers 1, 3 and 4 cover this gap; pushing any small commit every couple of months also resets it.
+
+---
+
+## Layer 3 — Edge Function + UptimeRobot (also free, ~10 minutes)
+
+Two parts: **(1)** deploy the tiny `ping` function that lives at `supabase/functions/ping/index.ts` in this package (it performs a **real database write** each time it is called), then **(2)** tell the free UptimeRobot service to call it automatically forever.
+
+### Part 1 — Install the Supabase CLI and deploy the function (one time)
+
+The Supabase CLI is a small command-line tool. Pick the instructions for your computer:
+
+**Windows (easiest — via Scoop):**
+1. Open **PowerShell** (Start menu → type "PowerShell" → Enter).
+2. Install Scoop (a Windows app installer) if you don't have it:
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   irm get.scoop.sh | iex
+   ```
+3. Install the Supabase CLI:
+   ```powershell
+   scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+   scoop install supabase
+   ```
+
+**macOS (via Homebrew):**
+```bash
+brew install supabase/tap/supabase
+```
+
+**Any computer that has Node.js (Windows/macOS/Linux) — no global install needed:**
+```bash
+npx supabase --version
+```
+(then use `npx supabase ...` wherever the commands below say `supabase ...`)
+
+4. Confirm it works: `supabase --version` should print a version number.
+
+**Now log in and deploy (run these inside the folder of this site — the folder that contains the `supabase/` subfolder):**
+
+```bash
+# 1. Log in — this opens your browser; approve the access token
+supabase login
+
+# 2. Link this folder to YOUR project.
+#    Find your project-ref: it is the short code in your dashboard URL:
+#    https://supabase.com/dashboard/project/THIS-PART   (e.g. abcdefghijklmnop)
+supabase link --project-ref YOUR_PROJECT_REF
+
+# 3. Deploy the ping function.
+#    --no-verify-jwt makes it callable by UptimeRobot without a login token.
+supabase functions deploy ping --no-verify-jwt
+```
+
+5. **Test it immediately.** Open this URL in your browser (replace with your real project ref):
+   ```
+   https://YOUR_PROJECT_REF.supabase.co/functions/v1/ping
+   ```
+   ✅ You should see JSON like:
+   ```json
+   {"status":"alive","timestamp":"2026-07-28T10:00:00.000Z","database_heartbeat":"heartbeat written at 2026-07-28T10:00:00+00:00","message":"Supabase free-tier keep-alive ping"}
+   ```
+   The important part is **`database_heartbeat: "heartbeat written at …"`** — that proves a real database write happened. If it says `rpc error … run database/keep-alive.sql`, run that SQL file once in the SQL Editor and refresh.
+
+### Part 2 — Create the UptimeRobot monitor (calls the function forever)
+
+1. Go to [uptimerobot.com](https://uptimerobot.com) → **Register for FREE** → sign up (email or Google) and confirm your email. The free plan allows **50 monitors** with 5-minute-or-slower intervals — far more than we need.
+2. In the dashboard click **+ Add New Monitor** (green button, top-left).
+3. Fill the form:
+
+   | Field | Value |
+   |---|---|
+   | **Monitor Type** | `HTTP(s)` (choose **Keyword** instead if available — see the tip below) |
+   | **Friendly Name** | `Supabase keep-alive — <school name>` |
+   | **URL (or IP)** | `https://YOUR_PROJECT_REF.supabase.co/functions/v1/ping` |
+   | **Monitoring Interval** | every **12 hours** if selectable; otherwise the largest interval offered (even the default 5 minutes is fine — each call is tiny, but 12–24 h conserves your 500k/month Edge-Function quota) |
+   | **Alert contacts** | tick your email so you are notified if the ping ever starts failing |
+
+4. Click **Create Monitor**.
+
+**💡 Better: use a Keyword monitor (also free).** Instead of type `HTTP(s)`, choose **Keyword**, set Keyword = `heartbeat written` and condition = **Keyword Not Exists → Down** (i.e. alert when the phrase is missing). Then UptimeRobot doesn't just check that the URL answers — it verifies the **database write actually succeeded**, and emails you the moment it stops.
+
+### How do you KNOW it is working? (verification checklist)
+
+1. **In UptimeRobot:** the monitor's status dot turns **green / "Up"** within a few minutes of creation, and the response-time chart starts filling. If it shows red/"Down", click the monitor and read the reason (wrong URL and forgetting `--no-verify-jwt` at deploy are the two usual causes).
+2. **In Supabase (the definitive proof):** SQL Editor →
+   ```sql
+   select last_ping, last_source, ping_count from public.sc_heartbeat;
+   ```
+   After the monitor has run, `last_source` shows **`edge-ping`** and `ping_count` keeps increasing day after day. Check it again tomorrow: if the number grew, the whole chain (UptimeRobot → edge function → database) is proven working.
+3. **Email test (optional):** temporarily edit the monitor's URL to something wrong, wait for the "Down" email, then fix it back. Now you know alerting works too.
+
+### Bonus — a second monitor for your Vercel site (2 minutes)
+
+This one watches your actual school website, so you learn immediately if the *site itself* ever goes down, and every check also keeps the site's edge cache warm:
+
+1. In UptimeRobot click **+ Add New Monitor** again.
+2. Fill it in:
+
+   | Field | Value |
+   |---|---|
+   | **Monitor Type** | `HTTP(s)` |
+   | **Friendly Name** | `School website — <school name>` |
+   | **URL (or IP)** | your live site, e.g. `https://yourschool.vercel.app/` |
+   | **Monitoring Interval** | 5 minutes (fine here — static pages, no quota concerns) |
+   | **Alert contacts** | your email |
+
+3. Click **Create Monitor**. Done — you now have two green monitors: one guarding the **database** (keep-alive) and one guarding the **website** (uptime alerts).
+4. Optional: UptimeRobot's free plan also includes one public **status page** (Status Pages → Create) — a professional touch you can share with the school.
+
+> Note: this second monitor does **not** replace the keep-alive one. Fetching a static Vercel page does not touch the Supabase database; only the `/functions/v1/ping` monitor (and Layers 1/2/4) resets the pause timer.
+
+---
 
 ## Layer 4 — pg_cron (fully internal, installed automatically)
 
@@ -62,7 +205,7 @@ The edge function `supabase/functions/ping/index.ts` now performs a **real datab
 
 Run `database/keep-alive.sql` once in the Supabase **SQL Editor** (Dashboard → SQL Editor → paste → Run). It is idempotent and safe to re-run. Then redeploy the site files so the new `app.js` heartbeat is live.
 
-## How to verify it is working
+## How to verify the whole system
 
 Run in the SQL Editor:
 ```sql
@@ -74,8 +217,8 @@ select last_ping, last_source, ping_count from public.sc_heartbeat;
 
 - [x] Layer 1 (site-visit) — automatic, nothing to do
 - [x] Layer 4 (pg_cron) — automatic when the schema is installed
-- [ ] Layer 2: add the two GitHub secrets, run the workflow once ✅
-- [ ] Layer 3: deploy `ping` + one UptimeRobot monitor (optional but free)
+- [ ] Layer 2: add the two GitHub secrets (Step B/C above), run the workflow once ✅
+- [ ] Layer 3: deploy `ping` + two UptimeRobot monitors (keep-alive + website)
 - [ ] Verify: `select * from public.sc_heartbeat;`
 
 With Layers 1 + 4 alone the project stays alive automatically; adding Layer 2 (and optionally 3) gives independent, external redundancy so the portal **never pauses**, even across long school holidays.

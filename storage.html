@@ -468,7 +468,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <strong>Always export first</strong> (CSV/JSON on the <a href="admin-data.html">Admin Data</a> page) so nothing is truly lost.</p>
       </div>
       <div class="card" style="margin-bottom:16px" data-admin-only>
-        <button class="btn btn-primary" onclick="ST.load()">📊 Show table sizes</button>
+        <button class="btn btn-primary" onclick="ST.load()">📊 Show table sizes</button> <a class="btn btn-outline" href="platform-health.html">🛡️ Platform Health Console</a>
         <div id="st-sizes" style="margin-top:12px"></div>
       </div>
       <div class="card" data-owner-only style="margin-bottom:16px;border:2px solid #86efac">
@@ -479,8 +479,28 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div class="grid grid-4"><div><label>Audit log days</label><input class="form-input" id="rt-activity" type="number" value="365"></div><div><label>Notifications days</label><input class="form-input" id="rt-notifications" type="number" value="180"></div><div><label>Check-in days</label><input class="form-input" id="rt-checkins" type="number" value="365"></div><div><label>CBT results days</label><input class="form-input" id="rt-cbt" type="number" value="730"></div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-primary" onclick="ST.savePolicy()">💾 Save retention policy</button><button class="btn btn-outline" onclick="ST.health()">📈 Analyse health</button><button class="btn btn-outline" onclick="ST.candidates()">🔎 Find expired candidates</button></div><div id="st-candidates" style="margin-top:12px"></div>
       </div>
+      <div class="card" data-owner-only style="margin-bottom:16px;border:2px solid #93c5fd">
+        <h3>📦 Archive Vault — move old rows into the 1 GB File Storage</h3>
+        <p style="color:#475569;margin-top:4px">Your database is limited to <b>500 MB</b>, but Supabase also gives a separate <b>1 GB File Storage</b> that this platform barely uses. This vault <b>moves old, low-value rows out of the database into File Storage</b> as restorable JSON archives — freeing database space without losing anything. Workflow: <b>1)</b> Archive to vault → <b>2)</b> confirm it appears in the list → <b>3)</b> Purge the same table/days above. Restore any archive back into the database at any time.</p>
+        <div class="grid grid-2">
+          <div class="form-group"><label>Table</label><select class="form-select" id="vt-table">
+            <option value="activity_log">activity_log (audit trail)</option><option value="login_audit">login_audit (login history)</option>
+            <option value="cbt_results">cbt_results (old exam attempts)</option>
+            <option value="notifications">notifications (read alerts)</option>
+            <option value="reading_scores">reading_scores (already pulled)</option>
+            <option value="attendance_checkins">attendance_checkins (old scans)</option><option value="staff_clock">staff_clock (old staff clock rows)</option><option value="student_clock">student_clock (old learner clock rows)</option>
+          </select></div>
+          <div class="form-group"><label>Older than (days)</label><input class="form-input" type="number" id="vt-days" value="180"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="VT.archive()">📦 Archive old rows → File Storage</button>
+          <button class="btn btn-outline" onclick="VT.list()">📂 List vault archives</button>
+        </div>
+        <div id="vt-list" style="margin-top:12px"></div>
+        <p style="font-size:.82rem;color:var(--gray-500);margin:8px 0 0">One-time setup: run <code>database/storage-offload.sql</code> in the Supabase SQL Editor (creates the private <code>archives</code> bucket; already included in new installs of <code>complete-schema.sql</code>).</p>
+      </div>
       <div class="card" data-admin-only>
-        <h3>🧹 Purge old rows (after exporting!)</h3>
+        <h3>🧹 Purge old rows (after archiving/exporting!)</h3>
         <div class="grid grid-2">
           <div class="form-group"><label>Table</label><select class="form-select" id="st-table">
             <option value="activity_log">activity_log (audit trail)</option><option value="login_audit">login_audit (login history)</option>
@@ -524,6 +544,15 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
+const VT={
+  fmt(b){b=Number(b)||0;return b>1048576?(b/1048576).toFixed(2)+' MB':b>1024?(b/1024).toFixed(1)+' KB':b+' B';},
+  ensure(){if(!sb){toast('DB not configured','warning');return false;}if(!window.DataPortability){toast('Data portability engine unavailable.','danger');return false;}DataPortability.init(sb);return true;},
+  async archive(){if(!this.ensure())return;const t=document.getElementById('vt-table').value,d=Number(document.getElementById('vt-days').value||180);if(!confirm('Copy rows in '+t+' older than '+d+' days into the File Storage vault?\n\nNothing is deleted by this step. After confirming the archive in the list, use "Purge old rows" above to free database space.'))return;try{const r=await DataPortability.archiveToVault(t,d);toast('✅ '+r.rows+' row(s) archived to File Storage as '+r.path+'. Now purge the same table/days above to free database space.','success',9000);this.list();}catch(e){toast(e.message||e,'danger',9000);}},
+  async list(){if(!this.ensure())return;const b=document.getElementById('vt-list');b.textContent='Loading vault…';try{const items=await DataPortability.listVault();if(!items.length){b.innerHTML='<p style="color:var(--gray-500)">Vault is empty. Archives you create will appear here.</p>';return;}b.innerHTML='<div class="table-wrap"><table><thead><tr><th>Archive</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody>'+items.map(i=>'<tr><td style="word-break:break-all">'+esc(i.path)+'</td><td>'+this.fmt(i.size)+'</td><td>'+esc(String(i.created).slice(0,10))+'</td><td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="VT.restore(\''+esc(i.path)+'\')">↩ Restore</button> <button class="btn btn-sm btn-outline" onclick="VT.dl(\''+esc(i.path)+'\')">⬇</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="VT.del(\''+esc(i.path)+'\')">🗑</button></td></tr>').join('')+'</tbody></table></div>';}catch(e){b.innerHTML='<p style="color:#b91c1c">'+esc(e.message||e)+'</p>';}},
+  async restore(p){if(!this.ensure())return;if(!confirm('Restore all rows from '+p+' back into the database? Existing rows with the same id are updated, missing ones are re-created.'))return;try{const rep=await DataPortability.restoreFromVault(p,'upsert');const saved=rep.reduce((a,x)=>a+x.saved,0),failed=rep.reduce((a,x)=>a+x.failed,0);toast('Restored '+saved+' row(s)'+(failed?', '+failed+' failed':'')+' ✓',failed?'warning':'success',8000);}catch(e){toast(e.message||e,'danger',9000);}},
+  async dl(p){if(!this.ensure())return;try{await DataPortability.downloadVault(p);}catch(e){toast(e.message||e,'danger');}},
+  async del(p){if(!this.ensure())return;if(!confirm('Delete archive '+p+' from File Storage permanently? Only do this if the data was restored or is no longer needed.'))return;try{await DataPortability.deleteVault(p);toast('Archive deleted.','info');this.list();}catch(e){toast(e.message||e,'danger');}}
+};
 const ST={
   async loadPolicy(){if(!sb)return;const{data}=await sb.from('data_retention_settings').select('*').eq('id',1).maybeSingle();if(!data)return;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v};set('rt-quota',data.quota_mb);set('rt-warning',data.warning_percent);set('rt-critical',data.critical_percent);set('rt-activity',data.activity_log_days);set('rt-notifications',data.notification_days);set('rt-checkins',data.checkin_days);set('rt-cbt',data.cbt_result_days);},
   async savePolicy(){const row={id:1,quota_mb:Number(document.getElementById('rt-quota').value)||500,warning_percent:Number(document.getElementById('rt-warning').value)||75,critical_percent:Number(document.getElementById('rt-critical').value)||90,activity_log_days:Number(document.getElementById('rt-activity').value)||365,notification_days:Number(document.getElementById('rt-notifications').value)||180,checkin_days:Number(document.getElementById('rt-checkins').value)||365,cbt_result_days:Number(document.getElementById('rt-cbt').value)||730,updated_by:window.SC_PROFILE?.id||null,updated_at:new Date().toISOString()};const{error}=await sb.from('data_retention_settings').upsert(row,{onConflict:'id'});if(error)return toast(error.message,'danger');toast('Retention policy saved. No rows were deleted.','success');ST.health();ST.candidates();},
