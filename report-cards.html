@@ -226,7 +226,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class=""><span class="app-nav-icon">🔐</span><span>Change Password</span></a>
       </nav>
       <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
-        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
       </div>
     </aside>
   <main class="app-main">
@@ -273,11 +273,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <button class="btn btn-primary" onclick="RC.reportCard()">🧾 Student Report Card</button>
           <button class="btn btn-outline" onclick="RC.broadsheet()" data-staff-only>📊 Class Broadsheet</button>
           <button class="btn btn-outline" onclick="RC.scoresheet()" data-staff-only>📋 Teacher Scoresheet</button>
+          <button class="btn btn-primary" style="background:linear-gradient(135deg,#7c3aed,#4f46e5)" onclick="RC.bulkClassCards()" data-admin-only>🖨️ Bulk Print ALL Report Cards (per class)</button>
         </div>
+        <div id="rc-bulk-progress" style="display:none;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--gray-600)"><span id="rc-bulk-msg">Preparing…</span><span id="rc-bulk-count"></span></div><div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:4px"><div id="rc-bulk-bar" style="height:100%;width:0;background:linear-gradient(90deg,#7c3aed,#4f46e5);transition:width .3s"></div></div></div>
       </div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
-      © <span data-current-year></span> <span data-school-name>School Portal</span> · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
+      © <span data-current-year></span> <span data-school-name>School Portal</span> · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
     </footer>
   </main>
 </div>
@@ -764,6 +766,36 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       } catch(e) { console.error(e); toast('Could not generate report card: '+(e.message||e),'danger',8000); }
     },
 
+
+    /* V6.2: bulk print all report cards for the selected class in ONE job.
+       Admin picks class/term/session above; every student's full card renders
+       one-per-page and a single print dialog covers the whole class. */
+    async bulkClassCards(){
+      if (this._familyMode) { toast('Bulk printing is an administrative action.', 'warning'); return; }
+      if (!window.sb) { toast('Database not configured', 'warning'); return; }
+      const cls = this.ctx.class || ($('rc-class') || {}).value || '';
+      const term = this.ctx.term || ($('rc-term') || {}).value || '';
+      const ses = this.ctx.session || ($('rc-session') || {}).value || '';
+      if (!cls) { toast('Choose a class first (Class dropdown above), then click Bulk Print again.', 'warning', 6000); return; }
+      ReportEngine.init(window.sb);
+      let names = [];
+      try { names = await ReportEngine.listClassStudents({class:cls,term:term,session:ses}); }
+      catch(e){ toast(e.message||e,'danger',8000); return; }
+      if (!names.length) { toast('No result records found for '+cls+' in the selected term/session. Enter scores first.', 'warning', 8000); return; }
+      if (!confirm('Bulk print '+names.length+' report card(s) for '+cls+(term?' — '+term:'')+(ses?' ('+ses+')':'')+'?\n\nEach student prints on their own page in ONE print job. Large classes can take a minute to build.')) return;
+      const wrap=document.getElementById('rc-bulk-progress'),bar=document.getElementById('rc-bulk-bar'),msg=document.getElementById('rc-bulk-msg'),cnt=document.getElementById('rc-bulk-count');
+      if(wrap){wrap.style.display='block';bar.style.width='0%';msg.textContent='Building cards…';cnt.textContent='0 / '+names.length;}
+      try {
+        const out = await ReportEngine.renderClassBulk({class:cls,term:term,session:ses,students:names},(done,total,name)=>{
+          if(wrap){bar.style.width=Math.round(done/total*100)+'%';msg.textContent='Building: '+name;cnt.textContent=done+' / '+total;}
+        });
+        if(wrap){msg.textContent='Opening print dialog…';}
+        ReportEngine.print('Report Cards — '+cls+(term?' — '+term:'')+(ses?' ('+ses+')':''), out.html, false);
+        toast('🖨️ '+out.count+' report card(s) ready — one per page. Use the print dialog to print or Save as PDF.', 'success', 9000);
+        if (window.App && App.logActivity) App.logActivity('bulk-print', 'report_cards', cls+'|'+term+'|'+ses+'|'+out.count+' cards');
+      } catch(e) { console.error(e); toast('Bulk print failed: '+(e.message||e),'danger',9000); }
+      finally { if(wrap) setTimeout(()=>{wrap.style.display='none';},4000); }
+    },
     async broadsheet(){
       if (this._familyMode) { toast('Broadsheets are staff-only. Only administrators and teachers can view class broadsheets.', 'warning'); return; }
       if (!window.sb) { toast('Database not configured', 'warning'); return; }
