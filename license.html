@@ -84,7 +84,7 @@ function render(){
     rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">State</td><td style="padding:6px 10px"><b>'+badge+'</b> — no recurring payments, the client owns this portal.</td></tr>';
   }
   rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Source</td><td style="padding:6px 10px">'+esc(src)+(__lic.tampered?' · <b style="color:#b91c1c">signature mismatch (tamper check failed)</b>':' · signature OK/not required')+'</td></tr>';
-  if(lic.renew_url)rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Renewal</td><td style="padding:6px 10px"><a href="'+esc(lic.renew_url)+'" target="_blank" rel="noopener">'+esc(lic.renew_url)+'</a></td></tr>';
+  if(lic.renew_url)rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Renewal</td><td style="padding:6px 10px"><a href="'+esc(lic.renew_url)+'" target="_blank" rel="noopener">'+esc(lic.renew_url)+'</a> <a class="btn btn-outline btn-sm" href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener">📢 Join the HMG WhatsApp Channel</a></td></tr>';
   card.innerHTML='<table style="width:100%;border-collapse:collapse">'+rows+'</table>';
 }
 async function load(){
