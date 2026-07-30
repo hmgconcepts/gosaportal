@@ -1166,6 +1166,8 @@ const App = {
     const supabase = window.sb || this.sb || null;
     if (!supabase) { location.href = 'login.html'; return; }
     try { localStorage.removeItem('sc-cached-profile'); localStorage.removeItem('sc-last-role'); } catch(_){}
+    // V6.0: record the sign-out in the login audit trail before the session ends.
+    try { if (window.SecurityGuard) SecurityGuard.audit('logout'); } catch(_){}
     supabase.auth.signOut().then(() => { location.href = 'login.html'; });
   },
 
@@ -1449,6 +1451,11 @@ function handleSignUp(e){ return App.handleSignUp(e); }
 // Load the portable archive engine on every operational page so any CSV/data
 // export has a single re-import path without uploading source files to Supabase.
 (function(){if(window.DataPortability)return;const s=document.createElement('script');s.src='assets/js/data-portability.js';s.defer=true;document.head.appendChild(s);})();
+// V5.9: Google Drive auto-sync engine — loaded everywhere so a due scheduled backup
+// can run in the background no matter which page an admin opens.
+(function(){if(window.DriveSync)return;const s=document.createElement('script');s.src='assets/js/drive-sync.js';s.defer=true;document.head.appendChild(s);})();
+// V6.0: runtime security layer (idle auto-lock, login audit, emergency lockdown, password meter).
+(function(){if(window.SecurityGuard)return;const s=document.createElement('script');s.src='assets/js/security-guard.js';s.defer=true;document.head.appendChild(s);})();
 (function(){if(window.ReportCommentBands)return;const s=document.createElement('script');s.src='assets/js/v57-enhancements.js';s.defer=true;document.head.appendChild(s);})();
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', App.init);
 else App.init();
