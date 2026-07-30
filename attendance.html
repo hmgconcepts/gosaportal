@@ -444,7 +444,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a>
       </nav>
       <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
-        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
       </div>
     </aside>
   <main class="app-main">
@@ -460,10 +460,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
     </header>
     <div class="app-content">
-      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button><button class="btn btn-outline" data-staff-only onclick="AT.printRegister()">🖨️ Print register</button></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
+      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
-      © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+      © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
     </footer>
   </main>
 </div>
@@ -491,17 +491,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
-const AT_printRegister=function(){
-  const cls=document.getElementById('at-class').value,date=document.getElementById('at-date').value;
-  if(!cls){toast('Choose a class first.','warning');return;}
-  const reg=document.getElementById('at-register');
-  if(!reg||!reg.querySelector('table')){toast('Load the register first, then print.','warning');return;}
-  const sc=window.SCHOOL||{};const w=window.open('','_blank');if(!w){toast('Popup blocked — allow popups to print.','warning');return;}
-  w.document.write('<!DOCTYPE html><html><head><title>Attendance Register — '+cls+' — '+date+'</title><style>@page{size:A4 portrait;margin:10mm}body{font-family:Arial,sans-serif;color:#111;padding:14px}h1{font-size:19px;margin:0;text-align:center}p.m{margin:3px 0;text-align:center;color:#475569;font-size:11px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #334155;padding:5px 7px;font-size:11px;text-align:left}th{background:#f1f5f9}button,select,input{display:none!important}.sig{display:flex;justify-content:space-between;margin-top:34px;font-size:11px}.sig div{width:220px;border-top:1px solid #111;padding-top:5px;text-align:center}</style></head><body><h1>'+(sc.name||'School')+'</h1><p class="m">'+(sc.motto||'')+'</p><p class="m"><b>Class Attendance Register — '+cls+' — '+date+'</b></p>'+reg.innerHTML+'<div class="sig"><div>Class Teacher</div><div>Principal / Head</div></div><p class="m" style="margin-top:18px;color:#94a3b8">Generated by School Connect · HMG Concepts</p><script>setTimeout(function(){window.print()},350);<\/script></body></html>');
-  w.document.close();w.focus();
-};
 const AT={
-  printRegister(){return AT_printRegister();},
   students:[], 
   async init(){
     document.getElementById('at-date').value=new Date().toISOString().slice(0,10);
