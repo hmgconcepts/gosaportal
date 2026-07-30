@@ -469,11 +469,32 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="card" style="margin-bottom:16px" data-admin-only>
         <h3>🗄️ Full backup & restore</h3>
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
-          <button class="btn btn-primary" onclick="DataTools.backupAll()">⬇ Download full backup (JSON)</button>
+          <button class="btn btn-primary" onclick="DataTools.backupAll()">⬇ Download full backup (JSON)</button> <a class="btn btn-outline" href="platform-health.html">🛡️ Platform Health Console</a>
           <label class="btn btn-outline">⬆ Restore from backup<input type="file" accept=".json" hidden onchange="DataTools.restore(event)"></label>
         </div>
       </div>
-      <div class="card" style="margin-bottom:16px" data-admin-only>
+            <div class="card" style="margin-bottom:16px;border:2px solid #a5b4fc" data-admin-only>
+        <h3>☁️ Google Drive Backup & Sync (school-owned, free)</h3>
+        <p style="color:var(--gray-600);margin-top:4px">Back up the <b>entire school database</b> straight into the school’s own Google Drive with one click, restore from Drive with one click, and let the platform <b>re-back-up automatically on a schedule</b>. Backups are the same portable JSON archives used everywhere else, so they restore perfectly. The connection uses Google’s <code>drive.file</code> permission: this site can only see the backup files it created — never the rest of the school’s Drive.</p>
+        <div id="gd-status" style="margin:8px 0"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-primary" onclick="GD.backup()">☁️⬇ Back up now to Google Drive</button>
+          <button class="btn btn-outline" onclick="GD.list()">📂 List Drive backups (restore)</button>
+        </div>
+        <div id="gd-progress" style="color:var(--gray-600);font-size:.9rem;margin-bottom:8px"></div>
+        <div id="gd-list"></div>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-weight:600">⚙️ Setup & automatic sync schedule (owner only)</summary>
+          <div class="grid grid-3" style="margin-top:10px">
+            <div class="form-group" style="grid-column:1/-1"><label>Google OAuth Client ID (one-time setup — see the guide)</label><input class="form-input" id="gd-client" placeholder="1234567890-abc123.apps.googleusercontent.com"></div>
+            <div class="form-group"><label>Automatic backup</label><select class="form-select" id="gd-enabled"><option value="false">Off (manual only)</option><option value="true">On (scheduled)</option></select></div>
+            <div class="form-group"><label>Every (days)</label><input class="form-input" id="gd-days" type="number" min="1" value="7"></div>
+            <div style="display:flex;align-items:end"><button class="btn btn-primary" onclick="GD.save()">💾 Save Drive settings</button></div>
+          </div>
+          <p style="font-size:.82rem;color:var(--gray-500);margin:6px 0 0">How auto-sync works on a free stack: whenever an admin opens any page and a backup is due, it uploads silently in the background (after the first authorisation in that browser). Full setup steps: <code>docs/GOOGLE-DRIVE-SYNC-GUIDE.md</code> in this package. One-time DB update for older installs: run <code>database/drive-sync.sql</code>.</p>
+        </details>
+      </div>
+<div class="card" style="margin-bottom:16px" data-admin-only>
         <h3>♻️ Portable Data Archive Center</h3>
         <p style="color:var(--gray-600)"><b>Every machine-readable export can come back.</b> Portable JSON preserves UUIDs, dates, arrays and JSON fields for later restoration/analysis; CSV remains available for spreadsheets and can be re-imported into the selected table. Files are processed locally and are never stored in Supabase.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="DataTools.portableFull()">⬇ Export all portable JSON</button><button class="btn btn-outline" onclick="DataTools.portableSelected()">⬇ Export selected table JSON</button><button class="btn btn-outline" onclick="DataTools.choosePortableImport()">⬆ Import JSON / CSV with preview</button></div>
@@ -578,4 +599,18 @@ const DataTools = {
   }
 };
 document.addEventListener('DOMContentLoaded',()=>DataTools.init());if(document.readyState!=='loading')DataTools.init();
-</script></body></html>
+</script><script src="assets/js/drive-sync.js"></script>
+<script>
+const GD={
+  fmt(b){b=Number(b)||0;return b>1048576?(b/1048576).toFixed(2)+' MB':b>1024?(b/1024).toFixed(1)+' KB':b+' B';},
+  prog(m){const e=document.getElementById('gd-progress');if(e)e.textContent=m||'';},
+  async refreshStatus(){await DriveSync.loadCfg();const e=document.getElementById('gd-status');if(!e)return;const c=DriveSync.cfg;const last=c.lastBackup?new Date(c.lastBackup).toLocaleString():'never';e.innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value" style="font-size:1rem">'+(c.clientId?'Configured ✓':'Not configured')+'</div><div class="stat-label">Google connection</div></div><div class="stat-card"><div class="stat-value" style="font-size:1rem">'+(c.enabled?'Every '+c.days+' day(s)':'Off')+'</div><div class="stat-label">Automatic sync</div></div><div class="stat-card"><div class="stat-value" style="font-size:1rem">'+esc(last)+'</div><div class="stat-label">Last Drive backup</div></div></div>';const ce=document.getElementById('gd-client'),en=document.getElementById('gd-enabled'),dy=document.getElementById('gd-days');if(ce&&!ce.value)ce.value=c.clientId||'';if(en)en.value=String(!!c.enabled);if(dy)dy.value=c.days||7;},
+  async save(){try{await DriveSync.loadCfg();await DriveSync.saveCfg({clientId:document.getElementById('gd-client').value.trim(),enabled:document.getElementById('gd-enabled').value==='true',days:Math.max(1,Number(document.getElementById('gd-days').value)||7)});toast('Google Drive settings saved for the whole school ✓','success');this.refreshStatus();}catch(e){toast(e.message||e,'danger',8000);}},
+  async backup(){try{await DriveSync.loadCfg();this.prog('Starting backup…');const r=await DriveSync.backupNow({interactive:true,onProgress:m=>this.prog(m)});this.prog('');toast('✅ Backup uploaded to Google Drive: '+r.file.name+' ('+r.rows+' rows, '+this.fmt(r.bytes)+'). Find it in the “'+DriveSync.folderName()+'” folder of the authorised Google account.','success',10000);this.refreshStatus();this.list();}catch(e){this.prog('');toast(e.message||e,'danger',10000);}},
+  async list(){const b=document.getElementById('gd-list');b.textContent='Loading Drive backups…';try{await DriveSync.loadCfg();const files=await DriveSync.listBackups();if(!files.length){b.innerHTML='<p style="color:var(--gray-500)">No backups in Drive yet. Click “Back up now” to create the first one.</p>';return;}b.innerHTML='<div class="table-wrap"><table><thead><tr><th>Backup file</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody>'+files.map(f=>'<tr><td style="word-break:break-all">'+esc(f.name)+'</td><td>'+this.fmt(f.size)+'</td><td>'+esc(String(f.createdTime).slice(0,16).replace('T',' '))+'</td><td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="GD.restore(\''+f.id+'\',\''+esc(f.name)+'\')">↩ Restore</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="GD.del(\''+f.id+'\',\''+esc(f.name)+'\')">🗑</button></td></tr>').join('')+'</tbody></table></div>';}catch(e){b.innerHTML='<p style="color:#b91c1c">'+esc(e.message||e)+'</p>';}},
+  async restore(id,name){if(!confirm('Restore “'+name+'” from Google Drive into the database?\n\nExisting rows with the same id are updated; missing rows are re-created. Nothing is deleted.'))return;try{this.prog('Downloading from Drive and importing…');const rep=await DriveSync.restoreFrom(id,'upsert');this.prog('');const saved=rep.reduce((a,x)=>a+x.saved,0),failed=rep.reduce((a,x)=>a+x.failed,0);document.getElementById('gd-list').insertAdjacentHTML('afterbegin',DataPortability.reportHTML(rep));toast('Restore finished: '+saved+' row(s) imported'+(failed?', '+failed+' failed (see report)':'')+' ✓',failed?'warning':'success',9000);}catch(e){this.prog('');toast(e.message||e,'danger',10000);}},
+  async del(id,name){if(!confirm('Delete the Drive backup “'+name+'” permanently?'))return;try{await DriveSync.deleteBackup(id);toast('Drive backup deleted.','info');this.list();}catch(e){toast(e.message||e,'danger');}}
+};
+document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>GD.refreshStatus(),800);});
+</script>
+</body></html>
