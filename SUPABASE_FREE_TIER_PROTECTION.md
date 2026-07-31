@@ -201,6 +201,25 @@ This one watches your actual school website, so you learn immediately if the *si
 
 ---
 
+## Layer 5 — Manual heartbeat button (zero setup, human-triggered)
+
+On the **Platform Health Console** (`platform-health.html`) there is now a big **"💓 Send keep-alive heartbeat NOW"** button. Any admin can press it — it performs a real database write via `sc_keep_alive('manual-button')` and instantly shows the confirmed server timestamp plus the updated ping counter.
+
+**When to use it:** once a week during long school holidays, before travel, or any time you want visible, human-confirmed proof that the inactivity timer was just reset. It complements (never replaces) the automated layers — pressing it also lets you *see* on the same page whether the automated layers have been firing (check `last_source` and `ping_count`).
+
+## Layer 6 — cron-job.org (a second, independent free scheduler — optional)
+
+If you want redundancy beyond UptimeRobot, [cron-job.org](https://cron-job.org) is a long-running free service that calls a URL on a schedule:
+
+1. Create a free account → **Create cronjob**.
+2. Title: `Supabase keep-alive`; URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/ping`
+3. Schedule: **every day at 06:00** (once daily is plenty).
+4. Save. Under **History** you can see each execution's HTTP 200 response — open one and confirm the body contains `heartbeat written`.
+
+Because it calls the same edge function as Layer 3, it needs no extra setup beyond the function already being deployed. Running BOTH UptimeRobot and cron-job.org means two unrelated companies are independently keeping your database awake.
+
+---
+
 ## Existing sites installed before this feature
 
 Run `database/keep-alive.sql` once in the Supabase **SQL Editor** (Dashboard → SQL Editor → paste → Run). It is idempotent and safe to re-run. Then redeploy the site files so the new `app.js` heartbeat is live.
@@ -211,7 +230,7 @@ Run in the SQL Editor:
 ```sql
 select last_ping, last_source, ping_count from public.sc_heartbeat;
 ```
-`last_ping` should never be older than ~4 days. `last_source` tells you which layer fired last (`site-visit`, `github-actions`, `edge-ping`, `pg_cron`).
+`last_ping` should never be older than ~4 days. `last_source` tells you which layer fired last (`site-visit`, `github-actions`, `edge-ping`, `pg_cron`, `manual-button`).
 
 ## Recommended client handover checklist
 
@@ -221,7 +240,7 @@ select last_ping, last_source, ping_count from public.sc_heartbeat;
 - [ ] Layer 3: deploy `ping` + two UptimeRobot monitors (keep-alive + website)
 - [ ] Verify: `select * from public.sc_heartbeat;`
 
-With Layers 1 + 4 alone the project stays alive automatically; adding Layer 2 (and optionally 3) gives independent, external redundancy so the portal **never pauses**, even across long school holidays.
+With Layers 1 + 4 alone the project stays alive automatically; Layers 2, 3 and 6 add independent external redundancy, and Layer 5 gives the admin a one-press manual reset for holiday peace of mind — six safeguards in total, so the portal **never pauses** under any circumstance.
 
 > **Best long-term option for a production school:** the Supabase **Pro plan** ($25/mo) removes pausing entirely and adds 7-day backups. The free layers above are a robust zero-cost alternative.
 

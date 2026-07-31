@@ -215,7 +215,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class=""><span class="app-nav-icon">💬</span><span>Inbox</span></a>
         <a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class=""><span class="app-nav-icon">👤</span><span>Student Profile</span></a>
         <a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class=""><span class="app-nav-icon">🧪</span><span>Take Exam</span></a>
-        <a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class=""><span class="app-nav-icon">🔎</span><span>Verify Certificate</span></a>
+        <a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class=""><span class="app-nav-icon">🔎</span><span>Verify Certificate</span></a>
         <a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class=""><span class="app-nav-icon">👨‍🏫</span><span>Teacher Overview</span></a>
         <a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class=""><span class="app-nav-icon">📘</span><span>Feature Guide</span></a>
         <a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class=""><span class="app-nav-icon">🏫</span><span>About</span></a>
@@ -226,7 +226,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class=""><span class="app-nav-icon">🔐</span><span>Change Password</span></a>
       </nav>
       <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
-        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
       </div>
     </aside>
   <main class="app-main">
@@ -236,7 +236,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
 
         <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
-        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Guest</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">not signed in</small></span></div>
+        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
         <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle theme">🌙</button>
         <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
       </div>
@@ -261,7 +261,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <div class="form-group"><label>Term</label><select class="form-select" id="rc-term" data-readonly-role="student parent"><option value="">— select term —</option></select></div>
           <div class="form-group"><label>Session</label><select class="form-select" id="rc-session" data-readonly-role="student parent"><option value="">— select session —</option></select></div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span id="score-grid"></span><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
       </div>
       <div id="rc-cols" data-staff-only></div>
       <div id="rc-grid"></div>
@@ -273,11 +273,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <button class="btn btn-primary" onclick="RC.reportCard()">🧾 Student Report Card</button>
           <button class="btn btn-outline" onclick="RC.broadsheet()" data-staff-only>📊 Class Broadsheet</button>
           <button class="btn btn-outline" onclick="RC.scoresheet()" data-staff-only>📋 Teacher Scoresheet</button>
+          <button class="btn btn-primary" style="background:linear-gradient(135deg,#7c3aed,#4f46e5)" onclick="RC.bulkClassCards()" data-admin-only>🖨️ Bulk Print ALL Report Cards (per class)</button>
         </div>
+        <div id="rc-bulk-progress" style="display:none;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--gray-600)"><span id="rc-bulk-msg">Preparing…</span><span id="rc-bulk-count"></span></div><div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:4px"><div id="rc-bulk-bar" style="height:100%;width:0;background:linear-gradient(90deg,#7c3aed,#4f46e5);transition:width .3s"></div></div></div>
       </div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
-      © <span data-current-year></span> <span data-school-name>School Portal</span> · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
+      © <span data-current-year></span> <span data-school-name>School Portal</span> · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
     </footer>
   </main>
 </div>
@@ -514,7 +516,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       const configuredTotal=this.cols.reduce((a,c)=>a+Number(c.max_mark||0),0),suspicious=this.cols.filter(c=>!(Number(c.max_mark)>0)||Number(c.max_mark)>100),keys=this.cols.map(c=>String(c.name||'').toLowerCase().replace(/[^a-z0-9]/g,'')),duplicates=keys.filter((x,i)=>keys.indexOf(x)!==i);
       const audit='<div class="notice" style="margin:8px 0;background:'+(suspicious.length||duplicates.length?'#fef2f2':'#f0fdf4')+';border-color:'+(suspicious.length||duplicates.length?'#fca5a5':'#86efac')+';color:'+(suspicious.length||duplicates.length?'#991b1b':'#166534')+'"><b>Configured maximum: '+configuredTotal+'</b>. Printed headings use these exact names/maxima. '+(suspicious.length?'Review unusual maximum: '+suspicious.map(c=>esc(c.name)+' ('+Number(c.max_mark)+')').join(', ')+'. ':'')+(duplicates.length?'Duplicate-like headings detected; rename or delete duplicates.':'Structure looks consistent.')+'</div>';
       $('rc-cols').innerHTML =
-        '<div class="card"><h3>School-wide assessment columns</h3><p style="color:var(--gray-600);font-size:.86rem">Create CA1, CA2, CBT, project and examination columns once. The same template is reused for every subject; scores stay separated by subject.</p>' +audit+
+        '<div class="card" data-admin-only><h3>School-wide assessment columns (admin only)</h3><p style="color:var(--gray-600);font-size:.86rem">Only administrators create, rename or delete report-card columns (CA1, CA2, CBT, project, examination). Teachers do not design the template — they simply enter scores in the Subject Broadsheet grid below; the same admin-approved template is reused for every subject.</p>' +audit+
         '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Max mark</th><th>Source</th><th></th></tr></thead><tbody>' +
         (this.cols.length ? this.cols.map(c => '<tr><td>' + esc(c.name) + '</td><td>' + c.max_mark + '</td><td>' + (c.source === 'cbt' ? '<span class="badge">From CBT</span>' : 'Manual') + '</td><td><button type="button" class="btn btn-sm btn-outline" data-edit-col="' + c.id + '">Edit</button> <button type="button" class="btn btn-sm btn-outline" data-del-col="' + c.id + '">✕</button></td></tr>').join('') : '<tr><td colspan="4">No columns yet — add your first one below.</td></tr>') +
         '</tbody></table></div>' +
@@ -527,6 +529,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     },
 
     async addCol(){
+      if (!(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) { toast('Only administrators can create report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }
       const name = ($('rc-cn') || {}).value ? $('rc-cn').value.trim() : '';
       const max = parseFloat(($('rc-cm') || {}).value) || 10;
       if (!name) { toast('Enter a column name.', 'warning'); return; }
@@ -603,7 +606,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       const max = Number(el.dataset.max); let v = parseFloat(el.value); if (isNaN(v)) {toast('Enter a valid number or leave blank.','warning');return;} if(v<0){v=0;el.value=0;} if (v > max) { v = max; el.value = max; toast('Capped at max ' + max, 'warning'); }
       const row = { column_id: el.dataset.col, student_id: el.dataset.studentId || null, student_id_ref: el.dataset.ref, student_name: el.dataset.name, class: this.ctx.class, subject: this.ctx.subject, term: this.ctx.term, session: this.ctx.session, score: v, source: 'manual', updated_by: (window.SC_PROFILE && SC_PROFILE.id) || null };
       const { error } = await window.sb.from('report_scores').upsert(row, { onConflict: 'column_id,student_id_ref,student_name,class,subject,term,session' });
-      if (error) { toast('Score not saved: ' + (error.message || error), 'danger', 8000); return; }
+      if (error) { const em=String(error.message||error); toast(em.includes('row-level security') ? 'Score not saved: this database still has the old security rules. Admin: run database/v6.3-role-access-fixes.sql once in the Supabase SQL Editor (2 minutes), then teachers can save scores normally.' : ('Score not saved: ' + em), 'danger', 10000); return; }
       // Mirror standard assessment columns into Results immediately. This is the one-way bridge that makes a subject-broadsheet entry available to the class broadsheet and student report card without retyping.
       await this.syncScoreToResults(el, v);
       if (window.App) App.logActivity('update', 'report_score', el.dataset.ref);
@@ -764,6 +767,36 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       } catch(e) { console.error(e); toast('Could not generate report card: '+(e.message||e),'danger',8000); }
     },
 
+
+    /* V6.2: bulk print all report cards for the selected class in ONE job.
+       Admin picks class/term/session above; every student's full card renders
+       one-per-page and a single print dialog covers the whole class. */
+    async bulkClassCards(){
+      if (this._familyMode) { toast('Bulk printing is an administrative action.', 'warning'); return; }
+      if (!window.sb) { toast('Database not configured', 'warning'); return; }
+      const cls = this.ctx.class || ($('rc-class') || {}).value || '';
+      const term = this.ctx.term || ($('rc-term') || {}).value || '';
+      const ses = this.ctx.session || ($('rc-session') || {}).value || '';
+      if (!cls) { toast('Choose a class first (Class dropdown above), then click Bulk Print again.', 'warning', 6000); return; }
+      ReportEngine.init(window.sb);
+      let names = [];
+      try { names = await ReportEngine.listClassStudents({class:cls,term:term,session:ses}); }
+      catch(e){ toast(e.message||e,'danger',8000); return; }
+      if (!names.length) { toast('No result records found for '+cls+' in the selected term/session. Enter scores first.', 'warning', 8000); return; }
+      if (!confirm('Bulk print '+names.length+' report card(s) for '+cls+(term?' — '+term:'')+(ses?' ('+ses+')':'')+'?\n\nEach student prints on their own page in ONE print job. Large classes can take a minute to build.')) return;
+      const wrap=document.getElementById('rc-bulk-progress'),bar=document.getElementById('rc-bulk-bar'),msg=document.getElementById('rc-bulk-msg'),cnt=document.getElementById('rc-bulk-count');
+      if(wrap){wrap.style.display='block';bar.style.width='0%';msg.textContent='Building cards…';cnt.textContent='0 / '+names.length;}
+      try {
+        const out = await ReportEngine.renderClassBulk({class:cls,term:term,session:ses,students:names},(done,total,name)=>{
+          if(wrap){bar.style.width=Math.round(done/total*100)+'%';msg.textContent='Building: '+name;cnt.textContent=done+' / '+total;}
+        });
+        if(wrap){msg.textContent='Opening print dialog…';}
+        ReportEngine.print('Report Cards — '+cls+(term?' — '+term:'')+(ses?' ('+ses+')':''), out.html, false);
+        toast('🖨️ '+out.count+' report card(s) ready — one per page. Use the print dialog to print or Save as PDF.', 'success', 9000);
+        if (window.App && App.logActivity) App.logActivity('bulk-print', 'report_cards', cls+'|'+term+'|'+ses+'|'+out.count+' cards');
+      } catch(e) { console.error(e); toast('Bulk print failed: '+(e.message||e),'danger',9000); }
+      finally { if(wrap) setTimeout(()=>{wrap.style.display='none';},4000); }
+    },
     async broadsheet(){
       if (this._familyMode) { toast('Broadsheets are staff-only. Only administrators and teachers can view class broadsheets.', 'warning'); return; }
       if (!window.sb) { toast('Database not configured', 'warning'); return; }
