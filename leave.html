@@ -472,7 +472,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <li>Ask the 💬 assistant, or open <a href="feature-guide.html">Feature Guide</a>, for a fuller explanation.</li>
         </ol>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+            <div class="card" data-admin-only style="margin-bottom:16px;border:2px solid #86efac">
+        <h3>✅ Leave Decision Panel (admin only)</h3>
+        <p style="color:var(--gray-600);margin-top:4px">Every pending request appears here. Click <b>Approve</b> or <b>Reject</b> — the decision is stamped with your name and time by the database, the staff member keeps a permanent record, and only administrators can make this change (staff cannot alter the status even from the form).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="btn btn-outline" onclick="LV.load()">↻ Refresh pending requests</button></div>
+        <div id="lv-pending"><span class="pulse">Loading pending leave requests…</span></div>
+      </div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary" onclick="CRUD.openForm('leave')" data-staff-only>+ Add new</button>
         <button class="btn btn-outline" onclick="CRUD.renderList('leave')">↻ Refresh</button>
         <button class="btn btn-outline" onclick="CRUD.exportCSV('leave')" data-staff-only>⬇ Export CSV</button>
@@ -515,5 +521,33 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.Super) Super.init(sb, window.SCHOOL);
   if (window.Enterprise) Enterprise.init(sb);
   if (window.CRUD) CRUD.init(sb);
+</script>
+<script>
+const LV={
+  esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
+  async load(){
+    const box=document.getElementById('lv-pending');
+    if(!box)return;
+    if(!window.sb){box.textContent='Database not configured.';return;}
+    const r=await sb.from('leave_requests').select('*, staff:staff_id(full_name,staff_no)').eq('status','pending').order('created_at',{ascending:true});
+    if(r.error){box.innerHTML='<p style="color:#b91c1c">'+this.esc(r.error.message)+'</p>';return;}
+    const rows=r.data||[];
+    if(!rows.length){box.innerHTML='<p style="color:var(--gray-500)">No pending requests — everything is decided. 🎉</p>';return;}
+    box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Staff</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Decision</th></tr></thead><tbody>'+rows.map(x=>{
+      const nm=(x.staff&&x.staff.full_name)||x.requested_by||'Staff';
+      return '<tr><td><b>'+this.esc(nm)+'</b>'+(x.staff&&x.staff.staff_no?'<br><small>'+this.esc(x.staff.staff_no)+'</small>':'')+'</td><td>'+this.esc(x.type||'')+'</td><td>'+this.esc(x.start_date||'')+'</td><td>'+this.esc(x.end_date||'')+'</td><td>'+this.esc(x.days||'')+'</td><td style="max-width:220px">'+this.esc(x.reason||'')+'</td><td style="white-space:nowrap"><button class="btn btn-sm btn-primary" onclick="LV.decide(\''+x.id+'\',\'approved\')">✅ Approve</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="LV.decide(\''+x.id+'\',\'rejected\')">✖ Reject</button></td></tr>';
+    }).join('')+'</tbody></table></div>';
+  },
+  async decide(id,status){
+    if(!confirm((status==='approved'?'APPROVE':'REJECT')+' this leave request?\n\nThe decision is final, stamped with your account and time, and the staff member will see it immediately.'))return;
+    const r=await sb.from('leave_requests').update({status:status}).eq('id',id).select('id');
+    if(r.error){toast(String(r.error.message||'').includes('administrator')?'Only an administrator can approve or reject leave (database-enforced).':('Decision failed: '+r.error.message),'danger',8000);return;}
+    if(!r.data||!r.data.length){toast('Decision not saved — your role may not permit this. Only admin-tier roles decide leave.','danger',8000);return;}
+    toast('Leave '+status+' ✓ The requester can see the decision now.','success',6000);
+    this.load(); if(window.CRUD)CRUD.renderList('leave');
+    if(window.App&&App.logActivity)App.logActivity('leave-'+status,'leave_requests',id);
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>LV.load(),900);});
 </script>
 </body></html>

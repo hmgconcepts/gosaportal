@@ -494,6 +494,24 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <p style="font-size:.82rem;color:var(--gray-500);margin:6px 0 0">How auto-sync works on a free stack: whenever an admin opens any page and a backup is due, it uploads silently in the background (after the first authorisation in that browser). Full setup steps: <code>docs/GOOGLE-DRIVE-SYNC-GUIDE.md</code> in this package. One-time DB update for older installs: run <code>database/drive-sync.sql</code>.</p>
         </details>
       </div>
+      <div class="card" style="margin-bottom:16px;border:2px solid #38bdf8" data-admin-only>
+        <details>
+        <summary style="cursor:pointer;font-weight:800;font-size:1.05rem">🚑 Disaster Recovery Wizard — restore a school onto a FRESH database from Google Drive (click to open)</summary>
+        <p style="color:var(--gray-600);margin-top:10px"><b>When to use this:</b> the school’s old Supabase project was paused too long / deleted / permanently lost, but backups exist in the school’s Google Drive. This wizard rebuilds everything on a brand-new database in ~30–45 minutes with free tools. (If the old project is merely <i>paused</i>, do NOT use this — just restore it at supabase.com and press the 💓 heartbeat on the Platform Health Console.)</p>
+        <ol style="line-height:2;color:var(--gray-700);padding-left:20px">
+          <li><b>Create the fresh database:</b> <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> → New project → copy the new <b>Project URL</b> and <b>anon public key</b> (Project Settings → API).</li>
+          <li><b>Install the schema:</b> new project → SQL Editor → paste the ENTIRE <code>database/complete-schema.sql</code> from the site files → Run → wait for “installed successfully ✅”. (This auto-installs keep-alive, the vault, Drive-sync and security settings.)</li>
+          <li><b>Reconnect this website:</b> edit <code>assets/js/config.js</code> — replace the old SUPABASE_URL and SUPABASE_ANON_KEY with the new values — push to GitHub; Vercel redeploys the SAME site onto the fresh database.</li>
+          <li><b>Recreate the first admin:</b> Login page → Request access → sign up; then in Supabase → Table Editor → <code>profiles</code> → set that row to <code>role = super_admin</code>, <code>status = approved</code>.</li>
+          <li><b>Reconnect Google Drive:</b> sign in here as that admin → expand <b>⚙️ Setup</b> in the ☁️ Google Drive card above → paste the school’s existing OAuth <b>Client ID</b> (it is tied to the site URL, not the database, so the SAME one still works) → Save.</li>
+          <li><b>One-click restore:</b> click <b>📂 List Drive backups</b> above → authorise with the school’s Google account → every past backup appears → on the NEWEST one click <b>🚑 Recover to new project</b> (not plain Restore). Recovery mode imports every school record, skips dead login accounts, clears stale references, retries row-by-row, and verifies the SHA-256 seal first.</li>
+          <li><b>Re-onboard people:</b> staff/parents/students sign up again (send one broadcast); approve them on <a href="approvals.html">Approvals</a> — restored records re-link by admission/staff number and email.</li>
+          <li><b>Re-arm ALL safeguards:</b> open the <a href="platform-health.html">🛡️ Platform Health Console</a> → press <b>💓 heartbeat</b>, re-add the two GitHub Action secrets with the NEW url/key, repoint UptimeRobot at the new project, switch Drive <b>auto-sync back ON</b> and run one fresh backup. Every tile must be green.</li>
+        </ol>
+        <p style="font-size:.85rem;color:var(--gray-500)">Full printable runbook with a “what survives / what doesn’t” table: <code>docs/DISASTER-RECOVERY-RUNBOOK.md</code> (included in this package). Prevention: keep auto-sync ON and glance at the Health Console weekly — then this wizard is never needed.</p>
+        </details>
+      </div>
+
 <div class="card" style="margin-bottom:16px" data-admin-only>
         <h3>♻️ Portable Data Archive Center</h3>
         <p style="color:var(--gray-600)"><b>Every machine-readable export can come back.</b> Portable JSON preserves UUIDs, dates, arrays and JSON fields for later restoration/analysis; CSV remains available for spreadsheets and can be re-imported into the selected table. Files are processed locally and are never stored in Supabase.</p>
