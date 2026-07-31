@@ -509,10 +509,27 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         this.students = studs || [];
       } catch (e) { this.students = []; console.warn('RC students load failed', e); }
       this.renderCols();
+      // V6.5: the signed-in role can resolve after the first render — re-check
+      // once so a teacher never briefly sees (or keeps) the admin column editor.
+      clearTimeout(this._colsRoleTimer); this._colsRoleTimer=setTimeout(()=>{try{this.renderCols();}catch(_){}} ,2500);
       await this.renderGrid();
     },
 
+    _isAdminNow(){ const r=(window.SC_PROFILE||{}).role||(window.App&&App.currentRole)||document.body.dataset.currentRole; return !!(window.App && App.isAdminRole && App.isAdminRole(r)); },
     renderCols(){
+      /* V6.5 FIX #1 (root cause): this card is injected AFTER app.js applied the
+         data-admin-only visibility pass, so the token never hid it for teachers.
+         Now we branch at render time: non-admins get a READ-ONLY column listing —
+         no add form, no edit, no delete — while the RLS policy ac_admin_write
+         remains the hard database gate. */
+      if(!this._isAdminNow()){
+        $('rc-cols').innerHTML = '<div class="card"><h3>Report-card columns (read-only)</h3>'+
+          '<p style="color:var(--gray-600);font-size:.86rem">These assessment columns were designed by the administrator. As a teacher you <b>enter scores</b> into them in the Subject Broadsheet grid below — you cannot add, rename or delete columns. Need a new column? Ask an admin.</p>'+
+          '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Max mark</th><th>Source</th></tr></thead><tbody>'+
+          (this.cols.length?this.cols.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.max_mark+'</td><td>'+(c.source==='cbt'?'<span class="badge">From CBT</span>':'Manual')+'</td></tr>').join(''):'<tr><td colspan="3">No columns yet — the administrator has not designed the report template for this class/term.</td></tr>')+
+          '</tbody></table></div></div>';
+        return;
+      }
       const configuredTotal=this.cols.reduce((a,c)=>a+Number(c.max_mark||0),0),suspicious=this.cols.filter(c=>!(Number(c.max_mark)>0)||Number(c.max_mark)>100),keys=this.cols.map(c=>String(c.name||'').toLowerCase().replace(/[^a-z0-9]/g,'')),duplicates=keys.filter((x,i)=>keys.indexOf(x)!==i);
       const audit='<div class="notice" style="margin:8px 0;background:'+(suspicious.length||duplicates.length?'#fef2f2':'#f0fdf4')+';border-color:'+(suspicious.length||duplicates.length?'#fca5a5':'#86efac')+';color:'+(suspicious.length||duplicates.length?'#991b1b':'#166534')+'"><b>Configured maximum: '+configuredTotal+'</b>. Printed headings use these exact names/maxima. '+(suspicious.length?'Review unusual maximum: '+suspicious.map(c=>esc(c.name)+' ('+Number(c.max_mark)+')').join(', ')+'. ':'')+(duplicates.length?'Duplicate-like headings detected; rename or delete duplicates.':'Structure looks consistent.')+'</div>';
       $('rc-cols').innerHTML =
@@ -529,7 +546,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     },
 
     async addCol(){
-      if (!(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) { toast('Only administrators can create report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }
+      if (!this._isAdminNow()) { toast('Only administrators can create report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }
       const name = ($('rc-cn') || {}).value ? $('rc-cn').value.trim() : '';
       const max = parseFloat(($('rc-cm') || {}).value) || 10;
       if (!name) { toast('Enter a column name.', 'warning'); return; }
@@ -540,12 +557,12 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       this.load();
     },
 
-    editCol(id){ if (!(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; } const c=this.cols.find(x=>String(x.id)===String(id));if(!c)return;openModal('Edit assessment column','<div class="form-group"><label>Heading shown on reports</label><input class="form-input" id="rc-ec-name" value="'+esc(c.name)+'"></div><div class="form-group"><label>Maximum mark</label><input class="form-input" type="number" min="0.5" step="0.5" id="rc-ec-max" value="'+Number(c.max_mark||0)+'"></div><p>Example: CA1 max 20, CA2 max 10, Project max 10. Report headings and mappings update from these settings.</p>','<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="RC.saveColEdit(\''+id+'\')">Save column</button>');},
+    editCol(id){ if (!this._isAdminNow()) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; } const c=this.cols.find(x=>String(x.id)===String(id));if(!c)return;openModal('Edit assessment column','<div class="form-group"><label>Heading shown on reports</label><input class="form-input" id="rc-ec-name" value="'+esc(c.name)+'"></div><div class="form-group"><label>Maximum mark</label><input class="form-input" type="number" min="0.5" step="0.5" id="rc-ec-max" value="'+Number(c.max_mark||0)+'"></div><p>Example: CA1 max 20, CA2 max 10, Project max 10. Report headings and mappings update from these settings.</p>','<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="RC.saveColEdit(\''+id+'\')">Save column</button>');},
     async saveColEdit(id){
-      if (!(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }const name=document.getElementById('rc-ec-name').value.trim(),max=Number(document.getElementById('rc-ec-max').value);if(!name||!(max>0)){toast('Enter a heading and maximum mark greater than zero.','warning');return;}const old=this.cols.find(x=>String(x.id)===String(id)),r=await window.sb.from('assessment_columns').update({name,max_mark:max}).eq('id',id);if(r.error){toast(r.error.message,'danger');return;}if(old&&old.name!==name){try{await window.sb.from('cbt_exams').update({report_column:name,max_score:max}).eq('class',this.ctx.class).eq('term',this.ctx.term).eq('session',this.ctx.session).eq('report_column',old.name);}catch(_){}}closeModal();toast('Column updated. Report headings and matching CBT mappings now use '+name+' ('+max+').','success');this.load();},
+      if (!this._isAdminNow()) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }const name=document.getElementById('rc-ec-name').value.trim(),max=Number(document.getElementById('rc-ec-max').value);if(!name||!(max>0)){toast('Enter a heading and maximum mark greater than zero.','warning');return;}const old=this.cols.find(x=>String(x.id)===String(id)),r=await window.sb.from('assessment_columns').update({name,max_mark:max}).eq('id',id);if(r.error){toast(r.error.message,'danger');return;}if(old&&old.name!==name){try{await window.sb.from('cbt_exams').update({report_column:name,max_score:max}).eq('class',this.ctx.class).eq('term',this.ctx.term).eq('session',this.ctx.session).eq('report_column',old.name);}catch(_){}}closeModal();toast('Column updated. Report headings and matching CBT mappings now use '+name+' ('+max+').','success');this.load();},
 
     async delCol(id){
-      if (!(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }
+      if (!this._isAdminNow()) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }
       if (!confirm('Delete this column and its scores?')) return;
       const r=await SCDelete.byId(window.sb,'assessment_columns',id);if(!r.ok){toast(r.error,'danger');return;}toast('Assessment column deleted permanently.','success');this.load();
     },
