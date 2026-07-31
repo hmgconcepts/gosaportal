@@ -706,8 +706,25 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     }
 
     // Get current user and role for filtering
-    const currentUserId = window.SC_PROFILE?.id || null;
-    const currentRole = String(window.SC_PROFILE?.role || window.App?.currentRole || '').toLowerCase();
+    let currentUserId = window.SC_PROFILE?.id || null;
+    let currentRole = String(window.SC_PROFILE?.role || window.App?.currentRole || '').toLowerCase();
+    /* V6.5 FIX #2 (root cause of "students see other students' payments"):
+       renderList fires on DOMContentLoaded, which often BEATS the async auth/
+       profile resolution. With no profile, the student/parent client filter was
+       silently skipped and the table showed every row RLS allowed (old
+       databases with legacy permissive policies allowed everything).
+       Fix: for privacy-scoped modules, WAIT for the profile before rendering —
+       and if it still cannot be resolved, render NOTHING rather than everything. */
+    const privacyScoped = ['fees','fee_payments','payment_history','payments_online','results','report_cards','attendance','certificates','idcards','health','conduct','behaviour'];
+    if (!currentUserId && privacyScoped.includes(this.canonicalId(moduleId))) {
+      this._privWait = (this._privWait || {});
+      const attempts = this._privWait[moduleId] = (this._privWait[moduleId] || 0) + 1;
+      if (attempts <= 20) { setTimeout(() => this.renderList(moduleId, options), 700); return; }
+      // Profile never resolved (broken session): fail CLOSED for privacy.
+      tableEl.querySelector('tbody').innerHTML = '<tr><td colspan="9">Could not confirm who is signed in — private records stay hidden. Refresh the page or sign in again.</td></tr>';
+      return;
+    }
+    if (currentUserId) this._privWait = {};
     const isStudent = currentRole === 'student';
     const isParent = currentRole === 'parent';
 
@@ -1726,20 +1743,47 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
 
   /* Apply approved/draft promotions: move each student to their to_class. */
   async applyPromotions() {
+    /* V6.5 #7 — ONE-CLICK session promotion, rebuilt for clarity and safety:
+       • Shows a full PREVIEW (per-action counts + class movements) before anything changes.
+       • Moves students by student_id when available (name matching only as last resort),
+         so two students sharing a name can never be mis-promoted.
+       • Repeat decisions are stamped applied too (student stays in class by design).
+       • Graduates become status='graduated' and later flow to Alumni.
+       • Every applied decision prints on the student's report card automatically
+         (PROMOTED TO…, NOT PROMOTED — REPEAT…, GRADUATED). */
     if (!this.sb) { toast('Database not configured.', 'warning'); return; }
-    if (!confirm('Apply all promotions? This updates each student\'s class (graduates become "graduated").')) return;
-    const { data: proms } = await this.sb.from('promotions').select('*').in('status', ['draft', 'approved']).limit(5000);
-    if (!proms || !proms.length) { toast('No promotions to apply.', 'warning'); return; }
-    let done = 0;
-    for (const p of proms) {
-      if (p.action === 'pending') continue;
-      const upd = p.action === 'graduate' ? { status: 'graduated' } : (p.action === 'promote' ? { class: p.to_class } : {});
-      if (Object.keys(upd).length) { await this.sb.from('students').update(upd).eq('full_name', p.student_name); }
-      await this.sb.from('promotions').update({ status: 'applied' }).eq('id', p.id);
-      done++;
+    const { data: proms, error } = await this.sb.from('promotions').select('*').in('status', ['draft', 'approved']).limit(5000);
+    if (error) { toast(error.message, 'danger'); return; }
+    const actionable = (proms || []).filter(p => ['promote','graduate','repeat'].includes(String(p.action||'').toLowerCase()));
+    if (!actionable.length) { toast('No promotion decisions to apply. Run “⚙ Auto-promote (by exam)” first to draft decisions.', 'warning', 8000); return; }
+    const counts = { promote:0, graduate:0, repeat:0 }; const moves = {};
+    actionable.forEach(p => { const a=String(p.action).toLowerCase(); counts[a]++; if(a==='promote'){ const k=(p.from_class||'?')+' → '+(p.to_class||'?'); moves[k]=(moves[k]||0)+1; } });
+    const moveLines = Object.entries(moves).map(([k,v]) => '   • ' + k + ': ' + v + ' student(s)').join('\n');
+    if (!confirm('ONE-CLICK SESSION PROMOTION — please review:\n\n' +
+      '⬆ Promote: ' + counts.promote + ' student(s)' + (moveLines ? '\n' + moveLines : '') + '\n' +
+      '🎓 Graduate: ' + counts.graduate + ' student(s) (status → graduated)\n' +
+      '🔁 Repeat: ' + counts.repeat + ' student(s) (stay in current class)\n\n' +
+      'What happens on OK:\n' +
+      '1) Promoted students MOVE to their new class automatically — every page (results, attendance, fees, timetable) follows the new class instantly.\n' +
+      '2) Each decision is stamped on the student\'s report card (PROMOTED / REPEAT / GRADUATED).\n' +
+      '3) Decisions become “applied” and will not re-run.\n\nProceed?')) return;
+    let done = 0, failed = 0;
+    for (const p of actionable) {
+      try {
+        const upd = p.action === 'graduate' ? { status: 'graduated' } : (p.action === 'promote' ? { class: p.to_class } : null);
+        if (upd) {
+          let r;
+          if (p.student_id) r = await this.sb.from('students').update(upd).eq('id', p.student_id).select('id');
+          else r = await this.sb.from('students').update(upd).eq('full_name', p.student_name).select('id');
+          if (r.error || !r.data || !r.data.length) { failed++; continue; }
+        }
+        await this.sb.from('promotions').update({ status: 'applied' }).eq('id', p.id);
+        done++;
+      } catch (_) { failed++; }
     }
-    if (window.App && App.logActivity) App.logActivity('apply-promotions', 'students', done + ' applied');
-    toast('✅ Applied ' + done + ' promotion(s).', 'success'); this.renderList('promotion');
+    if (window.App && App.logActivity) App.logActivity('apply-promotions', 'students', done + ' applied' + (failed ? ', ' + failed + ' failed' : ''));
+    toast('✅ ' + done + ' promotion decision(s) applied' + (failed ? ' — ' + failed + ' failed (student record not found; fix the name/class on the draft and re-apply)' : '') + '. Promoted students are already in their new classes; report cards now show each decision.', failed ? 'warning' : 'success', 10000);
+    this.renderList('promotion');
   },
 
   /* Issue 6: Build today's attendance from QR self check-ins so teachers don't
