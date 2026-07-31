@@ -626,13 +626,17 @@ var Punct = {
     a.href = URL.createObjectURL(blob); a.download = 'punctuality-awards.csv'; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   },
   async pushModal() {
-    let cols = [{ name: 'ca1' }, { name: 'ca2' }, { name: 'ca3' }, { name: 'exam' }], terms = [], sessions = [];
-    try { if (window.ReportEngine && ReportEngine.reportPickerOptions) { const p = await ReportEngine.reportPickerOptions(); if (p.columns && p.columns.length) cols = p.columns; terms = p.terms || []; sessions = p.sessions || []; } } catch (_) {}
+    /* V6.4 #2: the destination dropdown lists ONLY the assessment columns the
+       admin created on the Report Cards page (by column id). No hard-coded
+       ca1/ca2/ca3/exam entries — if no columns exist yet, we say so and stop. */
+    let cols = [], terms = [], sessions = [];
+    try { if (window.ReportEngine && ReportEngine.reportPickerOptions) { const p = await ReportEngine.reportPickerOptions(); cols = p.columns || []; terms = p.terms || []; sessions = p.sessions || []; } } catch (_) {}
+    if (!cols.length) { openModal('🚀 Push Punctuality Points → Report Card', '<div class="notice" style="background:#fef3c7;border-color:#fcd34d;color:#92400e"><b>No report-card columns exist yet.</b><br>Punctuality points are written into a column of the official report card, and only an administrator can create columns.<br><br><b>Admin:</b> open <a href="report-cards.html">Report Cards</a> → “School-wide assessment columns (admin only)” → add a column (e.g. a dedicated “Punctuality” column with its maximum mark) → come back and push.</div>', '<button class="btn btn-outline" onclick="closeModal()">Close</button>'); return; }
     const opt = (v, l) => '<option value="' + this.esc(v) + '">' + this.esc(l) + '</option>';
     openModal('🚀 Push Punctuality Points → Report Card',
       '<p style="color:var(--gray-600)">Sum each student\'s punctuality points over a period and write the total into a <strong>report-card column</strong> (e.g. CA2 or a dedicated "Punctuality" column). Re-pushing the same term/class/range <strong>updates</strong> the same rows — never duplicates.</p>' +
       '<div class="grid grid-3">' +
-      '<div class="form-group"><label>Target column (Results)</label><select id="pp-col" class="form-select">' + cols.map(function (c) { const nm = (c.name || '').toLowerCase(); return opt(nm, (c.name || nm) + (c.max_mark ? ' (max ' + c.max_mark + ')' : '')); }).join('') + '</select></div>' +
+      '<div class="form-group"><label>Report-card column (created by admin)</label><select id="pp-col" class="form-select">' + cols.map(function (c) { return opt(c.id, (c.name || 'Column') + (c.max_mark ? ' (max ' + c.max_mark + ')' : '')); }).join('') + '</select></div>' +
       '<div class="form-group"><label>Term</label><input id="pp-term" class="form-input" list="pp-terms" placeholder="e.g. First Term"><datalist id="pp-terms">' + terms.map(function (t) { return opt(t, t); }).join('') + '</datalist></div>' +
       '<div class="form-group"><label>Session</label><input id="pp-sess" class="form-input" list="pp-sessions" placeholder="e.g. 2025/2026"><datalist id="pp-sessions">' + sessions.map(function (t) { return opt(t, t); }).join('') + '</datalist></div>' +
       '</div><div class="grid grid-3">' +
@@ -642,14 +646,21 @@ var Punct = {
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button> <button class="btn btn-primary" onclick="Punct.doPush()">🚀 Push now</button>');
   },
   async doPush() {
-    const p = { p_term: this.el('pp-term').value.trim(), p_session: this.el('pp-sess').value.trim(), p_column: (this.el('pp-col').value || 'ca2').toLowerCase(), p_class: this.el('pp-class').value.trim(), p_start: this.el('pp-from').value || null, p_end: this.el('pp-to').value || null };
+    /* V6.4 #2: push straight into report_scores under the admin-created column. */
+    const colSel = this.el('pp-col');
+    const p = { p_column_id: colSel.value, p_term: this.el('pp-term').value.trim(), p_session: this.el('pp-sess').value.trim(), p_class: this.el('pp-class').value.trim(), p_start: this.el('pp-from').value || null, p_end: this.el('pp-to').value || null };
+    if (!p.p_column_id) { toast('Choose the report-card column.', 'warning'); return; }
     if (!p.p_term) { toast('Pick the term.', 'warning'); return; }
-    closeModal(); toast('Pushing punctuality points into Results…', 'info', 1800);
-    let done = null;
-    try { const r = await sb.rpc('sc_push_punctuality_to_results', p); if (r.error) { if (!this._missing(r.error)) { toast('Push failed: ' + r.error.message, 'danger', 7000); return; } } else done = r.data; } catch (e) { done = null; }
-    if (done == null) { done = await this.pushClient(p); if (done === false) return; }
-    toast('✅ Punctuality points pushed for ' + done + ' student(s) into Results column "' + p.p_column + '". Open Report Cards to see them.', 'success', 8000);
-    if (window.App && App.logActivity) App.logActivity('push-punctuality', 'results', p.p_column);
+    const colLabel = colSel.options[colSel.selectedIndex] ? colSel.options[colSel.selectedIndex].text : 'column';
+    closeModal(); toast('Pushing punctuality points into the report card…', 'info', 1800);
+    const r = await sb.rpc('sc_push_punctuality_to_report', p);
+    if (r.error) {
+      const em = String(r.error.message || '');
+      if (/could not find|does not exist|schema cache/i.test(em)) { toast('Push failed: your database is missing the V6.4 update. Admin: run database/v6.4-hard-scope-fixes.sql once in the Supabase SQL Editor, then push again.', 'danger', 10000); return; }
+      toast('Push failed: ' + em, 'danger', 8000); return;
+    }
+    toast('✅ Punctuality points pushed for ' + (r.data || 0) + ' student(s) into the report-card column "' + colLabel + '" (subject line: PUNCTUALITY). Open Report Cards to see them.', 'success', 9000);
+    if (window.App && App.logActivity) App.logActivity('push-punctuality', 'report_scores', colLabel);
   },
   async pushClient(p) { // fallback when the RPC is absent — identical upserts client-side
     let q = sb.from('punctuality_awards').select('student_id,student_name,student_id_ref,class,date,points').limit(20000);
