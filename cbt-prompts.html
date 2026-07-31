@@ -61,7 +61,15 @@
     <meta name="twitter:title" content="AI Question Prompts (for CBT CSV) • God of Seed Academy">
     <meta name="twitter:description" content="God of Seed Academy — AI Question Prompts (for CBT CSV). Free school management platform by HMG Concepts.">
     <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
-  </head>
+  <style>
+/* V6.3 NAV-UNIFY: single canonical navigation look on every page. */
+.app-sidebar{width:286px!important;overflow:hidden!important}
+.app-nav{display:flex!important;flex-direction:column!important;gap:4px!important;padding:12px 10px!important;flex:1!important;overflow-y:auto!important}
+.app-nav a{display:grid!important;grid-template-columns:32px minmax(0,1fr)!important;align-items:center!important;gap:10px!important;min-height:42px!important;padding:8px 10px!important;border-radius:12px!important;font-size:.875rem!important;font-weight:700!important;line-height:1.2!important;white-space:normal!important;text-align:left!important;flex-direction:row!important}
+.app-nav a span:first-child,.app-nav .app-nav-icon{width:32px!important;height:32px!important;min-width:32px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:1.05rem!important;line-height:1!important;border-radius:10px!important;background:rgba(79,70,229,.09)!important;color:var(--primary)!important;flex-shrink:0!important;overflow:hidden!important}
+.app-nav a.active span:first-child,.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22)!important;color:#fff!important}
+</style>
+</head>
 <body data-theme="theme2" data-school="God of Seed Academy" data-font="raleway">
 
 <div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
@@ -102,7 +110,7 @@
     <div id="modal-footer" class="modal-footer"></div>
   </div>
 </div>
-<div class="app-layout layout1" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
         <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
@@ -403,7 +411,7 @@
         </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
           <span class="app-nav-icon">🧪</span>
           <span>Take Exam</span>
-        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🔎</span>
           <span>Verify Certificate</span>
         </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">

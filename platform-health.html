@@ -20,7 +20,7 @@
   </div>
 
   <div class="ph-grid">
-    <div class="card"><h3>💓 Keep-Alive (anti-pause)</h3><div id="ph-heartbeat">Loading…</div>
+    <div class="card"><h3>💓 Keep-Alive (anti-pause)</h3><div id="ph-heartbeat">Loading…</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="PH.pingNow()">💓 Send keep-alive heartbeat NOW</button></div><p class="muted" style="margin-top:6px"><b>Layer 5 — manual heartbeat:</b> press this once a week during long holidays (or any time) to reset Supabase’s 7-day inactivity timer instantly. It performs a real database write and shows the confirmed server timestamp.</p>
       <p class="muted">Layers: site-visit · GitHub Actions · edge ping · pg_cron. Details: <code>SUPABASE_FREE_TIER_PROTECTION.md</code></p></div>
     <div class="card"><h3>🗄️ Database Space (500 MB free tier)</h3><div id="ph-storage">Loading…</div>
       <p class="muted">Manage old rows on the <a href="storage.html">Storage Manager</a> (Archive Vault → 1 GB File Storage).</p></div>
@@ -60,6 +60,11 @@
 const PH={
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
   badge(t,cls){return '<span class="ph-badge '+cls+'">'+this.esc(t)+'</span>';},
+  async pingNow(){if(!window.sb){toast('Database not configured','warning');return;}
+    try{const{data,error}=await sb.rpc('sc_keep_alive',{src:'manual-button'});
+      if(error){toast('Heartbeat failed: '+error.message+' — run database/keep-alive.sql once in the Supabase SQL Editor.','danger',9000);return;}
+      toast('💓 Heartbeat written! Supabase confirmed at '+new Date(data).toLocaleString()+'. The 7-day inactivity timer has been reset.','success',9000);this.heartbeat();
+    }catch(e){toast(e.message||e,'danger');}},
   async heartbeat(){const b=document.getElementById('ph-heartbeat');if(!window.sb){b.textContent='Database not configured.';return;}
     try{const{data,error}=await sb.from('sc_heartbeat').select('*').eq('id',1).maybeSingle();
       if(error||!data){b.innerHTML=this.badge('Keep-alive not installed','warn')+'<p class="muted">Run <code>database/keep-alive.sql</code> once in the Supabase SQL Editor.</p>';return;}

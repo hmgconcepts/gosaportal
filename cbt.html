@@ -61,7 +61,15 @@
     <meta name="twitter:title" content="CBT / Online Exams • God of Seed Academy">
     <meta name="twitter:description" content="God of Seed Academy — CBT / Online Exams. Free school management platform by HMG Concepts.">
     <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
-  </head>
+  <style>
+/* V6.3 NAV-UNIFY: single canonical navigation look on every page. */
+.app-sidebar{width:286px!important;overflow:hidden!important}
+.app-nav{display:flex!important;flex-direction:column!important;gap:4px!important;padding:12px 10px!important;flex:1!important;overflow-y:auto!important}
+.app-nav a{display:grid!important;grid-template-columns:32px minmax(0,1fr)!important;align-items:center!important;gap:10px!important;min-height:42px!important;padding:8px 10px!important;border-radius:12px!important;font-size:.875rem!important;font-weight:700!important;line-height:1.2!important;white-space:normal!important;text-align:left!important;flex-direction:row!important}
+.app-nav a span:first-child,.app-nav .app-nav-icon{width:32px!important;height:32px!important;min-width:32px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:1.05rem!important;line-height:1!important;border-radius:10px!important;background:rgba(79,70,229,.09)!important;color:var(--primary)!important;flex-shrink:0!important;overflow:hidden!important}
+.app-nav a.active span:first-child,.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22)!important;color:#fff!important}
+</style>
+</head>
 <body data-theme="theme2" data-school="God of Seed Academy" data-font="raleway">
 
 <div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
@@ -102,7 +110,7 @@
     <div id="modal-footer" class="modal-footer"></div>
   </div>
 </div>
-<div class="app-layout layout1" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
         <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
@@ -403,7 +411,7 @@
         </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
           <span class="app-nav-icon">🧪</span>
           <span>Take Exam</span>
-        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🔎</span>
           <span>Verify Certificate</span>
         </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
@@ -497,6 +505,7 @@
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script src="assets/js/cbt-engine.js"></script>
+<script src="assets/js/proctor.js"></script>
 <script>
 CBT.init(sb);
 if(window.CBTUI && window.CBTUI.loadPickers) window.CBTUI.loadPickers();
@@ -555,7 +564,7 @@ window.CBTUI = {
     });
     rows.sort((a,b)=>f.sort==='title'?String(a.title||'').localeCompare(String(b.title||'')):(f.sort==='oldest'?new Date(a.created_at)-new Date(b.created_at):new Date(b.created_at)-new Date(a.created_at)));
     this._visibleExamIds=rows.map(e=>e.id);
-    const action=e=>'<button class="btn btn-sm btn-outline" onclick="CBTUI.toggle(\''+e.id+'\','+(!e.is_open)+')">'+(e.is_open?'Close':'Open')+'</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.share(\''+esc(e.code)+'\')">Share</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.results(\''+e.id+'\',\''+esc(e.code)+'\')">Results</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.preview(\''+e.id+'\')">Preview</button> '+(CBTUI.canManageExam(e)?'<button class="btn btn-sm btn-primary" onclick="CBTUI.edit(\''+e.id+'\')">Edit</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.editQuestions(\''+e.id+'\')">Questions</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.setArchived(\''+e.id+'\','+(!e.is_archived)+')">'+(e.is_archived?'Restore':'Archive')+'</button> <details style="display:inline-block"><summary class="btn btn-sm btn-outline" style="list-style:none">More</summary><div class="card" style="position:absolute;z-index:20;min-width:220px"><button class="btn btn-sm btn-outline" onclick="CBTUI.exportPackage(\''+e.id+'\')">Export package</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.appendCSV(\''+e.id+'\')">Attach CSV</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.diagnoseScoring(\''+e.id+'\')">Diagnose</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairScoring(\''+e.id+'\')">Repair scoring</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.regradeResults(\''+e.id+'\')">Regrade</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairTabs(\''+e.id+'\')">Repair tabs</button> <button class="btn btn-sm btn-outline" data-admin-only onclick="CBTUI.del(\''+e.id+'\')">Delete</button></div></details>':'<span class="badge">Read-only</span>');
+    const action=e=>'<button class="btn btn-sm btn-outline" onclick="CBTUI.toggle(\''+e.id+'\','+(!e.is_open)+')">'+(e.is_open?'Close':'Open')+'</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.share(\''+esc(e.code)+'\')">Share</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.results(\''+e.id+'\',\''+esc(e.code)+'\')">Results</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.preview(\''+e.id+'\')">Preview</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.proctorReview(\''+esc(e.code)+'\')" title="Review proctoring snapshots">📸</button> '+(CBTUI.canManageExam(e)?'<button class="btn btn-sm btn-primary" onclick="CBTUI.edit(\''+e.id+'\')">Edit</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.editQuestions(\''+e.id+'\')">Questions</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.setArchived(\''+e.id+'\','+(!e.is_archived)+')">'+(e.is_archived?'Restore':'Archive')+'</button> <details style="display:inline-block"><summary class="btn btn-sm btn-outline" style="list-style:none">More</summary><div class="card" style="position:absolute;z-index:20;min-width:220px"><button class="btn btn-sm btn-outline" onclick="CBTUI.exportPackage(\''+e.id+'\')">Export package</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.appendCSV(\''+e.id+'\')">Attach CSV</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.diagnoseScoring(\''+e.id+'\')">Diagnose</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairScoring(\''+e.id+'\')">Repair scoring</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.regradeResults(\''+e.id+'\')">Regrade</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairTabs(\''+e.id+'\')">Repair tabs</button> <button class="btn btn-sm btn-outline" data-admin-only onclick="CBTUI.del(\''+e.id+'\')">Delete</button></div></details>':'<span class="badge">Read-only</span>');
     const groups={};rows.forEach(e=>{const key=(e.session||'No session')+'|||'+(e.term||'No term');(groups[key]||(groups[key]=[])).push(e);});
     const groupHtml=Object.entries(groups).map(([key,list])=>{const [session,term]=key.split('|||');return '<section class="card" style="margin:14px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">'+esc(session)+' · '+esc(term)+'</h3><span class="badge">'+list.length+' exam(s)</span></div><div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject & Class</th><th>Mode</th><th>Report</th><th>Status</th><th>Owner</th><th>Actions</th></tr></thead><tbody>'+list.map(e=>'<tr><td><b>'+esc(e.code)+'</b><br>'+esc(e.title||'Untitled')+'<br><small>'+esc(e.assessment_type||'exam')+' · '+(isMulti(e)?'Multi-subject':'Single-subject')+'</small></td><td>'+esc(e.subject||'—')+'<br><small>'+esc(e.class||'—')+'</small></td><td>'+(isAnon(e)?'Open / anonymous':'Registered')+'</td><td>'+esc(e.report_column||'Not mapped')+(e.max_score?'<br><small>max '+Number(e.max_score)+'</small>':'')+'</td><td>'+(e.is_archived?'<span class="badge">Archived</span>':(e.is_open?'<span class="badge badge-success">Open</span>':'<span class="badge">Closed</span>'))+'</td><td>'+esc(e.teacher_name||'—')+'</td><td style="min-width:290px">'+action(e)+'</td></tr>').join('')+'</tbody></table></div></section>';}).join('');
     const totals='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+exams.filter(e=>!e.is_archived).length+'</div><div class="stat-label">Active exams</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>e.is_archived).length+'</div><div class="stat-label">Archived</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Visible after filters</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(isMulti).length+'</div><div class="stat-label">Multi-subject</div></div></div>';
@@ -592,6 +601,8 @@ window.CBTUI = {
           <label><input type="checkbox" id="ac-right" checked> Block right-click</label>
           <label><input type="checkbox" id="ac-full" checked> Encourage fullscreen mode</label>
           <label><input type="checkbox" id="ac-watermark" checked> Show candidate watermark</label>
+          <label title="Intermittent webcam snapshots (~1/min) saved privately to File Storage for teacher review"><input type="checkbox" id="ac-camera"> 📸 Camera snapshots (proctoring)</label>
+          <label title="Watches microphone LOUDNESS only (nothing is recorded); sustained talking logs a violation + snapshot"><input type="checkbox" id="ac-audio"> 🎙️ Audio monitoring (noise alerts)</label>
           <div class="form-group"><label>Violation limit before auto-submit</label><input class="form-input" type="number" id="ac-max" value="5" min="0" max="10"><small>0 disables auto-submit.</small></div>
         </div>
       </div>
@@ -680,7 +691,7 @@ window.CBTUI = {
       select_count: parseInt(document.getElementById('ex-sel').value)||0,
       instructions: document.getElementById('ex-instr').value,
       is_open: true,
-      anti_cheat_config: {tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,max_violations:parseInt(document.getElementById('ac-max')?.value||'5')},
+      anti_cheat_config: {tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5')},
       csv_data: questions
     };
     const { data, error } = await CBT.createExam(exam);
@@ -816,6 +827,31 @@ window.CBTUI = {
   },
   async saveAppendCSV(id){ const txt=document.getElementById('append-cbt-csv').value.trim(); const qs=CBT.parseCSV(txt); if(!qs.length){toast('No valid questions found','warning');return;} const check=CBT.validateQuestionBank(qs);if(!check.ok){toast('Cannot append: '+check.errors.slice(0,5).join(' | '),'danger',12000);return;} const {data:e}=await sb.from('cbt_exams').select('csv_data,questions').eq('id',id).maybeSingle(); const old=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]); const bank=old.concat(qs); const {error}=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id); if(error){toast(error.message,'danger');return;} closeModal(); toast('Questions appended and scoring keys validated.','success'); CBTUI.refresh(); },
   async del(id){if(!sb||!confirm('Delete this exam and all its results?'))return;const r=await SCDelete.byId(sb,'cbt_exams',id);if(!r.ok){toast(r.error,'danger');return;}if(App)App.logActivity('delete','cbt_exam',id);toast('Exam deleted permanently.','success');CBTUI.refresh();},
+  async proctorReview(code){
+    if(!window.Proctor){toast('Proctor engine still loading — try again in a second.','warning');return;}
+    openModal('📸 Proctoring Review — '+code,'<div id="pr-body"><div class="pulse">Loading snapshots from File Storage…</div></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Close</button> <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="CBTUI.proctorDeleteAll(\''+esc(code)+'\')">🗑 Delete ALL snapshots (one click)</button>');
+    try{
+      const files=await Proctor.listForExam(code);
+      const body=document.getElementById('pr-body');
+      if(!files.length){body.innerHTML='<p style="color:var(--gray-500)">No snapshots for this exam. Either proctoring was off, no student has sat it yet, or snapshots were already cleaned up.</p>';return;}
+      CBTUI._prFiles=files.map(f=>f.path);
+      let html='<p style="color:var(--gray-600);font-size:.85rem">'+files.length+' snapshot(s), grouped by candidate. Click an image to open it full size (private 10-minute link). Use 🗑 on one image or <b>Delete ALL</b> below when review is complete — this permanently frees the File Storage space.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;max-height:52vh;overflow:auto">';
+      for(const f of files){
+        let url='';try{url=await Proctor.signedUrl(f.path);}catch(_){ }
+        const cand=(f.path.split('/')[1]||'').split('-').slice(0,-1).join(' ')||'candidate';
+        html+='<div style="border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;background:#fff"><a href="'+esc(url)+'" target="_blank" rel="noopener">'+(url?'<img src="'+esc(url)+'" style="width:100%;height:100px;object-fit:cover" loading="lazy">':'<div style="height:100px;display:flex;align-items:center;justify-content:center">🖼</div>')+'</a><div style="padding:6px;font-size:.7rem;color:var(--gray-600)"><b>'+esc(cand)+'</b><br>'+esc(String(f.path.split('/').pop()).replace('.jpg',''))+'<br><button class="btn btn-sm btn-outline" style="margin-top:4px;color:#dc2626;border-color:#dc2626" onclick="CBTUI.proctorDeleteOne(\''+esc(f.path)+'\',this)">🗑 Delete</button></div></div>';
+      }
+      body.innerHTML=html+'</div>';
+    }catch(e){document.getElementById('pr-body').innerHTML='<p style="color:#b91c1c">'+esc(e.message||e)+'</p>';}
+  },
+  async proctorDeleteOne(path,btn){try{await Proctor.remove(path);if(btn)btn.closest('div[style*="border"]').remove();toast('Snapshot deleted.','info');}catch(e){toast(e.message||e,'danger');}},
+  async proctorDeleteAll(code){
+    if(!confirm('Delete ALL proctoring snapshots for exam '+code+' permanently?\n\nDo this after you finish reviewing — it frees the File Storage space in one click.'))return;
+    try{const files=CBTUI._prFiles&&CBTUI._prFiles.length?CBTUI._prFiles:(await Proctor.listForExam(code)).map(f=>f.path);
+      await Proctor.remove(files);CBTUI._prFiles=[];toast('🧹 '+files.length+' snapshot(s) deleted — storage space reclaimed.','success',7000);closeModal();
+    }catch(e){toast(e.message||e,'danger');}
+  },
   share(code){
     const url = location.origin + location.pathname.replace(/cbt\.html$/,'cbt-exam.html') + '?code=' + code;
     const wa = 'https://wa.me/?text='+encodeURIComponent('Take the exam ('+code+'): '+url);
@@ -959,7 +995,7 @@ document.addEventListener('DOMContentLoaded', CBTUI.refresh); CBTUI.refresh();
     const bankCheck=CBT.validateQuestionBank(questions);
     if(!bankCheck.ok){toast('Cannot publish this exam: '+bankCheck.errors.slice(0,5).join(' | '),'danger',12000);return;}
     const multiSubjects=[...new Set(questions.map(q=>q.section).filter(Boolean))];
-    const exam={ title:document.getElementById('ex-title').value, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(document.getElementById('ex-subject').value||multiSubjects[0]||'General'), class:document.getElementById('ex-class').value, term:document.getElementById('ex-term').value, session:document.getElementById('ex-session').value, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:document.getElementById('ex-col').value, max_score:parseFloat(document.getElementById('ex-max').value)||0, duration:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions:document.getElementById('ex-instr').value, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
+    const exam={ title:document.getElementById('ex-title').value, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(document.getElementById('ex-subject').value||multiSubjects[0]||'General'), class:document.getElementById('ex-class').value, term:document.getElementById('ex-term').value, session:document.getElementById('ex-session').value, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:document.getElementById('ex-col').value, max_score:parseFloat(document.getElementById('ex-max').value)||0, duration:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions:document.getElementById('ex-instr').value, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
     const {data,error}=await CBT.createExam(exam); if(error){toast('Could not create: '+error.message,'danger');return;} if(typeof App!=='undefined'&&App.logActivity)App.logActivity('create','cbt_exam',data&&data.code); closeModal(); toast('✅ Exam created. Code: '+(data&&data.code),'success',6000); CBTUI.refresh();
   };
 })();

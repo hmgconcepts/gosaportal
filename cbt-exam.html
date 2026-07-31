@@ -114,6 +114,7 @@ textarea.form-input{min-height:80px;resize:vertical}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/cbt-engine.js"></script>
+<script src="assets/js/proctor.js"></script>
 <script>
 /* ===================================================================
    CBT Exam Runner v15 — Final Stable
@@ -530,6 +531,21 @@ textarea.form-input{min-height:80px;resize:vertical}
 
   Exam.beginMonitor = function(){
     const cfg = (this.data && this.data.anti_cheat_config) || {};
+    // V6.3 #21: optional camera-snapshot + audio-loudness proctoring. Runs only
+    // when the teacher enabled the toggles for THIS exam; the browser asks the
+    // student for permission; refusal is logged but never blocks the exam.
+    if (window.Proctor && (cfg.camera || cfg.audio_monitor)) {
+      try {
+        Proctor.start(cfg, (this.data && this.data.code) || 'exam', (this.student && this.student.name) || 'candidate', (type, detail) => {
+          try {
+            this.violationLog = this.violationLog || [];
+            this.violationLog.push({ type: type, detail: detail, at: new Date().toISOString() });
+            if (type === 'audio_noise') { this.violations = (this.violations || 0) + 1; const v = document.getElementById('viol'); if (v) v.textContent = '⚠ ' + this.violations + ' integrity flag(s)'; }
+            if (type === 'proctor_started' && typeof toast === 'function') toast('🔒 Exam monitoring is ON for this assessment: ' + detail + '. Work alone and stay in view of the camera.', 'info', 8000);
+          } catch (_) {}
+        });
+      } catch (e) { console.warn('[Proctor] start skipped:', e.message || e); }
+    }
     if (window.CBT && typeof window.CBT.startAntiCheat === 'function') {
       this.monitor = window.CBT.startAntiCheat(cfg, (type, n) => {
         this.violations = n;
@@ -565,6 +581,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     this._done = true;
     clearInterval(this.timer);
     if (this.monitor) try { this.monitor.stop(); } catch (e) {}
+    if (window.Proctor && Proctor.active) try { Proctor.stop(); } catch (e) {}
     const graded = (window.CBT && window.CBT.gradeSubmission) ? window.CBT.gradeSubmission(this.data, this.answers) : { score: 0, total: 0, percent: 0, grade: 'F', correct: 0, wrong: 0, skipped: 0 };
     const timeTaken = Math.round((Date.now() - this.startTs) / 1000);
     const payload = {
