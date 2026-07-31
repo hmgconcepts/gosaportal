@@ -22,19 +22,25 @@ const CRUD = {
     lesson_plans:['staff','teacher'], announcements:[], events:[],
     gallery:[], library:[], digital_library:['staff','teacher'],
     eresources:['staff','teacher'], directory:[], broadcast:[],
-    complaints:['staff','teacher','parent','student'], inbox:['staff','teacher','parent'],
+    complaints:['staff','teacher','parent','student'], inbox:['staff','teacher','parent','student'], /* V6.3 #14: students can also write in-app messages */
     messages:['staff','teacher','parent','student'], leave:['staff','teacher'], visitors:['staff','teacher'],
     hostel:[], transport:[], certificates:[],
     behaviour:['staff','teacher'], conduct:['staff','teacher'], health:['staff','teacher'],
     support_plans:['staff','teacher'], diary:['staff','teacher'], checkin:['staff','teacher'],
-    rubrics:['staff','teacher'], counselling:['staff','teacher'], substitutions:['staff','teacher'],
+    rubrics:['staff','teacher'], counselling:['staff','teacher'], substitutions:[], /* V6.3 #11: staff read-only; admin approves/creates cover */
     helpdesk:['staff','teacher','parent','student'], book_request:['staff','teacher','student'],
     // Admin-only write modules
     academic_setup:[], approvals:[], admin_data:[], analytics:[], finance:[], hr:[], payroll:[],
     staff_loans:[], staff_bonus:[], appraisals:[], inventory:[], compliance:[], activity_log:[],
     storage:[], settings:[], promotion:[], alumni:[], financial_aid:[], donations:[], payments_online:[],
     admissions:[], admission_links:[], exam_registrations:['staff','teacher'], departments:[], front_desk:[], document_builder:[], fleet_tracking:[], facility_booking:[],
-    menu:[], cafeteria:[], idcards:[], flyer:[], school_calendar:[], lost_found:[], parent_meeting:[]
+    menu:[], cafeteria:[], idcards:[], flyer:[], school_calendar:[], lost_found:[], parent_meeting:[],
+    /* V6.3 #10: every staff/teacher has read/write on domain traits & report comments
+       (RLS still keeps each teacher to rows they authored; admin overrides). */
+    affective_traits:['staff','teacher'], psychomotor_traits:['staff','teacher'], report_comments:['staff','teacher'],
+    /* V6.3 #17: fees & payment recording writable by staff (bursar is an admin-tier
+       role and always writes; this keeps the UI consistent for finance staff). */
+    fees:['staff','teacher'], fee_payments:['staff','teacher']
   },
   init(supabaseClient) { this.sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null); },
 
@@ -198,11 +204,11 @@ const CRUD = {
       {key:'category',label:'Category',type:'text'},{key:'amount',label:'Amount',type:'number',required:true},
       {key:'description',label:'Description',type:'textarea'},{key:'date',label:'Date',type:'date'}
     ]},
-    leave: { table:'leave_requests', title:'Leave request', cols:[
+    leave: { table:'leave_requests', title:'Leave request', help:'Staff submit leave requests (they start as PENDING). Only an administrator can approve or reject — the database enforces this and stamps who decided and when.', cols:[
       {key:'type',label:'Type',type:'select',options:['sick','casual','earned','study','maternity']},
       {key:'start_date',label:'Start',type:'date'},{key:'end_date',label:'End',type:'date'},
       {key:'days',label:'Days',type:'number'},{key:'reason',label:'Reason',type:'textarea'},
-      {key:'status',label:'Status',type:'select',options:['pending','approved','rejected']}
+      {key:'status',label:'Status (admin decides)',type:'select',options:['pending','approved','rejected'],adminOnly:true,help:'Staff requests are always submitted as pending; only admin can change this.'}
     ]},
     visitors: { table:'visitors', title:'Visitor', cols:[
       {key:'full_name',label:'Name',type:'text',required:true},{key:'phone',label:'Phone',type:'tel'},
@@ -990,6 +996,9 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const getVal = (k) => k.indexOf('data.') === 0 ? ((row.data || {})[k.slice(5)]) : row[k];
     const fields = [];
     for (const c of d.cols) {
+      // V6.3: columns marked adminOnly are hidden from non-admin users entirely
+      // (e.g. leave-request status — only admin approves/rejects; RLS enforces it too).
+      if (c.adminOnly && !(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) continue;
       const rv = getVal(c.key);
       const val = rv != null ? rv : (c.default != null ? c.default : '');
       const req = c.required ? ' required' : '';
@@ -1086,7 +1095,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     if (!id && d.table === 'health' && window.SC_PROFILE && SC_PROFILE.id) { payload.recorded_by_id = SC_PROFILE.id; if (!payload.recorded_by && SC_PROFILE.full_name) payload.recorded_by = SC_PROFILE.full_name; }
     if (!id && ['academic_print_records','reports'].includes(d.table) && window.SC_PROFILE && SC_PROFILE.id) payload.generated_by = SC_PROFILE.id;
     if(d.table==='report_comments'){payload.comment_source='manual';payload.comment_locked=true;payload.comment_band_id=null;payload.applied_percent=null;}
-    if(window.SC_PROFILE&&SC_PROFILE.id){if(d.table==='digital_library')payload.teacher_id=SC_PROFILE.id;if(d.table==='eresources')payload.uploaded_by=SC_PROFILE.id;if(d.table==='conduct')payload.recorded_by_id=SC_PROFILE.id;if(d.table==='behaviour_points')payload.awarded_by=SC_PROFILE.id;if(d.table==='support_plans')payload.created_by=SC_PROFILE.id;if(d.table==='student_diary')payload.created_by=SC_PROFILE.id;if(['affective_traits','psychomotor_traits','report_comments'].includes(d.table))payload.teacher_id=SC_PROFILE.id;}
+    if(window.SC_PROFILE&&SC_PROFILE.id){if(d.table==='digital_library')payload.teacher_id=SC_PROFILE.id;if(d.table==='eresources')payload.uploaded_by=SC_PROFILE.id;if(d.table==='conduct')payload.recorded_by_id=SC_PROFILE.id;if(d.table==='behaviour_points')payload.awarded_by=SC_PROFILE.id;if(d.table==='support_plans')payload.created_by=SC_PROFILE.id;if(d.table==='student_diary')payload.created_by=SC_PROFILE.id;if(['affective_traits','psychomotor_traits','report_comments'].includes(d.table))payload.teacher_id=SC_PROFILE.id;if(d.table==='leave_requests'&&!payload.requested_by)payload.requested_by=SC_PROFILE.id;}
     // V6/V4: teacher-owned academic records. Admin can supervise all, but subject teachers
     // should not edit/delete another teacher's records.
     if (window.SC_PROFILE && SC_PROFILE.id && !(window.App && App.isAdminRole && App.isAdminRole(App.currentRole))) {

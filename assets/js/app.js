@@ -192,7 +192,22 @@ const App = {
     el.style.display = show ? 'flex' : 'none';
   },
 
+
+  /* V6.3 FIX #4: on every page, populate the user chip instantly from the cached
+     profile so a slow/bad network never shows a "Guest / not signed in" flash. */
+  primeUserChip() {
+    try {
+      const cached = this.getCachedProfile && this.getCachedProfile();
+      const nameEl = document.getElementById('user-display-name');
+      const roleEl = document.getElementById('user-display-role');
+      if (cached && cached.full_name) {
+        if (nameEl) nameEl.textContent = cached.full_name;
+        if (roleEl) roleEl.textContent = String(cached.role || '').replace(/_/g, ' ');
+      }
+    } catch (_) {}
+  },
   async resolveAndApplyRole() {
+    App.primeUserChip();
     const currentSb = window.sb || this.sb || null;
     const page = currentPage();
     // Show loading immediately on dashboard to prevent guest flash
