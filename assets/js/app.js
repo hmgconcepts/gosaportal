@@ -553,10 +553,9 @@ const App = {
     'announcements','events','school_calendar','school-calendar',
     'gallery','helpdesk','lost_found','lost-found',
     'diary','parent_meeting','parent-meeting',
-    'academic-records','academic_records',
     'flyer',
     'feature-guide','feature_guide','about','contact',
-    'index','login','apply','verify-certificate','verify_certificate',
+    'index','login','apply',
     'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products'
   ]),
 
@@ -573,7 +572,6 @@ const App = {
     'student-profile','student_profile',
     'fees','idcards',
     'results','report-cards','report_cards',
-    'academic-records','academic_records',
     'attendance','assignments','timetable','idcards','inbox','complaints','eresources','e-resources','certificates',
     'announcements','events','school_calendar','school-calendar',
     'gallery','helpdesk','lost_found','lost-found',
@@ -581,7 +579,7 @@ const App = {
     'certificates',
     'voting',
     'feature-guide','feature_guide','about','contact',
-    'index','login','apply','verify-certificate','verify_certificate',
+    'index','login','apply',
     'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products'
   ]),
 
