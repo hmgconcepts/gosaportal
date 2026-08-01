@@ -885,8 +885,20 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       }
       const max = Number(el.dataset.max); let v = parseFloat(el.value); if (isNaN(v)) {toast('Enter a valid number or leave blank.','warning');return;} if(v<0){v=0;el.value=0;} if (v > max) { v = max; el.value = max; toast('Capped at max ' + max, 'warning'); }
       const row = { column_id: el.dataset.col, student_id: el.dataset.studentId || null, student_id_ref: el.dataset.ref, student_name: el.dataset.name, class: this.ctx.class, subject: this.ctx.subject, term: this.ctx.term, session: this.ctx.session, score: v, source: 'manual', updated_by: (window.SC_PROFILE && SC_PROFILE.id) || null };
-      const { error } = await window.sb.from('report_scores').upsert(row, { onConflict: 'column_id,student_id_ref,student_name,class,subject,term,session' });
-      if (error) { const em=String(error.message||error); toast(em.includes('row-level security') ? 'Score not saved: this database still has the old security rules. Admin: run database/v6.3-role-access-fixes.sql once in the Supabase SQL Editor (2 minutes), then teachers can save scores normally.' : ('Score not saved: ' + em), 'danger', 10000); return; }
+      /* V6.9: server-side save via SECURITY-DEFINER RPC — immune to RLS/upsert
+         mechanics (the old client upsert could fail on the SELECT policy alone).
+         Falls back to the legacy upsert only when the RPC is not installed yet. */
+      let rpcRes = null;
+      try { rpcRes = await window.sb.rpc('sc_save_report_score', { p_rows: row }); } catch(_) { rpcRes = { error: { message: 'rpc unavailable' } }; }
+      if (rpcRes.error && /could not find|does not exist|schema cache|rpc unavailable/i.test(String(rpcRes.error.message||''))) {
+        const { error } = await window.sb.from('report_scores').upsert(row, { onConflict: 'column_id,student_id_ref,student_name,class,subject,term,session' });
+        if (error) { const em=String(error.message||error); toast(em.includes('row-level security') ? 'Score not saved: this database needs one update. Admin: run the latest database/complete-schema.sql (or database/v6.9-report-score-save.sql) once in the Supabase SQL Editor, then saving works for every teacher.' : ('Score not saved: ' + em), 'danger', 10000); return; }
+      } else if (rpcRes.error) { toast('Score not saved: ' + rpcRes.error.message, 'danger', 9000); return; }
+      else {
+        const d = rpcRes.data || {};
+        if (d.ok === false) { toast(d.error || 'Score not saved.', 'danger', 9000); return; }
+        if ((d.blocked||0) > 0) { toast((d.errors&&d.errors[0]) || 'This score was entered by another teacher — ask an administrator to change it.', 'warning', 9000); return; }
+      }
       // Mirror standard assessment columns into Results immediately. This is the one-way bridge that makes a subject-broadsheet entry available to the class broadsheet and student report card without retyping.
       await this.syncScoreToResults(el, v);
       if (window.App) App.logActivity('update', 'report_score', el.dataset.ref);
@@ -928,10 +940,29 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       if (!batchOk) {
         // Row-by-row fallback: saves every valid row and reports the first cause
         ok = 0;
-        for (const e of entries) {
-          const { error } = await window.sb.from('report_scores').upsert(e.row, { onConflict: ON_CONFLICT_KEY });
-          if (error) { fail++; lastError = error; }
-          else { await this.syncScoreToResults(e.el, e.v); ok++; }
+        /* V6.9: one server-side RPC call saves the whole batch (per-row skip
+           messages for other-teacher-locked rows); legacy per-row upsert only
+           when the RPC is missing on an un-migrated database. */
+        let usedRpc = false;
+        try {
+          const rr = await window.sb.rpc('sc_save_report_score', { p_rows: entries.map(e => e.row) });
+          if (!rr.error && rr.data && rr.data.ok !== false) {
+            usedRpc = true; ok = rr.data.saved || 0; fail = rr.data.blocked || 0;
+            if (fail && rr.data.errors && rr.data.errors.length) lastError = { message: rr.data.errors.slice(0,3).join(' | ') };
+            for (const e of entries) { await this.syncScoreToResults(e.el, e.v); }
+          } else if (!rr.error && rr.data && rr.data.ok === false) {
+            usedRpc = true; fail = entries.length; lastError = { message: rr.data.error || 'Save rejected.' };
+          }
+        } catch(_) {}
+        if (!usedRpc) {
+          for (const e of entries) {
+            const { error } = await window.sb.from('report_scores').upsert(e.row, { onConflict: ON_CONFLICT_KEY });
+            if (error) { fail++; lastError = error; }
+            else { await this.syncScoreToResults(e.el, e.v); ok++; }
+          }
+          if (fail && lastError && String(lastError.message||'').includes('row-level security')) {
+            lastError = { message: 'This database needs one update — Admin: run the latest database/complete-schema.sql (or database/v6.9-report-score-save.sql) once in the Supabase SQL Editor, then saving works for every teacher.' };
+          }
         }
       } else {
         for (const e of entries) { await this.syncScoreToResults(e.el, e.v); }
