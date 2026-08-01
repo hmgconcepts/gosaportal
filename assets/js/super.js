@@ -1,0 +1,1017 @@
+/* ====================================================================
+   super.js — School Connect Gen v3 "Super Features" engine
+   --------------------------------------------------------------------
+   Ports the standout features from the original School Connect builder
+   into EVERY generated school site, and adds new enterprise super
+   features. 100% free tools, NO AI APIs. Everything is interconnected
+   through the single shared Supabase database (window.sb) and the
+   shared school config (window.SCHOOL).
+
+   Provides (all attached to window):
+     • Super.chatbot   — rules-based help assistant (per-school)
+     • Super.palette    — global command palette / cross-module search (Ctrl+K)
+     • Super.notify     — multi-channel notification fan-out hooks
+     • Super.idcard     — printable QR ID-card generator
+     • Super.cert       — printable, verifiable certificate generator
+     • Super.flyer       — printable marketing flyer generator
+     • Super.data        — per-school export / import / draft autosave
+   ==================================================================== */
+
+const Super = {
+  sb: null,
+  school: null,
+
+  init(supabaseClient, school) {
+    this.sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null);
+    this.school = school || (typeof window !== 'undefined' ? window.SCHOOL : null) || {};
+    this.chatbot.mount();
+    this.palette.mount();
+    if (typeof document !== 'undefined') {
+      document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); Super.palette.toggle(true); }
+      });
+    }
+  },
+
+  esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
+
+  /* ==================================================================
+     1) SCHOOL HELP CHATBOT (rules-based, no AI, per-school)
+     ================================================================== */
+  chatbot: {
+    open: false, history: [],
+    /* Enhanced knowledge base: each entry has keywords (m), a reply (r), an
+       optional page link (p) and optional follow-up chips (chips). */
+    KB: [
+      { m: ['exam registration page','waec registration','neco registration','nabteb registration','ncee registration','jamb registration'], r: 'The **Public Examination Registration** page is for collecting candidate details for WAEC, NECO, NABTEB, NCEE, UTME/JAMB, GCE, IGCSE and other exams. Applicants fill biodata, exam type/year/series, subjects, centre preferences and documents; the school examination officer reviews and processes the registration.', p: 'exam-register.html' },
+      { m: ['v12 voting repair','invalid input syntax uuid','invalid input syntax for type uuid','cannot create poll','cannot close poll','cannot vote'], r: 'Voting has been repaired in V12. Admin/staff can create, edit, close and re-open polls. Students/parents can vote on open polls. If your Supabase project was created before V12, run `database/update-v12-schema.sql` after the main schemas so `poll_votes.candidate_id` is converted to text and the open-poll policies are installed.', p: 'voting.html', chips: ['Create a poll', 'Student voting', 'Run V12 SQL'] },
+      { m: ['notification disappears','notification flashes','bell closes','parent notifications','student notifications'], r: 'V12 notifications now stay in the bell, the Notifications page, and a persistent live notification tray. If a toast appears, it no longer disappears as the only copy; open the bell or Notifications page to review it again.', p: 'notifications.html' },
+      { m: ['teacher ownership','cannot edit another teacher','read only record','health clinic ownership','helpdesk ownership','counselling ownership'], r: 'V12 enforces creator/owner editing. Teachers may read relevant records for coordination, but only the creator/assigned owner or an admin can edit/delete exams, results, helpdesk, health/clinic, counselling and reports. Admins retain full oversight.', p: 'teacher-overview.html' },
+      { m: ['staff geofence','school location','staff attendance location','outside premises','gps attendance'], r: 'Admins set the school GPS point in Settings → Staff Attendance Geofence. Staff check-in requires browser GPS and must be inside the configured radius, preventing attendance from outside the premises.', p: 'settings.html' },
+      { m: ['role based navigation', 'menu security', 'why hidden', 'navigation', 'permission', 'not safe', 'roles'], r: 'School Connect uses role-based navigation for safety. **Admin/Super Admin** can see all modules plus oversight panels because they manage payments, staff, parents and students. **Staff/Teacher** see teaching/operation pages only. **Parents** see child/payment/communication pages only. **Students** see learning/exam/result pages only. Hidden menu items are intentional data protection, not a bug.', p: 'dashboard.html', chips: ['Admin overview', 'Staff dashboard', 'Parent dashboard', 'Student dashboard'] },
+      { m: ['inbox workflow', 'in app inbox', 'internal message', 'message status', 'unread read archived'], r: 'The **In-App Inbox** is the internal message log. Compose in **Messaging Centre** or click **+ Add new** in Inbox. Messages are saved as inbox records, notifications appear in the bell, and staff/admin track status from **unread → read → archived**. Parents and students use it for school communication without paid APIs.', p: 'inbox.html', chips: ['Open Messaging Centre', 'Who can use inbox?', 'Notifications'] },
+      { m: ['notification not visible', 'notification bell', 'left aligned', 'bell alert'], r: 'The notification bell opens a fixed, right-aligned panel so messages are visible on mobile and desktop. Click a notification to mark it read and open its page. Announcements, polls and in-app messages create notification records for the proper audience.', p: 'notifications.html' },
+      { m: ['teacher overview', 'teacher dashboard', 'staff overview', 'teacher supervision'], r: 'The **Teacher Overview** page lets admin choose any staff member and see assigned subjects, results entered, CBT exams created, scheme-of-work rows, lesson plans and attendance activity. Use it for supervision and follow-up.', p: 'teacher-overview.html' },
+      { m: ['login', 'sign in', 'signin', 'password', 'cannot log', "can't log", 'access account'], r: 'To sign in, open the **Login** page and use your registered email + password. New here? Choose **Request access** — an admin approves you first. Forgot your password? Use the reset link on the login page.', p: 'login.html', chips: ['How do I get approved?', 'Enable 2FA'] },
+      { m: ['approve', 'pending', 'activate account', 'admin approval'], r: 'New accounts start as **pending**. An admin opens **Admin Data → profiles** (or Settings) and sets your status to *approved*. Then you can sign in.', p: 'admin-data.html' },
+      { m: ['2fa', 'two factor', 'two-factor', 'otp', 'secure my account'], r: 'Turn on **2-Factor Authentication** in **Settings** — it uses a free email one-time code (no SMS/AI cost).', p: 'settings.html' },
+      { m: ['cbt', 'exam', 'test', 'quiz', 'online exam', 'set exam'], r: 'Open **CBT / Online Exams**. Create an exam, upload questions by CSV (17 question types), then share a 6-character **code** or link. Map the exam to a report-card column and scores flow into the report card automatically.', p: 'cbt.html', chips: ['How do students take it?', 'How are CBT scores graded?'] },
+      { m: ['take exam', 'student exam', 'exam code', 'join exam', 'write exam'], r: 'Students open the exam link or go to **Take Exam**, enter the **6-character code** and their name — no account needed (open mode). A timer, navigator and anti-cheat run during the exam.', p: 'cbt-exam.html' },
+      { m: ['grade', 'scoring', 'mark scheme', 'how are scores', 'negative marking'], r: 'CBT auto-grades all 17 question types (with partial credit and optional **negative marking**). Essays use rule-based keyword scoring. No AI is used.', p: 'cbt.html' },
+      { m: ['report', 'result', 'report card', 'grades', 'ca1', 'ca2'], r: 'Open **Report Cards**. Add custom columns (CA1, CA2, Assignment, Project, Exam), apportion a max mark to each, and enter scores. CBT/online results auto-fill their mapped columns; totals, % and grades compute live.', p: 'report-cards.html', chips: ['Pull CBT into report card', 'Export report cards'] },
+      { m: ['fee', 'pay', 'invoice', 'balance', 'receipt', 'school fees'], r: 'Open **Fees** to view balances, record payments and print receipts. For online payment links use **Online Fee Payments** (Paystack/Flutterwave/bank transfer — free to integrate; you pay only the gateway transaction fee).', p: 'fees.html' },
+      { m: ['attendance', 'register', 'present', 'absent', 'mark attendance'], r: 'Open **Attendance** to mark daily/class attendance (present/absent/late/excused). Parents see only their own children. For self check-in, use **QR Check-in**.', p: 'attendance.html', chips: ['QR check-in', 'Attendance report'] },
+      { m: ['qr', 'check in', 'check-in', 'checkin', 'scan'], r: 'Open **QR Check-in**. Students scan their ID-card QR (or type their admission number) to check in — no biometric hardware needed.', p: 'checkin.html' },
+      { m: ['timetable', 'schedule', 'periods', 'time table'], r: 'Open **Auto-Timetable** to build a conflict-free timetable from each subject weekly period demand. It supports **part-time teachers** — tick *Part-time* and choose the days they attend; they are only scheduled on those days.', p: 'timetable-generator.html', chips: ['Add a part-time teacher', 'Why are some periods unplaced?'] },
+      { m: ['part time', 'part-time', 'visiting teacher', 'specific day'], r: 'In **Auto-Timetable**, tick **Part-time teacher** and select the weekdays that teacher attends (e.g. Tue & Thu). The generator will only place their periods on those days. If their periods cannot all fit, it tells you how many are *unplaced*.', p: 'timetable-generator.html' },
+      { m: ['vote', 'poll', 'prefect', 'election', 'head boy', 'head girl'], r: 'Open **Voting & Polls** to run prefect / head-boy / head-girl elections and staff polls with live, anonymous results.', p: 'voting.html' },
+      { m: ['survey', 'feedback', 'form', 'questionnaire'], r: 'Open **Surveys** to create anonymous-optional feedback forms and collect responses (separate from elections).', p: 'surveys.html' },
+      { m: ['notif', 'alert', 'announce', 'broadcast', 'message parent'], r: 'Notifications fan out in-app + browser push + email + WhatsApp + SMS. Staff post via **Announcements** / **Result Broadcast**; everyone receives them.', p: 'announcements.html' },
+      { m: ['diary', 'homework', 'home work', 'assignment log'], r: 'Open **Diary** to log daily homework, classwork and behaviour notes; parents can view and acknowledge them.', p: 'diary.html' },
+      { m: ['install', 'app', 'pwa', 'offline', 'home screen'], r: 'This portal is an installable app (PWA). Tap the **Install** banner, or your browser menu → *Install / Add to Home Screen* for offline access and push notifications.' },
+      { m: ['id card', 'idcard', 'badge', 'student card'], r: 'Open **ID Cards** to generate branded student/staff cards with a scannable QR code — printable straight from the browser.', p: 'idcards.html' },
+      { m: ['certificate', 'cert', 'testimonial'], r: 'Open **Certificates** to issue branded, printable certificates with a verification code. CBT exams also issue certificate codes automatically.', p: 'certificates.html' },
+      { m: ['library', 'book', 'borrow'], r: 'Open **Library** to catalogue books and track lending and returns.', p: 'library.html' },
+      { m: ['menu', 'meal', 'food', 'canteen', 'cafeteria'], r: 'Open **Menu** to plan weekly meals with allergen notes for parents.', p: 'menu.html' },
+      { m: ['backup', 'export', 'delete', 'restore', 'data console'], r: 'Admins open **Admin Data** to read, delete, back up (JSON) and restore every table, and export any table to CSV. Every action is logged.', p: 'admin-data.html' },
+      { m: ['analytics', 'kpi', 'chart', 'dashboard stats', 'insight'], r: 'Open **Analytics** for live, platform-wide KPIs and charts (enrollment, CBT performance, fees, attendance) to support decisions.', p: 'analytics.html' },
+      { m: ['language', 'translate', 'french', 'hausa', 'yoruba', 'igbo', 'accessibility', 'font size', 'contrast'], r: 'Open **Settings** to switch language (English/French/Kiswahili/Hausa/Yoruba/Igbo) and adjust accessibility (font size, high contrast).', p: 'settings.html' },
+      { m: ['search', 'find', 'where is', 'go to', 'command'], r: 'Press **Ctrl/Cmd + K** anywhere to open the global command palette and jump to any module or search students, staff and exams.' },
+      { m: ['dark mode', 'theme', 'night'], r: 'Click the **🌙 button** in the top bar to toggle dark mode. Your choice is remembered.' },
+      { m: ['cost', 'price', 'free', 'monthly'], r: 'The platform itself is **free to run forever** on free Supabase + free hosting: no per-user fees, no AI-API costs. You own all your data.' },
+      { m: ['license', 'renew', 'expired', 'expiry', 'locked', 'suspend'], r: 'This portal has a **Site License** (see Settings → Site License & Subscription). One-time (lifetime) owners never pay recurring fees. Subscription portals show renewal reminders 30 days before expiry, a grace banner after expiry, and a renewal screen once the term fully lapses — data stays safe and returns on renewal. Admins manage it on **license.html**.', p: 'license.html' },
+      { m: ['subscription', 'payment plan', 'installment', 'termly payment'], r: 'Clients who cannot pay once can run School Connect on a **subscription** (monthly/termly/annual) set up by HMG at build time. Check the current status, expiry and renewal link on the **Site License** page.', p: 'license.html' },
+      { m: ['demo', 'preview', 'guest login', 'try it', 'prospect'], r: 'Want a tour? The **demo deployment** ships with simulated students, staff, parents, fees, attendance, CBT exams, results and report cards, and one-tap guest sign-in for Admin/Teacher/Parent/Student/Bursar. Ask HMG for the demo link.' },
+      { m: ['deploy', 'host', 'supabase', 'go live', 'setup'], r: 'See **DEPLOYMENT-GUIDE.md** in your download: create a free Supabase project, run only `database/complete-schema.sql` once, paste your keys into `assets/js/config.js`, and host the folder on GitHub Pages / Netlify / Vercel / Cloudflare.' },
+      { m: ['contact', 'support', 'help me', 'human', 'whatsapp'], r: 'Need a human? Use the **WhatsApp** / email contact in the footer, or reach HMG Concepts. For product news and updates, join the 📢 HMG WhatsApp Channel (link in the footer). I can answer questions about any module here too.' },
+      { m: ['ai prompt', 'generate questions', 'csv questions', 'question prompt', 'make questions', 'prompt'], r: 'Open **AI Question Prompts**. Copy a Simple/Intermediate/Advanced prompt, paste it into any **free** AI chat (ChatGPT, Gemini, Copilot), fill in the topic/number/class, and it returns questions in the exact CSV format. Edit them, save as a .csv, then upload on the **CBT** page. The platform itself uses no paid AI.', p: 'cbt-prompts.html', chips: ['Upload CSV to CBT', 'What question types are supported?'] },
+      { m: ['entrance', 'common entrance', 'placement', 'assessment exam', 'admission test', 'anonymous exam'], r: 'Open **Entrance & Assessments**. Create the exam on the CBT page (tick *entrance*), share the code — anyone can sit it without an account. Results show here instantly and you can generate **result slips, certificates and admission letters** per candidate or in bulk.', p: 'entrance.html', chips: ['Generate admission letters', 'Set the pass mark'] },
+      { m: ['admission letter', 'offer letter', 'letter of admission'], r: 'On the **Entrance & Assessments** page, set the pass mark, then click **Generate ALL admission letters** (or *Letter* on a single candidate). Letters are branded with your school logo, address and motto.', p: 'entrance.html' },
+      { m: ['storage', 'full', 'database full', 'space', 'quota', 'limit', 'free up', 'purge'], r: 'Open **Storage Manager**. It shows each table\'s size and lets an admin **purge old, low-value rows** (audit logs, old results, read notifications) to free space. Export them first on **Admin Data** so nothing is lost.', p: 'storage.html' },
+      { m: ['developer', 'who built', 'about developer', 'brand', 'hmg', 'adewale'], r: 'This platform was built by **Adewale Samson Adeagbo**, founder of **HMG Concepts** (Academy · Technologies · Media · Gospel). See the **About the Developer** page for the full bio and links.', p: 'developer.html' },
+      { m: ['digital library', 'read book', 'online book', 'reading', 'comprehension'], r: 'Open **Digital Library**. Teachers post a reading **link** (Drive/web — no upload) with optional questions; students read and take the auto-marked quiz, and the score can be **pulled into Results** so it counts toward the grade.', p: 'digital_library.html', chips: ['Pull reading marks to report card'] },
+      { m: ['pull marks', 'pull reading', 'reading score to report', 'count toward grade'], r: 'On the **Results** page, use **Pull reading scores** to bring Digital-Library quiz marks into Results (scaled to a CA column). They then count toward the report card.', p: 'results.html' },
+      { m: ['promote', 'promotion', 'graduate', 'next class', 'repeat'], r: 'Open **Promotion**. Click **Auto-promote (by exam)**, set a benchmark and the graduating class; the system drafts promote/repeat/graduate decisions from term averages. Review/edit, then **Apply**.', p: 'promotion.html' },
+      { m: ['super admin', 'proprietor', 'owner', 'highest access'], r: 'The **proprietor/proprietress is the super-admin** — full access to every module, all dashboards, role management and storage control. An existing super-admin assigns the role on the **Approvals** page (set role to *super_admin*).', p: 'approvals.html' },
+      { m: ['student dashboard', 'parent dashboard', 'my child', 'view student', 'see dashboard'], r: 'Each student/parent dashboard shows the student\'s name, DOB, class, fees & payment history, awards, records and report card. Admins can open **any** student or parent dashboard from the **Students** page (View → Dashboard).', p: 'students.html' },
+      { m: ['track fees', 'payment history', 'salary', 'who paid', 'fees overview'], r: 'Admins can track every student\'s fee/payment history on **Fees**, and staff salary on **HR/Payroll**. The **Analytics** page gives a school-wide overview.', p: 'fees.html' },
+      { m: ['birthday month', 'group birthday', 'this month birthday'], r: 'On the **Birthdays** page, click **Group by month** to see students grouped by birth month, each with their name and class.', p: 'birthdays.html' },
+      { m: ['render link', 'thumbnail', 'show image', 'video link', 'drive link'], r: 'When you paste a Google-Drive/YouTube/image/video **link** into a record, the list automatically renders it as an **image or video thumbnail** — no upload needed, saving Supabase space.' },
+      { m: ['bulk', 'download all', 'export all', 'print all'], r: 'Most pages support **single and bulk** actions: Export CSV/PDF on every module, **Print ALL** ID cards (students or staff), and **bulk** admission letters/certificates on the Entrance page.' },
+      { m: ['add new error', 'no editable form', 'cannot add', 'activity log error'], r: 'The **Activity Log** is read-only (the system writes it automatically), so it has no *Add new* button. If a page truly should be editable but isn\'t, tell an admin to check the module configuration.' },
+      { m: ['keep alive', 'keepalive', 'pause', 'paused', 'inactive', 'inactivity', 'heartbeat', 'project sleep', '7 days'], r: 'Your database is protected by **six keep-alive layers**: ① automatic site-visit heartbeat, ② GitHub Actions (Mon+Thu), ③ UptimeRobot + edge ping, ④ pg_cron inside the database, ⑤ the **💓 manual heartbeat button** on the Platform Health Console (press it weekly during long holidays), ⑥ optional cron-job.org. Check the heartbeat tile on **🛡️ Platform Health** — if the last ping is under 4 days old you are safe. Full guide: SUPABASE_FREE_TIER_PROTECTION.md.', p: 'platform-health.html' },
+      { m: ['google drive', 'drive backup', 'drive sync', 'auto backup', 'cloud backup'], r: 'Open **Admin Data → ☁️ Google Drive Backup & Sync**. One click backs up the ENTIRE database into the school\'s own Google Drive as a sealed, restorable archive; one click restores it. Turn on **auto-sync** (default weekly) and backups run silently whenever an admin uses the portal. Setup guide: docs/GOOGLE-DRIVE-SYNC-GUIDE.md.', p: 'admin-data.html' },
+      { m: ['disaster', 'recover', 'recovery', 'lost project', 'deleted project', 'new supabase', 'start over'], r: '🚑 Total-loss recovery is built in. If the old database is gone forever but Google Drive backups exist: create a fresh Supabase project, run complete-schema.sql, point config.js at it, then on **Admin Data → List Drive backups** click **🚑 Recover to new project** on the newest backup — every school record is salvaged (old login accounts are simply re-created via sign-up + re-approval). Full runbook: docs/DISASTER-RECOVERY-RUNBOOK.md.', p: 'admin-data.html' },
+      { m: ['health console', 'platform health', 'is my portal ok', 'system status', 'cockpit'], r: 'Open the **🛡️ Platform Health Console** — one page shows keep-alive status, database space vs 500 MB, Google Drive backup freshness, your lifetime license, security controls (idle lock + lockdown) and the recent sign-in audit. All tiles green = school fully healthy.', p: 'platform-health.html' },
+      { m: ['lockdown', 'emergency', 'lock portal', 'exam leak', 'compromised'], r: '🚨 **Emergency lockdown**: on the Platform Health Console an owner can flip one switch that instantly locks out every non-admin user (they see a professional notice; admins keep working). Use it during exam-leak investigations or if an account is compromised, then switch it off when resolved.', p: 'platform-health.html' },
+      { m: ['idle', 'auto logout', 'auto sign out', 'shared computer', 'session lock'], r: 'The portal **auto-signs-out idle sessions** (default 30 minutes; owner-configurable on the Platform Health Console; 0 disables). This protects shared school computers — an abandoned admin session can no longer expose results or fees.', p: 'platform-health.html' },
+      { m: ['integrity', 'seal', 'sha', 'tamper', 'corrupted backup', 'verify backup'], r: 'Every export is **cryptographically sealed** (SHA-256). On import/restore the seal is re-verified: if the file was corrupted or edited anywhere (Drive, email, USB), the import refuses and tells you to use a clean copy. You can PROVE your backups are intact.' },
+      { m: ['archive vault', 'vault', 'file storage', '1 gb', 'offload'], r: 'The **📦 Archive Vault** (Storage Manager) moves old rows (logs, old CBT attempts, read notifications) OUT of the 500 MB database INTO the separate 1 GB File Storage as sealed, restorable archives. Workflow: Archive → confirm in list → Purge. Restore any archive with one click.', p: 'storage.html' },
+      { m: ['delete log', 'clear log', 'purge log', 'audit log delete', 'log retention', 'activity log full'], r: 'Yes — audit logs are deletable, safely. On the **Activity Log** page, owners use the **🧹 Retention & Purge** card: choose the log (activity/login audit) and a period (1 week to 2 years, or custom days), **export first** (sealed portable JSON), then purge. The Storage Manager\'s retention candidates and Vault offer the same by table.', p: 'activity_log.html' },
+      { m: ['onboard', 'new admin', 'getting started', 'first steps', 'how to start', 'training'], r: '**Onboarding path:** ① every page has a collapsible “What is this page?” card at the top, ② the ❓ Page Help button (bottom-left) gives a quick summary, ③ I can explain any feature — just ask, ④ admins: read the Feature Guide, then confirm the 🛡️ Platform Health Console tiles are green. Suggested admin sequence: Settings → Academic Setup → Classes/Subjects → Staff → Students → Approvals → Fees → CBT/Results.', p: 'feature-guide.html' },
+      { m: ['one time payment', 'recurring', 'lifetime', 'own my data', 'vendor lock'], r: 'The HMG Concepts promise: **“Recurring payments should not keep your schools from having online presences.”** You pay once; the platform runs on free-tier infrastructure forever, with six anti-pause safeguards, sealed exports, Google Drive sync to YOUR account, and a disaster-recovery mode. Your data is never hostage.' },
+      { m: ['bulk print', 'print all report', 'print class report', 'all report cards', 'whole class cards', 'print per class'], r: 'Open **Report Cards**, choose the Class (and term/session) from the dropdowns, then click **🖨️ Bulk Print ALL Report Cards (per class)**. Every student\'s full card builds with a live progress bar and prints one-per-page in a single print job — or use the dialog\'s *Save as PDF* to get the whole class as one PDF file.', p: 'report-cards.html' },
+      { m: ['channel', 'whatsapp channel', 'hmg channel', 'updates channel', 'news'], r: 'Follow the official **HMG Concepts WhatsApp Channel** for product news, new features, tips and ecosystem updates: https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f — the 📢 link is also in every page footer.' },
+      { m: ['proctor', 'exam camera', 'snapshot', 'audio monitor', 'exam security', 'cheating photo', 'watch students'], r: 'CBT exams now support optional **📸 camera snapshots** (about one per minute, saved privately to File Storage) and **🎙️ audio monitoring** (loudness-only — nothing is recorded; sustained talking logs a violation + snapshot). Teachers toggle both per exam on the CBT page, review the pictures via the 📸 button on the exam row, and delete them one-by-one or ALL with one click after review. The browser always asks the student for permission first.', p: 'cbt.html' },
+      { m: ['leave', 'leave request', 'approve leave', 'holiday request'], r: 'On **Leave Management**, staff submit requests (they always start as *pending* — the status box is hidden from staff). ONLY an administrator can approve or reject; the database enforces this and stamps who decided and when.', p: 'leave.html' },
+      { m: ['assessment column', 'create column', 'report column', 'who creates columns'], r: 'Only **administrators** design the report-card template: the *School-wide assessment columns* card (CA1, CA2, project, exam…) is admin-only in both the page and the database. **Teachers** simply enter scores into those columns in the Subject Broadsheet grid.', p: 'report-cards.html' },
+      { m: ['multi subject push', 'push cbt', 'subject by subject', 'cbt to report'], r: 'When you push a **multi-subject CBT** to report cards, each candidate\'s per-subject scores are split and written to the matching subject line automatically (English → English, Maths → Maths) in the chosen column. Open Report Cards → 🚀 Bulk Push CBT Scores; re-pushing updates rows, never duplicates.', p: 'report-cards.html' },
+      { m: ['print id', 'bulk id', 'id per class', 'print all cards'], r: 'On **ID Cards**, type a class (e.g. JSS1) in the Class box then click **🖨 Print ALL** — only that class prints, each card ready to cut. Leave the box empty to print the whole school. Same idea on Report Cards with the 🖨️ Bulk Print button.', p: 'idcards.html' },
+      { m: ['recovery wizard', 'restore new database', 'rebuild school', 'fresh supabase'], r: 'The full 8-step **🚑 Disaster Recovery Wizard** is on Admin Data (admin only): fresh project → run complete-schema.sql → repoint config.js → recreate first admin → reconnect the SAME Google Client ID → 🚑 Recover to new project on the newest Drive backup → re-approve people → re-arm all safeguards on the Health Console. Printable version: docs/DISASTER-RECOVERY-RUNBOOK.md.', p: 'admin-data.html' },
+      { m: ['punctuality push', 'punctuality column', 'points to report'], r: 'Punctuality points now push into a **report-card column the admin created** (chosen by name from the dropdown — no preset ca1/ca2 list). If no columns exist yet, the modal explains that the admin must first add columns on Report Cards. Points appear on the report under the PUNCTUALITY subject line; re-pushing updates, never duplicates.', p: 'punctuality.html' },
+      { m: ['decide leave', 'pending leave', 'leave panel'], r: 'Admins: open **Leave Management** — the ✅ **Leave Decision Panel** at the top lists every pending request with one-click Approve / Reject. The database stamps who decided and when; staff can neither see the panel nor change any status.', p: 'leave.html' },
+      { m: ['traits access', 'affective access', 'fill domain', 'teacher comments access'], r: 'Every staff/teacher now has full **read/write** on Affective Domain, Psychomotor Domain and Report Card Comments — open them from the sidebar and fill each student\'s ratings for the report card. You edit rows you authored; admin can edit all.', p: 'affective_traits.html' },
+      { m: ['promote class', 'move students', 'next class', 'end of session', 'session promotion', 'apply promotion'], r: '**One-click session promotion:** ① end of third term, open **Promotion** → ⚙ Auto-promote (by exam) — set the pass benchmark and graduating class; the system drafts promote/repeat/graduate for every student. ② Review/adjust drafts. ③ Click **✅ Apply promotions** — a full preview shows the per-class movements; on OK, promoted students MOVE to their new classes automatically (results, attendance, fees, timetable all follow instantly), graduates become alumni-ready, and every report card prints the decision (PROMOTED TO…, REPEAT, GRADUATED).', p: 'promotion.html' },
+      { m: ['column read only', 'teacher columns', 'cannot add column'], r: 'Teachers see the report-card columns as a **read-only list** — the add/edit/delete controls only exist for administrators, and the database rejects any non-admin column change outright. Teachers\' job is entering scores in the Subject Broadsheet grid.', p: 'report-cards.html' },
+      { m: ['sample data', 'demo data', 'fill demo', 'empty pages', 'no records yet'], r: 'Admins: open **Admin Data → 🎬 One-Click Demo Sample Data** and press the button — payroll, inventory, application links, messages, assignments, behaviour points, support plans, library books, help-desk tickets, house points, cafeteria menus, lost & found and PTA meetings are all filled with believable rows in seconds. Idempotent: tables that already have data are skipped.', p: 'admin-data.html' },
+      { m: ['signature', 'draw signature', 'sign pad', 'principal signature', 'stamp upload'], r: 'On **Settings**, draw the signature on the pad and click **☁️ Save signature to School Storage** — one click stores the tiny PNG (~5–20 KB) in the school\'s 1 GB File Storage (public branding bucket), sets it as the official signature, and it prints on report cards, e-receipts and certificates immediately. No Google Drive round-trip needed (Drive links still work too). Older databases: run database/branding-bucket.sql once.', p: 'settings.html' },
+    ],
+    QUICK: ['What is this page?', 'Is my portal healthy?', 'How do backups work?', 'How do I create a CBT exam?', 'Set up report cards', 'Delete old audit logs'],
+    /* Per-page explanations (issue 3): the assistant explains the current page,
+       and the topbar "ℹ️ About this page" button opens this. */
+    PAGE_HELP: {
+      dashboard: 'The **Dashboard** is your home overview — live counts of students, staff, fees and notices, latest announcements, active polls and quick analytics. Use the sidebar to open any module.',
+      students: 'The **Students** page is your student register. Click **+ Add new** to register a student (admission numbers are **auto-generated**). You can edit, delete and export to CSV. Other modules pull student names from here via dropdowns.',
+      staff: 'The **Staff** page lists teachers and non-teaching staff. Add staff, set roles and departments, and mark part-time. Member IDs are auto-generated when an account is approved.',
+      classes: 'The **Classes** page defines the classes/arms your school runs. These appear as dropdown options across results, attendance, timetable and more.',
+      subjects: 'The **Subjects** page lists subjects offered. They appear as dropdowns in results, scheme of work, assignments and the timetable.',
+      attendance: 'The **Attendance** page records daily/class attendance. Pick the student from the dropdown (class auto-fills), choose present/absent/late/excused and the time. Parents see only their own children.',
+      results: 'The **Results** page records CA and exam scores per student per subject. Pick the student, subject, class, term and session from dropdowns. Totals and grades feed the report card and broadsheet.',
+      'report-cards': 'The **Report Cards** page builds termly report cards: define assessment columns (CA1/CA2/Exam…) with max marks, enter scores, then generate each student\'s report card, the class broadsheet and a teacher scoresheet. Admins: the 🖨️ Bulk Print button prints EVERY student\'s card for a class in one job, one per page.',
+      timetable: 'The **Timetable** page shows class timetables. Use **Auto-Timetable** to generate a conflict-free timetable (with break periods and part-time-teacher days).',
+      'timetable-generator': 'The **Auto-Timetable** page first lets you set the daily periods, their times and breaks, then generates a conflict-free timetable. Part-time teachers are only scheduled on the days they attend.',
+      sow: 'The **Scheme of Work** page lets each teacher enter their term plan (week → topic) at the start of term, then tick each topic as **taught** weekly so admin can monitor covered vs uncovered topics.',
+      cbt: 'The **CBT** page lets teachers create online exams (17 question types), share a code/link, and view results. Exams can be mapped to a report-card column so scores flow in automatically.',
+      fees: 'The **Fees** page records payments per student (pick the student from the dropdown). View balances, print receipts; use Online Fee Payments for gateway links.',
+      announcements: 'The **Announcements** page posts notices. Choose the **audience** from the dropdown (all/students/parents/staff/a class) and a priority.',
+      birthdays: 'The **Birthdays** page celebrates students/staff. Student birthdays are pulled automatically from the students\' dates of birth.',
+      idcards: 'The **ID Cards** page generates branded student/staff cards with a QR code and the student\'s photo (from the student record / Google Drive). Print one or all.',
+      certificates: 'The **Certificates** page designs branded certificates and also prints CBT certificates. Staff/admin can load CBT certificate codes from completed CBT results, print them with the school logo and signature, or issue manual awards/testimonials with a unique verification code.',
+      admissions: 'The **Admissions** page manages applications. Generate an **application link** to send to prospective parents; copy, disable or delete links when no longer needed. When an application is accepted, **extract** it to create the student record automatically.',
+      approvals: 'The **Approvals** page is where admins approve prospective students, parents and staff (and admissions applications). Approving generates their member ID.',
+      analytics: 'The **Analytics** page shows comprehensive, live KPIs and charts across every module to support decisions.',
+      checkin: 'The **QR Check-in** page lets students check in by scanning their ID-card QR with the device camera, or by typing their admission number.',
+      voting: 'The **Voting** page runs elections and polls with live, optionally anonymous results. When a poll opens/closes, a notification is created so the right audience sees it in the bell and on their dashboard.',
+      settings: 'The **Settings** page controls 2-factor authentication, language and accessibility (font size, contrast).',
+      subjects: 'The **Subjects** page registers every subject once and maps each to a teacher (chosen from the staff list). Subjects then appear as dropdowns in results, scheme of work, assignments and the timetable.',
+      digital_library: 'The **Digital Library** lets a teacher post an online book/resource (a Google-Drive or web **link** — no upload) with optional comprehension questions. Students read it, take the auto-marked quiz, and their score can be **pulled into Results** so it counts toward their grade.',
+      promotion: 'The **Promotion** page moves students up automatically. Click **Auto-promote (by exam)**, set a pass benchmark and the graduating class; the system drafts promote/repeat/graduate decisions from each student\'s term average. Review/edit, then **Apply**.',
+      'cbt-prompts': 'The **AI Question Prompts** page gives you ready-made Simple/Intermediate/Advanced prompts. Copy one, paste it into any free AI chat (ChatGPT/Gemini/Copilot), fill in [TOPIC]/[NUMBER]/[CLASS], and it returns questions in the exact CSV format the CBT page accepts. Edit, save as .csv, and upload on the CBT page. The platform itself uses no paid AI.',
+      entrance: 'The **Entrance & Assessments** page handles exams that anyone can sit without an account (entrance, common-entrance, placement). Create the exam on the CBT page (tick entrance), share the code, and candidates take it. Results appear here instantly and you can generate each candidate\'s result slip, certificate and admission letter — one at a time or in bulk.',
+      storage: 'The **Storage Manager** shows how much Supabase space each table uses and lets an admin safely purge old, low-value rows (audit logs, old results, read notifications) to make room. Always export first on Admin Data so nothing is truly lost.',
+      developer: 'The **About the Developer** page is the site\'s last page — the bio of the developer (Adewale Samson Adeagbo) and the HMG Concepts ecosystem (Academy, Technologies, Media, Gospel).',
+      'platform-health': 'The **🛡️ Platform Health Console** is the owner cockpit. Tiles show: keep-alive heartbeat (with the 💓 manual heartbeat button — press weekly in long holidays), database space vs the free 500 MB, Google Drive backup freshness, and your lifetime license. Below: security controls (idle auto-lock minutes, 🚨 emergency lockdown with custom notice) and the recent sign-in audit. Green everywhere = healthy school.',
+      'admin-data': 'The **Admin Data** page is the data-sovereignty centre: full local JSON backup/restore, sealed portable exports of any table, the ☁️ Google Drive card (one-click backup, one-click restore, scheduled auto-sync, and 🚑 disaster recovery into a brand-new database), plus browse/delete for every table. All archives carry a SHA-256 integrity seal that is verified on import.',
+      helpdesk: 'The **Help Desk** page is internal ticketing for non-academic problems (IT, network, electrical, plumbing, furniture, equipment, security, cleaning, admin requests). Choose a category, give the ticket a short title, describe it, set priority; admin tracks it open → in progress → resolved → closed.',
+      activity_log: 'The **Activity Log** is a read-only audit trail: every create, update, delete, import and login is recorded automatically (who did what, when). You cannot add rows by hand. Owners can EXPORT then PURGE entries older than a chosen period (1 week → 2 years) using the 🧹 Retention & Purge card, so the trail never fills the database.',
+    },
+    /* Issue 1: rich, structured per-page knowledge — purpose, what it does,
+       who uses it, advantages, and the benefit to the school. The assistant
+       renders these as a full explanation so a brand-new user understands
+       everything about the page at a glance. */
+    PAGE_INFO: {
+      dashboard: { purpose:'Your home overview of the whole school at a glance.', does:'Shows live counts (students, staff, fees, notices), latest announcements, active polls and quick analytics, with one-click access to every module.', who:'Everyone — admins, staff, teachers, parents and students (each sees what their role allows).', advantages:['One screen for the day\'s key numbers','No digging through menus','Role-aware so each person sees what matters to them'], benefit:'Leaders make faster, data-driven decisions and everyone starts the day informed.' },
+      students: { purpose:'The single, authoritative register of every enrolled learner.', does:'Add/edit students (admission numbers auto-generate), import many at once by CSV, open any student\'s 360° dashboard, and export to CSV/PDF.', who:'Admins & office staff manage it; teachers reference it; parents see only their own children.', advantages:['No re-typing — every other page pulls names from here','Auto admission numbers prevent duplicates','Bulk CSV import saves hours at enrolment'], benefit:'One reliable source of truth for all student data, eliminating scattered spreadsheets.' },
+      staff: { purpose:'The complete directory and HR record of every teaching & non-teaching staff member.', does:'Capture full details (role, subject, qualification, etc.), auto-generate staff numbers, and feed the payroll, appraisal, loan and timetable modules. Approved teacher sign-ups appear here automatically.', who:'Admin/HR/proprietor manage; teachers appear as options elsewhere.', advantages:['Privacy-aware (staff DOB stored as day/month only)','Approved sign-ups auto-create staff records','Drives payroll, appraisals & timetabling'], benefit:'Professional, centralised workforce management with less paperwork.' },
+      classes: { purpose:'Defines each class/arm the school runs.', does:'Create classes, assign a class teacher from a dropdown, set level and capacity. These then appear as options everywhere a class is needed.', who:'Admin sets these up at the start of each session.', advantages:['Class teacher chosen from staff — no typos','Consistent class names across the whole platform'], benefit:'Clean, consistent class structure that powers attendance, results and promotion.' },
+      subjects: { purpose:'The catalogue of every subject the school offers.', does:'Register each subject once with code/department/level and map it to a teacher.', who:'Admin/HOD set up; teachers are mapped to subjects.', advantages:['Subjects reused everywhere as dropdowns','Each subject mapped to its teacher'], benefit:'Accurate curriculum data feeding results, scheme of work and the timetable.' },
+      attendance: { purpose:'Records who is present, absent, late or excused.', does:'Mark attendance per student/class, or pull a whole class PRESENT from QR check-ins in one click. Parents see only their own children.', who:'Class teachers record; parents and admins view.', advantages:['QR pull removes one-by-one typing','Per-class accuracy (better than daily-only systems)','Exportable for audits'], benefit:'Faster, more accurate attendance and early warning on truancy.' },
+      results: { purpose:'Captures CA and exam scores per student, subject, term and session.', does:'Enter scores from dropdowns; grades auto-suggest; pull CBT and Digital-Library marks; feeds report cards and automated promotion.', who:'Subject teachers enter; admins oversee.', advantages:['Auto-grading reduces marking errors','CBT & reading marks flow in automatically','Drives report cards and promotion'], benefit:'Trustworthy academic records produced with far less manual work.' },
+      'report-cards': { purpose:'Builds termly report cards, broadsheets and scoresheets.', does:'Define custom assessment columns with max marks, auto-pull scores, and generate printable, branded report cards, class broadsheets and teacher scoresheets.', who:'Teachers and admins at term end.', advantages:['Fully customisable columns','Auto totals, %, grades & positions','Print or save as PDF'], benefit:'Professional, consistent reporting that parents trust — in minutes, not days.' },
+      cbt: { purpose:'A complete computer-based testing engine.', does:'Create exams (17 question types), upload questions by CSV, share a code/link, auto-grade, and flow results into report cards and certificates.', who:'Teachers create; students (even anonymous) take.', advantages:['17 question types with partial credit','Anti-cheat, timer, randomisation','Free — no per-student cost'], benefit:'Run reliable online exams on any device with zero exam-software fees.' },
+      'cbt-prompts': { purpose:'A library of ready-made AI prompts to draft CBT questions fast.', does:'Provides Simple/Intermediate/Advanced prompts you paste into any free AI chat; it returns questions in the exact CSV format the CBT page accepts.', who:'Teachers and exam officers.', advantages:['Three difficulty levels','Exact CSV format — no reformatting','Platform uses no paid AI'], benefit:'Teachers build large, varied question banks in minutes for free.' },
+      entrance: { purpose:'Runs entrance/placement assessments open to anyone.', does:'Anonymous candidates sit a CBT entrance exam; results appear instantly and you generate result slips, certificates and admission letters — single or bulk.', who:'Admissions officers and admins.', advantages:['No account needed for candidates','Instant, branded admission letters','Single or bulk generation'], benefit:'A complete, professional admissions-testing pipeline at no cost.' },
+      promotion: { purpose:'Moves students to the next class automatically by exam result.', does:'Drafts promote/repeat/graduate decisions from each student\'s term average vs a benchmark you set; admin reviews/edits then applies.', who:'Admin/proprietor at session end.', advantages:['Automated, consistent decisions','Admin override before applying','Graduates flow to Alumni'], benefit:'End-of-session promotion done fairly in minutes instead of days.' },
+      fees: { purpose:'Records school-fee payments and balances.', does:'Record payments per student, view full payment history on the student dashboard, and export statements.', who:'Bursar/admin record; parents view their own.', advantages:['Per-student payment history','Exportable statements','Feeds the student 360 dashboard'], benefit:'Transparent fee tracking and fewer payment disputes.' },
+      hr: { purpose:'Runs staff salaries and produces professional payslips.', does:'Compute basic+allowances+bonus+overtime minus tax/pension/loans to AUTO net pay, set pay status, and print a payslip for each staff member.', who:'Bursar/HR/proprietor.', advantages:['Auto net-pay calculation','Printable, professional payslips','Pick staff from a list — no typos'], benefit:'Accurate, on-time salaries that boost staff morale and ensure compliance.' },
+      payroll: { purpose:'The full monthly salary register.', does:'List every staff salary record, auto-compute net pay, approve/pay, and print payslips in bulk.', who:'Bursar/HR/proprietor.', advantages:['Monthly register view','Bulk payslips','Audit-friendly records'], benefit:'A single, reliable salary ledger for budgeting and audits.' },
+      staff_loans: { purpose:'Tracks staff loans and salary advances.', does:'Record principal, monthly EMI, months, amount repaid and status; the repayment links to payroll deductions.', who:'Bursar/HR.', advantages:['EMI repayment schedules','Live balance tracking','Status (active/completed/defaulted)'], benefit:'Controlled staff lending with no missed repayments.' },
+      staff_bonus: { purpose:'Records bonuses and special allowances.', does:'Log performance, 13th-month, holiday and long-service bonuses per staff with citations and pay status.', who:'HR/proprietor.', advantages:['Categorised bonuses','Citations for transparency','Feeds payroll'], benefit:'Fair, documented rewards that motivate staff.' },
+      appraisals: { purpose:'Structured staff performance appraisals.', does:'Score weighted criteria (punctuality, teaching quality, results, teamwork, conduct) 1–10; auto-compute average & band and record a recommendation.', who:'Heads of department, principal, proprietor.', advantages:['Objective, weighted scoring','Auto grade band','Clear recommendation (promote/train/etc.)'], benefit:'Evidence-based staff development and promotion decisions.' },
+      idcards: { purpose:'Generates professional digital ID cards.', does:'Produce branded student/staff cards with photo, QR, full school contact details and several professional templates; print one or all.', who:'Admin/office staff.', advantages:['Multiple professional templates','Staff & student cards','QR for check-in'], benefit:'Smart, secure identity cards that look world-class — printed in-house for free.' },
+      certificates: { purpose:'Issues verifiable, branded certificates.', does:'Design certificates (colours/fonts/layout/signature) each with a verification code; CBT exams auto-issue codes.', who:'Admin/teachers.', advantages:['Verification codes','Custom designs','Bulk issuance'], benefit:'Credible, tamper-evident certificates without a print shop.' },
+      flyer: { purpose:'Designs professional marketing flyers.', does:'Choose premium templates, colours, fonts, sizes (A4/A5/social), badges and decorations, edit all text, and print or save as PDF/image.', who:'Admin/marketing.', advantages:['International-standard templates','Full design control','Print & social-ready sizes'], benefit:'Attractive admissions marketing produced in-house, saving design fees.' },
+      digital_library: { purpose:'An online reading library with auto-marked quizzes.', does:'Teachers post a reading link (no upload) with optional questions; students read and take the quiz; scores can be pulled into Results.', who:'Teachers post; students read.', advantages:['Link-based (saves storage)','Auto-marked comprehension','Counts toward grades'], benefit:'Encourages reading and adds assessment data with no extra cost.' },
+      birthdays: { purpose:'Celebrates student & staff birthdays.', does:'Auto-imports dates from records and groups people by birth month with name and class.', who:'Everyone views; staff manage.', advantages:['Auto-import','Grouped by month','Name + class shown'], benefit:'A warmer school community and never a missed celebration.' },
+      'student-profile': { purpose:'A 360° dashboard for a single student/parent.', does:'Shows bio, class, fees & payment history, attendance, awards and results/report card; admins can open any student\'s dashboard.', who:'Students/parents (their own); admins/staff (any).', advantages:['Everything about a student in one place','Admin can view any dashboard','Parent-friendly'], benefit:'Total transparency for parents and instant context for staff.' },
+      analytics: { purpose:'School-wide insight and KPIs.', does:'Live charts across enrolment, results, fees and attendance for decision-making.', who:'Leadership and admins.', advantages:['Live KPIs','Multiple modules in one view','Free'], benefit:'Data-driven leadership without an expensive BI tool.' },
+      storage: { purpose:'Keeps the free database lean.', does:'Shows each table\'s size and lets admins safely purge old, low-value rows after exporting.', who:'Admins/super-admin.', advantages:['See space usage','Safe, guarded purge','Stays on the free tier'], benefit:'The platform keeps running free even as data grows.' },
+      approvals: { purpose:'Gatekeeps who can access the platform.', does:'Approve/suspend students, parents and staff, assign roles (incl. super-admin), and review admissions.', who:'Admins/proprietor.', advantages:['Role assignment','Suspend instantly','Admissions review in one place'], benefit:'Strong access control and security for the whole school.' },
+      parents: { purpose:'Links parents to their children.', does:'Pick a registered parent and a student from dropdowns to create the link (works both directions).', who:'Admin/office staff.', advantages:['No typing IDs','Searchable parent & student pickers','Bi-directional link'], benefit:'Accurate parent–child relationships that power the parent portal.' },
+      developer: { purpose:'The site\'s last page — about the developer & brand.', does:'Presents Adewale Samson Adeagbo and the HMG Concepts ecosystem with links.', who:'Anyone curious about who built the platform.', advantages:['Professional credit','Direct links','Contact for support'], benefit:'Trust and a clear support channel.' }
+    ,
+      "activity_log":{purpose:"Tamper-evident audit trail.",does:"A secure, read-only system log recording every login, database creation, update, deletion, and bulk import. Designed for administrative oversight, compliance auditing, and security forensic reviews. Manual row creation is completely blocked by database triggers.",who:"Admin & Super Admin only.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "sow":{purpose:"Curriculum tracking and teacher delivery sign-off.",does:"Digitises the school curriculum per subject and class arm. Teachers enter weekly lesson topics and check the confirmation box upon completing classroom instruction. Administrators receive live visual telemetry on academic progress.",who:"Teachers enter topics; Admins monitor coverage.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "gamification":{purpose:"Positive behavior reinforcement and reward badges.",does:"A transparent reward tracking engine where teachers allocate positive behavior points and achievement badges to students. Scores accumulate directly on the student 360° dashboard to encourage exemplary conduct.",who:"Teachers award points; Students/Parents view.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "announcements":{purpose:"Institutional communication broadcasting.",does:"A centralized noticeboard allowing staff to publish announcements to targeted audiences (All, Students, Parents, Staff, or specific classes). Urgent notices can be pinned to the top of user dashboards.",who:"Staff post; All users view.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "eresources":{purpose:"Curriculum document and past paper repository.",does:"A secure digital filing system allowing teachers to share class study materials, revision guides, and exam syllabi via direct web links or Google Drive URLs without consuming database storage.",who:"Teachers upload; Students/Parents view.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "reports":{purpose:"Custom administrative and departmental summaries.",does:"A flexible reporting log where heads of department and administrators file official termly summaries, inspection notes, and executive status briefs for institutional governance.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "directory":{purpose:"Searchable contact registry for staff and students.",does:"Aggregates active database profiles into a searchable, read-only contact directory. Displays full names, institutional email addresses, phone contacts, roles, and current academic standing.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "departments":{purpose:"Academic faculty and HOD structure setup.",does:"Defines the institutional academic architecture by establishing distinct academic departments (e.g., Sciences, Arts, Languages) and assigning official Heads of Department (HOD) for faculty governance.",who:"Admin and Super Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "rubrics":{purpose:"Reusable, standards-based marking guides for assignments, projects, practicals, behaviour or skills.",does:"Define the skill, subject/class, measurable criteria and scale before marking. Teachers apply the same descriptors consistently, total the achieved rubric levels and convert the result to the configured Report Card assignment/project maximum. A rubric is guidance—not an automatic student score.",who:"HOD/admin define common rubrics; teachers use them while marking.",advantages:["Worked criteria reduce subjective marking","One rubric can be exported/re-imported and reused","Learners can see expectations before the task","Consistent scoring across teachers/classes"],benefit:"Fairer, explainable assessment with less marker variation."},
+      "transcripts":{purpose:"Approved cumulative academic-history register for transfers, admissions and external applications.",does:"After source report cards are verified, staff pick the student and record the exact sessions/terms, cumulative average or GPA, subject-grade summary and official remark. Missing source grades must be corrected in Report Cards first; the transcript register never invents them.",who:"Authorised academic admin/exams staff prepare; school leadership approves.",advantages:["Identity and session checklist","Portable CSV/JSON archive","Printable official summary","Clear distinction from a one-term report card"],benefit:"Produces traceable cumulative records suitable for transfer or application review."},
+      "transfer_cert":{purpose:"Official student departure and clearance documentation.",does:"Generates official school leaving certificates and clearance documentation for departing students. Records academic standing, final attendance summaries, conduct ratings, and official release authorization.",who:"Admin and Staff.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "counselling":{purpose:"Confidential academic and psychological guidance tracking.",does:"A secure logging facility where school guidance counsellors record confidential student guidance sessions, psychological intervention notes, university placement advice, and career action plans.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "hostel":{purpose:"Student accommodation and dormitory wing management.",does:"Manages residential student housing by tracking dormitory wings, specific room numbers, bed allocations, and supervising boarding housemasters/mistresses.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "alumni":{purpose:"Past student tracking and institutional network archiving.",does:"Preserves the institutional heritage by maintaining an active database of graduated students. Records graduation cohorts, higher education placements, career achievements, and alumni association contact details.",who:"Admin and Super Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "inventory":{purpose:"Asset tracking and physical facility logging.",does:"A dedicated physical asset ledger tracking institutional equipment, laboratory apparatus, classroom furniture, and maintenance supplies. Records initial quantities, unit valuations, storage locations, and current asset conditions.",who:"Admin and Super Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "lms":{purpose:"Structured digital courseware and video lesson delivery.",does:"A complete digital courseware hub where teachers structure academic lessons, embed instructional lecture videos, upload study notes, and assign interactive assignments for self-paced student learning.",who:"Teachers upload; Students learn.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "cafeteria":{purpose:"Weekly school meal menus and allergen tracking.",does:"Manages the institutional cafeteria by publishing daily and weekly student dining menus. Captures meal descriptions, nutritional notes, and mandatory allergen warnings to ensure student dining safety.",who:"Staff manage; Students/Parents view.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "financial_aid":{purpose:"Fee waiver tracking and student sponsorship logging.",does:"Maintains official records of institutional scholarships, fee discounts, bursaries, and corporate sponsorships awarded to deserving students. Interconnects with the fee management engine for accurate balance calculations.",who:"Admin and Bursar.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "front_desk":{purpose:"Gatekeeper logging for walk-ins, dispatches, and calls.",does:"A comprehensive administrative reception ledger tracking institutional visitors, daily package dispatches, walk-in inquiries, and official phone logs to enforce rigorous campus security.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "career_counseling":{purpose:"Higher education tracking and career placement logs.",does:"Maintains longitudinal tracking of senior student higher education applications, university admission offers, aptitude test results, and professional career placement milestones.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "document_builder":{purpose:"Custom administrative certificate and letter publishing.",does:"A dynamic publishing engine allowing administrators to format and print official school correspondence, bonafide certificates, examination hall passes, and custom testimonials instantly.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "fleet_tracking":{purpose:"Bus route logistics, driver tracking, and maintenance logs.",does:"Manages institutional transportation logistics by maintaining active ledgers of school bus routes, assigned transport vehicles, authorized drivers, daily pick-up schedules, and scheduled fleet maintenance.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "facility_booking":{purpose:"Resource reservation for auditoriums, labs, and grounds.",does:"A scheduling console for reserving shared campus infrastructure such as science laboratories, auditoriums, sports grounds, and conference rooms. Prevents double-booking via conflict checking.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "compliance":{purpose:"Institutional certification and government regulation tracking.",does:"An executive governance dashboard tracking mandatory government accreditations, ministry inspection timelines, safety audit certificates, and statutory operational compliance milestones.",who:"Admin and Super Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "lesson_plans":{purpose:"Structured instructional planning and HOD vetting.",does:"Provides a structured digital template where teachers author daily and weekly lesson plans, establishing core learning objectives, teaching methodologies, and assessment strategies for HOD vetting.",who:"Teachers author; HODs vet.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "behaviour":{purpose:"Behavioral tracking and disciplinary action recording.",does:"A specialized pastoral care ledger for tracking student behavioral milestones, positive conduct citations, disciplinary infractions, and administrative intervention measures.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "support_plans":{purpose:"Individualized Education Plans and academic interventions.",does:"Manages Individualized Education Plans (IEP) and specialized learning accommodations for students requiring academic remediation, specialized therapy, or behavioral support.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "donations":{purpose:"Philanthropic endowment tracking and benefactor logging.",does:"A secure financial ledger maintaining comprehensive records of institutional endowments, alumni donations, corporate grants, and charitable contributions complete with benefactor metadata.",who:"Admin and Super Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "substitutions":{purpose:"Emergency class cover and absentee teacher replacement.",does:"Maintains operational continuity by managing emergency teacher substitutions. Reassigns available teaching staff to cover classes for absent colleagues based on active availability rosters.",who:"Staff and Admin.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "helpdesk":{purpose:"Institutional ticketing for repairs, IT, and maintenance.",does:"A complete institutional service desk where staff and students lodge repair tickets for broken campus hardware, IT network issues, plumbing faults, and physical facility maintenance.",who:"All users submit; Admin resolves.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "payments_online":{purpose:"Digital payment tracking and secure fee gateways.",does:"Integrates electronic fee transactions, digital bank transfers, and online payment gateway logs into the master school financial dashboard, generating verified instant e-receipts.",who:"Admin manage; Parents/Students pay.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "school_calendar":{purpose:"Master academic event schedule and holiday tracking.",does:"The definitive institutional calendar displaying term start dates, examination timeframes, public holidays, sports events, and parent-teacher meeting schedules for the entire school community.",who:"Staff manage; All users view.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "lost_found":{purpose:"Campus property logging for lost items and claims.",does:"A campus property ledger where staff and students log found personal items, textbooks, and electronic devices. Records item descriptions, finding locations, and successful property claims.",who:"All users view; Staff manage.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "parent_meeting":{purpose:"PTA assembly logging, scheduling, and official minutes.",does:"Manages institutional Parent-Teacher Association (PTA) assemblies, individual teacher consultation schedules, official meeting agendas, and published assembly minutes.",who:"Staff manage; Parents view.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      "book_request":{purpose:"Student book reservation and lending requests.",does:"A dedicated library service portal where students and staff request physical book reservations, track lending availability, and lodge requests for new curriculum textbooks.",who:"Students/Staff request; Librarian manages.",advantages:["Full RLS security", "Easy export & reporting", "Instant search & dropdowns"],benefit:"Streamlined digital operations with complete accountability."},
+      'report-cards':{ purpose:'Build and print termly report cards, class broadsheets and teacher scoresheets.', does:'Define custom assessment columns (CA1, CA2, Assignment, Project, Exam) with apportioned max marks; enter or auto-pull scores from CBT and Digital Library; auto-compute totals, percentages, grades and positions; print or save as PDF. Parents and students see only their own reports, in read-only mode.', who:'Teachers and admins at term end. Parents and students see only their own (read-only).', advantages:['Fully customisable assessment columns','Auto totals, %, grades & positions','Print to PDF with school logo and principal signature','Family-safe: parents see only their children, students see only themselves'], benefit:'Professional, branded report cards that parents trust — produced in minutes, not days, with zero printing cost.'},
+      'cbt-exam':{ purpose:'The student-facing exam runner. Students enter an exam code, see the questions, and submit their answers online.', does:'Anonymous and registered candidates type the exam code shared by the teacher, take the test under anti-cheat monitoring (window focus, copy/paste block, fullscreen, watermark), navigate by subject (multi-subject exams show subject tabs at the top), and submit. Results are auto-graded and either released instantly or held for the teacher.', who:'Students and any anonymous candidate.', advantages:['No student account required','Multi-subject support (UTME/Common Entrance style tabs)','Anti-cheat with watermark + integrity log','Auto-graded with optional certificates','Works offline and queues submissions when network returns'], benefit:'Reliable online exams on any device at zero cost — even for 400+ simultaneous candidates.'},
+      'cbt-multi':{ purpose:'A dedicated builder for multi-subject exam packages (UTME / Common Entrance / JAMB style).', does:'Teacher creates ONE exam that contains MULTIPLE subjects. Each subject gets its own CSV question bank. Students see one exam code but get a tab at the top for each subject during the exam and can switch between subjects without losing progress.', who:'Teachers and exam officers.', advantages:['One code, multiple subjects — students jump between subject tabs','Questions NEVER mix between subjects','Auto-grade with per-subject scoring','Perfect for UTME, JAMB, Common Entrance, NABTEB and other multi-subject exams'], benefit:'Schools can simulate national exams (UTME/JAMB) for practice and revision without paying for an exam portal.'},
+      'exam-register':{ purpose:'A public, no-account-needed form for candidates to register for external examinations (WAEC, NECO, JAMB, IGCSE, BECE, NCEE, NABTEB and more).', does:'The candidate fills a 40+ field form covering personal details, NIN, contact, school, subjects, payment and required documents (passport photo, birth certificate, leaving certificate, special-needs evidence). The data is saved to the school portal for the examination officer to review, verify and extract to CSV/PDF for upload to the examination body.', who:'Any candidate (open to public) submits; school examination officer reviews.', advantages:['No login required','40+ fields covering all standard examination body requirements','Per-examination subject chips for WAEC, NECO, JAMB, IGCSE, BECE, NCEE, NABTEB, A-Level, TOEFL, IELTS, SAT','NIN validation, age check for NCEE, document link collection','Auto-balance calculation for payment tracking','Local-storage fallback if database unavailable'], benefit:'A single, free, no-login exam-registration form that complies with Nigerian and international examination body requirements — ready to send to the official body.'},
+      'exam_registrations':{ purpose:'The staff-side table of all submitted external exam registrations.', does:'Admins and examination officers review every submitted exam registration, mark statuses (pending, approved, rejected, uploaded to WAEC), add notes, and bulk-export to CSV/PDF for upload to the official examination body.', who:'Admin, examination officer, principal.', advantages:['See all candidates in one place','Filter by examination type, status, year, class','Bulk export to CSV/PDF','Mark uploaded/approved/rejected workflow','Full RLS for safety'], benefit:'A single dashboard to manage every external exam candidate — from form submission to WAEC upload.'},
+      'student-profile':{ purpose:'A 360° view of one student: biodata, attendance, results, fees, behaviour, medical, and printable documents.', does:'Click any student from the Students list to see all their data in one tabbed page. Parents see only their linked children; students see only themselves.', who:'Admin/teachers: any student. Parents: their children only. Students: themselves only.', advantages:['Single page, every data point','Printable documents and reports','Family-safe access control','Quick navigation to report card, fees, results'], benefit:'A complete student dossier in one click — saves hours of cross-page searching.'},
+      'transport':{ purpose:'Bus route, driver, and fleet management for school transport.', does:'Register routes, vehicles, drivers, students per route, GPS check-ins, and monthly fees. Admin/owner view only.', who:'Admin/owner (intentionally hidden from parents/students).', advantages:['Routes + drivers + students in one place','GPS check-in (optional)','Monthly fee tracking'], benefit:'Safe, accountable school transport with full audit trail.'},
+      'health':{ purpose:'Sick-bay visit log, medical history, and allergy alerts.', does:'Records clinic visits, immunisations, chronic conditions and known allergies. Surfaces allergy alerts in the student profile for any teacher viewing the student.', who:'School nurse / admin (intentionally hidden from parents/students).', advantages:['Allergy alerts surface where they matter','Sick-bay visit audit trail','Chronic-condition tracking'], benefit:'Safer school with allergies and chronic conditions always one click away.'},
+      'financial_aid':{ purpose:'Tracks scholarships, fee waivers, and sponsorships awarded to students.', does:'Records which student receives which scholarship/bursary, the percentage or amount, the sponsor, the duration, and the academic conditions. Updates fee balances automatically.', who:'Admin/bursar (intentionally hidden from parents/students for confidentiality).', advantages:['Auto-adjusts fee balances','Tracks academic conditions','Sponsorship audit trail'], benefit:'Transparent, accountable financial-aid system that supports deserving students.'},
+      'profile':{ purpose:'Personal account profile and photo management.', does:'Edit your full name, phone, email, role, and profile photo. Set a profile picture via Google Drive share link (auto-converted to a direct-view URL). Renders a per-role context card (your children for parents, your student record for students, your staff record for staff).', who:'Everyone — every role can edit their own profile.', advantages:['Google Drive photo with auto-conversion','Live preview of the photo before saving','Per-role context card surfaces linked records','CSP-safe (no inline event handlers)','Self-service — no admin intervention needed'], benefit:'Each user controls their own identity and quickly reaches the records that matter to them.' },
+      'change-password':{ purpose:'Account password change.', does:'Securely update your sign-in password. Requires the current password for verification and a new password that meets strength requirements.', who:'Everyone.', advantages:['Requires current password for safety','Strength meter for the new password','Logs the change to the activity log'], benefit:'Users keep their accounts secure without needing admin help.' },
+      'notifications':{ purpose:'In-app notification centre.', does:'Full page view of every notification you have received — announcements, result slips, broadcast messages, poll openings, fee reminders, etc. Filter by read/unread and mark as read.', who:'Everyone.', advantages:['Bulk mark as read','Unread count badge on the bell','Per-audience notifications (you see only what is meant for you)','Optional WhatsApp / email / SMS deep links'], benefit:'Users never miss important school communications.' },
+      'inbox':{ purpose:'Internal in-app messaging log.', does:'A persistent, read-only history of every in-app message between users. Compose via the Messaging Centre; read here with status tracking (unread → read → archived).', who:'Everyone (their own inbox).', advantages:['In-app + email + WhatsApp fan-out','Status tracking (unread, read, archived)','Search and filter by sender, date, subject'], benefit:'A reliable internal communication history that does not depend on any third-party service.' },
+      'messages':{ purpose:'Messaging Centre (compose).', does:'Compose and send in-app messages, broadcasts, result announcements and class-wide messages. Recipients can be all, students, parents, staff, a single role, a single class, or a single user.', who:'Staff and admin compose; everyone receives.', advantages:['Multiple audiences (role, class, individual)','Save as draft','Attach files (link-based, no upload needed)','Auto-create notification for every recipient'], benefit:'A free, no-AI messaging engine that scales from one-to-one to school-wide.' },
+      'cbt-exam':{ purpose:'The student-facing exam runner.', does:'Students enter a 6-character exam code (or click a shared link), see the questions, and submit their answers online. Multi-subject exams show subject tabs at the top so candidates can switch between subjects without losing progress. Anti-cheat (focus loss, copy/paste block, fullscreen, watermark) protects integrity. Auto-grades on submit and records the result.', who:'Students and any anonymous candidate.', advantages:['Multi-subject UTME-style tabs (subject_breakdown auto-inferred)','Anti-cheat with watermark + integrity log','Auto-grade with partial credit and negative marking','Offline submit queue (resends when network returns)','Issue a verifiable certificate on pass'], benefit:'Reliable online exams on any device at zero cost — even for hundreds of simultaneous candidates.' },
+      'cbt-multi':{ purpose:'A dedicated builder for multi-subject exam packages (UTME / Common Entrance / JAMB style).', does:'Teacher creates ONE exam that contains MULTIPLE subjects. Each subject gets its own CSV question bank. Students see one exam code but get a tab at the top for each subject during the exam and can switch between subjects without losing progress.', who:'Teachers and exam officers.', advantages:['One code, multiple subjects — students jump between subject tabs','Questions NEVER mix between subjects','Auto-grade with per-subject scoring','Perfect for UTME, JAMB, Common Entrance, NABTEB and other multi-subject exams','CBT engine recovers tabs from old exams (cbt_repair_tabs)'], benefit:'Schools can simulate national exams (UTME/JAMB) for practice and revision without paying for an exam portal.' },
+      'exam-register':{ purpose:'A public, no-account form for external exam registration.', does:'A 40+ field form covering personal details, NIN, contact, parent/guardian, school, subjects, payment and required documents (passport photo, birth certificate, leaving certificate, special-needs evidence). Saves to the school portal for the examination officer to review. Exam-specific sections show dynamically for JAMB (reg no, course), IGCSE/A-Level (URN, syllabus), IELTS (type, city, ID doc), TOEFL (format, native language), SAT (College Board ID, grad/app year).', who:'Any candidate (open to public) submits; school examination officer reviews.', advantages:['No login required','40+ fields covering all major examination body requirements','Exam-specific dynamic fields','NIN validation, age check for NCEE, document link collection','Auto-balance calculation for payment tracking','Local-storage fallback if database unavailable','14 examination types covered (WAEC, NECO, UTME, IGCSE, NCEE, BECE, NABTEB, A-Level, TOEFL, IELTS, SAT, GCE, etc.)'], benefit:'A single, free, no-login exam-registration form that complies with Nigerian and international examination body requirements — ready to send to the official body.' },
+      'exam_registrations':{ purpose:'The staff-side table of all submitted external exam registrations.', does:'Admins and examination officers review every submitted exam registration, mark statuses (pending, approved, rejected, uploaded to WAEC), add notes, and bulk-export to CSV/PDF for upload to the official examination body.', who:'Admin, examination officer, principal.', advantages:['See all candidates in one place','Filter by examination type, status, year, class','Bulk export to CSV/PDF','Mark uploaded/approved/rejected workflow','Full RLS for safety'], benefit:'A single dashboard to manage every external exam candidate — from form submission to WAEC upload.' },
+      'student-profile':{ purpose:'A 360° view of one student.', does:'Click any student from the Students list to see all their data in one tabbed page: bio, attendance, results, fees, behaviour, medical. Parents see only their linked children; students see only themselves. Admins can open any student dashboard for counseling or follow-up.', who:'Admin/teachers: any student. Parents: their children only. Students: themselves only.', advantages:['Single page, every data point','Printable documents and reports','Family-safe access control','Quick navigation to report card, fees, results'], benefit:'A complete student dossier in one click — saves hours of cross-page searching.' },
+      'dashboard':{ purpose:'Your home overview of the whole school at a glance.', does:'Shows live counts (students, staff, fees, notices), latest announcements, active polls, event calendar, lost & found, cafeteria menu, and quick analytics. Quick-links are role-aware (parents see My Children/Fees/Results, students see Take CBT/Timetable, teachers see Attendance/CBT Manager, admins see Students/Staff/Analytics). Includes a Page Access & Permission Manager for admin.', who:'Everyone — admins, staff, teachers, parents and students (each sees what their role allows).', advantages:['Role-aware quick links','Live school feed (events, polls, broadcasts, surveys)','One-click access to every module','Admin can control page read/write access from here'], benefit:'Leaders make faster, data-driven decisions and everyone starts the day informed.' },
+      'login':{ purpose:'Secure sign-in.', does:'Sign in with email + password. The system can also resolve a Student/Staff ID to its email for convenience. New users can request access (subject to admin approval).', who:'Everyone.', advantages:['Email + ID login (look up by staff or student number)','Forgot-password recovery link','Admin approval flow for new accounts','Two-Factor Authentication via email OTP (optional)'], benefit:'Safe, simple, no-AI sign-in that supports the school ID system.' },
+      'index':{ purpose:'Public landing page.', does:'Showcase the school with hero, motto, quick contact, public CTAs (apply, contact, about), and a public results-certificate verifier link.', who:'Anonymous visitors.', advantages:['No login required to view','Application form is open to the public','Certificate verifier is open to the public','Mobile-first responsive design'], benefit:'Parents and prospective students get a great first impression — without you having to maintain a separate marketing site.' },
+      'about':{ purpose:'About the school.', does:'Public about page with the school\'s history, motto, mission, vision, leadership, contact, address, and a brief feature catalog.', who:'Anonymous + everyone.', advantages:['Editable in the dashboard','Publicly indexed by search engines','Contact + address surface for SEO'], benefit:'A polished, editable public profile.' },
+      'contact':{ purpose:'Public contact page.', does:'Public contact info, contact form, social links, address (with map embed), and direct WhatsApp / email / phone deep-links.', who:'Anonymous + everyone.', advantages:['WhatsApp / email / phone deep-links','Map embed','Anti-spam honeypot on the contact form'], benefit:'Visitors can reach the school with one tap, on any device.' },
+      'apply':{ purpose:'Online admission application.', does:'Prospective parents/students fill an application form. Admin reviews in **Admissions → Approvals**, accepts/rejects, and **Extract** creates the student record automatically.', advantages:['No portal account needed','Application links can be time-limited or password-protected','Extract → Student record in one click'], benefit:'A complete, free admissions pipeline that turns applications into students in seconds.' },
+      'settings':{ purpose:'User preferences.', does:'Set language (English / French / Kiswahili / Hausa / Yoruba / Igbo), adjust accessibility (font size, high contrast), enable 2FA via email OTP, choose a theme (light/dark), and review the school terms & sessions.', who:'Everyone for personal settings; admin for school-wide settings.', advantages:['Multi-language support','Accessibility (font size, contrast)','Email-based 2FA (free)','Theme toggle','School terms & sessions list'], benefit:'A platform that respects the user, with accessibility and language baked in.' },
+      'announcements':{ purpose:'Institutional noticeboard.', does:'Staff post announcements with a target audience (All, Students, Parents, Staff, a class). Notifications are auto-created for the audience. Pin urgent notices to the top of the dashboard.', who:'Staff post; everyone views.', advantages:['Audience targeting (all, role, class)','Priority pin','Auto-notify','Filter by audience'], benefit:'Whole-school communication in one place, with the right people notified instantly.' },
+      'events':{ purpose:'School events calendar.', does:'Post upcoming events (open days, sports days, excursions, PTA meetings, exams) with date, time, venue, audience and reminders.', who:'Staff post; everyone views.', advantages:['ICS-style calendar export','Audience targeting','Dashboard integration','Add to Google Calendar'], benefit:'Everyone knows what is coming up.' },
+      'birthdays':{ purpose:'Student & staff birthdays.', does:'Auto-imports dates from records and groups people by birth month, showing their name and class/role. Birthday notifications are sent to the relevant audience on the day.', who:'Everyone views; admin manages.', advantages:['Auto-import','Grouped by month','Notifications on the day','Inclusive of staff and students'], benefit:'A warmer school community that never misses a birthday.' },
+      'gallery':{ purpose:'Photo & video gallery.', does:'Paste an image/video/YouTube/Drive link and it auto-renders as a thumbnail. Albums group media; lightbox preview on click.', who:'Staff post; everyone views.', advantages:['Link-based (saves storage)','Auto-thumbnail (YouTube, Drive, image, video)','Albums','Lightbox preview'], benefit:'A free photo gallery that does not eat your Supabase storage.' },
+      'cbt':{ purpose:'CBT Manager (the staff side).', does:'Teachers create CBT exams, validate CSV answer keys before publishing, share a code/link, view results, diagnose/repair legacy scoring banks, and map CBT results to report cards. Diagnose Scoring lists missing keys; Repair Scoring normalises CorrectAnswer/Correct Answer/answer_key and option aliases. Repair Tabs restores old UTME packages.', who:'Teachers and exam officers.', advantages:['V5.1 server-verified grading — browser marks are never trusted','Legacy answer-key diagnosis and one-click repair','Anti-cheat, timer, original-index-safe randomisation','6-filter list (search, class, subject, teacher, mode, group)','Repair Tabs retroactively infers subject_breakdown','Missing objective keys fail loudly instead of recording zero','Free — no per-student cost'], benefit:'Reliable online exams on any device at zero per-student cost.' },
+      'fees':{ purpose:'School fees and payment recording.', does:'Record school-fee payments per student, view full payment history, print receipts, see the balance, and export statements. For online gateways, see Online Pay.', who:'Bursar/admin record; parents view their own.', advantages:['Per-student payment history','Auto-receipts (e-receipt sample printable)','Family-safe filtering (parents see only their children)','Exportable statements'], benefit:'Transparent fee tracking and zero receipt-printing costs.' },
+      'payments_online':{ purpose:'Online payment tracking (read-only for parents).', does:'Family-safe: parents and students see ONLY their own online payments (in read-only mode). RLS scopes the data at the database level; refunds and edits are admin-only.', who:'Parents and students (read-only); admin manages.', advantages:['RLS enforces family-scope at the database layer','Read-only UI for parents and students','Auto-balance computation','Exportable receipts'], benefit:'Parents can verify their payments in seconds — with strong privacy.' },
+      'payment-history':{ purpose:'A complete payment history for an admin or bursar.', does:'A paginated, filterable list of every fee payment ever recorded: by date, term, class, student, status, method.', who:'Admin and bursar.', advantages:['Paginated','Filterable','Exportable to CSV/PDF','Audit-friendly with timestamps and method'], benefit:'End-to-end fee audit trail for accountability.' },
+      'transport':{ purpose:'Bus route, driver, and fleet management.', does:'Register routes, vehicles, drivers, students per route, GPS check-ins, and monthly fees. Admin/owner view only — hidden from parents/students by design.', who:'Admin/owner (intentionally hidden from parents/students).', advantages:['Routes + drivers + students in one place','GPS check-in (optional)','Monthly fee tracking'], benefit:'Safe, accountable school transport with full audit trail.' },
+      'health':{ purpose:'Sick-bay visit log, medical history, and allergy alerts.', does:'Records clinic visits, immunisations, chronic conditions and known allergies. Surfaces allergy alerts in the student profile for any teacher viewing the student.', who:'School nurse / admin (intentionally hidden from parents/students).', advantages:['Allergy alerts surface where they matter','Sick-bay visit audit trail','Chronic-condition tracking'], benefit:'Safer school with allergies and chronic conditions always one click away.' },
+      'library':{ purpose:'Book catalogue and lending.', does:'Catalogue books (title, author, ISBN, class, copies, location). Track lend/return, overdue, and borrower history. Generate borrower receipts.', who:'Librarian (staff); students & parents view (own history).', advantages:['ISBN scanner integration','Lending history per student','Overdue alerts','Printable borrower cards'], benefit:'A free library management system that does not require a separate app.' },
+      'digital_library':{ purpose:'Online reading library with auto-marked comprehension quizzes.', does:'Teachers post a reading link (no upload) with optional questions. Students read, take the auto-marked quiz, and the score can be **pulled into Results** so it counts toward their grade. Teachers can edit and delete readings.', who:'Teachers post; students read.', advantages:['Link-based (saves storage)','Auto-marked comprehension','Counts toward grades','Teacher can edit + delete','Live preview of the reading'], benefit:'Encourages reading and adds assessment data with no extra cost.' },
+      'complaints':{ purpose:'Anonymous or named complaints / suggestions.', does:'Anyone can submit a complaint or suggestion. Admin reviews, categorises, and resolves. Notifications are sent when status changes.', who:'Everyone submits; admin resolves.', advantages:['Anonymous or named','Category tagging','Status workflow (open → investigating → resolved)','Audit trail'], benefit:'A safe, accountable channel for student/parent feedback.' },
+      'voting':{ purpose:'Elections & polls (e.g. prefect elections, PTA voting).', does:'Run a poll with multiple candidates, optionally anonymous, with live results. Notifications are sent when the poll opens/closes.', who:'Staff create; everyone votes (where allowed).', advantages:['Live, anonymous-capable results','Optional multi-winner','Real-time chart','Notifications to audience'], benefit:'Free, transparent school elections and polls.' },
+      'surveys':{ purpose:'Surveys and feedback forms.', does:'Build short or long surveys (Likert, free-text, multiple choice, matrix). Anonymous-capable. Results auto-summarise.', who:'Staff create; everyone responds.', advantages:['Multiple question types','Anonymous-capable','Auto-summary charts','Exportable to CSV'], benefit:'Real-time feedback for quality improvement.' },
+      'timetable':{ purpose:'Class timetables (read-only view).', does:'Displays the class timetable built by Auto-Timetable. Filter by class, teacher, or day.', who:'Everyone views their own timetable; admin/staff view any.', advantages:['Read-only view (no accidental edits)','Filter by class, teacher, day','Print or PDF'], benefit:'A clear, printable timetable for every class.' },
+      'timetable-generator':{ purpose:'Auto-timetable builder.', does:'Generates a conflict-free timetable from each subject weekly period demand, with break periods and part-time-teacher days. Detects and reports any unplaced periods.', who:'Admin / HOD.', advantages:['Conflict-free','Part-time teachers only on their days','Break periods','Unplaced-periods report'], benefit:'A complete school timetable in minutes, with no spreadsheet gymnastics.' },
+      'sow':{ purpose:'Scheme of Work tracker.', does:'Teachers enter weekly topics for each subject, mark each as **taught** weekly, and admin sees live coverage telemetry. Used for HOD supervision.', who:'Teachers enter; admins monitor coverage.', advantages:['Live coverage %','Per-class, per-subject, per-term','HOD review workflow','Printable per term'], benefit:'A real-time, auditable scheme-of-work with no missing-topic surprises.' },
+      'lesson_plans':{ purpose:'Daily/weekly lesson plan templates.', does:'Teachers author lesson plans (objectives, methods, resources, assessment). HODs vet and approve. Stored per subject, class and week.', who:'Teachers author; HODs vet; admin oversees.', advantages:['Structured template','HOD approval workflow','Search by week/class/subject'], benefit:'A paperless, auditable lesson-plan archive.' },
+      'feature-guide':{ purpose:'In-app feature catalog and user guide.', does:'A printable, browsable guide to every feature. New users can self-onboard using this page.', who:'Everyone.', advantages:['Always up-to-date','Printable PDF','Per-feature "how to"'], benefit:'Reduces the burden on admin to train every new user.' },
+      'teacher-overview':{ purpose:'A per-teacher supervision dashboard.', does:'Admin can pick any staff member and see their assigned subjects, results entered, CBT exams created, scheme-of-work rows, lesson plans, attendance activity, and appraised scores. Used for HOD/Principal supervision.', who:'Admin (supervisor); staff (themselves only).', advantages:['Single page, every activity','Performance signals at a glance','Useful for appraisals and follow-up'], benefit:'Data-driven teacher supervision in one click.' },
+      'academic-records':{ purpose:'Bulk academic-record exports (broadsheets, class reports).', does:'Generate and print class broadsheets, subject broadsheets, and termly reports in bulk. Filter by class, term, session, subject.', who:'Admin and exam officer.', advantages:['Bulk generation','Per-class, per-subject, per-term','PDF / print','Save as draft for HOD review'], benefit:'End-of-term reports generated in minutes.' },
+      'academic_setup':{ purpose:'Set up the academic year.', does:'Define the active session, term, classes, subjects, assessment columns, class teachers, and grading scale. All other pages pull from here.', who:'Admin.', advantages:['Centralised setup','Drives every other page','Versioned per session'], benefit:'A clean, central, version-controlled academic year setup.' },
+      'approvals':{ purpose:'Approve new sign-ups and admissions applications.', does:'Approve/suspend prospective students, parents, and staff. Assign roles (including super-admin). Review and accept admissions applications.', who:'Admin and super-admin.', advantages:['Bulk approve','Role assignment','Suspend instantly','Admissions review in one place'], benefit:'Strong access control and security for the whole school.' },
+      'admin-data':{ purpose:'Read, edit, back up, and restore every database table.', does:'A super-admin console: browse every table, edit any row, export to JSON / CSV, and restore from backup. Every action is logged to the activity_log table.', who:'Super-admin only.', advantages:['Read/write any table','Bulk export/import','JSON + CSV','Activity log audit'], benefit:'A complete data console for the school, without paying for a separate admin tool.' },
+      'storage':{ purpose:'Free-tier storage manager.', does:'Shows each table\'s size and lets admin safely purge old, low-value rows (audit logs, old results, read notifications) to stay under Supabase free limits. Always export first.', who:'Super-admin.', advantages:['See space usage per table','Safe, guarded purge','Stays on the free tier'], benefit:'The platform keeps running free even as data grows.' },
+      'analytics':{ purpose:'School-wide insight and KPIs.', does:'Live charts across enrolment, results, fees, attendance, CBT performance, and broadcast reach. Supports decision-making.', who:'Leadership and admins.', advantages:['Live KPIs','Multiple modules in one view','Free','Printable per-term reports'], benefit:'Data-driven leadership without an expensive BI tool.' },
+      'index':{ purpose:'Public landing page.', does:'Hero, motto, school info, public CTAs (apply, contact, about, feature-guide), and a public results-certificate verifier link.', who:'Anonymous visitors.', advantages:['No login required','Application form is open to the public','Certificate verifier is open to the public','Mobile-first responsive design'], benefit:'A polished public face for the school without a separate marketing site.' },
+            'transcripts':{ purpose:'Multi-year academic transcripts for graduating students and alumni.', does:'Pulls every term across every year for one student and prints an official transcript with the school letterhead, principal signature, and a unique transcript number for verification.', who:'Admin (hidden from parents/students).', advantages:['Full multi-year record','Verifiable transcript number','Branded letterhead and signature'], benefit:'Official transcripts ready in seconds for university applications.' },
+      'admissions':{ purpose:'Admissions pipeline.', does:'Prospective parents/students apply via the public Apply page. Admin reviews applications, accepts/rejects, and Extract creates the student record automatically. Application links can be time-limited or password-protected.', who:'Admin (and Bursar for payment).', advantages:["Application links with optional password + expiry","Extract to Student record in one click","Bulk status update","Communicate via in-app messaging"], benefit:'A complete, free admissions pipeline that turns applications into students in seconds.' },
+      'appraisals':{ purpose:'Staff appraisals.', does:'Structured staff performance appraisals: score weighted criteria (punctuality, teaching quality, results, teamwork, conduct) 1-10; auto-compute average and band; record a recommendation. Used for HOD/Principal reviews.', who:'Heads of department, principal, proprietor.', advantages:["Weighted scoring","Auto grade band","Clear recommendation (promote/train/etc.)","Printable per staff"], benefit:'Evidence-based staff development and promotion decisions.' },
+      'assignments':{ purpose:'Homework / assignments log.', does:'Teachers post assignments per subject/class with due date, attachments (link-based), and instructions. Students submit by upload or note. Auto-mark optional for quizzes.', who:'Teachers post; students submit.', advantages:["Link attachments","Auto-mark quizzes","Submissions tracker","Late flag"], benefit:'A paperless homework loop that students, parents and teachers can follow.' },
+      'attendance':{ purpose:'Daily class attendance.', does:'Mark attendance per student/class (present/absent/late/excused). Pull a whole class PRESENT from QR check-ins in one click. Parents see only their own children; admins see everything. Filter by class, date, term.', who:'Class teachers record; parents and admins view.', advantages:["QR pull (class becomes PRESENT in one click)","Per-class accuracy (better than daily-only systems)","Exportable for audits","Real-time parent view"], benefit:'Faster, more accurate attendance and early warning on truancy.' },
+      'broadcast':{ purpose:'Result / announcement broadcast.', does:'Compose a broadcast to a class or all -- e.g. SSS 3 results are out, click to view your report card. Auto-creates an in-app notification for each recipient.', who:'Staff and admin.', advantages:["Reach entire class in one click","Auto-notification + email + WhatsApp deep links","Personalised with the student name"], benefit:'Result days become a one-tap broadcast, not a 200-message mailing list.' },
+      'certificates':{ purpose:'Branded, verifiable certificates.', does:'Design certificates (colours/fonts/layout/signature) each with a verification code. CBT exams also auto-issue certificate codes. Anyone can verify a certificate via the public verify-certificate page.', who:'Admin and teachers.', advantages:["Custom designs (colours, fonts, signature)","Bulk issuance","Public verification","CBT auto-issues codes"], benefit:'Credible, tamper-evident certificates without a print shop.' },
+      'checkin':{ purpose:'QR-based check-in (self or staff).', does:'Students scan their ID-card QR (or type their admission number) to check in. The system records the time, location (if shared), and updates the attendance log for the day.', who:'Staff/teacher operate; students self-check-in.', advantages:["Camera QR scan","Fallback to admission number typing","Updates the daily attendance log","Printable QR codes on the ID card"], benefit:'Faster school entry and reliable attendance with zero extra hardware.' },
+      'classes':{ purpose:'Class / arm definitions.', does:'Create classes, assign a class teacher from a dropdown, set level and capacity. These appear as dropdowns across attendance, results, timetable, etc.', who:'Admin sets these up at the start of each session.', advantages:["Class teacher chosen from staff -- no typos","Consistent class names across the whole platform","Per-class capacity"], benefit:'A clean, consistent class structure that powers attendance, results and promotion.' },
+      'conduct':{ purpose:'Conduct / discipline notes.', does:'Records positive conduct notes and disciplinary incidents per student. Surfaces in the student profile and the report card (where enabled).', who:'Staff and admin.', advantages:["Per-student timeline","Report-card integration","Photo / link evidence","Resolution workflow"], benefit:'A complete, transparent conduct history for every student.' },
+      'developer':{ purpose:'About the developer.', does:'The site last page -- bio of the developer (Adewale Samson Adeagbo) and the HMG Concepts ecosystem (Academy, Technologies, Media, Gospel) with links.', who:'Anyone.', advantages:["Professional credit","Direct links","Contact for support"], benefit:'Trust and a clear support channel.' },
+      'diary':{ purpose:'Class / homework diary.', does:'Teachers post a daily classwork / homework / behaviour note per class. Parents can view and acknowledge. Auto-translates to parent language (where set).', who:'Teachers post; parents and students view.', advantages:["Per-day, per-class notes","Parent acknowledgement","Auto-translate","Photo / link attachments"], benefit:'A daily home-school communication channel, no paper.' },
+      'finance':{ purpose:'General finance ledger.', does:'Tracks every financial transaction: fees paid, expenses, loans, payroll outflows. Categorised by type and account. Reports and CSV export.', who:'Bursar / admin.', advantages:["Categorised ledger","Per-account balances","CSV export","Audit-friendly"], benefit:'A single, auditable financial picture for the school.' },
+      'flyer':{ purpose:'Marketing flyer designer.', does:'Choose premium templates, colours, fonts, sizes (A4/A5/social), badges and decorations, edit all text, and print or save as PDF.', who:'Admin / marketing.', advantages:["International-standard templates","Full design control","Print and social-ready sizes","Bulk generation"], benefit:'Attractive admissions marketing produced in-house, saving design fees.' },
+      'hr':{ purpose:'HR & payroll management.', does:'Staff records: roles, qualifications, employment dates, salary components, allowances, deductions. Used to compute net pay, generate payslips, and feed the Payroll Register.', who:'Bursar/HR/proprietor.', advantages:["Per-staff full history","Salary components and deductions","Links to Payroll Register","Printable per-staff dossier"], benefit:'Professional HR management without dedicated HR software.' },
+      'idcards':{ purpose:'Branded, printable ID cards.', does:'Generate branded student/staff cards with photo, QR, full school contact details and several professional templates; print one or all.', who:'Admin/office staff.', advantages:["Multiple professional templates","Staff and student cards","QR for check-in","Batch print"], benefit:'Smart, secure identity cards that look world-class -- printed in-house for free.' },
+      'leave':{ purpose:'Staff leave requests.', does:'Staff request leave; admin/HOD approves. Leave balance and history tracked. Auto-deducts from balance.', who:'Staff request; HOD/admin approves.', advantages:["Self-service request","Approve/reject workflow","Leave balance auto-tracked","Per-staff history"], benefit:'A paperless, auditable leave system.' },
+      'menu':{ purpose:'Weekly meal menu.', does:'Plan weekly cafeteria meals with allergen notes. Parents see the menu and allergen warnings. Cafeteria staff see the prep list.', who:'Staff manage; students/parents view.', advantages:["Allergen warnings","Per-day menu","Printable prep list","Per-class dietary needs"], benefit:'Safer, transparent cafeteria planning with allergen safety.' },
+      'offline':{ purpose:'Offline fallback page (PWA).', does:'When the network is down, the service worker redirects here. Shows a friendly message and lists pages that work offline (CBT draft saves, diary drafts, etc.).', who:'Everyone (automatic).', advantages:["Cached for instant load","Lists offline-capable features","Friendly fallback"], benefit:'The app never goes blank -- even without internet.' },
+      'parents':{ purpose:'Parent-child mapping.', does:'Pick a registered parent and a student from dropdowns to create the link (works both directions). Also assigns parent login accounts and links them to children.', who:'Admin/office staff.', advantages:["No typing IDs","Searchable parent and student pickers","Bi-directional link","Bulk map by class"], benefit:'Accurate parent-child relationships that power the parent portal.' },
+      'payroll':{ purpose:'Monthly salary register.', does:'List every staff salary record, auto-compute net pay, approve/pay, and print payslips in bulk.', who:'Bursar/HR/proprietor.', advantages:["Monthly register view","Bulk payslips","Audit-friendly records","Per-staff breakdown"], benefit:'A single, reliable salary ledger for budgeting and audits.' },
+      'promotion':{ purpose:'End-of-session student promotion.', does:'Moves students to the next class automatically. Click Auto-promote (by exam), set a pass benchmark and the graduating class; the system drafts promote/repeat/graduate decisions from each student term average. Review/edit, then Apply.', who:'Admin/proprietor at session end.', advantages:["Automated, consistent decisions","Admin override before applying","Graduates flow to Alumni"], benefit:'End-of-session promotion done fairly in minutes instead of days.' },
+      'results':{ purpose:'Academic scores capture and lookup.', does:'Enter CA and exam scores per student, subject, term, session. Grades auto-suggest. CBT and Digital-Library marks auto-pull. Feeds the report card and the broadsheet.', who:'Subject teachers enter; admins oversee; parents and students see only their own.', advantages:["Auto-grading reduces marking errors","CBT and reading marks flow in automatically","Drives report cards and promotion","Family-safe: parents see only their children, students see only themselves"], benefit:'Trustworthy academic records produced with far less manual work.' },
+      'staff':{ purpose:'Staff directory and HR record.', does:'Capture full details (role, subject, qualification, etc.), auto-generate staff numbers, and feed the payroll, appraisal, loan and timetable modules. Approved teacher sign-ups appear here automatically.', who:'Admin/HR/proprietor manage; teachers appear as options elsewhere.', advantages:["Privacy-aware (staff DOB stored as day/month only)","Approved sign-ups auto-create staff records","Drives payroll, appraisals and timetabling"], benefit:'Professional, centralised workforce management with less paperwork.' },
+      'staff_bonus':{ purpose:'Staff bonuses and special allowances.', does:'Log performance, 13th-month, holiday and long-service bonuses per staff with citations and pay status.', who:'HR/proprietor.', advantages:["Categorised bonuses","Citations for transparency","Feeds payroll"], benefit:'Fair, documented rewards that motivate staff.' },
+      'staff_loans':{ purpose:'Staff loans and salary advances.', does:'Record principal, monthly EMI, months, amount repaid and status; the repayment links to payroll deductions.', who:'Bursar/HR.', advantages:["EMI repayment schedules","Live balance tracking","Status (active/completed/defaulted)"], benefit:'Controlled staff lending with no missed repayments.' },
+      'students':{ purpose:'The student register.', does:'Add/edit students (admission numbers auto-generate), import many at once by CSV, open any student 360 dashboard, and export to CSV/PDF.', who:'Admins and office staff manage; teachers reference; parents see only their own children.', advantages:["No re-typing -- every other page pulls names from here","Auto admission numbers prevent duplicates","Bulk CSV import saves hours at enrolment"], benefit:'One reliable source of truth for all student data, eliminating scattered spreadsheets.' },
+      'subjects':{ purpose:'The subject catalogue.', does:'Register each subject once with code/department/level and map it to a teacher.', who:'Admin/HOD set up; teachers are mapped to subjects.', advantages:["Subjects reused everywhere as dropdowns","Each subject mapped to its teacher"], benefit:'Accurate curriculum data feeding results, scheme of work and the timetable.' },
+      'verify-certificate':{ purpose:'Public certificate verification.', does:'Anyone can paste a certificate code (e.g. SC-ABCDEFGH) and instantly see whether the certificate is valid, who it was issued to, when, and by whom.', who:'Anonymous (public).', advantages:["No login required","Tamper-evident","Tamper-checked against the database","Printable verification result"], benefit:'Anyone -- employers, parents, other schools -- can verify a School Connect certificate in seconds.' },
+      'visitors':{ purpose:'Visitor log / gate register.', does:'A digital gate register: name, ID, purpose, host staff, in/out times, photo. Searchable per day/month.', who:'Security / front desk.', advantages:["Photo capture (Drive link)","Host notification","Per-day/month filter","Printable per day"], benefit:'A complete, auditable gate register.' },
+
+    },
+    renderPageInfo(id) {
+      const forced = (id === 'exam-register' || id === 'exam_registrations') ? (this.PAGE_INFO[id] || this.PAGE_INFO[id.replace(/-/g,'_')]) : null;
+      if (forced) return '📖 **' + (id.charAt(0).toUpperCase() + id.slice(1)).replace(/-/g, ' ').replace(/_/g, ' ') + ' page**\n\n' + '**What it is:** ' + forced.purpose + '\n\n' + '**What it does:** ' + forced.does + '\n\n' + '**Who uses it:** ' + forced.who + '\n\n' + '**Advantages:** ' + forced.advantages.map(a => '• ' + a).join('  ') + '\n\n' + '**Benefit to the school:** ' + forced.benefit;
+      if (window.SC_HELP && SC_HELP.get && SC_HELP.format) return SC_HELP.format(SC_HELP.get(id));
+      this.ensurePageInfoCoverage();
+      const i = this.PAGE_INFO[id] || this.PAGE_INFO[id.replace(/-/g,'_')];
+      if (!i) return this.PAGE_HELP[id] || ('This is the **' + id.replace(/-/g, ' ') + '** page. Ask me anything specific about it!');
+      const live=this.dynamicPageInfo(id,document.querySelector('.app-page-title,h1')?.textContent);
+      return '📖 **' + (id.charAt(0).toUpperCase() + id.slice(1)).replace(/-/g, ' ').replace(/_/g, ' ') + ' page**\n\n' +
+        '**What it is:** ' + i.purpose + '\n\n' +
+        '**What it does:** ' + i.does + '\n\n' +
+        '**Who uses it:** ' + i.who + '\n\n' +
+        '**Advantages:** ' + i.advantages.map(a => '• ' + a).join('  ') + '\n\n' +
+        '**Visible workflow and controls on this page:** ' + live.advantages.slice(0,3).map(a=>'• '+a).join('  ')+'\n\n'+
+        '**Data safety:** Use portable JSON/CSV before purge or major edits. Hidden/read-only controls are role protected; PostgreSQL RLS remains authoritative.\n\n'+
+        '**Benefit to the school:** ' + i.benefit;
+    },
+    currentPageId() { return (location.pathname.split('/').pop() || 'dashboard').replace('.html', '') || 'dashboard'; },
+    dynamicPageInfo(id,label){
+      const clean=s=>String(s||'').replace(/\s+/g,' ').trim(),title=clean(label||document.querySelector('.app-page-title,h1')?.textContent||id.replace(/[-_]/g,' '));
+      const guide=[...document.querySelectorAll('.app-content .card p,.app-content .card li,main .card p,main .card li')].map(x=>clean(x.textContent)).filter(x=>x.length>20).slice(0,6);
+      const actions=[...document.querySelectorAll('button,a.btn')].map(x=>clean(x.textContent)).filter(x=>x&&!/sign out|theme|help/i.test(x)).slice(0,10);
+      const fields=[...document.querySelectorAll('.form-group label')].map(x=>clean(x.textContent)).filter(Boolean).slice(0,12);
+      const roleAttr=document.body.getAttribute('data-require-role')||document.body.getAttribute('data-role-allow')||'';
+      return {purpose:title+' — a connected School Connect operational workspace.',does:(guide.join(' ')||'Use this page to view and manage '+title.toLowerCase()+' records.')+' The page reads/writes structured Supabase records; files remain external links where supported to conserve free-tier storage.',who:roleAttr?('Authorised roles: '+roleAttr.replace(/_/g,' ')+'.'):'The menu and database RLS determine who can view or change these records.',advantages:['Main actions: '+(actions.join(', ')||'view, add, update and review'),'Key fields: '+(fields.join(', ')||'shown in the page form'),'Dropdowns reuse school setup values to prevent spelling errors','CSV/portable JSON export and re-import are available through the module or Admin Data','Changes remain protected by role checks and PostgreSQL RLS'],benefit:'Provides an orderly, auditable workflow for '+title.toLowerCase()+' while helping first-time users understand what to do next.'};
+    },
+    ensurePageInfoCoverage() {
+      try {
+        const items=new Map(),add=(id,label)=>{id=String(id||'').replace(/-/g,'_');if(id)items.set(id,label||id);};
+        document.querySelectorAll('[data-module-id]').forEach(a=>add(a.getAttribute('data-module-id'),a.textContent));
+        ((window.SC&&SC.MODULES)||[]).forEach(m=>add(m.id,m.name));
+        add(this.currentPageId(),document.querySelector('.app-page-title,h1')?.textContent);
+        items.forEach((label,id)=>{if(!this.PAGE_INFO[id]&&!this.PAGE_INFO[id.replace(/_/g,'-')])this.PAGE_INFO[id]=this.dynamicPageInfo(id,label);});
+      } catch(e) {}
+    },
+
+    explainPage() {
+      const id = this.currentPageId();
+      const msg = this.renderPageInfo(id);
+      Super.chatbot.toggle(true);
+      this.history.push({ from: 'bot', msg: msg, chips: ['How do I add a record?', 'Who can use this?', 'What are the benefits?', 'Back to topics'] });
+      this.render();
+    },
+    mount() {
+      if (typeof document === 'undefined' || document.getElementById('sc-chatbot')) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'sc-chatbot';
+      wrap.innerHTML = `
+        <button id="sc-chat-fab" title="Help" aria-label="Open help assistant"
+          style="position:fixed;right:18px;bottom:18px;z-index:9998;width:56px;height:56px;border-radius:50%;border:none;cursor:pointer;background:var(--primary,#4f46e5);color:#fff;font-size:24px;box-shadow:0 8px 24px rgba(0,0,0,.25)">💬</button>
+        <div id="sc-chat-win" style="display:none;position:fixed;right:18px;bottom:84px;z-index:9999;width:340px;max-width:92vw;height:460px;max-height:75vh;background:#fff;border-radius:16px;box-shadow:0 20px 50px rgba(0,0,0,.3);flex-direction:column;overflow:hidden">
+          <div style="background:var(--primary,#4f46e5);color:#fff;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+            <strong>School Assistant</strong><button id="sc-chat-x" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer">×</button>
+          </div>
+          <div id="sc-chat-msgs" style="flex:1;overflow-y:auto;padding:14px;background:#f8fafc;font-size:.9rem"></div>
+          <div style="display:flex;gap:6px;padding:10px;border-top:1px solid #e2e8f0">
+            <input id="sc-chat-in" placeholder="Ask about CBT, results, fees…" style="flex:1;padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:.9rem">
+            <button id="sc-chat-send" style="background:var(--primary,#4f46e5);color:#fff;border:none;border-radius:10px;padding:0 14px;cursor:pointer">➤</button>
+          </div>
+        </div>`;
+      document.body.appendChild(wrap);
+      document.getElementById('sc-chat-fab').onclick = () => Super.chatbot.toggle();
+      document.getElementById('sc-chat-x').onclick = () => Super.chatbot.toggle(false);
+      document.getElementById('sc-chat-send').onclick = () => Super.chatbot.send();
+      document.getElementById('sc-chat-in').addEventListener('keydown', e => { if (e.key === 'Enter') Super.chatbot.send(); });
+      this.history.push({ from: 'bot', msg: 'Hi! 👋 I\'m the ' + ((Super.school && Super.school.name) || 'school') + ' assistant. I explain pages in simple first-time-user language: what a feature means, who should use it, how to use it step by step, security/role rules, and the benefit to the school. Ask me about CBT, fees, results, attendance, dashboards, deployment, or tap a suggestion. Tip: press **Ctrl+K** to search permitted pages.', chips: ['Explain this page','Role based navigation','CBT exams','Fees','Report cards','Deployment'] });
+    },
+    toggle(force) {
+      const w = document.getElementById('sc-chat-win'); if (!w) return;
+      this.open = force !== undefined ? force : !this.open;
+      w.style.display = this.open ? 'flex' : 'none';
+      if (this.open) { this.render(); const i = document.getElementById('sc-chat-in'); if (i) i.focus(); }
+    },
+    ask(text) { const i = document.getElementById('sc-chat-in'); if (i) i.value = text; this.send(); },
+    send() {
+      const i = document.getElementById('sc-chat-in'); if (!i) return;
+      const msg = i.value.trim(); if (!msg) return;
+      this.history.push({ from: 'user', msg }); i.value = ''; this.render();
+      setTimeout(() => { const a = this.answer(msg); this.history.push({ from: 'bot', msg: a.r, link: a.p, chips: a.chips }); this.render(); }, 220);
+    },
+    /* Scored, fuzzy keyword matching — picks the BEST entry, not just the first.
+       Returns { r: replyText, p: pageLink, chips: [followups] }. */
+    answer(msg) {
+      const l = ' ' + msg.toLowerCase().replace(/[^a-z0-9 ]/g, ' ') + ' ';
+      // Per-page contextual help (issue 3)
+      if (/(what is|about|explain|help with|how does|details|guide|use).*(this|the)?\s*(page|section|screen|module)?|^\s*this page\s*$|^\s*about\s*$/.test(l) || /\bback to topics\b/.test(l)) {
+        if (/back to topics/.test(l)) return { r: 'Sure — pick a topic:', chips: this.QUICK };
+        const id = this.currentPageId();
+        return { r: this.renderPageInfo(id), chips: ['How do I add a record?', 'Who can use this?', 'What are the benefits?', 'Back to topics'] };
+      }
+      if (/where.*(dropdown|options|come from)|how.*dropdown/.test(l)) return { r: 'Dropdowns are populated from your own data: students from the **Students** page, classes from **Classes**, subjects from **Subjects**, and lists like *audience* from **Settings → lookups**. Register them once and pick them everywhere — no retyping.', chips: this.QUICK };
+      if (/how.*(add|create).*(record|entry|new)/.test(l)) return { r: 'Click **+ Add new** on the page. A form opens — fields with dropdowns let you pick existing students/classes/subjects/terms instead of typing. Fill it and click **Save**.', chips: this.QUICK };
+      let best = null, bestScore = 0;
+      for (const e of this.KB) {
+        let score = 0;
+        for (const k of e.m) {
+          if (l.includes(' ' + k + ' ') || l.includes(k)) score += k.split(' ').length + k.length / 10;
+        }
+        if (score > bestScore) { bestScore = score; best = e; }
+      }
+      if (best && bestScore > 0) return { r: best.r, p: best.p, chips: best.chips };
+      if (/\b(thanks|thank you|thx)\b/.test(l)) return { r: 'You\'re welcome! 🎉 Anything else?', chips: this.QUICK };
+      if (/\b(hi|hello|hey|good (morning|afternoon|evening))\b/.test(l)) return { r: 'Hello! How can I help? Pick a topic:', chips: this.QUICK };
+      if (/\b(bye|goodbye)\b/.test(l)) return { r: 'Goodbye! 👋 Reopen me anytime from the 💬 button.' };
+      if (window.SC_HELP && SC_HELP.pages) {
+        for (const key in SC_HELP.pages) {
+          const h = SC_HELP.pages[key];
+          const hay = (key + ' ' + (h.title||'') + ' ' + (h.purpose||'')).toLowerCase();
+          if (hay && l.length > 2 && hay.includes(l.replace(/page|module|explain|what is|how to|open/g,'').trim())) {
+            return { r: SC_HELP.format(h), chips: ['How do I use it?', 'Who can use this?', 'Back to topics'] };
+          }
+        }
+      }
+
+      // No match → suggest closest topics + Ctrl+K
+      return { r: 'I\'m not sure about that exact wording, but here are things I can help with — tap one, or press **Ctrl+K** to search the whole portal.', chips: ['CBT exams', 'Report cards', 'Fees', 'Attendance', 'Timetable', 'Voting'] };
+    },
+    render() {
+      const box = document.getElementById('sc-chat-msgs'); if (!box) return;
+      box.innerHTML = this.history.map(m => {
+        const bubble = `<div style="margin:8px 0;display:flex;${m.from === 'user' ? 'justify-content:flex-end' : ''}">
+          <div style="max-width:82%;padding:9px 12px;border-radius:12px;${m.from === 'user' ? 'background:var(--primary,#4f46e5);color:#fff' : 'background:#fff;border:1px solid #e2e8f0'}">${Super.esc(m.msg).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}${m.link ? '<div style="margin-top:8px"><a href="' + Super.esc(m.link) + '" style="color:var(--primary,#4f46e5);font-weight:700;text-decoration:none">Open page →</a></div>' : ''}</div></div>`;
+        const chips = (m.chips && m.chips.length) ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px">${m.chips.map(c => `<button onclick="Super.chatbot.ask('${Super.esc(c).replace(/'/g, "\\'")}')" style="background:#eef2ff;color:var(--primary,#4f46e5);border:1px solid #c7d2fe;border-radius:14px;padding:5px 11px;font-size:.78rem;cursor:pointer">${Super.esc(c)}</button>`).join('')}</div>` : '';
+        return bubble + chips;
+      }).join('');
+      box.scrollTop = box.scrollHeight;
+    }
+  },
+
+  /* ==================================================================
+     2) GLOBAL COMMAND PALETTE / CROSS-MODULE SEARCH (Ctrl+K)
+        Interconnects every module: jump to pages AND search live data.
+     ================================================================== */
+  palette: {
+    open: false,
+    PAGES: [
+      ['Dashboard', 'dashboard.html', '🏠'], ['Students', 'students.html', '👨‍🎓'],
+      ['Staff', 'staff.html', '👨‍🏫'], ['Attendance', 'attendance.html', '📋'],
+      ['Results', 'results.html', '📊'], ['Report Cards', 'report-cards.html', '🧾'],
+      ['CBT / Exams', 'cbt.html', '🧠'], ['Fees', 'fees.html', '💰'],
+      ['Analytics', 'analytics.html', '📈'], ['Voting', 'voting.html', '🗳️'],
+      ['Notifications', 'notifications.html', '🔔'], ['ID Cards', 'idcards.html', '🪪'],
+      ['Certificates', 'certificates.html', '📜'], ['Admin Data', 'admin-data.html', '🗄️'],
+      ['Announcements', 'announcements.html', '📢'], ['Events', 'events.html', '🎭'],
+      ['Timetable Generator', 'timetable-generator.html', '🗓️'], ['QR Check-in', 'checkin.html', '📲'],
+      ['Student Diary', 'diary.html', '📔'], ['Surveys', 'surveys.html', '🗒️'], ['Menu Planner', 'menu.html', '🍽️'], ['Settings', 'settings.html', '⚙️']
+    ],
+    mount() {
+      if (typeof document === 'undefined' || document.getElementById('sc-palette')) return;
+      const el = document.createElement('div');
+      el.id = 'sc-palette';
+      el.style.cssText = 'display:none;position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.5);align-items:flex-start;justify-content:center;padding-top:12vh';
+      el.innerHTML = `<div style="width:560px;max-width:94vw;background:#fff;border-radius:14px;box-shadow:0 30px 60px rgba(0,0,0,.4);overflow:hidden">
+        <input id="sc-pal-in" placeholder="Search modules, students, staff, exams…  (Esc to close)" style="width:100%;padding:16px 18px;border:none;border-bottom:1px solid #e2e8f0;font-size:1rem;outline:none">
+        <div id="sc-pal-res" style="max-height:50vh;overflow-y:auto"></div>
+      </div>`;
+      document.body.appendChild(el);
+      el.addEventListener('click', e => { if (e.target === el) Super.palette.toggle(false); });
+      document.getElementById('sc-pal-in').addEventListener('input', e => Super.palette.search(e.target.value));
+      document.getElementById('sc-pal-in').addEventListener('keydown', e => { if (e.key === 'Escape') Super.palette.toggle(false); });
+    },
+    toggle(force) {
+      const el = document.getElementById('sc-palette'); if (!el) return;
+      this.open = force !== undefined ? force : !this.open;
+      el.style.display = this.open ? 'flex' : 'none';
+      if (this.open) { const i = document.getElementById('sc-pal-in'); if (i) { i.value = ''; i.focus(); } this.render(this.PAGES.map(p => ({ label: p[0], href: p[1], icon: p[2] }))); }
+    },
+    async search(q) {
+      q = (q || '').trim();
+      const pages = this.PAGES.filter(p => p[0].toLowerCase().includes(q.toLowerCase())).map(p => ({ label: p[0], href: p[1], icon: p[2] }));
+      if (q.length < 2 || !Super.sb) { this.render(pages); return; }
+      const results = pages.slice();
+      try {
+        const [st, sf, ex] = await Promise.all([
+          Super.sb.from('students').select('id,full_name,class,admission_no').ilike('full_name', '%' + q + '%').limit(5),
+          Super.sb.from('staff').select('id,full_name,role').ilike('full_name', '%' + q + '%').limit(5),
+          Super.sb.from('cbt_exams').select('id,subject,code').or('subject.ilike.%' + q + '%,code.ilike.%' + q + '%').limit(5)
+        ]);
+        (st.data || []).forEach(s => results.push({ label: '👨‍🎓 ' + s.full_name + ' — ' + (s.class || ''), href: 'students.html?q=' + encodeURIComponent(s.full_name) }));
+        (sf.data || []).forEach(s => results.push({ label: '👨‍🏫 ' + s.full_name + ' — ' + (s.role || ''), href: 'staff.html?q=' + encodeURIComponent(s.full_name) }));
+        (ex.data || []).forEach(e => results.push({ label: '🧠 ' + e.subject + ' (' + e.code + ')', href: 'cbt.html?code=' + e.code }));
+      } catch (e) { /* offline / demo */ }
+      this.render(results);
+    },
+    render(items) {
+      const box = document.getElementById('sc-pal-res'); if (!box) return;
+      if (!items.length) { box.innerHTML = '<div style="padding:18px;color:#64748b">No matches.</div>'; return; }
+      box.innerHTML = items.map(i => `<a href="${i.href}" style="display:flex;gap:10px;padding:12px 18px;text-decoration:none;color:#0f172a;border-bottom:1px solid #f1f5f9">${i.icon ? '<span>' + i.icon + '</span>' : ''}<span>${Super.esc(i.label)}</span></a>`).join('');
+    }
+  },
+
+  /* ==================================================================
+     3) MULTI-CHANNEL NOTIFICATION FAN-OUT (interconnection hooks)
+        Call Super.notify.fire(...) from any module after an event.
+        Writes an in-app notification row and offers free WA/email/SMS.
+     ================================================================== */
+  notify: {
+    async fire(title, body, opts) {
+      opts = opts || {};
+      if (Super.sb) {
+        try {
+          await Super.sb.from('notifications').insert({
+            title, body: body || '', url: opts.url || '',
+            audience: opts.audience || 'all', priority: opts.priority || 'normal',
+            channels: opts.channels || ['inapp']
+          });
+        } catch (e) { /* table optional */ }
+      }
+      // Browser push (if the SW + permission exist)
+      try { if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body: body || '' }); } catch (e) {}
+      // Free deep links the caller can present to the user
+      return {
+        whatsapp: 'https://wa.me/?text=' + encodeURIComponent(title + '\n' + (body || '')),
+        email: 'mailto:?subject=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body || ''),
+        sms: 'sms:?body=' + encodeURIComponent(title + ' ' + (body || ''))
+      };
+    }
+  },
+
+  /* ==================================================================
+     4) ID-CARD GENERATOR (QR via free Google Chart API fallback + canvas)
+     ================================================================== */
+  /* Issue 11: render a pasted link (Google Drive image/video, YouTube, direct
+     image/video URL) as a clickable thumbnail. No upload, no AI. */
+  media: {
+    driveId(url) {
+      let m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/) || url.match(/[?&]id=([^&]+)/) || url.match(/drive\.google\.com\/open\?id=([^&]+)/);
+      return m ? m[1] : '';
+    },
+    ytId(url) {
+      let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{11})/);
+      return m ? m[1] : '';
+    },
+    kind(url) {
+      if (!url) return 'none';
+      if (this.ytId(url)) return 'youtube';
+      if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(url)) return 'video';
+      if (/\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url)) return 'image';
+      const did = this.driveId(url);
+      if (did) return 'drive';
+      return 'link';
+    },
+    thumb(url, opts) {
+      opts = opts || {}; const w = opts.w || 120, h = opts.h || 80;
+      if (!url) return '';
+      const k = this.kind(url);
+      const box = 'width:' + w + 'px;height:' + h + 'px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;background:#f1f5f9';
+      if (k === 'youtube') {
+        const id = this.ytId(url);
+        return '<a href="' + Super.esc(url) + '" target="_blank" rel="noopener" title="Play video"><img src="https://img.youtube.com/vi/' + id + '/mqdefault.jpg" style="' + box + '" alt="video"><span style="margin-left:-' + (w / 2 + 8) + 'px;color:#fff;font-size:1.2rem;text-shadow:0 1px 3px #000">▶</span></a>';
+      }
+      if (k === 'drive') {
+        const id = this.driveId(url);
+        return '<a href="' + Super.esc(url) + '" target="_blank" rel="noopener"><img src="https://drive.google.com/uc?export=view&id=' + id + '" referrerpolicy="no-referrer" style="' + box + '" alt="media" onerror="this.onerror=null;this.outerHTML=\'<a href=&quot;' + Super.esc(url) + '&quot; target=_blank>🔗 open link</a>\'"></a>';
+      }
+      if (k === 'image') return '<a href="' + Super.esc(url) + '" target="_blank" rel="noopener"><img src="' + Super.esc(url) + '" style="' + box + '" alt="img" loading="lazy"></a>';
+      if (k === 'video') return '<video src="' + Super.esc(url) + '" style="' + box + '" muted controls preload="metadata"></video>';
+      return '<a href="' + Super.esc(url) + '" target="_blank" rel="noopener">🔗 open link</a>';
+    }
+  },
+
+  idcard: {
+    qrUrl(data, size) { size = size || 120; return 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(data); },
+    /* Convert a Google-Drive share link to a direct-image URL so student
+       photos stored on Drive actually render on the ID card (issue 11). */
+    driveDirect(url) {
+      if (!url) return '';
+      url = String(url).trim();
+      // ENTERPRISE V6 (issue 19): support every common Google Drive link shape,
+      // googleusercontent links, and Dropbox share links.
+      let m = url.match(/drive\.google\.com\/file\/d\/([^/?#]+)/) || url.match(/[?&]id=([^&#]+)/) || url.match(/drive\.google\.com\/open\?id=([^&#]+)/) || url.match(/drive\.google\.com\/uc\?[^ ]*id=([^&#]+)/);
+      if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1000';
+      if (/dropbox\.com/.test(url)) return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace(/[?&]dl=0/, '');
+      return url;
+    },
+    /* v7 (issue 10): second-chance Drive photo URL. If the thumbnail endpoint
+       fails (some files 403 on it), retry via lh3.googleusercontent.com before
+       falling back to the initial-letter avatar. */
+    driveAlt(url) {
+      const m = String(url || '').match(/[-\w]{25,}/);
+      return m ? 'https://lh3.googleusercontent.com/d/' + m[0] + '=w1000' : '';
+    },
+    /* ENTERPRISE FINAL V2 (#9/#10): shared authorised-signature block for ALL card templates. */
+    signBlock(color, width) {
+      const st = window.SC_SETTINGS || {};
+      let raw = ''; try { raw = localStorage.getItem('sc-signature-url') || ''; } catch(_) {}
+      raw = raw || st.signature_url || '';
+      let pn = ''; try { pn = localStorage.getItem('sc-principal-name') || ''; } catch(_) {}
+      pn = pn || st.principal_name || 'Principal';
+      const sg = this.driveDirect(raw);
+      const c = color || '#334155'; const w = width || 86;
+      return sg
+        ? '<div style="text-align:center"><img src="' + Super.esc(sg) + '" referrerpolicy="no-referrer" style="max-width:' + w + 'px;max-height:28px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><div style="font-size:.5rem;color:' + c + ';border-top:1px solid ' + c + ';margin-top:1px;padding-top:1px;font-weight:700">' + Super.esc(pn) + '</div></div>'
+        : '<div style="text-align:center;margin-top:10px"><div style="font-size:.5rem;color:' + c + ';border-top:1px solid ' + c + ';width:' + w + 'px;margin:0 auto;padding-top:1px;font-weight:700">' + Super.esc(pn) + '</div></div>';
+    },
+    /* Contact strip used by the new templates (#10: address + phone + email). */
+    contactStrip(s, dark) {
+      const bits = [s.address ? '📍 ' + Super.esc(s.address) : '', s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join(' · ');
+      return bits ? '<div style="font-size:.58rem;color:' + (dark ? '#94a3b8' : '#475569') + ';text-align:center;padding:5px 10px;line-height:1.5">' + bits + '</div>' : '';
+    },
+    html(person) {
+      const s = Super.school || {};
+      const photo = this.driveDirect(person.photo_url || '');
+      const initial = (person.full_name || person.name || 'S').charAt(0).toUpperCase();
+      const altSmall = this.driveAlt(person.photo_url || '');
+      const photoImg = photo
+        ? `<img src="${Super.esc(photo)}" referrerpolicy="no-referrer" style="width:70px;height:70px;border-radius:10px;object-fit:cover;background:#f1f5f9" alt="photo" data-alt="${Super.esc(altSmall)}" onerror="if(this.dataset.alt&&this.src!==this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt='';}else{this.onerror=null;this.style.display='none';this.nextElementSibling.style.display='flex';}"><div style="display:none;width:70px;height:70px;border-radius:10px;background:var(--primary,#4f46e5);color:#fff;align-items:center;justify-content:center;font-weight:900;font-size:1.6rem">${initial}</div>`
+        : `<div style="width:70px;height:70px;border-radius:10px;background:var(--primary,#4f46e5);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.6rem">${initial}</div>`;
+      const isStaff = (person.type === 'staff');
+      const idNo = person.admission_no || person.staff_no || person.id || '';
+      const qr = this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || person.name || '', type: person.type || 'student' }));
+      const tag = isStaff ? 'STAFF IDENTITY CARD' : 'STUDENT IDENTITY CARD';
+      // build the detail rows (professional, complete — issue 14)
+      const rows = [];
+      const add = (k, v) => { if (v) rows.push('<tr><td style="color:#64748b;padding:1px 8px 1px 0;white-space:nowrap">' + Super.esc(k) + '</td><td style="font-weight:600">' + Super.esc(v) + '</td></tr>'); };
+      add('ID No', idNo);
+      if (isStaff) { add('Designation', person.role); add('Department', person.department); add('Type', person.staff_type); }
+      else { add('Class', person.class); add('Arm', person.arm); }
+      add('Gender', person.gender); add('Phone', person.phone);
+      add('Blood', person.blood_group);
+      const session = (s.session || (new Date().getFullYear() + '/' + (new Date().getFullYear() + 1)));
+      const pc = person.pc || s.primary || 'var(--primary,#4f46e5)';
+      const ac = person.ac || s.accent || 'var(--accent,#0ea5e9)';
+      const tpl = person.template || 'horizontal';
+      const logo = 'assets/img/logo.' + (s.logoExt || 'svg');
+      const contactFooter = '<div style="background:#f1f5f9;padding:7px 14px;font-size:.62rem;color:#475569;text-align:center;line-height:1.5">' +
+        (s.address ? '📍 ' + Super.esc(s.address) + '<br>' : '') +
+        [s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join(' · ') +
+        (s.motto ? '<br><em style="color:#64748b">"' + Super.esc(s.motto) + '"</em>' : '') + '</div>';
+      const credit = '<div style="background:#0f172a;color:#94a3b8;font-size:.56rem;text-align:center;padding:3px 0">If found, please return to the school office · Powered by HMG Concepts</div>';
+      const bigPhoto = photo
+        ? '<img src="' + Super.esc(photo) + '" referrerpolicy="no-referrer" style="width:110px;height:110px;border-radius:12px;object-fit:cover;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.2);background:#f1f5f9" alt="photo" data-alt="' + Super.esc(this.driveAlt(person.photo_url || '')) + '" onerror="if(this.dataset.alt&&this.src!==this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=\'\';}else{this.onerror=null;this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}"><div style="display:none;width:110px;height:110px;border-radius:12px;background:' + pc + ';color:#fff;align-items:center;justify-content:center;font-weight:900;font-size:2.4rem;border:3px solid #fff">' + initial + '</div>'
+        : '<div style="width:110px;height:110px;border-radius:12px;background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:2.4rem;border:3px solid #fff">' + initial + '</div>';
+
+      // ============================================================
+      // ENTERPRISE V6 (issue 2): PREMIUM template — replica of the
+      // provided Sunrise-Academy-style sample:
+      //   • deep navy header band: logo+name left, "SCHOOL NAME /
+      //     STUDENT ID CARD" right
+      //   • white body: rounded photo left, bold name + Class /
+      //     Student ID / D.O.B. / Valid Thru rows centre
+      //   • large QR + "SCAN TO VERIFY" right, small crest + barcode
+      //     bottom-right
+      // ============================================================
+      if (tpl === 'premium') {
+        const dmy = (v) => { if (!v) return ''; const d = new Date(v); if (isNaN(d)) return String(v); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); };
+        const yr = new Date().getFullYear();
+        const validThru = s.session || (yr + '/' + (yr + 1));
+        const navy = pc || '#2d3d8f';
+        // v7: exact sample typography — bold NAVY "Label:" + dark value
+        const row = (k, v, bold) => v ? '<div style="font-size:.95rem;color:#111;margin:3px 0;line-height:1.35"><b style="color:' + navy + ';font-weight:800">' + Super.esc(k) + ':</b> <span style="' + (bold ? 'font-weight:700;' : 'font-weight:600;') + 'color:#111827">' + Super.esc(v) + '</span></div>' : '';
+        const altPhoto = this.driveAlt(person.photo_url || '');
+        const photoBig = photo
+          ? '<img src="' + Super.esc(photo) + '" referrerpolicy="no-referrer" style="width:132px;height:150px;border-radius:14px;object-fit:cover;background:#e2e8f0" data-alt="' + Super.esc(altPhoto) + '" onerror="if(this.dataset.alt&&this.src!==this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=\'\';}else{this.onerror=null;this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}"><div style="display:none;width:132px;height:150px;border-radius:14px;background:' + navy + ';color:#fff;align-items:center;justify-content:center;font-weight:900;font-size:3rem">' + initial + '</div>'
+          : '<div style="width:132px;height:150px;border-radius:14px;background:' + navy + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:3rem">' + initial + '</div>';
+        return '<div class="sc-idcard" style="width:520px;max-width:96vw;border-radius:22px;overflow:hidden;background:#f4f6fb;box-shadow:0 14px 40px rgba(15,23,42,.25);font-family:\'Segoe UI\',Arial,sans-serif;border:1px solid #d8dee9">' +
+          '<div style="background:' + navy + ';color:#fff;display:flex;align-items:center;gap:14px;padding:16px 22px">' +
+            '<img src="' + logo + '" style="width:52px;height:52px;object-fit:contain;background:#fff;border-radius:12px;padding:4px" onerror="this.style.display=\'none\'">' +
+            '<div style="flex:1;min-width:0"><div style="font-weight:900;font-size:1.02rem;letter-spacing:.4px;line-height:1.15">' + Super.esc((s.name || 'SCHOOL').toUpperCase()) + '</div><div style="font-size:.66rem;opacity:.85">' + Super.esc(s.motto || '') + '</div></div>' +
+            '<div style="text-align:right"><div style="font-weight:900;font-size:1.05rem;letter-spacing:.6px">' + Super.esc((s.shortName || s.name || 'SCHOOL').toUpperCase()) + '</div><div style="font-size:.78rem;letter-spacing:2.5px;opacity:.92">' + (isStaff ? 'STAFF ID CARD' : 'STUDENT ID CARD') + '</div></div></div>' +
+          '<div style="display:flex;gap:18px;padding:20px 22px;background:#fdfdfd;align-items:flex-start">' +
+            '<div style="flex-shrink:0">' + photoBig + '</div>' +
+            '<div style="flex:1;min-width:0;padding-top:4px">' +
+              '<div style="font-weight:900;font-size:1.55rem;color:#0f172a;line-height:1.12;margin-bottom:8px;letter-spacing:-.01em">' + Super.esc(person.full_name || person.name || '') + '</div>' +
+              (isStaff
+                ? row('Designation', person.role, true) + row('Department', person.department) + row('Staff ID', idNo, true) + row('Phone', person.phone)
+                : row('Class', ((person.class || '') + ' ' + (person.arm || '')).trim(), true) + row('Student ID', idNo, true) + row('D.O.B.', dmy(person.date_of_birth || person.dob)) ) +
+              row('Valid Thru', validThru, true) +
+            '</div>' +
+            '<div style="flex-shrink:0;text-align:center;width:118px">' +
+              '<img src="' + this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || '', type: person.type || 'student' }), 220) + '" style="width:108px;height:108px" alt="QR">' +
+              '<div style="font-size:.66rem;font-weight:900;letter-spacing:1.5px;color:' + navy + ';margin-top:3px">SCAN TO VERIFY</div>' +
+              '<div style="margin-top:8px;display:flex;align-items:center;gap:5px;justify-content:center"><img src="' + logo + '" style="width:22px;height:22px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="text-align:left"><div style="font-size:.55rem;font-weight:900;color:#0f172a;line-height:1">' + Super.esc((s.shortName || '').toUpperCase()) + '</div><div style="height:12px;width:64px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px)"></div></div></div>' +
+            '<div style="margin-top:6px">' + this.signBlock(navy, 86) + '</div>' +
+            '</div></div>' +
+          contactFooter + credit + '</div>';
+      }
+
+      /* ============================================================
+         ENTERPRISE FINAL V2 (#10): SIX new professional templates.
+         Every one carries: school logo+name, address/phone/email strip,
+         QR verify, owner photo (with Drive fallback chain) and the
+         authorised person's signature.
+         ============================================================ */
+      const miniPhoto = (wpx, hpx, rad) => photo
+        ? '<img src="' + Super.esc(photo) + '" referrerpolicy="no-referrer" data-alt="' + Super.esc(this.driveAlt(person.photo_url || '')) + '" style="width:' + wpx + 'px;height:' + hpx + 'px;border-radius:' + (rad||12) + 'px;object-fit:cover;background:#e2e8f0" onerror="if(this.dataset.alt&&this.src!==this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=\'\';}else{this.onerror=null;this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}"><div style="display:none;width:' + wpx + 'px;height:' + hpx + 'px;border-radius:' + (rad||12) + 'px;background:' + pc + ';color:#fff;align-items:center;justify-content:center;font-weight:900;font-size:1.8rem">' + initial + '</div>'
+        : '<div style="width:' + wpx + 'px;height:' + hpx + 'px;border-radius:' + (rad||12) + 'px;background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.8rem">' + initial + '</div>';
+      const detailRows = rows.join('');
+      const qrImg = (sz) => '<img src="' + this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || '', type: person.type || 'student' }), 200) + '" style="width:' + sz + 'px;height:' + sz + 'px" alt="QR">';
+
+      // 1) EXECUTIVE — gold-trimmed dark green, embassy style
+      if (tpl === 'executive') {
+        return '<div class="sc-idcard" style="width:420px;border-radius:16px;overflow:hidden;background:#0b3d2e;color:#f8fafc;font-family:Georgia,serif;box-shadow:0 12px 30px rgba(0,0,0,.3);border:2px solid #c9a227">' +
+          '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid #c9a227"><img src="' + logo + '" style="width:42px;height:42px;border-radius:8px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'"><div><strong style="font-size:.95rem;letter-spacing:.5px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</strong><div style="font-size:.6rem;color:#c9a227;letter-spacing:2px">' + tag + '</div></div></div>' +
+          '<div style="display:flex;gap:14px;padding:14px 16px;align-items:center">' + miniPhoto(96,112,10) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem;color:#fff">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.72rem;margin-top:5px;border-collapse:collapse;color:#d1fae5">' + detailRows.replace(/#64748b/g,'#a7f3d0') + '</table></div>' +
+          '<div style="text-align:center;background:#fff;border-radius:8px;padding:5px">' + qrImg(62) + '<div style="font-size:.5rem;color:#0b3d2e;font-weight:900">VERIFY</div></div></div>' +
+          '<div style="background:#0f4a38;padding:4px">' + this.signBlock('#f8fafc', 90) + '</div>' +
+          '<div style="background:#062b20">' + this.contactStrip(s, true) + '</div>' + credit + '</div>';
+      }
+      // 2) MINIMAL — clean white, thin accent line, Swiss typography
+      if (tpl === 'minimal') {
+        return '<div class="sc-idcard" style="width:400px;border-radius:14px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:Helvetica,Arial,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.08)">' +
+          '<div style="height:6px;background:' + pc + '"></div>' +
+          '<div style="padding:16px 18px;display:flex;gap:14px;align-items:flex-start">' + miniPhoto(84,100,8) +
+          '<div style="flex:1;min-width:0"><div style="font-size:.6rem;letter-spacing:2.5px;color:' + pc + ';font-weight:700">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + ' · ' + tag + '</div>' +
+          '<div style="font-weight:800;font-size:1.2rem;color:#0f172a;margin:4px 0">' + Super.esc(person.full_name||'') + '</div>' +
+          '<table style="font-size:.74rem;border-collapse:collapse">' + detailRows + '</table></div>' + qrImg(64) + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 18px 10px"><img src="' + logo + '" style="width:30px;height:30px;object-fit:contain" onerror="this.style.display=\'none\'">' + this.signBlock('#334155', 84) + '</div>' +
+          this.contactStrip(s, false) + credit + '</div>';
+      }
+      // 3) GRADIENT — vibrant diagonal gradient, modern student card
+      if (tpl === 'gradient') {
+        return '<div class="sc-idcard" style="width:400px;border-radius:18px;overflow:hidden;background:linear-gradient(120deg,' + pc + ' 0%,' + ac + ' 100%);color:#fff;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 12px 28px rgba(0,0,0,.25)">' +
+          '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px"><img src="' + logo + '" style="width:40px;height:40px;border-radius:10px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="flex:1"><strong>' + Super.esc(s.name||'School') + '</strong><div style="font-size:.62rem;opacity:.9;letter-spacing:1.5px">' + tag + '</div></div></div>' +
+          '<div style="background:rgba(255,255,255,.94);color:#0f172a;margin:0 12px;border-radius:14px;padding:12px;display:flex;gap:12px;align-items:center">' + miniPhoto(80,96,10) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.72rem;border-collapse:collapse">' + detailRows + '</table></div>' + qrImg(58) + '</div>' +
+          '<div style="display:flex;justify-content:center;padding:6px 0 2px"><span style="background:rgba(255,255,255,.92);border-radius:8px;padding:2px 10px">' + this.signBlock('#0f172a', 84) + '</span></div>' +
+          this.contactStrip(s, true).replace('#94a3b8','#e0e7ff') + credit + '</div>';
+      }
+      // 4) BADGE — conference-style portrait badge with big name
+      if (tpl === 'badge') {
+        return '<div class="sc-idcard" style="width:280px;border-radius:16px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.16);text-align:center">' +
+          '<div style="background:' + pc + ';color:#fff;padding:10px"><img src="' + logo + '" style="width:36px;height:36px;border-radius:8px;background:#fff;padding:2px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="font-weight:800;font-size:.8rem;margin-top:3px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</div></div>' +
+          '<div style="margin:-1px auto 0;background:' + ac + ';color:#fff;font-size:.58rem;letter-spacing:2px;padding:3px 0;font-weight:700">' + tag + '</div>' +
+          '<div style="padding:14px 12px 6px;display:flex;flex-direction:column;align-items:center">' + miniPhoto(110,110,999) +
+          '<div style="font-weight:900;font-size:1.15rem;margin-top:8px;color:#0f172a">' + Super.esc(person.full_name||'') + '</div>' +
+          '<table style="font-size:.72rem;border-collapse:collapse;margin:4px auto 0;text-align:left">' + detailRows + '</table>' +
+          '<div style="margin-top:8px">' + qrImg(70) + '<div style="font-size:.52rem;font-weight:900;color:' + pc + '">SCAN TO VERIFY</div></div>' +
+          '<div style="margin-top:6px">' + this.signBlock('#334155', 90) + '</div></div>' +
+          this.contactStrip(s, false) + credit + '</div>';
+      }
+      // 5) SMART — fintech-style card with chip + wave pattern
+      if (tpl === 'smart') {
+        return '<div class="sc-idcard" style="width:400px;border-radius:20px;overflow:hidden;position:relative;background:#111827;color:#e5e7eb;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 14px 34px rgba(0,0,0,.35)">' +
+          '<div style="position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,' + ac + '33,transparent 45%),radial-gradient(circle at 10% 90%,' + pc + '44,transparent 50%)"></div>' +
+          '<div style="position:relative;padding:16px 18px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:8px;align-items:center"><img src="' + logo + '" style="width:34px;height:34px;border-radius:8px;background:#fff;padding:2px;object-fit:contain" onerror="this.style.display=\'none\'"><strong style="font-size:.85rem">' + Super.esc(s.name||'School') + '</strong></div><span style="font-size:.55rem;letter-spacing:2px;color:' + ac + ';font-weight:800">' + tag + '</span></div>' +
+          '<div style="width:38px;height:28px;border-radius:6px;background:linear-gradient(135deg,#fbbf24,#b45309);margin:12px 0 8px"></div>' +
+          '<div style="display:flex;gap:12px;align-items:center">' + miniPhoto(72,86,8) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem;color:#fff;letter-spacing:.5px">' + Super.esc((person.full_name||'').toUpperCase()) + '</div><table style="font-size:.7rem;border-collapse:collapse;color:#cbd5e1">' + detailRows.replace(/#64748b/g,'#94a3b8') + '</table></div>' +
+          '<div style="background:#fff;border-radius:8px;padding:4px">' + qrImg(56) + '</div></div>' +
+          '<div style="display:flex;justify-content:flex-end;margin-top:6px"><span style="background:rgba(255,255,255,.92);border-radius:8px;padding:2px 8px">' + this.signBlock('#111827', 78) + '</span></div></div>' +
+          '<div style="position:relative;background:rgba(0,0,0,.35)">' + this.contactStrip(s, true) + '</div>' + credit + '</div>';
+      }
+      // 6) HERITAGE — classic crest style with serif type and double border
+      if (tpl === 'heritage') {
+        return '<div class="sc-idcard" style="width:410px;border-radius:12px;overflow:hidden;background:#fffef8;border:3px double ' + pc + ';font-family:Georgia,\'Times New Roman\',serif;box-shadow:0 8px 24px rgba(0,0,0,.14)">' +
+          '<div style="text-align:center;padding:10px 14px 4px"><img src="' + logo + '" style="width:46px;height:46px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="font-weight:900;font-size:1rem;color:' + pc + ';letter-spacing:1px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</div>' + (s.motto?'<div style="font-size:.62rem;font-style:italic;color:#7c2d12">' + Super.esc(s.motto) + '</div>':'') + '</div>' +
+          '<div style="background:' + pc + ';color:#fffef8;font-size:.6rem;letter-spacing:3px;text-align:center;padding:3px 0;font-weight:700">' + tag + '</div>' +
+          '<div style="display:flex;gap:14px;padding:12px 16px;align-items:center">' + miniPhoto(88,104,6) +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.1rem;color:#1f2937">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.74rem;border-collapse:collapse;color:#374151">' + detailRows + '</table></div>' + qrImg(64) + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 16px 8px"><div style="font-size:.6rem;color:#6b7280">Session: <b>' + Super.esc(session) + '</b></div>' + this.signBlock(pc, 92) + '</div>' +
+          '<div style="border-top:1px solid ' + pc + '33">' + this.contactStrip(s, false) + '</div>' + credit + '</div>';
+      }
+
+      // VERTICAL (portrait, lanyard-style) professional template (issue 3)
+      if (tpl === 'vertical') {
+        return '<div class="sc-idcard" style="position:relative;width:300px;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.18);background:#fff">' +
+          '<div style="height:14px;background:linear-gradient(90deg,' + pc + ',' + ac + ')"></div>' +
+          '<div style="text-align:center;padding:14px 14px 0"><img src="' + logo + '" style="width:46px;height:46px;border-radius:10px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+          '<div style="font-weight:800;color:#0f172a;margin-top:4px;line-height:1.15">' + Super.esc(s.name || 'School') + '</div>' +
+          '<div style="font-size:.62rem;color:#64748b">' + Super.esc(s.motto || '') + '</div></div>' +
+          '<div style="background:' + (isStaff ? '#0f766e' : pc) + ';color:#fff;font-size:.62rem;letter-spacing:1.5px;text-align:center;padding:4px 0;font-weight:700;margin:10px 0">' + tag + '</div>' +
+          '<div style="text-align:center;padding:0 14px">' + bigPhoto + '<div style="font-weight:800;font-size:1.05rem;margin-top:8px;color:#0f172a">' + Super.esc(person.full_name || person.name || '') + '</div>' +
+          '<table style="font-size:.74rem;margin:6px auto 0;border-collapse:collapse;text-align:left">' + rows.join('') + '</table></div>' +
+          '<div style="display:flex;justify-content:center;padding:10px 0 6px"><img src="' + qr + '" style="width:74px;height:74px"></div>' +
+          '<div style="text-align:center;font-size:.6rem;color:#64748b;margin-bottom:4px">Session: <strong>' + Super.esc(session) + '</strong></div>' +
+          '<div style="margin:0 auto 6px;width:110px">' + this.signBlock(pc, 100) + '</div>' +
+          contactFooter + credit + '</div>';
+      }
+      // CORPORATE (dark, premium) horizontal template
+      if (tpl === 'corporate') {
+        return '<div class="sc-idcard" style="width:360px;border-radius:16px;overflow:hidden;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 12px 30px rgba(0,0,0,.25);background:#0f172a;color:#e2e8f0">' +
+          '<div style="padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:2px solid ' + ac + '">' +
+          '<img src="' + logo + '" style="width:40px;height:40px;border-radius:9px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+          '<div style="flex:1"><strong style="font-size:.98rem;color:#fff">' + Super.esc(s.name || 'School') + '</strong><div style="font-size:.64rem;color:#94a3b8">' + Super.esc(s.motto || '') + '</div></div>' +
+          '<span style="font-size:.58rem;letter-spacing:1px;color:' + ac + ';font-weight:700">' + tag + '</span></div>' +
+          '<div style="display:flex;gap:14px;padding:16px;align-items:center">' + bigPhoto.replace('110px;height:110px', '92px;height:92px') +
+          '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem;color:#fff">' + Super.esc(person.full_name || person.name || '') + '</div>' +
+          '<table style="font-size:.73rem;margin-top:5px;border-collapse:collapse;color:#cbd5e1">' + rows.join('').replace(/#64748b/g, '#94a3b8').replace(/font-weight:600/g, 'font-weight:600;color:#fff') + '</table></div>' +
+          '<img src="' + qr + '" style="width:66px;height:66px;background:#fff;padding:3px;border-radius:6px"></div>' +
+          '<div style="background:#1e293b;padding:7px 14px;font-size:.6rem;color:#94a3b8;text-align:center">' + Super.esc(s.address || '') + ' · ' + Super.esc(s.phone || '') + ' · ' + Super.esc(s.email || '') + '<div style="display:flex;justify-content:center;margin-top:4px;filter:invert(0)"><span style="background:#fff;border-radius:6px;padding:2px 8px;display:inline-block">' + this.signBlock('#0f172a', 84) + '</span></div></div>' +
+          '<div style="background:' + ac + ';color:#0f172a;font-size:.56rem;text-align:center;padding:3px 0;font-weight:700">Session ' + Super.esc(session) + ' · Powered by HMG Concepts</div></div>';
+      }
+      // HORIZONTAL (default, enhanced)
+      return `<div class="sc-idcard" style="width:340px;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;font-family:'Segoe UI',Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff">
+        <div style="background:linear-gradient(135deg,${pc},${ac});color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px">
+          <img src="${logo}" style="width:38px;height:38px;border-radius:9px;background:#fff;padding:3px;object-fit:contain" alt="" onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0"><strong style="font-size:.95rem;display:block;line-height:1.15">${Super.esc(s.name || 'School')}</strong><div style="font-size:.66rem;opacity:.92">${Super.esc(s.motto || '')}</div></div>
+        </div>
+        <div style="background:${isStaff ? '#0f766e' : '#1d4ed8'};color:#fff;font-size:.64rem;letter-spacing:1.5px;text-align:center;padding:3px 0;font-weight:700">${tag}</div>
+        <div style="display:flex;gap:12px;padding:14px 14px 6px;align-items:flex-start">
+          <div style="flex-shrink:0">${photoImg}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:800;font-size:1rem;line-height:1.2;color:#0f172a">${Super.esc(person.full_name || person.name || '')}</div>
+            <table style="font-size:.74rem;margin-top:5px;border-collapse:collapse">${rows.join('')}</table>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 14px 10px">
+          <div style="font-size:.62rem;color:#64748b">
+            <div>Session: <strong>${Super.esc(session)}</strong></div>
+            </div><div style="margin-top:8px;width:100px">${this.signBlock('#334155', 92)}</div><div style="display:none">
+          </div>
+          <div style="text-align:center"><img src="${qr}" style="width:78px;height:78px" alt="QR"><div style="font-size:.55rem;font-weight:800;color:#0f172a">SCAN TO VERIFY</div><div style="height:18px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px);margin-top:3px"></div></div>
+        </div>
+        ${contactFooter}${credit}
+      </div>`;
+    },
+    print(person) {
+      // ENTERPRISE V11: robust ID-card printing. Never open an empty page:
+      // validate/fallback the person object, write print CSS, wait briefly for
+      // photos/QR/logo, then print even if a remote image stalls.
+      person = person || {};
+      if (!person.full_name && !person.name) person.full_name = 'Sample Student';
+      if (!person.admission_no && !person.staff_no && !person.id) person.admission_no = 'SAMPLE-ID';
+      const card = this.html(person) || '<div style="padding:30px;border:1px solid #ddd">ID card could not render.</div>';
+      const w = window.open('', '_blank');
+      if (!w) { if (typeof toast === 'function') toast('Popup blocked. Please allow popups to print ID cards.', 'warning'); return; }
+      const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI.replace(/[^/]*$/, '') : '';
+      w.document.open();
+      w.document.write('<!DOCTYPE html><html><head><title>ID Card</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{display:flex;justify-content:center;align-items:flex-start;padding:24px;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sc-idcard{break-inside:avoid;page-break-inside:avoid}img{max-width:100%}@media print{body{padding:0}}</style></head><body>' + card + '<script>window.onload=function(){var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.focus();window.print()},250)};var imgs=[].slice.call(document.images),left=imgs.length;if(!left)return go();var tick=function(){if(--left<=0)go()};imgs.forEach(function(im){if(im.complete)tick();else{im.onload=tick;im.onerror=tick}});setTimeout(go,2200)};<\/script></body></html>');
+      w.document.close();
+    }
+  },
+
+  /* ==================================================================
+     5) CERTIFICATE GENERATOR (printable, verifiable code)
+     ================================================================== */
+  cert: {
+    code() { const c = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = 'SC-'; for (let i = 0; i < 8; i++) s += c[Math.floor(Math.random() * c.length)]; return s; },
+    html(opts) {
+      const s = Super.school || {}; const code = opts.code || this.code();
+      return `<div class="sc-cert" style="width:800px;max-width:96vw;border:10px solid var(--primary,#4f46e5);padding:40px;text-align:center;font-family:Georgia,serif;background:#fff">
+        <img src="assets/img/logo.${(s.logoExt || 'svg')}" style="width:70px;height:70px;border-radius:12px;object-fit:contain" alt="">
+        <h1 style="margin:10px 0 4px">${Super.esc(s.name || 'School')}</h1>
+        <p style="color:#64748b;margin:0 0 20px">${Super.esc(s.motto || '')}</p>
+        <div style="letter-spacing:6px;color:#b8860b;font-size:3rem;font-weight:700;margin:16px 0 0">CERTIFICATE</div><h2 style="letter-spacing:3px;color:#0f172a;margin:0 0 18px">${Super.esc(opts.title || 'OF COMPLETION')}</h2>
+        <p style="margin:18px 0 6px">This is to certify that</p>
+        <h2 style="margin:0;border-bottom:2px solid #e2e8f0;display:inline-block;padding:0 30px 6px">${Super.esc(opts.name || '')}</h2>
+        <p style="max-width:560px;margin:18px auto;line-height:1.6">${Super.esc(opts.body || 'has successfully met the requirements and is hereby recognised for outstanding achievement.')}</p>
+        <div style="display:flex;justify-content:space-between;margin-top:40px;font-size:.85rem">
+          <div>____________________<br>Date: ${Super.esc(opts.date || (function(){const d=new Date();return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();})())}</div>
+          <div>____________________<br>${Super.esc(opts.signatory || 'Head of School')}</div>
+        </div>
+        <p style="margin-top:24px;font-size:.72rem;color:#94a3b8">Verification code: <strong>${Super.esc(code)}</strong> · Verify at ${Super.esc((typeof location!=='undefined'?location.origin:''))}</p>
+      </div>`;
+    },
+    print(opts) {
+      const w = window.open('', '_blank');
+      w.document.write('<html><head><title>Certificate</title></head><body style="display:flex;justify-content:center;padding:20px">' + this.html(opts) + '<script>window.onload=()=>window.print()<\/script></body></html>');
+      w.document.close();
+    }
+  },
+
+  /* ==================================================================
+     6) FLYER / MARKETING GENERATOR (printable promo poster — lead gen)
+     ================================================================== */
+  flyer: {
+    // Fully customisable (issue 15): colours, fonts, layouts, headline, bullets,
+    // CTA. Pass an options object; sensible defaults pull from the school config.
+    // Professional palettes (issue 2) for one-click international-standard looks.
+    PALETTES: {
+      royal:   { pc:'#1e3a8a', ac:'#f59e0b', text:'#ffffff' },
+      emerald: { pc:'#065f46', ac:'#fbbf24', text:'#ffffff' },
+      crimson: { pc:'#7f1d1d', ac:'#fca5a5', text:'#ffffff' },
+      violet:  { pc:'#4f46e5', ac:'#a78bfa', text:'#ffffff' },
+      teal:    { pc:'#0f766e', ac:'#5eead4', text:'#ffffff' },
+      slate:   { pc:'#0f172a', ac:'#38bdf8', text:'#ffffff' },
+      sunset:  { pc:'#b45309', ac:'#fde047', text:'#ffffff' }
+    },
+    SIZES: { a4portrait:{w:620,minh:860}, a5portrait:{w:520,minh:720}, square:{w:600,minh:600}, story:{w:480,minh:850}, landscape:{w:760,minh:480} },
+    defaults() {
+      const s = Super.school || {};
+      return {
+        title: s.name || 'Our School',
+        tagline: s.motto || 'Excellence in Education',
+        headline: 'ADMISSION IN PROGRESS',
+        bullets: ['Online results & report cards', 'CBT / online exams from any device', 'Fees, attendance & parent updates', 'Installable app + instant notifications'],
+        cta: 'Apply today — limited spaces!',
+        pc: '#4f46e5', ac: '#7c3aed', text: '#ffffff',
+        font: "system-ui,'Segoe UI',Arial,sans-serif",
+        layout: 'gradient', // gradient | banner | minimal | sidebar | poster | elegant
+        size: 'a4portrait', badge: 'NEW SESSION', ribbon: true, pattern: true, contactBar: true,
+        year: (new Date().getFullYear()) + '/' + (new Date().getFullYear() + 1)
+      };
+    },
+    html(o) {
+      o = Object.assign(this.defaults(), o || {});
+      const s = Super.school || {};
+      const logo = `assets/img/logo.${(s.logoExt || 'svg')}`;
+      const bullets = (o.bullets || []).map(b => `<p style="margin:7px 0;display:flex;align-items:flex-start;gap:8px"><span style="color:${o.ac};font-weight:900">✓</span><span>${Super.esc(b)}</span></p>`).join('');
+      const contact = o.contactBar !== false ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.25)"><p style="font-weight:700;margin:4px 0">📞 ${Super.esc(s.phone || '')} &nbsp; ✉️ ${Super.esc(s.email || '')}</p><p style="font-size:.78rem;opacity:.9;margin:0">📍 ${Super.esc(s.address || '')}</p></div>` : '';
+      const credit = '<p style="margin-top:14px;font-size:.68rem;opacity:.75">Powered by HMG Concepts</p>';
+      const sz = this.SIZES[o.size] || this.SIZES.a4portrait;
+      // professional decorations
+      const ribbon = o.ribbon ? `<div style="position:absolute;top:18px;right:-42px;transform:rotate(45deg);background:${o.ac};color:#1f2937;font-weight:800;font-size:.7rem;padding:6px 50px;box-shadow:0 2px 6px rgba(0,0,0,.2)">${Super.esc(o.year || '')}</div>` : '';
+      const badge = o.badge ? `<div style="display:inline-block;background:${o.ac};color:#1f2937;font-weight:800;font-size:.72rem;letter-spacing:1px;padding:5px 14px;border-radius:20px;margin-bottom:10px">${Super.esc(o.badge)}</div>` : '';
+      const pattern = o.pattern ? `background-image:radial-gradient(circle at 20% 10%,rgba(255,255,255,.10) 0,transparent 40%),radial-gradient(circle at 90% 80%,rgba(255,255,255,.08) 0,transparent 35%);` : '';
+      const base = `position:relative;overflow:hidden;width:${sz.w}px;min-height:${sz.minh}px;max-width:96vw;border-radius:18px;padding:40px;font-family:${o.font};color:${o.text};box-shadow:0 18px 50px rgba(0,0,0,.25)`;
+
+      if (o.layout === 'poster') {
+        return `<div class="sc-flyer" style="${base};background:linear-gradient(160deg,${o.pc},${o.ac});${pattern};text-align:center">
+          ${ribbon}
+          <img src="${logo}" style="width:90px;height:90px;border-radius:18px;background:#fff;padding:6px;object-fit:contain;box-shadow:0 6px 16px rgba(0,0,0,.2)" onerror="this.style.display='none'">
+          <h1 style="font-size:2.3rem;margin:16px 0 2px;letter-spacing:.5px">${Super.esc(o.title)}</h1>
+          <p style="opacity:.95;margin:0 0 6px;font-style:italic">${Super.esc(o.tagline)}</p>
+          ${badge}
+          <div style="background:rgba(255,255,255,.12);backdrop-filter:blur(2px);border:1px solid rgba(255,255,255,.25);border-radius:16px;padding:22px;margin:16px 0">
+            <h2 style="letter-spacing:2px;margin:0 0 14px">${Super.esc(o.headline)}</h2>
+            <div style="text-align:left;max-width:380px;margin:0 auto">${bullets}</div>
+          </div>
+          <div style="background:#fff;color:${o.pc};font-weight:800;border-radius:30px;padding:12px 18px;display:inline-block;font-size:1.05rem;box-shadow:0 6px 16px rgba(0,0,0,.2)">${Super.esc(o.cta)}</div>
+          ${contact}${credit}</div>`;
+      }
+      if (o.layout === 'elegant') {
+        return `<div class="sc-flyer" style="${base};background:#fffdf7;color:#1f2937;border:1px solid #e7e2d0;font-family:Georgia,serif">
+          <div style="border:2px solid ${o.pc};border-radius:12px;padding:30px;min-height:${sz.minh - 84}px;text-align:center">
+            <img src="${logo}" style="width:76px;height:76px;border-radius:12px;object-fit:contain" onerror="this.style.display='none'">
+            <h1 style="font-size:2rem;margin:12px 0 2px;color:${o.pc}">${Super.esc(o.title)}</h1>
+            <p style="color:#6b7280;margin:0 0 10px;font-style:italic">${Super.esc(o.tagline)}</p>
+            <div style="height:2px;width:80px;background:${o.ac};margin:12px auto"></div>
+            <span style="display:inline-block;color:${o.ac};font-weight:700;letter-spacing:2px;margin-bottom:10px">${Super.esc(o.badge || '')}</span>
+            <h2 style="letter-spacing:2px;color:${o.pc};margin:8px 0 16px">${Super.esc(o.headline)}</h2>
+            <div style="text-align:left;max-width:400px;margin:0 auto;color:#1f2937">${bullets}</div>
+            <p style="font-weight:800;margin:18px 0;color:${o.pc};font-size:1.1rem">${Super.esc(o.cta)}</p>
+            <div style="border-top:1px solid #e7e2d0;padding-top:12px;color:#6b7280;font-size:.8rem">📞 ${Super.esc(s.phone || '')} · ✉️ ${Super.esc(s.email || '')}<br>📍 ${Super.esc(s.address || '')}</div>
+          </div></div>`;
+      }
+      if (o.layout === 'minimal') {
+        return `<div class="sc-flyer" style="${base};background:#fff;color:#0f172a;border:3px solid ${o.pc};text-align:center">
+          <img src="${logo}" style="width:80px;height:80px;border-radius:16px;object-fit:contain" onerror="this.style.display='none'">
+          <h1 style="font-size:2rem;margin:14px 0 2px;color:${o.pc}">${Super.esc(o.title)}</h1>
+          <p style="color:#64748b">${Super.esc(o.tagline)}</p>
+          <h2 style="letter-spacing:2px;color:${o.ac};margin:18px 0">${Super.esc(o.headline)}</h2>
+          <div style="text-align:left;max-width:420px;margin:0 auto;color:#0f172a">${bullets}</div>
+          <p style="font-weight:800;margin:20px 0;color:${o.pc}">${Super.esc(o.cta)}</p>${contact}${credit}</div>`;
+      }
+      if (o.layout === 'banner') {
+        return `<div class="sc-flyer" style="${base};background:#fff;color:#0f172a;overflow:hidden;padding:0">
+          <div style="background:linear-gradient(135deg,${o.pc},${o.ac});color:${o.text};padding:28px;text-align:center">
+            <img src="${logo}" style="width:70px;height:70px;border-radius:14px;background:#fff;object-fit:contain" onerror="this.style.display='none'">
+            <h1 style="font-size:1.9rem;margin:10px 0 2px">${Super.esc(o.title)}</h1>
+            <p style="opacity:.95;margin:0">${Super.esc(o.tagline)}</p></div>
+          <div style="padding:28px;text-align:center"><h2 style="letter-spacing:2px;color:${o.ac};margin:0 0 14px">${Super.esc(o.headline)}</h2>
+          <div style="text-align:left;max-width:420px;margin:0 auto">${bullets}</div>
+          <p style="font-weight:800;margin:18px 0;color:${o.pc}">${Super.esc(o.cta)}</p>${contact}${credit}</div></div>`;
+      }
+      if (o.layout === 'sidebar') {
+        return `<div class="sc-flyer" style="${base};background:#fff;color:#0f172a;padding:0;display:flex;overflow:hidden">
+          <div style="width:34%;background:linear-gradient(160deg,${o.pc},${o.ac});color:${o.text};padding:24px;text-align:center;display:flex;flex-direction:column;justify-content:center">
+            <img src="${logo}" style="width:64px;height:64px;border-radius:12px;background:#fff;object-fit:contain;margin:0 auto" onerror="this.style.display='none'">
+            <h1 style="font-size:1.3rem;margin:10px 0 4px">${Super.esc(o.title)}</h1><p style="font-size:.78rem;opacity:.95">${Super.esc(o.tagline)}</p></div>
+          <div style="flex:1;padding:26px"><h2 style="letter-spacing:1.5px;color:${o.ac};margin:0 0 12px">${Super.esc(o.headline)}</h2>${bullets}
+          <p style="font-weight:800;margin:16px 0;color:${o.pc}">${Super.esc(o.cta)}</p>${contact}${credit}</div></div>`;
+      }
+      // gradient (default)
+      return `<div class="sc-flyer" style="${base};background:linear-gradient(135deg,${o.pc},${o.ac});text-align:center">
+        <img src="${logo}" style="width:80px;height:80px;border-radius:16px;background:#fff;object-fit:contain" onerror="this.style.display='none'">
+        <h1 style="font-size:2rem;margin:14px 0 4px">${Super.esc(o.title)}</h1>
+        <p style="opacity:.95">${Super.esc(o.tagline)}</p>
+        <h2 style="letter-spacing:2px;margin:16px 0 0">${Super.esc(o.headline)}</h2>
+        <div style="background:rgba(255,255,255,.15);border-radius:14px;padding:20px;margin:18px 0;text-align:left">${bullets}</div>
+        <p style="font-weight:800;margin:0 0 12px">${Super.esc(o.cta)}</p>${contact}${credit}</div>`;
+    },
+    print(o) {
+      const w = window.open('', '_blank');
+      w.document.write('<html><head><title>Flyer</title></head><body style="display:flex;justify-content:center;padding:20px">' + this.html(o) + '<script>window.onload=()=>window.print()<\/script></body></html>');
+      w.document.close();
+    }
+  },
+
+  /* ==================================================================
+     7) PER-SCHOOL DATA EXPORT / IMPORT + DRAFT AUTOSAVE (from "Projects")
+     ================================================================== */
+  data: {
+    autosaveKey(form) { return 'sc-draft-' + (form || location.pathname); },
+    bindAutosave(formEl, key) {
+      if (!formEl) return;
+      key = key || this.autosaveKey();
+      try { const saved = JSON.parse(localStorage.getItem(key) || '{}'); Object.keys(saved).forEach(n => { const f = formEl.elements[n]; if (f) f.value = saved[n]; }); } catch (e) {}
+      formEl.addEventListener('input', () => {
+        const obj = {}; [...formEl.elements].forEach(f => { if (f.name) obj[f.name] = f.value; });
+        try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) {}
+      });
+      formEl.addEventListener('submit', () => { try { localStorage.removeItem(key); } catch (e) {} });
+    }
+  }
+};
+
+if (typeof window !== 'undefined') window.Super = Super;
+if (typeof console !== 'undefined') // v2 cumulative assistant expansion: clearer, longer no-AI workflow guidance.
+try { if (window.Super && Super.chatbot) { Super.chatbot.extraHelp = 'School Connect is a cumulative no-AI-API school platform. Every workflow should start with setup data (session, term, classes, subjects, students, staff), then operational records (attendance, fees, results, CBT, assignments), then outputs (report cards, broadsheets, receipts, ID cards, certificates, analytics). Admin can control page read/write access from Dashboard → Page Access & Permission Manager.'; } } catch(e) {}
+console.log('%c[School Connect Gen v3] super features loaded — chatbot, command palette (Ctrl+K), notify hooks, ID cards, certificates, flyer, autosave. No AI.', 'color:#db2777;font-weight:bold');
