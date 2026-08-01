@@ -983,3 +983,134 @@ update school_settings set principal_name='Mrs. Grace Obi',proprietor_name='Dr. 
 insert into report_comment_bands(label,min_percent,max_percent,class,term,session,class_teacher_comment,principal_comment,priority)select*from(values('Outstanding',80::numeric,100::numeric,'*','*','*','[NAME] has demonstrated outstanding mastery and exemplary study habits. Maintain this excellent standard.','An exceptional [GRADE] performance at [PERCENT]. Continue to pursue excellence.',60),('Very Good',70,79.99,'*','*','*','[NAME] produced a very good performance. Greater consistency can move this result to distinction level.','A strong performance. Keep building accuracy and independent study habits.',50),('Good',60,69.99,'*','*','*','[NAME] made good progress. Regular revision and careful assignment completion will strengthen weaker areas.','A creditable result. Act on subject feedback and target a higher band next term.',40),('Satisfactory',50,59.99,'*','*','*','[NAME] achieved a satisfactory result but needs a structured study timetable and active participation.','A fair foundation. Home and school should support clear weekly improvement targets.',30),('Developing',40,49.99,'*','*','*','[NAME] requires focused support in core subjects, regular attendance and monitored practice.','Improvement is required. A teacher-parent support plan is recommended.',20),('Priority Support',0,39.99,'*','*','*','[NAME] requires immediate diagnostic review, remedial teaching and close home-school follow-up.','Performance is below expectation. Arrange an intervention meeting and track agreed actions.',10))x(label,min_percent,max_percent,class,term,session,class_teacher_comment,principal_comment,priority)where not exists(select 1 from report_comment_bands b where b.label=x.label and b.class='*');
 insert into exam_registration_links(token,title,intro,exam_types,session,term,registration_deadline,exam_date,venue,fee_note,requirements,instructions,contact_name,contact_phone,contact_email,consent_text,success_message,active,created_by)select'DEMO-EXAM-2026','2026/2027 Public Examination Registration','Complete this official demonstration form carefully.',array['WAEC SSCE (School)','NECO SSCE (School)','UTME (JAMB)','Common Entrance (NCEE)'],'2026/2027','First Term',now()+interval'60 days',current_date+75,'School Connect Demo Examination Centre','Confirm fees with the examination office.','Passport photograph, NIN and examination-specific documents.','Use official names exactly as shown on identity documents.','Mr. Chinedu Okafor','+234 810 086 6322','buildingmyictcareer@gmail.com','I certify that this information is accurate.','Registration received. Keep your reference.',true,(select id from sc_demo_ids where role='admin')where not exists(select 1 from exam_registration_links where token='DEMO-EXAM-2026');
 select 'School Connect demo V5.7 professional data installed ✅'as status;
+
+-- ============================================================
+-- V6.5 DEMO ENRICHMENT — richer sample data on EVERY page
+-- (idempotent guards per table; safe to re-run; demo ONLY)
+-- ============================================================
+do $$
+declare
+  admin_id uuid:=(select id from sc_demo_ids where role='admin');
+  teacher_id uuid:=(select id from sc_demo_ids where role='teacher');
+  parent_id uuid:=(select id from sc_demo_ids where role='parent');
+  student_user uuid:=(select id from sc_demo_ids where role='student');
+  adanna uuid:=(select id from public.students where admission_no='SCD-00014');
+  bello uuid:=(select id from public.students where admission_no='SCD-00015');
+  chiamaka uuid:=(select id from public.students where admission_no='SCD-00016');
+  st3 uuid;
+begin
+  select id into st3 from public.students where admission_no='SCD-00001';
+
+  -- Payroll: full month run for several staff (page previously looked empty)
+  if (select count(*) from public.payroll) < 4 then
+    insert into public.payroll (staff_id,staff_name,month,year,basic,allowances,bonus,overtime,tax,pension,loan_deduction,other_deductions,net_pay,method,status)
+    select s.id, s.full_name,'June',2026,
+           150000+(row_number()over())*10000, 20000, 0, 0, 10000, 12000, 0, 0,
+           148000+(row_number()over())*10000,'bank transfer','paid'
+      from public.staff s limit 4;
+  end if;
+
+  -- Inventory: a believable asset register
+  if (select count(*) from public.inventory) < 6 then
+    insert into public.inventory (item_name,category,asset_tag,quantity,location,condition,unit_cost,last_audit,next_audit) values
+      ('HP ProBook laptop','ICT','SCD-ICT-001',6,'ICT Laboratory','good',420000,'2026-05-02','2026-11-02'),
+      ('Epson projector','ICT','SCD-ICT-002',2,'Staff Room','good',250000,'2026-05-02','2026-11-02'),
+      ('Science microscope','Laboratory','SCD-LAB-014',8,'Science Lab','fair',95000,'2026-04-20','2026-10-20'),
+      ('Student desk & chair set','Furniture','SCD-FUR-101',120,'Classrooms','good',18000,'2026-03-15','2027-03-15'),
+      ('55-seater school bus','Transport','SCD-TRN-001',1,'Car park','good',28000000,'2026-06-01','2026-12-01'),
+      ('Standby generator 20KVA','Facilities','SCD-FAC-003',1,'Generator house','needs service',3500000,'2026-06-10','2026-09-10');
+  end if;
+
+  -- Admission links: an active public application link + one closed
+  if (select count(*) from public.admission_links) < 2 then
+    insert into public.admission_links (label,applying_for_class,session,active) values
+      ('2026/2027 JSS 1 Entrance Intake','JSS 1','2026/2027',true),
+      ('2025/2026 SS 1 Transfer Window (closed)','SS 1','2025/2026',false);
+  end if;
+
+  -- Messages: a fuller two-way thread set
+  if (select count(*) from public.messages) < 5 and admin_id is not null then
+    insert into public.messages (from_id,to_id,body,read,thread_id) values
+      (teacher_id,parent_id,'Good afternoon. Adanna performed excellently in the Mathematics revision test — 17/20. Keep encouraging her.',true,'d9000000-0000-4000-8000-000000000002'),
+      (parent_id,teacher_id,'Thank you for the update! We will keep supporting her at home.',false,'d9000000-0000-4000-8000-000000000002'),
+      (student_user,teacher_id,'Good evening ma. Please can you re-share the summary-writing notes link?',false,'d9000000-0000-4000-8000-000000000003'),
+      (admin_id,teacher_id,'Reminder: submit third-term scheme-of-work coverage before Friday.',true,'d9000000-0000-4000-8000-000000000004');
+  end if;
+
+  -- Assignments: one per level with due dates and links
+  if (select count(*) from public.assignments) < 4 then
+    insert into public.assignments (title,description,class,subject,due_date,posted_by,drive_link) values
+      ('Essay: My Role Model','Write a 400-word argumentative essay. Submit as a Drive link.','SS 2','English Language',current_date+5,teacher_id,'https://drive.google.com/'),
+      ('Simultaneous Equations Worksheet','Questions 1–15, elimination and substitution methods.','SS 2','Mathematics',current_date+3,teacher_id,'https://drive.google.com/'),
+      ('Basic Science: States of Matter Poster','Draw and label the three states of matter with examples.','JSS 1','Basic Science',current_date+7,teacher_id,''),
+      ('Civic Education Project','Group project: rights and duties of a citizen (submit one link per group).','JSS 3','Civic Education',current_date+10,teacher_id,'https://drive.google.com/');
+  end if;
+
+  -- Behaviour points: positive + corrective examples
+  if (select count(*) from public.behaviour_points) < 4 and adanna is not null then
+    insert into public.behaviour_points (student_id,points,reason,badge,awarded_by) values
+      (adanna,10,'Led the class study group all week','⭐ Star Leader',teacher_id),
+      (coalesce(bello,adanna),5,'Volunteered to clean the laboratory','🤝 Helping Hand',teacher_id),
+      (coalesce(chiamaka,adanna),8,'Perfect punctuality this month','⏰ Always Early',teacher_id),
+      (coalesce(st3,adanna),-3,'Late submission of two assignments','',teacher_id);
+  end if;
+
+  -- Support plans: SEN/intervention examples
+  if (select count(*) from public.support_plans) < 3 and adanna is not null then
+    insert into public.support_plans (student_id,need_type,intervention,goal,review_date,outcome,status) values
+      (coalesce(bello,adanna),'Reading fluency','20 minutes guided reading, three times weekly with the literacy coordinator.','Reach age-appropriate fluency by end of first term.',current_date+30,'Improving — moved up one reading band.','active'),
+      (coalesce(chiamaka,adanna),'Mathematics anxiety','Small-group numeracy club + weekly confidence check-in.','Attempt all test questions without skipping.',current_date+21,'','review'),
+      (coalesce(st3,adanna),'Speech support','External speech-therapist referral; classroom seating adjustment.','Clear participation in class reading.',current_date+45,'Closed after successful review.','closed');
+  end if;
+
+  -- Library: a proper catalogue shelf
+  if (select count(*) from public.library) < 6 then
+    insert into public.library (title,author,isbn,category,copies,lent,drive_link) values
+      ('Things Fall Apart','Chinua Achebe','978-0385474542','Literature',12,3,''),
+      ('New General Mathematics SS2','M. F. Macrae','978-9781255429','Mathematics',30,11,''),
+      ('Intensive English for SSS','P. O. Olatunbosun','978-9781234567','English',25,6,''),
+      ('Essential Biology','M. C. Michael','978-9785401234','Sciences',20,4,''),
+      ('Junior Atlas for Nigerian Schools','Macmillan','978-0333456789','Reference',15,0,''),
+      ('Civic Education for Secondary Schools','S. A. Adeyemi','978-9788765432','Humanities',18,2,'');
+  end if;
+
+  -- Helpdesk: tickets across categories/statuses (matches the new category dropdown)
+  if (select count(*) from public.helpdesk_tickets) < 4 then
+    insert into public.helpdesk_tickets (category,subject,body,priority,status,submitted_by) values
+      ('IT / computer','Projector in SS2 not displaying','Screen flickers then goes blank after 5 minutes.','high','in_progress',teacher_id),
+      ('plumbing','Leaking tap in junior block','Water wastage near the JSS toilets.','normal','open',teacher_id),
+      ('electrical','Faulty socket in science lab','Sparks when the microscope charger is plugged in.','urgent','resolved',teacher_id),
+      ('furniture','Broken chairs in JSS 1B','Four chairs need repair before resumption.','low','open',teacher_id);
+  end if;
+
+  -- Gamification / house points as module records (module_records powers the page)
+  if (select count(*) from public.module_records where module='gamification') = 0 then
+    insert into public.module_records (module,title,body,status,data,created_by) values
+      ('gamification','Blue House — Inter-house Quiz Champions','Blue House won the third-term inter-house quiz.','awarded','{"house":"Blue","points":50}'::jsonb,teacher_id),
+      ('gamification','Reading Challenge — 1000 Pages Club','Twelve students completed the 1000-page reading challenge.','awarded','{"badge":"1000 Pages","points":25}'::jsonb,teacher_id);
+  end if;
+  if (select count(*) from public.module_records where module='cafeteria') = 0 then
+    insert into public.module_records (module,title,body,status,ref_date,data,created_by) values
+      ('cafeteria','Jollof rice & grilled chicken','Wednesday lunch — contains groundnut oil.','planned',current_date+1,'{"allergens":["groundnut"]}'::jsonb,admin_id),
+      ('cafeteria','Beans porridge & plantain','Friday lunch — vegetarian option available.','planned',current_date+3,'{"allergens":[]}'::jsonb,admin_id);
+  end if;
+  if (select count(*) from public.module_records where module='lost_found') = 0 then
+    insert into public.module_records (module,title,body,status,data,created_by) values
+      ('lost_found','Blue water bottle (found)','Found near the assembly ground after Friday sports.','unclaimed','{"location":"Front desk"}'::jsonb,admin_id),
+      ('lost_found','Casio fx-991 calculator (lost)','Reported missing by an SS2 student.','searching','{"reward":"none"}'::jsonb,admin_id);
+  end if;
+  if (select count(*) from public.module_records where module='parent_meeting') = 0 then
+    insert into public.module_records (module,title,body,status,ref_date,data,created_by) values
+      ('parent_meeting','Third-Term PTA General Meeting','Agenda: results review, resumption dates, development levy update.','scheduled',current_date+14,'{"venue":"School hall","time":"10:00"}'::jsonb,admin_id);
+  end if;
+
+  -- Staff appraisal + bonus rows so HR pages feel alive
+  if (select count(*) from public.staff_bonus) = 0 then
+    insert into public.staff_bonus (staff_name,bonus_type,amount,reason,award_date,status)
+    values ('Funke Alabi','performance',25000,'Best WAEC Mathematics results in three years',current_date-20,'paid'),
+           ('Chukwuemeka Nwachukwu','extra duty',10000,'Coordinated inter-house sports',current_date-12,'approved');
+  end if;
+exception when others then
+  raise notice 'V6.5 demo enrichment partial skip: %', sqlerrm;
+end$$;
+select 'School Connect demo V6.5 enrichment installed ✅' as status;

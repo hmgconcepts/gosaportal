@@ -1469,6 +1469,8 @@ function handleSignUp(e){ return App.handleSignUp(e); }
 (function(){if(window.DriveSync)return;const s=document.createElement('script');s.src='assets/js/drive-sync.js';s.defer=true;document.head.appendChild(s);})();
 // V6.0: runtime security layer (idle auto-lock, login audit, emergency lockdown, password meter).
 (function(){if(window.SecurityGuard)return;const s=document.createElement('script');s.src='assets/js/security-guard.js';s.defer=true;document.head.appendChild(s);})();
+// V6.8: demo sample-data engine (auto-fills showcase pages on demo deployments).
+(function(){if(window.DemoSampleData)return;const s=document.createElement('script');s.src='assets/js/demo-sample-data.js';s.defer=true;document.head.appendChild(s);})();
 (function(){if(window.ReportCommentBands)return;const s=document.createElement('script');s.src='assets/js/v57-enhancements.js';s.defer=true;document.head.appendChild(s);})();
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', App.init);
 else App.init();
