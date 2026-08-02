@@ -38,9 +38,10 @@ const CRUD = {
     /* V6.3 #10: every staff/teacher has read/write on domain traits & report comments
        (RLS still keeps each teacher to rows they authored; admin overrides). */
     affective_traits:['staff','teacher'], psychomotor_traits:['staff','teacher'], report_comments:['staff','teacher'],
-    /* V6.3 #17: fees & payment recording writable by staff (bursar is an admin-tier
-       role and always writes; this keeps the UI consistent for finance staff). */
-    fees:['staff','teacher'], fee_payments:['staff','teacher']
+    /* V7.0 #1: fees & payments are READ-ONLY for ordinary staff/teachers.
+       Admin tier (incl. BURSAR, principal, head teacher, proprietor) keeps full
+       read/write — enforced here AND by the fee RLS policies. */
+    fees:[], fee_payments:[]
   },
   init(supabaseClient) { this.sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null); },
 
@@ -234,9 +235,9 @@ const CRUD = {
       {key:'body',label:'Full details — what happened, when, who was involved',type:'textarea',required:true},
       {key:'attachment_link',label:'Evidence link (photo/doc on Google Drive — optional)',type:'text',help:'Paste a Drive/web link. No upload needed.'},
       {key:'urgency',label:'Urgency',type:'select',options:['low','normal','high','critical']},
-      {key:'status',label:'Status (admin updates this)',type:'select',options:['submitted','reviewing','in_progress','resolved','rejected']},
-      {key:'assigned_to',label:'Assigned to (admin only)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value'},
-      {key:'resolution',label:'Resolution note (filled when closing)',type:'textarea'}
+      {key:'status',label:'Status (admin decides)',type:'select',options:['submitted','reviewing','in_progress','resolved','rejected'],adminOnly:true,help:'Complaints are always submitted as "submitted"; only admin moves the status.'},
+      {key:'assigned_to',label:'Assigned to (admin only)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',adminOnly:true},
+      {key:'resolution',label:'Resolution note (admin fills when closing)',type:'textarea',adminOnly:true}
     ]},
     gallery: { table:'gallery', title:'Gallery item', cols:[
       {key:'album',label:'Album',type:'text'},{key:'caption',label:'Caption',type:'text'},
@@ -794,9 +795,14 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
           const classRecord = (r) => (r.class && String(r.class).toLowerCase() === stClass) ||
             (r.student_class && String(r.student_class).toLowerCase() === stClass) ||
             (r.data && r.data.class && String(r.data.class).toLowerCase() === stClass);
-          const myMessage = (r) => r.created_by === currentUserId || r.submitted_by === currentUserId || r.recipient_id === currentUserId ||
+          /* V7.0 #3/#4: AUDIENCE-aware matching. School-wide resources (blank class)
+             and messages addressed to 'all'/'student' are FOR this student even
+             though no personal link exists — show them instead of "not linked". */
+          const forAudience = (r) => { const a = String(r.audience || (r.data && r.data.audience) || '').toLowerCase(); return a === 'all' || a === 'student' || a === 'students' || a === 'everyone' || a === 'public'; };
+          const schoolWide = (r) => { const c = r.class ?? r.student_class ?? (r.data && r.data.class); return c == null || String(c).trim() === '' || ['all','general','school'].includes(String(c).trim().toLowerCase()); };
+          const myMessage = (r) => forAudience(r) || r.created_by === currentUserId || r.submitted_by === currentUserId || r.recipient_id === currentUserId ||
             (r.data && (r.data.recipient_id === currentUserId || String(r.data.to || '').toLowerCase().includes(stName) || String(r.data.student || '').toLowerCase() === stName || String(r.data.admission_no || '').toLowerCase() === stAdm));
-          filteredData = (data || []).filter(r => strictStudentLikeModules.includes(key) ? ownRecord(r) : (classAssignedModules.includes(key) ? (ownRecord(r) || classRecord(r)) : myMessage(r)));
+          filteredData = (data || []).filter(r => strictStudentLikeModules.includes(key) ? ownRecord(r) : (classAssignedModules.includes(key) ? (ownRecord(r) || classRecord(r) || schoolWide(r)) : myMessage(r)));
         }
       } catch(e) { console.warn('Student filter failed:', e); filteredData = []; }
     }
@@ -819,8 +825,10 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
           const childClass = (r) => (r.class && childClasses.includes(String(r.class).toLowerCase())) ||
             (r.student_class && childClasses.includes(String(r.student_class).toLowerCase())) ||
             (r.data && r.data.class && childClasses.includes(String(r.data.class).toLowerCase()));
-          const myMessage = (r) => r.created_by === currentUserId || r.submitted_by === currentUserId || r.recipient_id === currentUserId || (r.data && (r.data.recipient_id === currentUserId || childNames.includes(String(r.data.student || '').toLowerCase()) || childAdm.includes(String(r.data.admission_no || '').toLowerCase())));
-          filteredData = (data || []).filter(r => strictStudentLikeModules.includes(key) ? childOwn(r) : (key === 'assignments' ? (childOwn(r) || childClass(r)) : (messageModules.includes(key) ? myMessage(r) : childOwn(r))));
+          const forAudienceP = (r) => { const a = String(r.audience || (r.data && r.data.audience) || '').toLowerCase(); return a === 'all' || a === 'parent' || a === 'parents' || a === 'everyone' || a === 'public'; };
+          const schoolWideP = (r) => { const c = r.class ?? r.student_class ?? (r.data && r.data.class); return c == null || String(c).trim() === '' || ['all','general','school'].includes(String(c).trim().toLowerCase()); };
+          const myMessage = (r) => forAudienceP(r) || r.created_by === currentUserId || r.submitted_by === currentUserId || r.recipient_id === currentUserId || (r.data && (r.data.recipient_id === currentUserId || childNames.includes(String(r.data.student || '').toLowerCase()) || childNames.includes(String(r.data.student_name || '').toLowerCase())));
+          filteredData = (data || []).filter(r => strictStudentLikeModules.includes(key) ? childOwn(r) : (key === 'assignments' ? (childOwn(r) || childClass(r) || schoolWideP(r)) : (messageModules.includes(key) ? myMessage(r) : (childOwn(r) || childClass(r) || schoolWideP(r)))));
         } else filteredData = [];
       } catch(e) { console.warn('Parent filter failed:', e); filteredData = []; }
     }

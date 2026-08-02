@@ -530,7 +530,7 @@ const App = {
     // 'cbt-exam' is intentionally NOT blacklisted — students/parents
     // enter an exam code to take a CBT (see STUDENT/PARENT_WHITELIST).
     'messages',
-    'digital_library','digital-library',
+    
     'surveys',
     'lms','gamification',
     'broadcast','document_builder','document-builder'
@@ -547,13 +547,13 @@ const App = {
     'dashboard','profile','change-password','notifications',
     'student-profile','student_profile',
     'results','report-cards','report_cards',
-    'attendance','timetable','assignments','idcards','inbox','complaints','eresources','e-resources','certificates',
+    'attendance','timetable','assignments','idcards','inbox','complaints','eresources','digital_library','digital-library','e-resources','certificates',
     'fees','idcards',
     'voting',
     'announcements','events','school_calendar','school-calendar',
     'gallery','helpdesk','lost_found','lost-found',
     'diary','parent_meeting','parent-meeting',
-    'flyer',
+    
     'feature-guide','feature_guide','about','contact',
     'index','login','apply',
     'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products'
