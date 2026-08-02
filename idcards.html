@@ -625,4 +625,17 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     this.printHtml(cards, 'ID Cards'); }
 };
 document.addEventListener('DOMContentLoaded',()=>{ if(window.Super)Super.init(window.sb||null,window.SCHOOL); ICUI.load(); ICUI.render(); setTimeout(()=>ICUI.render(),500); }); if(document.readyState!=='loading'){ ICUI.load(); ICUI.render(); }
+</script><script>
+/* V7.0 #10: deep link — ?student=ADMNO preselects that student's ID card. */
+document.addEventListener('DOMContentLoaded',function(){try{
+  var q=new URLSearchParams(location.search), stu=(q.get('student')||'').toLowerCase();
+  if(!stu)return;
+  var tries=0;var t=setInterval(function(){tries++;
+    if(window.ICUI&&ICUI.all&&ICUI.all.length){clearInterval(t);
+      var hit=ICUI.all.find(function(s){return String(s.admission_no||'').toLowerCase()===stu||String(s.full_name||'').toLowerCase()===stu;});
+      if(hit){var sel=document.getElementById('ic-pick');if(sel){sel.value=JSON.stringify(hit);sel.dispatchEvent(new Event('change'));}
+        if(typeof toast==='function')toast('🪪 '+(hit.full_name||'Student')+"'s ID card loaded from the profile link.",'info',5000);}
+    } else if(tries>25)clearInterval(t);
+  },600);
+}catch(_){}});
 </script></body></html>

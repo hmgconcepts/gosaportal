@@ -501,7 +501,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <p style="margin:10px 0 0;font-size:.85rem;color:var(--gray-500)">Tip: click the <strong>ℹ️ Help</strong> button in the top bar, or the 💬 assistant, for the full explanation of any page.</p>
       </div></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-        <button class="btn btn-primary" onclick="CRUD.openForm('fees')" data-staff-only>+ Add new</button> <a class="btn btn-outline" href="payment-history.html" data-admin-only>🧾 Payment History & Bulk Receipts</a>
+        <button class="btn btn-primary" onclick="CRUD.openForm('fees')" data-admin-only>+ Add new (admin/bursar)</button> <a class="btn btn-outline" href="payment-history.html" data-admin-only>🧾 Payment History & Bulk Receipts</a>
         <button class="btn btn-outline" onclick="CRUD.renderList('fees')">↻ Refresh</button>
         <button class="btn btn-outline" onclick="CRUD.exportCSV('fees')" data-staff-only>⬇ Export CSV</button>
         <button class="btn btn-outline" onclick="CRUD.exportPDF('fees')" data-staff-only>📄 Export PDF</button>
