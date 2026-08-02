@@ -492,7 +492,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <div class="form-group"><label>Term</label><select class="form-select" id="rc-term" data-readonly-role="student parent"><option value="">— select term —</option></select></div>
           <div class="form-group"><label>Session</label><select class="form-select" id="rc-session" data-readonly-role="student parent"><option value="">— select session —</option></select></div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><span id="score-grid"></span><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span id="score-grid"></span><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" style="color:#b45309;border-color:#f59e0b" onclick="RC.sweepGhosts()" data-admin-only title="Remove leftover report sheets from deleted columns/students">🧹 Sweep Ghost Report Sheets</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
       </div>
       <div id="rc-cols" data-staff-only></div>
       <div id="rc-grid"></div>
@@ -500,7 +500,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <h3>📄 Generate outputs</h3>
         <p style="color:var(--gray-600);font-size:.9rem">Generate printable termly outputs from the recorded scores (all subjects).</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <input class="form-input" id="rc-student" placeholder="Student name for report card" style="max-width:240px" data-readonly-role="student parent">
+          <input class="form-input" id="rc-student" list="rc-student-list" placeholder="Student name OR admission number" style="max-width:280px" data-readonly-role="student parent"><datalist id="rc-student-list"></datalist>
           <button class="btn btn-primary" onclick="RC.reportCard()">🧾 Student Report Card</button>
           <button class="btn btn-outline" onclick="RC.broadsheet()" data-staff-only>📊 Class Broadsheet</button>
           <button class="btn btn-outline" onclick="RC.scoresheet()" data-staff-only>📋 Teacher Scoresheet</button>
@@ -740,6 +740,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         this.students = studs || [];
       } catch (e) { this.students = []; console.warn('RC students load failed', e); }
       this.renderCols();
+      this.fillStudentPicker();
       // V6.8: watch for role CHANGES (not just first resolution) for ~30s.
       // A stale cached role (e.g. an earlier Staff session on the same device)
       // could otherwise freeze the wrong view; now the moment the authoritative
@@ -1048,9 +1049,55 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       w.focus();
     },
 
+
+    /* V7.0 #12: admission-number-aware picker. The datalist offers
+       "Name — ADM/NO (Class)" for every student in the selected class (or all),
+       so two students sharing a name can never be confused; typing either the
+       name or the admission number works. */
+    async fillStudentPicker(){
+      try{
+        if(!window.sb) return; const dl=document.getElementById('rc-student-list'); if(!dl) return;
+        let q=window.sb.from('students').select('full_name,admission_no,class').order('full_name').limit(2000);
+        const cls=this.ctx.class||($('rc-class')||{}).value||''; if(cls)q=q.eq('class',cls);
+        const {data}=await q; dl.innerHTML='';
+        (data||[]).forEach(s=>{const o=document.createElement('option');o.value=(s.admission_no?s.admission_no+' — ':'')+s.full_name;o.label=s.full_name+(s.admission_no?' ('+s.admission_no+')':'')+(s.class?' · '+s.class:'');dl.appendChild(o);});
+      }catch(_){}
+    },
+    /* Resolve whatever was typed (name, adm-no, or "ADM — Name") to the student. */
+    async resolveStudent(raw){
+      raw=String(raw||'').trim(); if(!raw)return null;
+      const admPart=raw.includes('—')?raw.split('—')[0].trim():raw;
+      try{
+        let r=await window.sb.from('students').select('id,full_name,admission_no,class').eq('admission_no',admPart).maybeSingle();
+        if(r.data)return r.data;
+        const namePart=raw.includes('—')?raw.split('—').slice(1).join('—').trim():raw;
+        r=await window.sb.from('students').select('id,full_name,admission_no,class').ilike('full_name',namePart).limit(2);
+        if(r.data&&r.data.length===1)return r.data[0];
+        if(r.data&&r.data.length>1){toast('⚠ '+r.data.length+' students share that name — use the admission number from the dropdown instead.','warning',8000);return r.data[0];}
+      }catch(_){}
+      return {full_name:raw};
+    },
+
+    /* V7.0 #13: one-click cleanup of "ghost" report sheets — mirrored rows left
+       behind when an assessment column was deleted and re-created, plus score
+       rows belonging to students who were deleted. Scoped to the currently
+       selected class/term/session (or everything when blank). */
+    async sweepGhosts(){
+      if(!window.sb){toast('Database not configured','warning');return;}
+      const cls=this.ctx.class||($('rc-class')||{}).value||'', term=this.ctx.term||($('rc-term')||{}).value||'', ses=this.ctx.session||($('rc-session')||{}).value||'';
+      if(!confirm('Sweep ghost report sheets'+(cls?' for '+cls:'')+(term?' — '+term:'')+(ses?' ('+ses+')':'')+'?\n\nRemoves:\n• leftover sheets from report columns you deleted/re-created\n• score rows of students who were deleted\n\nLive scores backed by existing columns and students are NEVER touched.'))return;
+      const r=await window.sb.rpc('sc_sweep_report_ghosts',{p_class:cls,p_term:term,p_session:ses});
+      if(r.error){toast(/could not find|does not exist|schema cache/i.test(String(r.error.message||''))?'This database needs one update — run the latest database/complete-schema.sql (or database/v7.0-clean-data-lifecycle.sql) once in the Supabase SQL Editor.':('Sweep failed: '+r.error.message),'danger',9000);return;}
+      const d=r.data||{};
+      toast('🧹 Ghost sweep complete: '+(d.mirrored_removed||0)+' leftover sheet row(s), '+(d.orphan_scores_removed||0)+' orphan score(s), '+(d.ghost_results_removed||0)+' ghost result(s) removed. Regenerate the report cards now — only current data prints.','success',10000);
+      if(window.App&&App.logActivity)App.logActivity('sweep-ghosts','report_scores',cls+'|'+term+'|'+ses);
+      this.load&&this.load();
+    },
     async reportCard(){
       if (!window.sb) { toast('Database not configured', 'warning'); return; }
       let name = ($('rc-student') || {}).value ? $('rc-student').value.trim() : '';
+      // V7.0 #12: resolve admission numbers / "ADM — Name" entries to the exact student
+      if (name && window.sb) { const stu = await this.resolveStudent(name); if (stu && stu.full_name) { name = stu.full_name; if (stu.class && !this.ctx.class) this.ctx.class = stu.class; } }
       // Family-mode enforcement
       if (this._familyMode) {
         if (this._role === 'parent') {
@@ -1143,4 +1190,19 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   else RC.init();
 })();
 </script>
-</body></html>
+<script>
+/* V7.0 #10: deep link from Student Profile — ?student=&class=&auto=1 prefill
+   the pickers and auto-generate that student's report card for the current term. */
+document.addEventListener('DOMContentLoaded',function(){try{
+  var q=new URLSearchParams(location.search), stu=q.get('student'), cls=q.get('class');
+  if(!stu)return;
+  var tries=0;var t=setInterval(function(){tries++;
+    var inp=document.getElementById('rc-student');
+    if(inp){clearInterval(t);inp.value=stu;
+      var ci=document.getElementById('rc-class');if(ci&&cls)ci.value=cls;
+      if(window.RC&&RC.ctx&&cls)RC.ctx.class=cls;
+      if(q.get('auto')==='1'&&window.RC&&RC.reportCard)setTimeout(function(){RC.reportCard();},1500);
+    } else if(tries>20)clearInterval(t);
+  },600);
+}catch(_){}});
+</script></body></html>

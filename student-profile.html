@@ -555,7 +555,7 @@ const SP={fees:[],student:null,
         '<p style="margin:4px 0;color:var(--gray-600)">Adm No: <b>'+esc(s.admission_no||'-')+'</b> · Class: <b>'+esc(s.class||'-')+(s.arm?' '+esc(s.arm):'')+'</b> · '+esc(s.gender||'')+'</p>'+
         '<p style="margin:4px 0;color:var(--gray-600)">DOB: '+esc(s.date_of_birth||'-')+' · Status: <span class="badge">'+esc(s.status||'active')+'</span></p>'+
         '<p style="margin:4px 0;color:var(--gray-600)">Guardian: '+esc(s.guardian_name||'-')+' · '+esc(s.guardian_phone||'')+'</p></div>'+
-        '<div style="text-align:right"><a class="btn btn-sm btn-outline" href="report-cards.html">📄 Report card</a> <a class="btn btn-sm btn-outline" href="idcards.html">🪪 ID card</a></div>'+
+        '<div style="text-align:right"><a class="btn btn-sm btn-outline" href="report-cards.html?student='+encodeURIComponent((s&&(s.admission_no||s.full_name))||'')+'&class='+encodeURIComponent((s&&s.class)||'')+'&auto=1">📄 Report card</a> <a class="btn btn-sm btn-outline" href="idcards.html?student='+encodeURIComponent((s&&(s.admission_no||s.full_name))||'')+'&auto=1">🪪 ID card</a></div>'+
       '</div></div>'+
       '<div class="grid grid-2">'+
         '<div class="card"><h3 style="margin-top:0">💰 Fees & Payment History</h3>'+

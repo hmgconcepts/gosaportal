@@ -3,4 +3,4 @@ Allow: /
 Disallow: /database/
 Disallow: /samples/
 
-Sitemap: https://gosasite.vercel.app/sitemap.xml
+Sitemap: https://gosaportal.vercel.app/sitemap.xml
