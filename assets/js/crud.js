@@ -658,6 +658,27 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
   },
 
   /* FIX v9: canWrite — use SC_PROFILE.role as fallback for async timing */
+
+  /* V7.1 #4: OWNERSHIP at the UI level. For teacher-owned academic modules,
+     a row authored by ANOTHER teacher shows a 🔒 badge instead of Edit/Delete
+     for ordinary staff (admins keep full override). RLS remains the hard gate —
+     this just stops teachers clicking buttons that would be rejected anyway. */
+  OWNER_FIELDS: { results:'teacher_id', attendance:'recorded_by', assignments:'posted_by', sow:'teacher_id',
+    scheme_of_work:'teacher_id', lesson_plans:'teacher_id', cbt:'teacher_id', cbt_exams:'teacher_id',
+    affective_traits:'teacher_id', psychomotor_traits:'teacher_id', report_comments:'teacher_id',
+    digital_library:'teacher_id', eresources:'uploaded_by', conduct:'recorded_by_id',
+    behaviour:'awarded_by', behaviour_points:'awarded_by', support_plans:'created_by', diary:'created_by', student_diary:'created_by' },
+  rowLockedForMe(moduleId, row, role, uid) {
+    try {
+      const r = String(role||'').toLowerCase();
+      if (!['staff','teacher'].includes(r)) return false;              // admins & family roles unaffected here
+      const key = this.canonicalId(moduleId);
+      const fld = this.OWNER_FIELDS[key];
+      if (!fld) return false;
+      const owner = row[fld] ?? (row.data && row.data[fld]);
+      return !!owner && !!uid && String(owner) !== String(uid);        // unowned/legacy rows stay claimable
+    } catch(_) { return false; }
+  },
   canWrite(moduleId) {
     // Use both App.currentRole and SC_PROFILE.role as fallbacks
     // This ensures role is always available, even before async profile load
@@ -780,7 +801,15 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     if (isStudent && studentOwnedModules.includes(key) && currentUserId) {
       try {
         const { data: st } = await this.sb.from('students').select('id,full_name,class,admission_no,user_id').eq('user_id', currentUserId).maybeSingle();
-        if (!st) { filteredData = []; }
+        if (!st) {
+          /* V7.1: profile not linked to a students row — still show content
+             addressed to ALL students (audience) or the whole school (blank
+             class). Personal modules (fees/results/report cards…) stay empty. */
+          const forAud=(r)=>{const a=String(r.audience||(r.data&&r.data.audience)||'').toLowerCase();return ['all','student','students','everyone','public'].includes(a);};
+          const wide=(r)=>{const c=r.class??r.student_class??(r.data&&r.data.class);return c==null||String(c).trim()===''||['all','general','school'].includes(String(c).trim().toLowerCase());};
+          filteredData = strictStudentLikeModules.includes(key) ? [] :
+            (classAssignedModules.includes(key) ? (data||[]).filter(wide) : (data||[]).filter(forAud));
+        }
         else {
           const stName = String(st.full_name || '').toLowerCase();
           const stClass = String(st.class || '').toLowerCase();
@@ -829,7 +858,14 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
           const schoolWideP = (r) => { const c = r.class ?? r.student_class ?? (r.data && r.data.class); return c == null || String(c).trim() === '' || ['all','general','school'].includes(String(c).trim().toLowerCase()); };
           const myMessage = (r) => forAudienceP(r) || r.created_by === currentUserId || r.submitted_by === currentUserId || r.recipient_id === currentUserId || (r.data && (r.data.recipient_id === currentUserId || childNames.includes(String(r.data.student || '').toLowerCase()) || childNames.includes(String(r.data.student_name || '').toLowerCase())));
           filteredData = (data || []).filter(r => strictStudentLikeModules.includes(key) ? childOwn(r) : (key === 'assignments' ? (childOwn(r) || childClass(r) || schoolWideP(r)) : (messageModules.includes(key) ? myMessage(r) : (childOwn(r) || childClass(r) || schoolWideP(r)))));
-        } else filteredData = [];
+        } else {
+          /* V7.1: no children linked yet — still show audience/'all'/parent
+             messages and school-wide notices; personal modules stay empty. */
+          const forAudP=(r)=>{const a=String(r.audience||(r.data&&r.data.audience)||'').toLowerCase();return ['all','parent','parents','everyone','public'].includes(a);};
+          filteredData = strictStudentLikeModules.includes(key) ? [] :
+            (messageModules.includes(key) ? (data||[]).filter(forAudP) :
+             (data||[]).filter(r=>{const c=r.class??r.student_class??(r.data&&r.data.class);return c==null||String(c).trim()===''||['all','general','school'].includes(String(c).trim().toLowerCase());}));
+        }
       } catch(e) { console.warn('Parent filter failed:', e); filteredData = []; }
     }
 
@@ -851,11 +887,11 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       let msg = '';
       if (isParent) {
         msg = dataCount > 0
-          ? `ℹ️ <strong>No linked records found</strong> — Database has ${dataCount} record(s) but none are linked to your children. Ask admin to link via <em>Parents → Parent-Child Link</em>. Previous records (if any) are preserved below so you can continue reading.`
+          ? (strictStudentLikeModules.includes(key) ? `ℹ️ <strong>No children are linked to your account yet.</strong> Ask the admin to link you on <em>Parents → Parent–Child Link</em> — one minute. School-wide notices still reach you meanwhile.` : `ℹ️ Nothing addressed to you yet — school-wide and parent notices appear here automatically.`)
           : 'ℹ️ No records yet — Ask admin to create records and link your children via Parents page.';
       } else if (isStudent) {
         msg = dataCount > 0
-          ? `ℹ️ <strong>No records linked to your profile</strong> — Database has ${dataCount} record(s) but your student profile is not linked. Ask admin to set your <em>user_id</em> in Students table. Previous records preserved below.`
+          ? (strictStudentLikeModules.includes(key) ? `ℹ️ <strong>Your account is not yet linked to a student record.</strong> Ask the admin to open <em>Students</em>, edit your record and set its <em>Linked account</em> — one minute. School-wide notices still reach you meanwhile.` : `ℹ️ Nothing addressed to you yet — new class or school-wide items appear here automatically.`)
           : 'ℹ️ No records yet.';
       } else {
         msg = dataCount > 0
@@ -906,8 +942,10 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         (moduleId === 'fees' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printReceipt(\'' + row.id + '\')">Print E-Receipt</button> ' : '') +
         (moduleId === 'admissions' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.previewAdmission(\'' + row.id + '\')">Preview</button> ' : '') +
         (moduleId === 'document_builder' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printDocument(\'' + row.id + '\')">🖨 Print</button> ' : '') +
-        '<button class="btn btn-sm btn-outline" onclick="CRUD.openForm(\'' + moduleId + '\',\'' + row.id + '\')">Edit</button> ' +
-        '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'' + moduleId + '\',\'' + row.id + '\')">Delete</button>' +
+        (CRUD.rowLockedForMe(moduleId, row, currentRole, currentUserId)
+          ? '<span class="badge" title="Entered by another teacher — only that teacher or an admin can change it">🔒 another teacher\'s record</span>'
+          : '<button class="btn btn-sm btn-outline" onclick="CRUD.openForm(\'' + moduleId + '\',\'' + row.id + '\')">Edit</button> ' +
+            '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'' + moduleId + '\',\'' + row.id + '\')">Delete</button>') +
       '</td>') + '</tr>').join('');
     tb.innerHTML = renderedRows;
     try { sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), html: renderedRows })); } catch(_) {}
@@ -1387,6 +1425,10 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
   async remove(moduleId, id) {
     const d = this.def(moduleId);
     if (!this.canWrite(moduleId)) { toast('Read-only for your role on this page.', 'warning', 5000); return; }
+    /* V7.1 #6: student deletion is a full lifecycle event — explain it clearly. */
+    if (this.canonicalId(moduleId) === 'students') {
+      if (!confirm('Delete this student?\n\nWhat happens:\n• The full record is archived automatically for record-tracking (Admin Data → module_records → student_archive).\n• Their leftover scores, punctuality and roster rows are removed, so old report sheets can never resurface.\n• The admission number becomes available for reuse.\n\nThis needs the latest database update (complete-schema.sql). Proceed?')) return;
+    }
     if (!d || !this.sb) return;
     // ENTERPRISE V6 (issue 15): library books are SHARED resources — any staff
     // member with write access may delete them; ownership lock only applies to

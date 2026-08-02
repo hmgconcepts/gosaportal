@@ -87,7 +87,7 @@ const ReportEngine = {
       let sq=db.from('report_scores').select('*').in('column_id',ids).limit(10000);
       if(ctx.class)sq=sq.eq('class',ctx.class); if(ctx.subject)sq=sq.eq('subject',ctx.subject); if(ctx.term)sq=sq.eq('term',ctx.term); if(ctx.session)sq=sq.eq('session',ctx.session);
       const sr=await sq; if(sr.error)return {rows:[],configured:true,columns:cols,error:sr.error};
-      const allowed=(sr.data||[]).filter(r=>(!ctx.student||String(r.student_name||'').toLowerCase().includes(String(ctx.student).toLowerCase()))&&this.allowRowForScope(r,scope));
+      const allowed=(sr.data||[]).filter(r=>(!ctx.student||this._studentMatch(r,ctx.student))&&this.allowRowForScope(r,scope));
       const groups=new Map();
       allowed.forEach(r=>{
         const key=[r.student_id||'',r.student_id_ref||'',String(r.student_name||'').toLowerCase(),r.subject||''].join('|');
@@ -122,6 +122,16 @@ const ReportEngine = {
     }catch(e){console.warn('Assessment-score adapter failed:',e);return {rows:[],configured:false,columns:[],error:e};}
   },
 
+  /* V7.1 #7: admission-number-first student matching. Accepts "ADM — Name",
+     a bare admission number, or a name; prefers the unique admission number. */
+  _studentMatch(row, needle){
+    needle=String(needle||'').trim(); if(!needle) return true;
+    const adm=(needle.includes('—')?needle.split('—')[0]:needle).trim().toLowerCase();
+    const name=(needle.includes('—')?needle.split('—').slice(1).join('—'):needle).trim().toLowerCase();
+    const ref=String(row.student_id_ref||row.admission_no||'').toLowerCase();
+    if(adm && ref && ref===adm) return true;
+    return !!name && String(row.student_name||row.full_name||'').toLowerCase().includes(name);
+  },
   async loadContext(ctx={}){
     const db = this.sb || (typeof sb !== 'undefined' ? sb : null);
     if (!db) throw new Error('Database not configured. Add Supabase keys in assets/js/config.js.');
@@ -309,7 +319,7 @@ const ReportEngine = {
     const data = await this.loadContext(ctx); const rows = data.rows;
     if (!rows.length) return this.empty('No result records found for this student/filter.');
     const name = ctx.student || rows[0].student_name;
-    const studentRows = rows.filter(r => !ctx.student || r.student_name.toLowerCase().includes(String(ctx.student).toLowerCase()));
+    const studentRows = rows.filter(r => !ctx.student || this._studentMatch(r, ctx.student));
     const list = studentRows.length ? studentRows : rows;
     const first = list[0] || {}; const sc=data.school;
     const promotion=await this.loadPromotionStatus(first.student_id,first.student_name,ctx.term||first.term,ctx.session||first.session);
@@ -593,8 +603,15 @@ const ReportEngine = {
      signatures, stamp). onProgress(done,total,name) keeps the admin informed. */
   async listClassStudents(ctx){
     const data=await this.loadContext({class:ctx.class,term:ctx.term,session:ctx.session});
-    const names=[...new Set((data.rows||[]).map(r=>r.student_name).filter(Boolean))];
-    return names.sort((a,b)=>String(a).localeCompare(String(b)));
+    /* V7.1 #7: identify each learner by ADMISSION NUMBER when present —
+       "ADM — Name" tokens keep same-named students separate in bulk printing. */
+    const seen=new Map();
+    (data.rows||[]).forEach(r=>{
+      if(!r.student_name) return;
+      const key=(r.student_id_ref?String(r.student_id_ref):'')+'|'+String(r.student_name).toLowerCase();
+      if(!seen.has(key)) seen.set(key, r.student_id_ref ? (r.student_id_ref+' — '+r.student_name) : r.student_name);
+    });
+    return [...seen.values()].sort((a,b)=>String(a).localeCompare(String(b)));
   },
   async renderClassBulk(ctx,onProgress){
     const names=ctx.students&&ctx.students.length?ctx.students:await this.listClassStudents(ctx);
