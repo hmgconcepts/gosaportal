@@ -1201,7 +1201,22 @@ document.addEventListener('DOMContentLoaded',function(){try{
     if(inp){clearInterval(t);inp.value=stu;
       var ci=document.getElementById('rc-class');if(ci&&cls)ci.value=cls;
       if(window.RC&&RC.ctx&&cls)RC.ctx.class=cls;
-      if(q.get('auto')==='1'&&window.RC&&RC.reportCard)setTimeout(function(){RC.reportCard();},1500);
+      if(q.get('auto')==='1'&&window.RC&&RC.reportCard){
+        /* V7.2 #1: pull the CURRENT academic period so the card generates for
+           the current term/session automatically — no manual picking. */
+        (async function(){
+          try{
+            if(window.sb){var r=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();
+              if(r.data){var te=document.getElementById('rc-term'),se=document.getElementById('rc-session');
+                if(te&&!te.value){if(![...te.options].some(function(o){return o.value===r.data.term;}))te.add(new Option(r.data.term,r.data.term));te.value=r.data.term;}
+                if(se&&!se.value){if(![...se.options].some(function(o){return o.value===r.data.session;}))se.add(new Option(r.data.session,r.data.session));se.value=r.data.session;}
+                if(window.RC&&RC.ctx){RC.ctx.term=RC.ctx.term||r.data.term;RC.ctx.session=RC.ctx.session||r.data.session;}
+                if(typeof toast==='function')toast('Generating '+stu+"'s report card for the CURRENT period: "+r.data.term+' '+r.data.session+'…','info',5000);
+              }}
+          }catch(_){ }
+          setTimeout(function(){RC.reportCard();},900);
+        })();
+      }
     } else if(tries>20)clearInterval(t);
   },600);
 }catch(_){}});
