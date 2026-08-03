@@ -1587,10 +1587,15 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     if (!ids.length) { toast('No students selected.', 'warning'); return; }
     if (!confirm('Promote ' + ids.length + ' student(s) from ' + from + ' to ' + (to === '__graduated__' ? 'Alumni (graduated)' : to) + '?')) return;
     let ok = 0;
+    /* V7.3: stamp each promotion row with the REAL student identity + current
+       period so the report card can find and print the decision. */
+    let curTerm='', curSession='';
+    try { const cp = await this.sb.from('academic_periods').select('term,session').eq('is_current', true).maybeSingle(); if (cp.data) { curTerm = cp.data.term || ''; curSession = cp.data.session || ''; } } catch(_) {}
     for (const id of ids) {
       const patch = to === '__graduated__' ? { status: 'graduated' } : { class: to };
+      let stu = null; try { const r = await this.sb.from('students').select('full_name').eq('id', id).maybeSingle(); stu = r.data; } catch(_) {}
       const { error } = await this.sb.from('students').update(patch).eq('id', id);
-      if (!error) { ok++; await this.sb.from('promotions').insert({ student_name: '', from_class: from, to_class: to === '__graduated__' ? 'GRADUATED' : to, action: to === '__graduated__' ? 'graduate' : 'promote', status: 'applied' }).then(()=>{},()=>{}); }
+      if (!error) { ok++; await this.sb.from('promotions').insert({ student_id: id, student_name: (stu && stu.full_name) || '', from_class: from, to_class: to === '__graduated__' ? 'GRADUATED' : to, action: to === '__graduated__' ? 'graduate' : 'promote', status: 'applied', term: curTerm, session: curSession }).then(()=>{},()=>{}); }
     }
     if (window.App && App.logActivity) App.logActivity('bulk-promote', 'students', from + '→' + to + ' (' + ok + ')');
     toast('✅ Promoted ' + ok + ' student(s) to ' + (to === '__graduated__' ? 'Alumni' : to) + '.', 'success', 6000);
@@ -1817,6 +1822,18 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       '1) Promoted students MOVE to their new class automatically — every page (results, attendance, fees, timetable) follows the new class instantly.\n' +
       '2) Each decision is stamped on the student\'s report card (PROMOTED / REPEAT / GRADUATED).\n' +
       '3) Decisions become “applied” and will not re-run.\n\nProceed?')) return;
+    /* V7.3: one server-side call finalises everything (moves classes, stamps
+       status='applied' + the CURRENT period so report cards print the decision
+       immediately). Falls back to the legacy loop on un-migrated databases. */
+    try {
+      const rr = await this.sb.rpc('sc_finalise_promotions');
+      if (!rr.error && rr.data && rr.data.ok) {
+        const d = rr.data;
+        if (window.App && App.logActivity) App.logActivity('apply-promotions', 'students', d.promoted + ' promoted, ' + d.graduated + ' graduated, ' + d.repeated + ' repeats' + (d.failed ? ', ' + d.failed + ' failed' : ''));
+        toast('✅ Session promotion finalised: ' + d.promoted + ' moved to their new classes, ' + d.graduated + ' graduated, ' + d.repeated + ' repeat(s) recorded' + (d.failed ? ' — ' + d.failed + ' failed (open the drafts and check the student name/class)' : '') + '. Report cards now print each decision (' + (d.term || 'current term') + ' ' + (d.session || '') + ').', d.failed ? 'warning' : 'success', 11000);
+        this.renderList('promotion'); return;
+      }
+    } catch(_) {}
     let done = 0, failed = 0;
     for (const p of actionable) {
       try {

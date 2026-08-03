@@ -161,10 +161,26 @@ const ReportEngine = {
     if (klass) sq = sq.eq('class', klass);
     const { data: students } = await sq;
 
+    /* V7.2 #2: LIVE ROSTER GATE — any score row whose student no longer exists
+       in the register is dropped at render time, so deleted students can never
+       appear on report cards/broadsheets even on databases that predate the
+       cleanup triggers. Matching is admission-number-first, then exact name. */
+    const _liveRosterGate=(list)=>{
+      const byId=new Set((students||[]).map(x=>String(x.id)));
+      const byAdm=new Set((students||[]).map(x=>String(x.admission_no||'').toLowerCase()).filter(Boolean));
+      const byName=new Set((students||[]).map(x=>String(x.full_name||'').toLowerCase()).filter(Boolean));
+      return (list||[]).filter(r=>{
+        if(r.student_id&&byId.has(String(r.student_id)))return true;
+        const ref=String(r.student_id_ref||'').toLowerCase();
+        if(ref&&byAdm.has(ref))return true;
+        const nm=String(r.student_name||'').toLowerCase();
+        return !!nm&&byName.has(nm);
+      });
+    };
     const baseRows = (scope.family ? (rows || []).filter(r => familyFilter(r)) : (rows || []));
-    let legacyNormalized=baseRows.map(r=>this.normalizeResult(r,students||[])).filter(r=>!studentText||String(r.student_name||'').toLowerCase().includes(studentText.toLowerCase()));
+    let legacyNormalized=_liveRosterGate(baseRows).map(r=>this.normalizeResult(r,students||[])).filter(r=>!studentText||String(r.student_name||'').toLowerCase().includes(studentText.toLowerCase()));
     const assessmentPack=await this.loadAssessmentRows({class:klass,subject,term,session,student:studentText},students||[],scope);
-    const assessmentNormalized=(assessmentPack.rows||[]).map(r=>this.normalizeResult(r,students||[]));
+    const assessmentNormalized=_liveRosterGate(assessmentPack.rows||[]).map(r=>this.normalizeResult(r,students||[]));
     // Once assessment columns exist for this report context, report_scores is the
     // only official source. Legacy results is a fallback solely for old contexts
     // that have never been configured in Report Cards.
@@ -292,8 +308,19 @@ const ReportEngine = {
 
   async loadPromotionStatus(studentId,studentName,term,session){
     const db=this.sb||(typeof sb!=='undefined'?sb:null);const pending={code:'not_decided',label:'PROMOTION NOT YET DECIDED',detail:'No approved promotion decision has been recorded.',color:'#92400e',background:'#fef3c7'};if(!db||(!studentId&&!studentName))return pending;
-    try{const run=async(field,value)=>{let q=db.from('promotions').select('*').eq(field,value);if(term)q=q.eq('term',term);if(session)q=q.eq('session',session);return await q.order('created_at',{ascending:false}).limit(1);};let r=studentId?await run('student_id',studentId):{data:[]};if(!(r.data||[]).length&&studentName)r=await run('student_name',studentName);const p=(r.data||[])[0];if(!p)return pending;const action=String(p.action||'').toLowerCase(),status=String(p.status||'approved').toLowerCase(),to=p.to_class||'';
-      if(!['approved','active','completed'].includes(status))return {code:'pending',label:'PROMOTION DECISION PENDING',detail:'Recorded action: '+(action||'pending')+(to?' → '+to:''),color:'#92400e',background:'#fef3c7'};
+    try{
+      /* V7.3 FIX (root cause of "PENDING — Recorded action: promote"):
+         1. "✅ Apply promotions" stamps rows status='applied' — the OFFICIAL final
+            state — but this reader only accepted approved/active/completed, so an
+            APPLIED promotion still printed as PENDING. 'applied' is now accepted.
+         2. The term+session filter was absolute; decisions saved without a term
+            (or for the session only) were invisible. Now: try term+session →
+            fall back to session-only → fall back to the student's latest decision. */
+      const run=async(field,value,useTerm,useSession)=>{let q=db.from('promotions').select('*').eq(field,value);if(useTerm&&term)q=q.eq('term',term);if(useSession&&session)q=q.eq('session',session);return await q.order('created_at',{ascending:false}).limit(1);};
+      const attempt=async(useTerm,useSession)=>{let r=studentId?await run('student_id',studentId,useTerm,useSession):{data:[]};if(!(r.data||[]).length&&studentName)r=await run('student_name',studentName,useTerm,useSession);return (r.data||[])[0];};
+      let p=await attempt(true,true); if(!p)p=await attempt(false,true); if(!p)p=await attempt(false,false);
+      if(!p)return pending;const action=String(p.action||'').toLowerCase(),status=String(p.status||'approved').toLowerCase(),to=p.to_class||'';
+      if(!['approved','active','completed','applied'].includes(status))return {code:'pending',label:'PROMOTION DECISION PENDING',detail:'Recorded action: '+(action||'pending')+(to?' → '+to:'')+' — admin: click “✅ Apply promotions” on the Promotion page to finalise.',color:'#92400e',background:'#fef3c7'};
       if(action==='promote')return {code:'promoted',label:'PROMOTED'+(to?' TO '+String(to).toUpperCase():''),detail:'Approved promotion decision.',color:'#166534',background:'#dcfce7'};
       if(action==='graduate')return {code:'graduated',label:'GRADUATED',detail:to?('Graduated to '+to):'Approved graduation decision.',color:'#1e40af',background:'#dbeafe'};
       if(action==='repeat')return {code:'not_promoted',label:'NOT PROMOTED — REPEAT'+(to?' '+String(to).toUpperCase():''),detail:'Approved repeat decision.',color:'#991b1b',background:'#fee2e2'};

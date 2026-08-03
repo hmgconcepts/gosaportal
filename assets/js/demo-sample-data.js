@@ -118,9 +118,11 @@ window.DemoSampleData = DemoSampleData;
       if(!['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher'].includes(role)) return;
       const KEY='sc-demo-autofill-at';
       if(Date.now()-(+localStorage.getItem(KEY)||0) < 24*3600000) return;
-      localStorage.setItem(KEY,String(Date.now()));
       const log=await DemoSampleData.run();
       const added=log.filter(x=>x.includes('✅')).length;
+      /* V7.2: stamp AFTER a successful run — a failed/blocked attempt (e.g. RLS
+         before sign-in resolved, network drop) can retry on the next page. */
+      localStorage.setItem(KEY,String(Date.now()));
       if(added&&typeof toast==='function') toast('🎬 Demo sample data topped up automatically ('+added+' section(s)). Every page now has live rows.','info',7000);
     }catch(e){ console.warn('[DemoSampleData] auto-fill skipped:',e.message||e); }
   };
@@ -128,3 +130,39 @@ window.DemoSampleData = DemoSampleData;
   else setTimeout(tick,2500);
 })();
 
+
+/* DEMO EMPTY-STATE BANNER: if key showcase tables are empty on a demo deployment,
+   admins see an unmissable banner with a one-click loader — no hunting for the card. */
+(function(){
+  let tries=0;
+  const check=async()=>{
+    tries++;
+    try{
+      const demo=window.SCHOOL&&window.SCHOOL.demo&&window.SCHOOL.demo.enabled;
+      if(!demo||!window.sb)return;
+      const p=window.SC_PROFILE;
+      if(!p||!p.role){ if(tries<20) setTimeout(check,1500); return; }
+      if(!['super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(String(p.role).toLowerCase()))return;
+      if(document.getElementById('sc-demo-empty-banner'))return;
+      const r=await window.sb.from('payroll').select('id',{count:'exact',head:true});
+      const r2=await window.sb.from('library').select('id',{count:'exact',head:true});
+      if((r.count||0)>0&&(r2.count||0)>0)return;                    // demo already looks alive
+      const bar=document.createElement('div');
+      bar.id='sc-demo-empty-banner';
+      bar.setAttribute('style','position:fixed;left:0;right:0;bottom:0;z-index:9990;background:linear-gradient(90deg,#7c3aed,#4f46e5);color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-size:.95rem;box-shadow:0 -6px 20px rgba(0,0,0,.25)');
+      bar.innerHTML='<span>🎬 <b>Demo looks empty?</b> Load believable sample data on every page (payroll, inventory, library, messages, assignments…) in one click.</span>'+
+        '<button id="sc-demo-fill-btn" style="background:#fff;color:#4f46e5;border:0;border-radius:10px;padding:8px 18px;font-weight:800;cursor:pointer">Load sample data now</button>'+
+        '<button onclick="this.parentNode.remove()" style="background:transparent;color:#e0e7ff;border:1px solid rgba(255,255,255,.5);border-radius:10px;padding:8px 12px;cursor:pointer">Later</button>';
+      document.body.appendChild(bar);
+      document.getElementById('sc-demo-fill-btn').onclick=async function(){
+        this.disabled=true;this.textContent='Loading…';
+        try{const log=await DemoSampleData.run();const added=log.filter(x=>x.includes('✅')).length;
+          if(typeof toast==='function')toast('🎬 Sample data loaded ('+added+' section(s)). Open any page to see it live.','success',8000);
+          bar.remove(); if(window.CRUD&&location.pathname.match(/(payroll|inventory|library|assignments|messages)/))location.reload();
+        }catch(e){this.disabled=false;this.textContent='Load sample data now';if(typeof toast==='function')toast(e.message||e,'danger',8000);}
+      };
+    }catch(e){/* silent */}
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(check,3200));
+  else setTimeout(check,3200);
+})();
