@@ -1107,10 +1107,57 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
       '<button class="btn btn-primary" onclick="CRUD.save(\'' + moduleId + '\',' + (id ? '\'' + id + '\'' : 'null') + ')">Save</button>');
     try { if (window.App && App.dedupeAllSelects) App.dedupeAllSelects(); } catch (_) {}
+    /* V7.4 #4: NEW records auto-select the CURRENT term & session everywhere —
+       no more typing the same period on every form. (Edits keep stored values;
+       every auto-choice remains editable.) */
+    if (!id) setTimeout(() => { try { this.autofillPeriod(); } catch(_) {} }, 250);
   },
 
   /* When a ref dropdown with autofill changes (e.g. pick a student), copy
      extra fields like the student's name and DOB into the form (issues 1 & 10). */
+
+  /* V7.4 #3: class-ladder intelligence. Natural-sorts the registered classes
+     (JSS 1 < JSS 2 < ... < SS 3) and returns the next rung, or null when the
+     student is in the final class (=> graduate). */
+  _classLadder: null,
+  async classLadder(){
+    if (this._classLadder) return this._classLadder;
+    try {
+      const { data } = await this.sb.from('classes').select('name').limit(200);
+      const names=[...new Set((data||[]).map(x=>String(x.name||'').trim()).filter(Boolean))];
+      const tok=(s)=>{const m=String(s).toUpperCase().match(/^([A-Z]*)\s*(\d+)/)||[];return {p:m[1]||String(s).toUpperCase(),n:Number(m[2]||0)};};
+      const rank=(s)=>{const t=tok(s);const stage={'KG':0,'NUR':1,'NURSERY':1,'PRY':2,'PRIMARY':2,'BASIC':2,'JSS':3,'JS':3,'SS':4,'SSS':4}[t.p];return (stage==null?9:stage)*100+t.n;};
+      names.sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b));
+      this._classLadder=names; return names;
+    } catch(_) { return []; }
+  },
+  async nextClassOf(cls){
+    const ladder=await this.classLadder();
+    const i=ladder.findIndex(x=>x.toLowerCase()===String(cls||'').trim().toLowerCase());
+    if(i<0) return null;
+    return (i>=ladder.length-1) ? '__last__' : ladder[i+1];
+  },
+  /* V7.4 #4: current academic period, cached — used to auto-select term/session
+     everywhere a form leaves them blank. */
+  _curPeriod: null,
+  async currentPeriod(){
+    if (this._curPeriod) return this._curPeriod;
+    try { const { data } = await this.sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();
+      this._curPeriod = data || {}; } catch(_) { this._curPeriod = {}; }
+    return this._curPeriod;
+  },
+  /* Auto-select current term/session in an open form when fields are empty. */
+  async autofillPeriod(){
+    try {
+      const cp = await this.currentPeriod(); if (!cp || (!cp.term && !cp.session)) return;
+      [['term',cp.term],['session',cp.session]].forEach(([k,v])=>{
+        if(!v) return;
+        const el=document.getElementById('cf-'+CRUD.fid(k)); if(!el||el.value) return;
+        if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===v)) el.add(new Option(v,v));
+        el.value=v;
+      });
+    } catch(_) {}
+  },
   onRefChange(moduleId, key, sel) {
     try {
       const opt = sel.options[sel.selectedIndex];
@@ -1124,6 +1171,31 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         const el = document.getElementById('cf-' + CRUD.fid(targetKey));
         if (el && r[srcCol] != null) el.value = r[srcCol];
       });
+      /* V7.4 #3: PROMOTION smart-fill — picking the student completes the whole
+         row: To-class = next rung on the class ladder (or graduation on the
+         final class), Action, Status 'approved' and the current term/session.
+         The admin just reviews and saves. Every value stays editable. */
+      if (this.canonicalId(moduleId) === 'promotion' && key === 'student_id') {
+        (async () => {
+          try {
+            const next = await this.nextClassOf(r.class);
+            const toEl = document.getElementById('cf-' + CRUD.fid('to_class'));
+            const actEl = document.getElementById('cf-' + CRUD.fid('action'));
+            const stEl = document.getElementById('cf-' + CRUD.fid('status'));
+            if (next === '__last__') {
+              if (actEl && !actEl.value) actEl.value = 'graduate';
+              if (toEl && !toEl.value) { if(toEl.tagName==='SELECT'&&![...toEl.options].some(o=>o.value==='GRADUATED'))toEl.add(new Option('GRADUATED','GRADUATED')); toEl.value='GRADUATED'; }
+              if (typeof toast==='function') toast(r.full_name+' is in the FINAL class ('+r.class+') — auto-set to GRADUATE. Change it if needed.','info',6000);
+            } else if (next) {
+              if (toEl && !toEl.value) { if(toEl.tagName==='SELECT'&&![...toEl.options].some(o=>o.value===next))toEl.add(new Option(next,next)); toEl.value=next; }
+              if (actEl && !actEl.value) actEl.value='promote';
+              if (typeof toast==='function') toast('Auto-filled: '+r.class+' → '+next+' (promote). Adjust if this student should repeat or graduate.','info',6000);
+            }
+            if (stEl && (!stEl.value || stEl.value==='draft')) stEl.value='approved';
+            await this.autofillPeriod();
+          } catch(_) {}
+        })();
+      }
     } catch (e) {}
   },
 
@@ -1761,7 +1833,17 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       (byStudent[r.student_name] = byStudent[r.student_name] || []).push(t);
     });
     // class progression map (override via opts.nextClass)
-    const nextClassMap = opts.nextClass || CRUD._defaultNextClass();
+    /* V7.4: prefer the LIVE class ladder from the registered classes — every
+       school's own structure (Primary → JSS → SS) drives To-class automatically;
+       the static map remains only as the last-resort fallback. */
+    let nextClassMap = opts.nextClass;
+    if (!nextClassMap) {
+      try {
+        const ladder = await this.classLadder();
+        if (ladder.length > 1) { nextClassMap = {}; for (let i = 0; i < ladder.length - 1; i++) nextClassMap[ladder[i]] = ladder[i + 1]; }
+      } catch(_) {}
+      if (!nextClassMap) nextClassMap = CRUD._defaultNextClass();
+    }
     const drafts = [];
     studs.forEach(s => {
       const scores = byStudent[s.full_name] || [];
@@ -1771,12 +1853,12 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       else if (avg == null) { action = 'pending'; }
       else if (avg >= benchmark) { action = 'promote'; to_class = nextClassMap[s.class] || ''; }
       else { action = 'repeat'; to_class = s.class; }
-      drafts.push({ student_name: s.full_name, from_class: s.class, to_class, action, average: avg == null ? null : Math.round(avg * 10) / 10, session, term, status: 'draft' });
+      drafts.push({ student_id: s.id || null, student_name: s.full_name, from_class: s.class, to_class, action, average: avg == null ? null : Math.round(avg * 10) / 10, session, term, status: 'draft' });
     });
     // store as draft promotions (admin can edit before applying)
     let ok = 0;
     for (let i = 0; i < drafts.length; i += 200) {
-      const { error } = await this.sb.from('promotions').insert(drafts.slice(i, i + 200).map(d => ({ student_name: d.student_name, from_class: d.from_class, to_class: d.to_class, action: d.action, session: d.session, term: d.term, status: d.status, average: d.average })));
+      const { error } = await this.sb.from('promotions').insert(drafts.slice(i, i + 200).map(d => ({ student_id: d.student_id || null, student_name: d.student_name, from_class: d.from_class, to_class: d.to_class, action: d.action, session: d.session, term: d.term, status: d.status, average: d.average })));
       if (!error) ok += Math.min(200, drafts.length - i);
     }
     if (window.App && App.logActivity) App.logActivity('auto-promote', 'promotions', ok + ' drafts @ ' + benchmark + '%');
@@ -1940,14 +2022,24 @@ const PromoUI = {
     let sessions = [], terms = [];
     try { const { data } = await CRUD.sb.from('lookups').select('value,kind').in('kind', ['session', 'term']); (data || []).forEach(r => { if (r.kind === 'session') sessions.push(r.value); else terms.push(r.value); }); } catch (e) {}
     const opt = (arr) => ['<option value="">— any —</option>'].concat(arr.map(v => '<option>' + esc(v) + '</option>')).join('');
+    /* V7.4: pre-select the CURRENT period and suggest the graduating class
+       (top of the class ladder) automatically — the admin usually just clicks
+       Generate drafts. */
+    let curT='', curS='', topClass='';
+    try { const cp = await CRUD.currentPeriod(); curT = cp.term || ''; curS = cp.session || ''; } catch(_){}
+    try { const lad = await CRUD.classLadder(); topClass = lad[lad.length-1] || ''; } catch(_){}
     openModal('Auto-promote students by exam result',
       '<div class="form-group"><label>Pass benchmark (% of total)</label><input class="form-input" id="pp-bm" type="number" value="40" min="0" max="100"></div>' +
       '<div class="form-group"><label>Session</label><select class="form-select" id="pp-sess">' + opt(sessions) + '</select></div>' +
       '<div class="form-group"><label>Term</label><select class="form-select" id="pp-term">' + opt(terms) + '</select></div>' +
-      '<div class="form-group"><label>Graduating class (students here → graduate)</label><input class="form-input" id="pp-grad" placeholder="e.g. SSS3"></div>' +
+      '<div class="form-group"><label>Graduating class (students here → graduate)</label><input class="form-input" id="pp-grad" value="' + esc(topClass) + '" placeholder="e.g. SS 3"></div>' +
       '<p style="color:var(--gray-500);font-size:.85rem">This creates editable DRAFTS only. Review them, then click “Apply promotions”.</p>',
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
       '<button class="btn btn-primary" onclick="PromoUI.run()">Generate drafts</button>');
+    setTimeout(() => { try {
+      const se=document.getElementById('pp-sess'); if(se&&curS){ if(![...se.options].some(o=>o.value===curS))se.add(new Option(curS,curS)); se.value=curS; }
+      const te=document.getElementById('pp-term'); if(te&&curT){ if(![...te.options].some(o=>o.value===curT))te.add(new Option(curT,curT)); te.value=curT; }
+    } catch(_){} }, 150);
   },
   run() {
     const benchmark = Number(document.getElementById('pp-bm').value || 40);
