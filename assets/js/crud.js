@@ -1109,8 +1109,10 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     try { if (window.App && App.dedupeAllSelects) App.dedupeAllSelects(); } catch (_) {}
     /* V7.4 #4: NEW records auto-select the CURRENT term & session everywhere —
        no more typing the same period on every form. (Edits keep stored values;
-       every auto-choice remains editable.) */
-    if (!id) setTimeout(() => { try { this.autofillPeriod(); } catch(_) {} }, 250);
+       every auto-choice remains editable.)
+       V7.5 #4 extends this: today's date, current month/year and the signed-in
+       staff member's own name are also pre-filled on NEW records. */
+    if (!id) setTimeout(() => { try { this.autofillPeriod(); this.autofillToday(); } catch(_) {} }, 250);
   },
 
   /* When a ref dropdown with autofill changes (e.g. pick a student), copy
@@ -1158,6 +1160,51 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       });
     } catch(_) {}
   },
+  /* V7.5 #4: platform-wide "never type what the system already knows".
+     On every NEW form: today's date fills empty *record-date* fields (never
+     birthdays, due/review/next dates), the current month/year fill payroll-style
+     fields, and staff-authored forms pre-pick the signed-in staff member's own
+     name. Every auto-choice stays fully editable. */
+  autofillToday(){
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const SAFE = ['date','ref_date','award_date','date_taken','payment_date','visit_date','checkin_date','entry_date','issue_date','start_date','date_of_leaving'];
+      SAFE.forEach(k => {
+        const el = document.getElementById('cf-'+CRUD.fid(k));
+        if (el && el.type === 'date' && !el.value) el.value = today;
+      });
+      const mEl = document.getElementById('cf-month');
+      if (mEl && mEl.tagName === 'SELECT' && !mEl.value) {
+        const mName = new Date().toLocaleString('en-GB',{month:'long'});
+        if ([...mEl.options].some(o=>o.value===mName)) mEl.value = mName;
+      }
+      const yEl = document.getElementById('cf-year');
+      if (yEl && !yEl.value) yEl.value = new Date().getFullYear();
+      /* Staff self-identification: leave requests, lesson plans, diaries etc.
+         pre-pick the signed-in teacher in a 'staff_name' ref when empty. */
+      const meName = String((window.SC_PROFILE||{}).full_name||'').trim();
+      const role = String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if (meName && ['staff','teacher'].includes(role)) {
+        ['staff_name','teacher','recorded_by'].forEach(k=>{
+          const el = document.getElementById('cf-'+CRUD.fid(k)); if(!el||el.value) return;
+          if (el.tagName==='SELECT') { const hit=[...el.options].find(o=>String(o.value).toLowerCase()===meName.toLowerCase()); if(hit) el.value=hit.value; }
+          else if (el.tagName==='INPUT') el.value = meName;
+        });
+      }
+    } catch(_) {}
+  },
+  /* V7.5 #1: remember the last student an admin worked with, so ID-card and
+     report-card pages opened from ANY route (profile button, sidebar link)
+     can auto-load that student without retyping. */
+  rememberStudent(s){
+    try { if (s && (s.admission_no || s.full_name)) sessionStorage.setItem('sc_last_student',
+      JSON.stringify({ adm:s.admission_no||'', name:s.full_name||'', cls:s.class||'', at:Date.now() })); } catch(_) {}
+  },
+  lastStudent(maxAgeMin){
+    try { const j=JSON.parse(sessionStorage.getItem('sc_last_student')||'null');
+      if (j && (Date.now()-(j.at||0)) < (maxAgeMin||30)*60000) return j; } catch(_) {}
+    return null;
+  },
   onRefChange(moduleId, key, sel) {
     try {
       const opt = sel.options[sel.selectedIndex];
@@ -1193,6 +1240,24 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
             }
             if (stEl && (!stEl.value || stEl.value==='draft')) stEl.value='approved';
             await this.autofillPeriod();
+            /* V7.5 #3: the AVERAGE also fills itself — pulled live from this
+               student's results for the current period (falls back to any
+               period). No promotion field needs typing anymore. */
+            try {
+              const avgEl = document.getElementById('cf-' + CRUD.fid('average'));
+              if (avgEl && !avgEl.value) {
+                const cp = await this.currentPeriod();
+                let rq = this.sb.from('results').select('ca1,ca2,ca3,exam').eq('student_name', r.full_name);
+                if (cp && cp.term) rq = rq.eq('term', cp.term);
+                if (cp && cp.session) rq = rq.eq('session', cp.session);
+                let { data: rs } = await rq.limit(50);
+                if (!rs || !rs.length) ({ data: rs } = await this.sb.from('results').select('ca1,ca2,ca3,exam').eq('student_name', r.full_name).limit(50));
+                if (rs && rs.length) {
+                  const tots = rs.map(x => (Number(x.ca1)||0)+(Number(x.ca2)||0)+(Number(x.ca3)||0)+(Number(x.exam)||0));
+                  avgEl.value = Math.round((tots.reduce((a,b)=>a+b,0)/tots.length)*10)/10;
+                }
+              }
+            } catch(_) {}
           } catch(_) {}
         })();
       }

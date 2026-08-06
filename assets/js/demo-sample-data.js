@@ -97,6 +97,59 @@ const DemoSampleData = {
       {title:'Casio fx-991 calculator (lost)',body:'Reported missing by an SS2 student.',status:'searching'}],'Lost & found'));
     await step('parent_meeting', ()=>mr('parent_meeting',[
       {title:'Third-Term PTA General Meeting',body:'Agenda: results review, resumption dates, development levy update.',status:'scheduled',ref_date:new Date(Date.now()+14*86400000).toISOString().slice(0,10),data:{venue:'School hall',time:'10:00'}}],'PTA meetings'));
+    /* ---- V7.5 breadth: every remaining showcase page gets believable rows ---- */
+    await step('staff_loans', async()=>{ if (!staff.length || !await this.need('staff_loans',2)) return;
+      await this.put('staff_loans',[
+        {staff_name:(staff[0]||{}).full_name||'Staff Member',loan_type:'personal loan',principal:150000,monthly_repayment:15000,months:10,amount_repaid:60000,date_taken:new Date(Date.now()-120*86400000).toISOString().slice(0,10),status:'active',notes:'Laptop purchase support, approved by proprietor.'},
+        {staff_name:(staff[1]||staff[0]||{}).full_name||'Staff Member',loan_type:'emergency',principal:80000,monthly_repayment:10000,months:8,amount_repaid:80000,date_taken:new Date(Date.now()-300*86400000).toISOString().slice(0,10),status:'completed',notes:'Medical advance, fully repaid.'}], 'Staff loans'); });
+    await step('staff_appraisals', async()=>{ if (!staff.length || !await this.need('staff_appraisals',2)) return;
+      await this.put('staff_appraisals',[
+        {staff_name:(staff[0]||{}).full_name||'Staff Member',period:'Current session',punctuality:9,teaching_quality:10,student_results:9,teamwork:9,conduct:10,total_score:'9.4 — Outstanding',recommendation:'commend',comments:'Outstanding lesson delivery; class average rose 14% this session.'},
+        {staff_name:(staff[1]||staff[0]||{}).full_name||'Staff Member',period:'Current session',punctuality:7,teaching_quality:8,student_results:8,teamwork:9,conduct:9,total_score:'8.2 — Very Good',recommendation:'train',comments:'Strong classroom management; recommend ICT-integration training.'}], 'Staff appraisals'); });
+    await step('promotions', async()=>{ if (!studs.length || !await this.need('promotions',3)) return;
+      let ladder=[], cp={};
+      try { ladder = await (window.CRUD && CRUD.classLadder ? CRUD.classLadder() : []); } catch(_){ }
+      try { cp = await (window.CRUD && CRUD.currentPeriod ? CRUD.currentPeriod() : {}); } catch(_){ }
+      const nextOf=(c)=>{const i=ladder.findIndex(x=>String(x).toLowerCase()===String(c||'').toLowerCase());return i<0?'':(i>=ladder.length-1?'GRADUATED':ladder[i+1]);};
+      const rows = studs.slice(0,5).map((s,i)=>({student_id:s.id,student_name:s.full_name,from_class:s.class,
+        to_class:(i===2? s.class : (nextOf(s.class)||'')),action:(i===2?'repeat':(nextOf(s.class)==='GRADUATED'?'graduate':'promote')),
+        average:(i===2?41:70+i*5),status:(i===4?'applied':'pending'),term:cp.term||null,session:cp.session||null}));
+      await this.put('promotions', rows, 'Promotion drafts'); });
+    await step('module_records breadth', ()=>Promise.all([
+      mr('front_desk',[
+        {title:'Prospectus enquiry — walk-in',body:'Parent asked about JSS 1 admission requirements; prospectus issued.',data:{kind:'walk-in',contact:'0803 555 1122'},ref_date:new Date().toISOString().slice(0,10)},
+        {title:'Courier dispatch — WAEC forms',body:'WAEC registration forms dispatched to zonal office via courier.',data:{kind:'dispatch',contact:'Courier waybill 4491'}}],'Front desk'),
+      mr('broadcast',[
+        {title:'Results released',body:'Dear parents, term results are now on the portal. Log in to view your child\u2019s report card.',data:{channel:'whatsapp',audience:'parents'},status:'sent'},
+        {title:'Resumption reminder',body:'School resumes soon — the fees portal is open.',data:{channel:'sms',audience:'all'},status:'queued'}],'Broadcasts'),
+      mr('reports',[{title:'Termly enrolment summary',body:'Active students, staff strength, attendance rate and fee collection at a glance.',data:{type:'termly'},ref_date:new Date().toISOString().slice(0,10)}],'Reports'),
+      mr('lms',[
+        {title:'Quadratic Equations — video lesson',body:'Watch the worked examples then attempt the practice set.',data:{subject:'Mathematics',class:(s0.class||'SS 2'),video:'https://drive.google.com/'}},
+        {title:'Photosynthesis explained',body:'Full topic notes with diagram labelling task.',data:{subject:'Biology',class:(s1.class||'SS 1'),video:'https://drive.google.com/'}}],'LMS lessons'),
+      mr('document_builder',[{title:'Fee clearance letter',body:'This is to certify that [NAME] of [CLASS] has cleared all fees for [TERM], [SESSION].',data:{type:'fee clearance',student:s0.full_name||'',class:s0.class||'',signatory_role:'Principal',reference:'FC/'+new Date().getFullYear()+'/014'},status:'issued'}],'Document builder'),
+      mr('facility_booking',[
+        {title:'School hall — PTA meeting',ref_date:new Date(Date.now()+9*86400000).toISOString().slice(0,10),data:{time:'10:00',bookedby:'PTA Secretary'},status:'approved'},
+        {title:'Football pitch — inter-house practice',ref_date:new Date(Date.now()+14*86400000).toISOString().slice(0,10),data:{time:'14:00',bookedby:'Games Master'},status:'requested'}],'Facility bookings'),
+      mr('compliance',[
+        {title:'Fire extinguisher service',data:{category:'fire drill'},ref_date:new Date(Date.now()+26*86400000).toISOString().slice(0,10),status:'due',body:'Annual service of all extinguishers.'},
+        {title:'Ministry of Education inspection',data:{category:'inspection'},status:'passed',body:'Passed with commendation on record keeping.'}],'Compliance'),
+      mr('fleet_tracking',[{title:'Bus 1 — morning route',data:{driver:'School driver'},body:'Morning run completed 07:42; evening run departs 15:30.',ref_date:new Date().toISOString().slice(0,10)}],'Fleet log'),
+      mr('transcripts',[{title:'Session transcript',data:{student:s0.full_name||'',term:'Third Term',gpa:'4.2 / 5.0',remark:'Excellent — top 5% of class'},body:'Mathematics A, English B2, Physics B3, Chemistry A, Biology B2.'}],'Transcripts'),
+      mr('transfer_cert',[{title:'TC/'+new Date().getFullYear()+'/003',data:{student:s2.full_name||'',last_class:s2.class||'',reason:'relocation',conduct:'good'},body:'Family relocated. All fees cleared.',ref_date:new Date().toISOString().slice(0,10)}],'Transfer certificates'),
+      mr('counselling',[{title:'Exam anxiety session',data:{student:s1.full_name||'',counsellor:'School counsellor'},status:'closed',body:'Two sessions held; coping strategies working well.'}],'Counselling'),
+      mr('rubrics',[{title:'Argumentative essay rubric',data:{subject:'English Language',class:(s0.class||'SS 2'),criteria:'Thesis clarity\nEvidence & examples\nOrganisation\nGrammar & mechanics',scale:'1-4 (Beginning–Exceeding)'},body:'Used for all continuous-assessment essays.'}],'Rubrics'),
+      mr('career_counseling',[{title:'University guidance — sciences',data:{student:s0.full_name||'',university:'University of Lagos — Medicine'},body:'JAMB subject combination confirmed; mock UTME booked.'}],'Career counselling'),
+      mr('financial_aid',[{title:'Proprietor\u2019s Scholarship',data:{student:s2.full_name||''},amount:75000,status:'approved',body:'50% tuition waiver for academic excellence.'}],'Financial aid'),
+      mr('book_request',[{title:'Further Mathematics — Egbe et al',data:{student:s1.full_name||''},status:'reserved',ref_date:new Date().toISOString().slice(0,10)}],'Book requests'),
+      mr('school_calendar',[{title:'Next term resumption',ref_date:new Date(Date.now()+40*86400000).toISOString().slice(0,10),data:{category:'term-start'},body:'All students resume; boarding house opens the day before.'}],'School calendar'),
+      mr('messages',[
+        {title:'Revision groups announced',body:'Revision groups meet in the library every Tuesday before mock exams.',audience:'student',data:{to:'All students'}},
+        {title:'Fee balance reminder',body:'Dear parents, kindly clear outstanding balances before the PTA meeting.',audience:'parent',data:{to:'All parents'}}],'Messages')
+    ]));
+    await step('eresources', async()=>{ if (!await this.need('eresources',3)) return;
+      await this.put('eresources',[
+        {title:'WAEC Past Questions — Mathematics',description:'Five years of past questions with chief examiner reports.',subject:'Mathematics',class:'SS 3',term:'Third Term',drive_link:'https://drive.google.com/'},
+        {title:'Phonics drill audio pack',description:'Daily 10-minute drills for early readers.',subject:'English Language',class:'JSS 1',term:'Third Term',drive_link:'https://drive.google.com/'}], 'E-resources'); });
     return this.log;
   }
 };
