@@ -484,7 +484,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
     </header>
     <div class="app-content">
-      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button><button class="btn btn-outline" data-staff-only onclick="AT.printRegister()">🖨️ Print register</button></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
+      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date" onchange="AT.load()" title="Pick ANY date — past registers load as saved for review or correction"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button><button class="btn btn-outline" data-staff-only onclick="AT.printRegister()">🖨️ Print register</button></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -649,13 +649,23 @@ const AT={
       })();
     }catch(e){}
   }, 
-  async load(){ 
-    const cls=document.getElementById('at-class').value, box=document.getElementById('at-register'); 
-    if(!cls){box.innerHTML='<p>Choose a class.</p>';return;} 
-    const {data,error}=await sb.from('students').select('id,full_name,admission_no,class').eq('class',cls).order('full_name').limit(300); 
-    if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;} 
-    this.students=data||[]; 
-    box.innerHTML='<div class="card"><h3>'+esc(cls)+' Register</h3><div class="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission No</th><th>Status</th></tr></thead><tbody>'+this.students.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(s.full_name)+'</td><td>'+esc(s.admission_no||'')+'</td><td><select class="form-select" id="ats-'+s.id+'"><option value="present">Present</option><option value="absent">Absent</option><option value="late">Late</option><option value="excused">Excused</option></select></td></tr>').join('')+'</tbody></table></div></div>';
+  async load(){
+    const cls=document.getElementById('at-class').value, box=document.getElementById('at-register');
+    if(!cls){box.innerHTML='<p>Choose a class.</p>';return;}
+    const {data,error}=await sb.from('students').select('id,full_name,admission_no,class').eq('class',cls).order('full_name').limit(300);
+    if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;}
+    this.students=data||[];
+    /* V7.6 #1: HISTORY-AWARE REGISTER — the register now loads the marks
+       ALREADY SAVED for the chosen date (any past date), so staff can review,
+       correct or reprint any previous day instead of always starting blank. */
+    const date=document.getElementById('at-date').value||new Date().toISOString().slice(0,10);
+    let saved={};
+    try{ const r=await sb.from('attendance').select('student_id,status').eq('class',cls).eq('date',date).limit(500);
+      (r.data||[]).forEach(a=>{saved[a.student_id]=String(a.status||'').toLowerCase();}); }catch(_){ }
+    const savedCount=Object.keys(saved).length;
+    const sel=(s)=>{const cur=saved[s.id]||'present';const opt=(v,l)=>'<option value="'+v+'"'+(cur===v?' selected':'')+'>'+l+'</option>';
+      return '<select class="form-select" id="ats-'+s.id+'">'+opt('present','Present')+opt('absent','Absent')+opt('late','Late')+opt('excused','Excused')+'</select>';};
+    box.innerHTML='<div class="card"><h3>'+esc(cls)+' Register — '+esc(date)+'</h3>'+(savedCount?'<p style="color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 12px;font-size:.85rem">📖 Showing the register AS SAVED for '+esc(date)+' ('+savedCount+' mark(s) on file). Change any mark and Save to correct history.</p>':'<p style="color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:.85rem">🆕 No marks saved yet for '+esc(date)+' — this is a fresh register.</p>')+'<div class="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Admission No</th><th>Status</th></tr></thead><tbody>'+this.students.map((s,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(s.full_name)+'</td><td>'+esc(s.admission_no||'')+'</td><td>'+sel(s)+'</td></tr>').join('')+'</tbody></table></div></div>';
   }, 
   async saveAll(){ 
     if(!this.students.length){toast('Load a class first','warning');return;} 
