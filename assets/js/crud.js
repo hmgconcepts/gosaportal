@@ -164,10 +164,11 @@ const CRUD = {
       {key:'recorded_by',label:'Recorded by',type:'text'}
     ]},
     promotion: { table:'promotions', title:'Promotion', cols:[
-      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,autofill:{student_name:'full_name',from_class:'class'}},
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,autofill:{student_name:'full_name',from_class:'class',department:'department'}},
       {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
       {key:'from_class',label:'From class',type:'text'},
       {key:'to_class',label:'To class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'department',label:'Department (auto)',type:'text',help:'V7.7: auto-copied from the student; filter the table by it'},
       {key:'average',label:'Term average %',type:'number',help:'auto-filled by Auto-promote'},
       {key:'action',label:'Action',type:'select',options:['promote','graduate','repeat','pending','delete']},
       {key:'status',label:'Status',type:'select',options:['draft','approved','applied']},
@@ -2089,7 +2090,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const session = opts.session || '';
     const term = opts.term || '';
     const graduatingClass = (opts.graduatingClass || '').trim();
-    const { data: studs } = await this.sb.from('students').select('id,full_name,class,status').eq('status', 'active').limit(5000);
+    const { data: studs } = await this.sb.from('students').select('id,full_name,class,status,department').eq('status', 'active').limit(5000);
     if (!studs || !studs.length) { toast('No active students found.', 'warning'); return; }
     let rq = this.sb.from('results').select('student_name,class,subject,ca1,ca2,ca3,exam');
     if (session) rq = rq.eq('session', session);
@@ -2121,12 +2122,14 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       else if (avg == null) { action = 'pending'; }
       else if (avg >= benchmark) { action = 'promote'; to_class = nextClassMap[s.class] || ''; }
       else { action = 'repeat'; to_class = s.class; }
-      drafts.push({ student_id: s.id || null, student_name: s.full_name, from_class: s.class, to_class, action, average: avg == null ? null : Math.round(avg * 10) / 10, session, term, status: 'draft' });
+      drafts.push({ student_id: s.id || null, student_name: s.full_name, from_class: s.class, to_class, action, department: s.department || '', average: avg == null ? null : Math.round(avg * 10) / 10, session, term, status: 'draft' });
     });
     // store as draft promotions (admin can edit before applying)
     let ok = 0;
     for (let i = 0; i < drafts.length; i += 200) {
-      const { error } = await this.sb.from('promotions').insert(drafts.slice(i, i + 200).map(d => ({ student_id: d.student_id || null, student_name: d.student_name, from_class: d.from_class, to_class: d.to_class, action: d.action, session: d.session, term: d.term, status: d.status, average: d.average })));
+      let { error } = await this.sb.from('promotions').insert(drafts.slice(i, i + 200).map(d => ({ student_id: d.student_id || null, student_name: d.student_name, from_class: d.from_class, to_class: d.to_class, action: d.action, department: d.department || '', session: d.session, term: d.term, status: d.status, average: d.average })));
+      /* older databases without promotions.department: retry without it */
+      if (error && /department/.test(error.message||'')) ({ error } = await this.sb.from('promotions').insert(drafts.slice(i, i + 200).map(d => ({ student_id: d.student_id || null, student_name: d.student_name, from_class: d.from_class, to_class: d.to_class, action: d.action, session: d.session, term: d.term, status: d.status, average: d.average }))));
       if (!error) ok += Math.min(200, drafts.length - i);
     }
     if (window.App && App.logActivity) App.logActivity('auto-promote', 'promotions', ok + ' drafts @ ' + benchmark + '%');

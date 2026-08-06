@@ -32,6 +32,36 @@
 
 const PUBLIC_PAGES = ['login','index','about','contact','apply','register','signup','cbt-exam','exam-register','offline',''];
 
+/* ====================================================================
+   V7.7 ROOT-CAUSE FIX — "my fixes never show up" / stale-version pattern.
+   The service worker serves assets CACHE-FIRST, so after every deployment
+   the first page load still runs the PREVIOUS crud.js/report-engine.js;
+   the new build only appeared after a second manual reload users never
+   knew to do — which is why already-fixed issues kept being re-reported.
+   Fix: the moment an updated service worker takes control, reload ONCE
+   (guarded against loops). Every deployment now reaches every open tab
+   automatically within seconds.
+   ==================================================================== */
+(function(){
+  if (!('serviceWorker' in navigator)) return;
+  // Snapshot BEFORE any event: was a worker already controlling this page?
+  // First-ever install (controller was null) must NOT reload — nothing stale.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  try {
+    navigator.serviceWorker.addEventListener('controllerchange', function(){
+      if (reloaded || !hadController) return; reloaded = true;
+      try { if (sessionStorage.getItem('sc-sw-reloaded') === '1') return; sessionStorage.setItem('sc-sw-reloaded','1'); } catch(_) {}
+      location.reload();
+    });
+    // Clear the guard after the reloaded page settles so FUTURE updates can also reload.
+    window.addEventListener('load', function(){ setTimeout(function(){ try { sessionStorage.removeItem('sc-sw-reloaded'); } catch(_) {} }, 5000); });
+    // Proactively check for a new SW on every page load (the browser's own check can lag).
+    navigator.serviceWorker.getRegistration().then(function(reg){ if (reg) reg.update().catch(function(){}); });
+  } catch(_) {}
+})();
+
+
 /* ---- Global date helpers (school standard: dd/mm/yyyy) ---- */
 function fmtDMY(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v);
   return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); }
