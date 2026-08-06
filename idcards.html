@@ -633,7 +633,9 @@ document.addEventListener('DOMContentLoaded',function(){try{
   var tries=0;var t=setInterval(function(){tries++;
     if(window.ICUI&&ICUI.all&&ICUI.all.length){clearInterval(t);
       var hit=ICUI.all.find(function(s){return String(s.admission_no||'').toLowerCase()===stu||String(s.full_name||'').toLowerCase()===stu;});
-      if(hit){var sel=document.getElementById('ic-pick');if(sel){sel.value=JSON.stringify(hit);sel.dispatchEvent(new Event('change'));}
+      if(hit){var sel=document.getElementById('ic-student');var v=JSON.stringify(hit);
+        if(sel){ if(![...sel.options].some(function(o){return o.value===v;})){var o=new Option((hit.full_name||'Student')+' ('+(hit.class||hit.admission_no||'')+')',v);sel.add(o);} sel.value=v; }
+        if(window.ICUI&&ICUI.pick)ICUI.pick(v); if(window.ICUI&&ICUI.render)setTimeout(function(){ICUI.render();},300);
         if(typeof toast==='function')toast('🪪 '+(hit.full_name||'Student')+"'s ID card loaded from the profile link.",'info',5000);}
     } else if(tries>25)clearInterval(t);
   },600);
