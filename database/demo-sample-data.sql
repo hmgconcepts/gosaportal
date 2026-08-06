@@ -143,3 +143,123 @@ exception when others then
   raise notice 'Demo sample pack partial skip: %', sqlerrm;
 end $$;
 select 'Demo sample data pack installed ✅ — open any page to see rows' as status;
+
+-- ===================== V7.5 breadth additions ==========================
+do $$
+declare
+  any_admin uuid := (select id from public.profiles where role in ('super_admin','admin','proprietor') and status in ('approved','active') limit 1);
+  s1 record; s2 record; nm1 text; nm2 text;
+begin
+  select id, full_name, class into s1 from public.students order by created_at limit 1;
+  select id, full_name, class into s2 from public.students order by created_at offset 1 limit 1;
+  if s2.id is null then s2 := s1; end if;
+  select full_name into nm1 from public.staff order by created_at limit 1;
+  select full_name into nm2 from public.staff order by created_at offset 1 limit 1;
+  nm2 := coalesce(nm2, nm1);
+
+  -- Staff loans (requires v7.5 RLS policies)
+  if nm1 is not null and (select count(*) from public.staff_loans) < 2 then
+    insert into public.staff_loans (staff_name,loan_type,principal,monthly_repayment,months,amount_repaid,date_taken,status,notes) values
+      (nm1,'personal loan',150000,15000,10,60000,current_date-120,'active','Laptop purchase support, approved by proprietor.'),
+      (nm2,'emergency',80000,10000,8,80000,current_date-300,'completed','Medical advance, fully repaid.');
+  end if;
+
+  -- Staff appraisals
+  if nm1 is not null and (select count(*) from public.staff_appraisals) < 2 then
+    insert into public.staff_appraisals (staff_name,period,punctuality,teaching_quality,student_results,teamwork,conduct,total_score,recommendation,comments) values
+      (nm1,'Current session',9,10,9,9,10,'9.4 — Outstanding','commend','Outstanding lesson delivery; class average rose 14% this session.'),
+      (nm2,'Current session',7,8,8,9,9,'8.2 — Very Good','train','Strong classroom management; recommend ICT-integration training.');
+  end if;
+
+  -- Promotion drafts (auto-fillable showcase for the promotion page)
+  if s1.id is not null and (select count(*) from public.promotions) < 3 then
+    insert into public.promotions (student_id,student_name,from_class,to_class,action,average,status,term,session)
+    select id, full_name, class, class, 'promote', 74, 'pending',
+           (select term from public.academic_periods where is_current limit 1),
+           (select session from public.academic_periods where is_current limit 1)
+      from public.students order by created_at limit 5;
+  end if;
+
+  -- E-resources
+  if (select count(*) from public.eresources) < 3 then
+    insert into public.eresources (title,description,subject,class,term,drive_link) values
+      ('WAEC Past Questions — Mathematics','Five years of past questions with chief examiner reports.','Mathematics','SS 3','Third Term','https://drive.google.com/'),
+      ('Phonics drill audio pack','Daily 10-minute drills for early readers.','English Language','JSS 1','Third Term','https://drive.google.com/');
+  end if;
+
+  -- module_records breadth: one guard per module keeps this idempotent
+  if (select count(*) from public.module_records where module='front_desk') = 0 then
+    insert into public.module_records (module,title,body,ref_date,data,created_by) values
+      ('front_desk','Prospectus enquiry — walk-in','Parent asked about JSS 1 admission requirements; prospectus issued.',current_date,'{"kind":"walk-in","contact":"0803 555 1122"}'::jsonb,any_admin),
+      ('front_desk','Courier dispatch — WAEC forms','WAEC registration forms dispatched to zonal office via courier.',current_date,'{"kind":"dispatch","contact":"Courier waybill 4491"}'::jsonb,any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='broadcast') = 0 then
+    insert into public.module_records (module,title,body,status,data,created_by) values
+      ('broadcast','Results released','Dear parents, term results are now on the portal. Log in to view your child''s report card.','sent','{"channel":"whatsapp","audience":"parents"}'::jsonb,any_admin),
+      ('broadcast','Resumption reminder','School resumes soon — the fees portal is open.','queued','{"channel":"sms","audience":"all"}'::jsonb,any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='reports') = 0 then
+    insert into public.module_records (module,title,body,ref_date,data,created_by) values
+      ('reports','Termly enrolment summary','Active students, staff strength, attendance rate and fee collection at a glance.',current_date,'{"type":"termly"}'::jsonb,any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='lms') = 0 then
+    insert into public.module_records (module,title,body,data,created_by) values
+      ('lms','Quadratic Equations — video lesson','Watch the worked examples then attempt the practice set.',jsonb_build_object('subject','Mathematics','class',coalesce(s1.class,'SS 2'),'video','https://drive.google.com/'),any_admin),
+      ('lms','Photosynthesis explained','Full topic notes with diagram labelling task.',jsonb_build_object('subject','Biology','class',coalesce(s2.class,'SS 1'),'video','https://drive.google.com/'),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='document_builder') = 0 then
+    insert into public.module_records (module,title,body,status,data,created_by) values
+      ('document_builder','Fee clearance letter','This is to certify that [NAME] of [CLASS] has cleared all fees for [TERM], [SESSION].','issued',jsonb_build_object('type','fee clearance','student',coalesce(s1.full_name,''),'class',coalesce(s1.class,''),'signatory_role','Principal','reference','FC/2026/014'),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='facility_booking') = 0 then
+    insert into public.module_records (module,title,ref_date,status,data,created_by) values
+      ('facility_booking','School hall — PTA meeting',current_date+9,'approved','{"time":"10:00","bookedby":"PTA Secretary"}'::jsonb,any_admin),
+      ('facility_booking','Football pitch — inter-house practice',current_date+14,'requested','{"time":"14:00","bookedby":"Games Master"}'::jsonb,any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='compliance') = 0 then
+    insert into public.module_records (module,title,body,ref_date,status,data,created_by) values
+      ('compliance','Fire extinguisher service','Annual service of all extinguishers.',current_date+26,'due','{"category":"fire drill"}'::jsonb,any_admin),
+      ('compliance','Ministry of Education inspection','Passed with commendation on record keeping.',current_date-60,'passed','{"category":"inspection"}'::jsonb,any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='fleet_tracking') = 0 then
+    insert into public.module_records (module,title,body,ref_date,data,created_by) values
+      ('fleet_tracking','Bus 1 — morning route','Morning run completed 07:42; evening run departs 15:30.',current_date,'{"driver":"School driver"}'::jsonb,any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='transcripts') = 0 then
+    insert into public.module_records (module,title,body,data,created_by) values
+      ('transcripts','Session transcript','Mathematics A, English B2, Physics B3, Chemistry A, Biology B2.',jsonb_build_object('student',coalesce(s1.full_name,''),'term','Third Term','gpa','4.2 / 5.0','remark','Excellent — top 5% of class'),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='transfer_cert') = 0 then
+    insert into public.module_records (module,title,body,ref_date,data,created_by) values
+      ('transfer_cert','TC/2026/003','Family relocated. All fees cleared.',current_date,jsonb_build_object('student',coalesce(s2.full_name,''),'last_class',coalesce(s2.class,''),'reason','relocation','conduct','good'),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='counselling') = 0 then
+    insert into public.module_records (module,title,body,status,data,created_by) values
+      ('counselling','Exam anxiety session','Two sessions held; coping strategies working well.','closed',jsonb_build_object('student',coalesce(s2.full_name,''),'counsellor','School counsellor'),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='rubrics') = 0 then
+    insert into public.module_records (module,title,body,data,created_by) values
+      ('rubrics','Argumentative essay rubric','Used for all continuous-assessment essays.',jsonb_build_object('subject','English Language','class',coalesce(s1.class,'SS 2'),'criteria',E'Thesis clarity\nEvidence & examples\nOrganisation\nGrammar & mechanics','scale','1-4 (Beginning–Exceeding)'),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='career_counseling') = 0 then
+    insert into public.module_records (module,title,body,data,created_by) values
+      ('career_counseling','University guidance — sciences','JAMB subject combination confirmed; mock UTME booked.',jsonb_build_object('student',coalesce(s1.full_name,''),'university','University of Lagos — Medicine'),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='financial_aid') = 0 then
+    insert into public.module_records (module,title,body,amount,status,data,created_by) values
+      ('financial_aid','Proprietor''s Scholarship','50% tuition waiver for academic excellence.',75000,'approved',jsonb_build_object('student',coalesce(s2.full_name,'')),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='book_request') = 0 then
+    insert into public.module_records (module,title,ref_date,status,data,created_by) values
+      ('book_request','Further Mathematics — Egbe et al',current_date,'reserved',jsonb_build_object('student',coalesce(s2.full_name,'')),any_admin);
+  end if;
+  if (select count(*) from public.module_records where module='messages') < 3 then
+    insert into public.module_records (module,title,body,audience,data,created_by) values
+      ('messages','Revision groups announced','Revision groups meet in the library every Tuesday before mock exams.','student','{"to":"All students"}'::jsonb,any_admin),
+      ('messages','Fee balance reminder','Dear parents, kindly clear outstanding balances before the PTA meeting.','parent','{"to":"All parents"}'::jsonb,any_admin);
+  end if;
+  raise notice 'V7.5 breadth sample pack applied.';
+exception when others then
+  raise notice 'V7.5 breadth pack partial skip: %', sqlerrm;
+end $$;
+select 'Demo sample data pack V7.5 (full breadth) installed ✅' as status;
