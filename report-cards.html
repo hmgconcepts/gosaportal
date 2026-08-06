@@ -499,6 +499,14 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="card" style="margin-top:16px">
         <h3>📄 Generate outputs</h3>
         <p style="color:var(--gray-600);font-size:.9rem">Generate printable termly outputs from the recorded scores (all subjects).</p>
+        <!-- V7.7 #4: the outputs section has its OWN class/term/session dropdowns so
+             the admin can generate ANY student's card for ANY past term/session/class
+             without touching the score-grid pickers above. Blank = use the pickers above. -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Class</label><select class="form-select" id="rc-out-class" style="max-width:170px" data-readonly-role="student parent" onchange="RC.fillStudentPicker()"><option value="">— same as above —</option></select></div>
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Term</label><select class="form-select" id="rc-out-term" style="max-width:160px" data-readonly-role="student parent"><option value="">— same as above —</option></select></div>
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Session</label><select class="form-select" id="rc-out-session" style="max-width:160px" data-readonly-role="student parent"><option value="">— same as above —</option></select></div>
+        </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <input class="form-input" id="rc-student" list="rc-student-list" placeholder="Student name OR admission number" style="max-width:280px" data-readonly-role="student parent"><datalist id="rc-student-list"></datalist>
           <button class="btn btn-primary" onclick="RC.reportCard()">🧾 Student Report Card</button>
@@ -645,6 +653,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       fillSelect('rc-subject', subjects);
       fillSelect('rc-term', terms);
       fillSelect('rc-session', sessions);
+      /* V7.7 #4: fill the Generate-outputs dropdowns too (default = inherit). */
+      const fillOut=(id,vals)=>{const el=$(id);if(!el)return;const keep=el.value;el.innerHTML='<option value="">— same as above —</option>'+(vals||[]).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(keep&&(vals||[]).includes(keep))el.value=keep;};
+      fillOut('rc-out-class', classes); fillOut('rc-out-term', terms); fillOut('rc-out-session', sessions);
     },
 
     async _safe(table, select, extra, limit){
@@ -1077,7 +1088,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       try{
         if(!window.sb) return; const dl=document.getElementById('rc-student-list'); if(!dl) return;
         let q=window.sb.from('students').select('full_name,admission_no,class').order('full_name').limit(2000);
-        const cls=this.ctx.class||($('rc-class')||{}).value||''; if(cls)q=q.eq('class',cls);
+        /* V7.7: outputs Class dropdown wins; blank = whole school so the admin
+           can generate a card for ANY student regardless of the grid class. */
+        const cls=($('rc-out-class')||{}).value||this.ctx.class||($('rc-class')||{}).value||''; if(cls)q=q.eq('class',cls);
         const {data}=await q; dl.innerHTML='';
         (data||[]).forEach(s=>{const o=document.createElement('option');o.value=(s.admission_no?s.admission_no+' — ':'')+s.full_name;o.label=s.full_name+(s.admission_no?' ('+s.admission_no+')':'')+(s.class?' · '+s.class:'');dl.appendChild(o);});
       }catch(_){}
@@ -1116,7 +1129,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       if (!window.sb) { toast('Database not configured', 'warning'); return; }
       let name = ($('rc-student') || {}).value ? $('rc-student').value.trim() : '';
       // V7.0 #12: resolve admission numbers / "ADM — Name" entries to the exact student
-      if (name && window.sb) { const stu = await this.resolveStudent(name); if (stu && stu.full_name) { name = stu.full_name; if (stu.class && !this.ctx.class) this.ctx.class = stu.class; } }
+      let resolvedClass='';
+      if (name && window.sb) { const stu = await this.resolveStudent(name); if (stu && stu.full_name) { name = stu.full_name; resolvedClass = stu.class || ''; if (stu.class && !this.ctx.class) this.ctx.class = stu.class; } }
       // Family-mode enforcement
       if (this._familyMode) {
         if (this._role === 'parent') {
@@ -1134,9 +1148,16 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         }
       }
       if (!name) { toast('Enter or select a student name first.', 'warning'); return; }
-      const term = this.ctx.term || ($('rc-term') || {}).value || '';
-      const ses = this.ctx.session || ($('rc-session') || {}).value || '';
-      const cls = this.ctx.class || ($('rc-class') || {}).value || '';
+      /* V7.7 #1/#4 ROOT-CAUSE FIX: outputs previously preferred this.ctx.* —
+         a snapshot frozen at the last Load/Build — over the LIVE dropdowns, so
+         switching Term/Session afterwards was silently ignored and the old
+         period printed again ("cannot regenerate previous terms"). Live
+         dropdowns now always win; ctx is only a fallback. */
+      const term = ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const ses = ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
+      /* the student's OWN class beats the grid class when no explicit outputs
+         class was chosen — a student from any class generates correctly. */
+      const cls = ($('rc-out-class')||{}).value || resolvedClass || ($('rc-class')||{}).value || this.ctx.class || '';
       try {
         ReportEngine.init(window.sb);
         const html=await ReportEngine.renderStudent({student:name,class:cls,term:term,session:ses});
@@ -1151,10 +1172,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     async bulkClassCards(){
       if (this._familyMode) { toast('Bulk printing is an administrative action.', 'warning'); return; }
       if (!window.sb) { toast('Database not configured', 'warning'); return; }
-      const cls = this.ctx.class || ($('rc-class') || {}).value || '';
-      const term = this.ctx.term || ($('rc-term') || {}).value || '';
-      const ses = this.ctx.session || ($('rc-session') || {}).value || '';
-      if (!cls) { toast('Choose a class first (Class dropdown above), then click Bulk Print again.', 'warning', 6000); return; }
+      const cls = ($('rc-out-class')||{}).value || ($('rc-class')||{}).value || this.ctx.class || '';
+      const term = ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const ses = ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
+      if (!cls) { toast('Choose a class first (Class dropdown above or the outputs Class dropdown), then click Bulk Print again.', 'warning', 6000); return; }
       ReportEngine.init(window.sb);
       let names = [];
       try { names = await ReportEngine.listClassStudents({class:cls,term:term,session:ses}); }
@@ -1177,9 +1198,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     async broadsheet(){
       if (this._familyMode) { toast('Broadsheets are staff-only. Only administrators and teachers can view class broadsheets.', 'warning'); return; }
       if (!window.sb) { toast('Database not configured', 'warning'); return; }
-      const cls = this.ctx.class || ($('rc-class') || {}).value || '';
-      const term = this.ctx.term || ($('rc-term') || {}).value || '';
-      const ses = this.ctx.session || ($('rc-session') || {}).value || '';
+      const cls = ($('rc-out-class')||{}).value || ($('rc-class')||{}).value || this.ctx.class || '';
+      const term = ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const ses = ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
       if (!cls) { toast('Choose a class first.', 'warning'); return; }
       try {
         ReportEngine.init(window.sb);
@@ -1191,11 +1212,11 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     async scoresheet(){
       if (this._familyMode) { toast('Scoresheets are staff-only. Only teachers can record and view subject scoresheets.', 'warning'); return; }
       if (!window.sb) { toast('Database not configured', 'warning'); return; }
-      const cls = this.ctx.class || ($('rc-class') || {}).value || '';
+      const cls = ($('rc-out-class')||{}).value || ($('rc-class')||{}).value || this.ctx.class || '';
       const sub = this.ctx.subject || ($('rc-subject') || {}).value || '';
       if (!cls || !sub) { toast('Choose class and subject first.', 'warning'); return; }
-      const term=this.ctx.term||($('rc-term')||{}).value||'';
-      const ses=this.ctx.session||($('rc-session')||{}).value||'';
+      const term=($('rc-out-term')||{}).value||($('rc-term')||{}).value||this.ctx.term||'';
+      const ses=($('rc-out-session')||{}).value||($('rc-session')||{}).value||this.ctx.session||'';
       try {
         ReportEngine.init(window.sb);
         const html=await ReportEngine.renderSubject({class:cls,subject:sub,term:term,session:ses});
