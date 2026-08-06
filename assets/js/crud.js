@@ -786,14 +786,18 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     }
     const cols = d.listCols || d.cols;
     const writable = this.canWrite(moduleId) && (!d.readOnly || (window.App && App.isAdminRole && App.isAdminRole(currentRole)));
+    /* V7.6 #2: ADMIN BULK MODE — admin-tier users get row checkboxes + a bulk
+       bar (delete selected / select page) on high-volume admin modules like
+       Promotion. Works together with the search box and column filters. */
+    const bulkable = writable && this.BULK_MODULES.includes(key) && window.App && App.isAdminRole && App.isAdminRole(currentRole);
     const cellVal = (row, c) => c.key.indexOf('data.') === 0 ? ((row.data || {})[c.key.slice(5)]) : row[c.key];
-    const head = '<tr>' + cols.map(c => '<th>' + esc(c.label) + '</th>').join('') + (writable ? '<th>Actions</th>' : '') + '</tr>';
+    const head = '<tr>' + (bulkable ? '<th style="width:34px"><input type="checkbox" title="Select all visible" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',this.checked)"></th>' : '') + cols.map(c => '<th>' + esc(c.label) + '</th>').join('') + (writable ? '<th>Actions</th>' : '') + '</tr>';
     tableEl.querySelector('thead').innerHTML = head;
     const tb = tableEl.querySelector('tbody');
     if (error) {
       let cached = null; try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch(_) {}
       if(cached&&cached.html&&Date.now()-Number(cached.at||0)<60000){tb.innerHTML=cached.html+'<tr><td colspan="'+(cols.length+(writable?1:0))+'" style="color:#b45309;background:#fffbeb">Live refresh failed; showing a cache less than one minute old. It will not be reused after that to prevent deleted records reappearing. '+esc(error.message)+'</td></tr>';return;}
-      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0)) + '">' + esc(error.message) + '</td></tr>'; return;
+      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '">' + esc(error.message) + '</td></tr>'; return;
     }
 
     // Additional filtering for students and parents - get linked IDs/names and filter data
@@ -869,6 +873,17 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       } catch(e) { console.warn('Parent filter failed:', e); filteredData = []; }
     }
 
+    /* V7.6 #4: DEMO SHOWCASE FALLBACK — on demo deployments an empty table
+       (fresh database, seeds not run) renders built-in SAMPLE rows clearly
+       marked as such, so a prospective client NEVER meets a blank page.
+       Nothing is written to the database; privacy-scoped and learner-owned
+       modules never fake data; unauthenticated visitors get it too. */
+    let demoGhost = false;
+    if ((!filteredData || !filteredData.length) && window.SCHOOL && SCHOOL.demo && SCHOOL.demo.enabled &&
+        !privacyScoped.includes(key) && !strictStudentLikeModules.includes(key)) {
+      try { const ghost = this.demoShowcaseRows(moduleId, d); if (ghost.length) { filteredData = ghost; demoGhost = true; } } catch(_) {}
+    }
+
     // FIX V2.1 — Persistent table: never clear existing rows when filtered result is empty.
     // This resolves issue #1 where parent/student pages flashed data then disappeared.
     // Strategy: keep cached HTML or existing DOM, show informative banner above table.
@@ -914,12 +929,14 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         // Keep existing rows, do not clear
         return;
       }
-      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0)) + '" style="color:var(--gray-500);padding:20px;text-align:center" class="empty-msg">' + msg + '</td></tr>';
+      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '" style="color:var(--gray-500);padding:20px;text-align:center" class="empty-msg">' + msg + '</td></tr>';
       return;
     }
     
     const isLinkCol = (key) => /(_link|link|media_url|photo_url|video|image|thumbnail|read_link|drive)$/i.test(key) || /^(media_url|read_link|drive_link|photo_url)$/i.test(key);
-    const renderedRows = filteredData.map(row => '<tr>' + cols.map(c => {
+    const renderedRows = filteredData.map(row => '<tr data-id="' + esc(String(row.id == null ? '' : row.id)) + '">' +
+      (bulkable ? '<td>' + (row._ghost ? '' : '<input type="checkbox" class="sc-bulk-cb" value="' + esc(String(row.id)) + '" onclick="CRUD.bulkBarRefresh(\'' + moduleId + '\')">') + '</td>' : '') +
+      cols.map(c => {
       let v = cellVal(row, c);
       // ENTERPRISE FINAL V2 (#8): fee balance reflects in every record —
       // auto-compute for display when the stored value is missing.
@@ -933,7 +950,8 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         return '<td><a href="' + esc(String(v)) + '" target="_blank" rel="noopener">🔗 link</a></td>';
       }
       return '<td>' + esc(String(v == null ? '' : v)).slice(0, 80) + '</td>';
-    }).join('') + (!writable ? '' :
+    }).join('') + (!writable ? '' : (row._ghost ?
+      '<td><span class="badge" style="background:#fef9c3;color:#a16207" title="Built-in demo preview — load the real sample data from Admin Data to edit">🎬 sample</span></td>' :
       '<td style="white-space:nowrap">' +
         (moduleId === 'students' ? '<a class="btn btn-sm btn-primary" href="student-profile.html?student=' + row.id + '">Dashboard</a> ' : '') +
         (moduleId === 'staff' ? '<a class="btn btn-sm btn-primary" href="teacher-overview.html?staff=' + row.id + '">Teacher overview</a> ' : '') +
@@ -946,14 +964,199 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
           ? '<span class="badge" title="Entered by another teacher — only that teacher or an admin can change it">🔒 another teacher\'s record</span>'
           : '<button class="btn btn-sm btn-outline" onclick="CRUD.openForm(\'' + moduleId + '\',\'' + row.id + '\')">Edit</button> ' +
             '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'' + moduleId + '\',\'' + row.id + '\')">Delete</button>') +
-      '</td>') + '</tr>').join('');
+      '</td>')) + '</tr>').join('');
     tb.innerHTML = renderedRows;
-    try { sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), html: renderedRows })); } catch(_) {}
+    if (demoGhost) {
+      tb.innerHTML += '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '" style="background:#fefce8;color:#a16207;font-size:.82rem;font-weight:700">🎬 Built-in sample preview — this table is empty in the demo database. Sign in as the demo Admin and click “Load sample data” (Admin Data page) to make these rows real and editable.</td></tr>';
+    }
+    if (!demoGhost) try { sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), html: renderedRows })); } catch(_) {}
     // re-apply role visibility to the freshly-rendered action buttons
     if (window.App && App.applyVisibilityTokens) try { App.applyVisibilityTokens(App.currentRole || (window.SC_PROFILE && SC_PROFILE.role) || ''); } catch (e) {}
     // ENHANCEMENT (#2): inject a live instant-search box above every module
     // table so recipients can find any record instantly. Persists the query.
     CRUD.injectTableSearch(moduleId, tableEl, filteredData.length);
+    /* V7.6 #2: column FILTER dropdowns (class / action / status / term /
+       session / department…) built from the actual data — one-click slicing
+       on promotion and every other big admin table. */
+    try { CRUD.injectColumnFilters(moduleId, tableEl, cols, filteredData, bulkable ? 1 : 0); } catch(_) {}
+  },
+
+  /* V7.6 #4: built-in demo showcase rows. Pure client-side "ghost" records for
+     DEMO deployments only — rendered when a table is empty so prospects always
+     see a working page. Generated from the module's own column schema so every
+     module (present and future) gets believable rows without maintenance. */
+  demoShowcaseRows(moduleId, d) {
+    const key = this.canonicalId(moduleId);
+    const NAMES=['Adaeze Nwosu','Ibrahim Musa','Chidera Obi','Funmilayo Ajayi','Emeka Eze'];
+    const STAFF=['Funke Alabi','Ikechukwu Eze','Halima Bello'];
+    const CLASSES=['JSS 1','JSS 2','JSS 3','SS 1','SS 2','SS 3'];
+    const SUBJECTS=['Mathematics','English Language','Basic Science','Civic Education','Biology'];
+    const TITLES={
+      payroll:['June salary run','July salary run','August salary run'],
+      hr:['June salary run','July salary run','August salary run'],
+      inventory:['HP ProBook laptop','Epson projector','Science microscope'],
+      library:['Things Fall Apart','New General Mathematics','Essential Biology'],
+      assignments:['Essay: My Role Model','Equations Worksheet','States of Matter Poster'],
+      behaviour:['Star Leader award','Helping Hand award','Perfect punctuality'],
+      support_plans:['Reading fluency plan','Numeracy confidence plan','Speech support plan'],
+      helpdesk:['Projector not displaying','Leaking tap in junior block','Faulty lab socket'],
+      admission_links:['2026/2027 JSS 1 Entrance','SS 1 Transfer Window','Nursery Intake'],
+      default:['Sample record one','Sample record two','Sample record three']
+    };
+    const titles=TITLES[key]||TITLES.default;
+    const today=(n)=>new Date(Date.now()+ (n||0)*86400000).toISOString().slice(0,10);
+    const cols=(d&&(d.listCols||d.cols))||[];
+    const rows=[];
+    for(let i=0;i<3;i++){
+      const row={id:'ghost-'+key+'-'+i,_ghost:true,created_at:new Date().toISOString(),data:{}};
+      cols.forEach(c=>{
+        const k=String(c.key||''); const kk=k.split('.').pop(); let v;
+        if(/^(title|item_name|subject_line)$/.test(kk)||kk==='name') v=titles[i%titles.length];
+        else if(/student|full_name/.test(kk)&&!/id$/.test(kk)) v=NAMES[i%NAMES.length];
+        else if(/staff|teacher|awarded_by|recorded_by|counsellor/.test(kk)&&!/id$/.test(kk)) v=STAFF[i%STAFF.length];
+        else if(kk==='to_class') v=CLASSES[Math.min((i*2)+1,CLASSES.length-1)];
+        else if(kk==='class'||/class$/.test(kk)) v=CLASSES[(i*2)%CLASSES.length];
+        else if(/subject/.test(kk)) v=SUBJECTS[i%SUBJECTS.length];
+        else if(/average|percent|score|points/.test(kk)) v=[78,64,85][i%3];
+        else if(/quantity|copies|months|year_count/.test(kk)) v=[12,25,8][i%3];
+        else if(c.type==='number'||/amount|price|fee|salary|basic|net_pay|principal/.test(kk)) v=[25000,150000,80000][i%3];
+        else if(c.type==='date'||/date$/.test(kk)) v=today(i*3-3);
+        else if(c.type==='select'&&Array.isArray(c.options)&&c.options.length) v=c.options[i%c.options.length];
+        else if(c.type==='checkbox') v=i===0;
+        else if(/description|body|reason|notes|goal|intervention/.test(kk)) v='Illustrative demo text so the page never looks empty — load the real sample pack from Admin Data.';
+        else if(/term$/.test(kk)) v='Third Term';
+        else if(/session$/.test(kk)) v='2025/2026';
+        else if(/status/.test(kk)) v=['active','open','approved'][i%3];
+        else v='';
+        if(k.indexOf('data.')===0) row.data[kk]=v; else row[k]=v;
+      });
+      rows.push(row);
+    }
+    return rows;
+  },
+
+  /* V7.6 #2: column filter dropdowns. For every low-cardinality column
+     (class, action, status, term, session, department, category, method…)
+     a dropdown appears beside the search box; picking values slices the
+     table instantly (client-side, combinable with the search text). */
+  FILTER_KEYS: ['class','from_class','to_class','action','status','term','session','department','category','method','audience','priority','role','staff_type','month','year','subject','need_type','loan_type'],
+  injectColumnFilters(moduleId, tableEl, cols, rows, cbOffset) {
+    if (!tableEl || !rows || rows.length < 2) return;
+    const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+    if (!wrap) return;
+    let host = wrap.querySelector('.sc-col-filters');
+    if (host) host.remove();                    // rebuild on every render (fresh data)
+    const cellVal = (row, c) => c.key.indexOf('data.') === 0 ? ((row.data || {})[c.key.slice(5)]) : row[c.key];
+    const defs = [];
+    const numDefs = [];
+    cols.forEach((c, idx) => {
+      const kk = String(c.key || '').split('.').pop();
+      if (this.NUMERIC_FILTER_KEYS.includes(kk)) { numDefs.push({ idx: idx + (cbOffset || 0), label: c.label || kk }); return; }
+      if (!this.FILTER_KEYS.includes(kk)) return;
+      const vals = [...new Set(rows.map(r => { const v = cellVal(r, c); return v == null ? '' : String(v); }).filter(v => v !== ''))];
+      if (vals.length >= 2 && vals.length <= 30) defs.push({ idx: idx + (cbOffset || 0), label: c.label || kk, vals: vals.sort() });
+    });
+    if (!defs.length && !numDefs.length) return;
+    host = document.createElement('div');
+    host.className = 'sc-col-filters';
+    host.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px';
+    host.innerHTML = '<span style="font-size:.8rem;color:var(--gray-500,#64748b);font-weight:700">Filter:</span>' + defs.map(d =>
+      '<select class="form-select sc-col-filter" data-col="' + d.idx + '" style="max-width:170px;padding:7px 10px;font-size:.85rem">' +
+      '<option value="">' + esc(d.label) + ': all</option>' + d.vals.map(v => '<option value="' + esc(v.toLowerCase()) + '">' + esc(v) + '</option>').join('') + '</select>').join('') +
+      numDefs.map(d =>
+        '<span style="display:inline-flex;gap:4px;align-items:center;font-size:.8rem;color:var(--gray-600,#475569)">' + esc(d.label) +
+        ' <select class="form-select sc-num-op" data-col="' + d.idx + '" style="width:64px;padding:7px 6px;font-size:.85rem"><option value="">—</option><option value="gte">≥</option><option value="lte">≤</option></select>' +
+        ' <input class="form-input sc-num-val" data-col="' + d.idx + '" type="number" placeholder="mark" style="width:84px;padding:7px 8px;font-size:.85rem"></span>').join('') +
+      '<button class="btn btn-sm btn-outline sc-col-filter-reset" style="padding:7px 12px">✕ Reset</button>';
+    const searchBox = wrap.querySelector('.sc-table-search');
+    wrap.insertBefore(host, searchBox ? searchBox.nextSibling : (wrap.querySelector('table') || tableEl));
+    const apply = () => {
+      const active = [...host.querySelectorAll('.sc-col-filter')].map(s => ({ col: Number(s.dataset.col), v: s.value })).filter(f => f.v);
+      const nums = [...host.querySelectorAll('.sc-num-op')].map(s => {
+        const val = host.querySelector('.sc-num-val[data-col="' + s.dataset.col + '"]');
+        return { col: Number(s.dataset.col), op: s.value, n: val && val.value !== '' ? Number(val.value) : null };
+      }).filter(f => f.op && f.n != null && !isNaN(f.n));
+      let shown = 0;
+      tableEl.querySelectorAll('tbody tr').forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length < 2) return;                      // banner/info rows
+        let hit = active.every(f => tds[f.col] && tds[f.col].textContent.trim().toLowerCase() === f.v);
+        if (hit && nums.length) hit = nums.every(f => {
+          const raw = tds[f.col] ? parseFloat(String(tds[f.col].textContent).replace(/[^0-9.\-]/g, '')) : NaN;
+          if (isNaN(raw)) return false;
+          return f.op === 'gte' ? raw >= f.n : raw <= f.n;
+        });
+        tr.dataset.scFiltered = hit ? '' : '1';
+        tr.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      });
+      const count = wrap.querySelector('.sc-table-count');
+      if (count && (active.length || nums.length)) count.textContent = shown + ' match filters';
+    };
+    host.querySelectorAll('.sc-col-filter').forEach(s => s.addEventListener('change', apply));
+    host.querySelectorAll('.sc-num-op').forEach(s => s.addEventListener('change', apply));
+    host.querySelectorAll('.sc-num-val').forEach(s => s.addEventListener('input', apply));
+    host.querySelector('.sc-col-filter-reset').addEventListener('click', () => {
+      host.querySelectorAll('.sc-col-filter').forEach(s => s.value = '');
+      host.querySelectorAll('.sc-num-op').forEach(s => s.value = '');
+      host.querySelectorAll('.sc-num-val').forEach(s => s.value = '');
+      apply();
+    });
+  },
+  NUMERIC_FILTER_KEYS: ['average','score','percent','total_score','points','amount','net_pay'],
+
+  /* V7.6 #2: modules where admins routinely need multi-row housekeeping.
+     Promotion drafts especially: an auto-promote run creates one row per
+     student, so clearing a bad run row-by-row was unusable. */
+  BULK_MODULES: ['promotion','results','attendance','activity_log','admissions','alumni','behaviour','inventory','library','announcements','events','birthdays','visitors','exam_registrations','helpdesk','complaints'],
+  bulkToggleAll(moduleId, checked) {
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    if (!tableEl) return;
+    tableEl.querySelectorAll('tbody .sc-bulk-cb').forEach(cb => { const tr = cb.closest('tr'); if (!tr || tr.style.display !== 'none') cb.checked = checked; });
+    this.bulkBarRefresh(moduleId);
+  },
+  bulkSelected(moduleId) {
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    if (!tableEl) return [];
+    return [...tableEl.querySelectorAll('tbody .sc-bulk-cb:checked')].map(cb => cb.value).filter(Boolean);
+  },
+  bulkBarRefresh(moduleId) {
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    if (!tableEl) return;
+    const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+    const n = this.bulkSelected(moduleId).length;
+    let bar = wrap.querySelector('.sc-bulk-bar');
+    if (!n) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'sc-bulk-bar';
+      bar.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;margin-bottom:12px';
+      bar.innerHTML = '<b class="sc-bulk-count" style="color:#b91c1c"></b>' +
+        '<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#b91c1c" onclick="CRUD.bulkDelete(\'' + moduleId + '\')">🗑 Delete selected</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',false)">Clear selection</button>';
+      wrap.insertBefore(bar, wrap.firstChild);
+    }
+    bar.querySelector('.sc-bulk-count').textContent = n + ' selected';
+  },
+  async bulkDelete(moduleId) {
+    const d = this.def(moduleId); if (!d || !this.sb) return;
+    const role = String((window.SC_PROFILE || {}).role || '').toLowerCase();
+    if (!(window.App && App.isAdminRole && App.isAdminRole(role))) { toast('Bulk delete is admin-only.', 'warning'); return; }
+    const ids = this.bulkSelected(moduleId);
+    if (!ids.length) { toast('Tick at least one row first.', 'info'); return; }
+    if (!confirm('Delete ' + ids.length + ' selected record(s) permanently? This cannot be undone.')) return;
+    let removed = 0, failed = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const slice = ids.slice(i, i + 100);
+      let q = this.sb.from(d.table).delete().in('id', slice);
+      if (d.generic) q = q.eq('module', d.module);
+      const { error } = await q;
+      if (error) { failed += slice.length; console.warn('[bulkDelete]', error.message); } else removed += slice.length;
+    }
+    toast(removed + ' record(s) deleted' + (failed ? ' · ' + failed + ' failed (RLS/permissions)' : '') + '.', failed ? 'warning' : 'success', 7000);
+    const wrap = (document.getElementById(moduleId + '-table') || {}).closest ? (document.getElementById(moduleId + '-table').closest('.table-wrap')) : null;
+    if (wrap) { const bar = wrap.querySelector('.sc-bulk-bar'); if (bar) bar.remove(); }
+    await this.renderList(moduleId);
   },
 
   /** Instant per-table search — enhances EVERY CRUD module page at once. */

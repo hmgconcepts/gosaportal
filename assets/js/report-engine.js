@@ -157,18 +157,29 @@ const ReportEngine = {
     // a second time alongside the pushed/scaled score.
     const familyFilter = (r) => this.allowRowForScope(r, scope);
 
-    let sq = db.from('students').select('*').limit(5000);
-    if (klass) sq = sq.eq('class', klass);
-    const { data: students } = await sq;
+    let sq = db.from('students').select('*').limit(8000);
+    /* V7.6 #1 ROOT-CAUSE FIX (history access): load the WHOLE register, not
+       just the current class roster. The roster gate below exists to hide
+       DELETED students — but matching against a class-filtered list also
+       killed every score row of students who had since been PROMOTED,
+       moved class or GRADUATED, making previous-term records impossible to
+       regenerate in the new term. Gate now checks the full register (any
+       class, any status), so promotion/graduation never hides history;
+       only genuinely deleted students stay excluded. */
+    const { data: allStudents } = await sq;
+    const students = klass
+      ? (allStudents || []).filter(s => String(s.class || '').trim().toLowerCase() === klass.toLowerCase())
+      : (allStudents || []);
 
     /* V7.2 #2: LIVE ROSTER GATE — any score row whose student no longer exists
        in the register is dropped at render time, so deleted students can never
        appear on report cards/broadsheets even on databases that predate the
-       cleanup triggers. Matching is admission-number-first, then exact name. */
+       cleanup triggers. Matching is admission-number-first, then exact name.
+       V7.6: matches the FULL register (see above) so history survives promotions. */
     const _liveRosterGate=(list)=>{
-      const byId=new Set((students||[]).map(x=>String(x.id)));
-      const byAdm=new Set((students||[]).map(x=>String(x.admission_no||'').toLowerCase()).filter(Boolean));
-      const byName=new Set((students||[]).map(x=>String(x.full_name||'').toLowerCase()).filter(Boolean));
+      const byId=new Set((allStudents||[]).map(x=>String(x.id)));
+      const byAdm=new Set((allStudents||[]).map(x=>String(x.admission_no||'').toLowerCase()).filter(Boolean));
+      const byName=new Set((allStudents||[]).map(x=>String(x.full_name||'').toLowerCase()).filter(Boolean));
       return (list||[]).filter(r=>{
         if(r.student_id&&byId.has(String(r.student_id)))return true;
         const ref=String(r.student_id_ref||'').toLowerCase();
@@ -178,9 +189,9 @@ const ReportEngine = {
       });
     };
     const baseRows = (scope.family ? (rows || []).filter(r => familyFilter(r)) : (rows || []));
-    let legacyNormalized=_liveRosterGate(baseRows).map(r=>this.normalizeResult(r,students||[])).filter(r=>!studentText||String(r.student_name||'').toLowerCase().includes(studentText.toLowerCase()));
-    const assessmentPack=await this.loadAssessmentRows({class:klass,subject,term,session,student:studentText},students||[],scope);
-    const assessmentNormalized=_liveRosterGate(assessmentPack.rows||[]).map(r=>this.normalizeResult(r,students||[]));
+    let legacyNormalized=_liveRosterGate(baseRows).map(r=>this.normalizeResult(r,allStudents||[])).filter(r=>!studentText||String(r.student_name||'').toLowerCase().includes(studentText.toLowerCase()));
+    const assessmentPack=await this.loadAssessmentRows({class:klass,subject,term,session,student:studentText},allStudents||[],scope);
+    const assessmentNormalized=_liveRosterGate(assessmentPack.rows||[]).map(r=>this.normalizeResult(r,allStudents||[]));
     // Once assessment columns exist for this report context, report_scores is the
     // only official source. Legacy results is a fallback solely for old contexts
     // that have never been configured in Report Cards.
