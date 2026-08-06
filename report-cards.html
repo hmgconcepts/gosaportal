@@ -1195,6 +1195,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
    the pickers and auto-generate that student's report card for the current term. */
 document.addEventListener('DOMContentLoaded',function(){try{
   var q=new URLSearchParams(location.search), stu=q.get('student'), cls=q.get('class');
+  /* V7.5 #1: no ?student= in the URL? Fall back to the student the admin just
+     viewed on Student Profile (remembered for 30 minutes) — the sidebar route
+     to Report Cards also lands with that student pre-picked (no auto-print). */
+  if(!stu){try{var last=window.CRUD&&CRUD.lastStudent&&CRUD.lastStudent(30);if(last){stu=last.adm||last.name||'';cls=cls||last.cls||'';}}catch(_){}}
   if(!stu)return;
   var tries=0;var t=setInterval(function(){tries++;
     var inp=document.getElementById('rc-student');

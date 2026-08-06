@@ -545,7 +545,7 @@ const SP={fees:[],student:null,
     try{ var r2=await sb.from('results').select('*').eq('student_name',name).limit(500); results=r2.data||[]; }catch(e){}
     try{ var r3=await sb.from('attendance').select('status').eq('student_name',name).limit(2000); var rows=r3.data||[]; att.total=rows.length; att.present=rows.filter(x=>x.status==='present').length; }catch(e){}
     try{ var r4=await sb.from('behaviour_points').select('*').eq('student_name',name).limit(200); awards=r4.data||[]; }catch(e){}
-    this.fees=fees; this.student=s; var totalPaid=fees.reduce((a,b)=>a+(Number(b.amount_paid)||0),0);
+    this.fees=fees; this.student=s; try{if(window.CRUD&&CRUD.rememberStudent)CRUD.rememberStudent(s);}catch(_){} var totalPaid=fees.reduce((a,b)=>a+(Number(b.amount_paid)||0),0);
     var cur=this.cur();
     var photo=window.Super?Super.media.thumb(s.photo_url||'',{w:90,h:90}):'';
     box.innerHTML=
