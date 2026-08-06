@@ -739,6 +739,25 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         const { data: studs } = await window.sb.from('students').select('id,full_name,admission_no,class').eq('class', this.ctx.class).order('full_name');
         this.students = studs || [];
       } catch (e) { this.students = []; console.warn('RC students load failed', e); }
+      /* V7.6 #1: HISTORY MERGE — when regenerating a PREVIOUS term, students who
+         have since been promoted/graduated out of this class no longer appear on
+         the live roster, which made their old scores unreachable. Merge everyone
+         who actually HAS saved scores for this class+term+session back into the
+         grid (marked “moved on”), so past records always regenerate in full. */
+      try {
+        if (this.cols.length) {
+          const ids=this.cols.map(c=>c.id);
+          const r=await window.sb.from('report_scores').select('student_id,student_id_ref,student_name').in('column_id',ids).eq('class',this.ctx.class).eq('term',this.ctx.term).eq('session',this.ctx.session).limit(5000);
+          const have=new Set(this.students.map(s=>String(s.admission_no||s.full_name).toLowerCase()));
+          const seen=new Set();
+          (r.data||[]).forEach(x=>{
+            const key=String(x.student_id_ref||x.student_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key);
+            const nameKey=String(x.student_name||'').toLowerCase();
+            if(have.has(key)||have.has(nameKey))return;
+            this.students.push({id:x.student_id||null,full_name:x.student_name||key,admission_no:x.student_id_ref||'',class:this.ctx.class,_history:true});
+          });
+        }
+      } catch(e){ console.warn('RC history merge skipped', e); }
       this.renderCols();
       this.fillStudentPicker();
       // V6.8: watch for role CHANGES (not just first resolution) for ~30s.
@@ -858,7 +877,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         }).join('');
         const pct = totalMax ? ((tot / totalMax) * 100).toFixed(1) : 0;
         const g = RC.grade(pct);
-        html += '<tr><td>' + esc(st.full_name) + '</td>' + cells + '<td><strong>' + tot.toFixed(1) + '</strong></td><td>' + pct + '%</td><td>' + g + '</td></tr>';
+        html += '<tr><td>' + esc(st.full_name) + (st._history ? ' <span class="badge" style="background:#e0e7ff;color:#3730a3" title="No longer in this class (promoted/graduated) — shown because saved scores exist for this term">🎓 moved on</span>' : '') + '</td>' + cells + '<td><strong>' + tot.toFixed(1) + '</strong></td><td>' + pct + '%</td><td>' + g + '</td></tr>';
       });
       html += '</tbody></table></div>';
       if (canWrite) {
