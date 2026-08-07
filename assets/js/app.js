@@ -1251,9 +1251,9 @@ const App = {
       } catch (_) { return []; }
     };
     try {
-      const [studentCount, staffCount, feeRows, announcements, openPolls, events, broadcasts, surveys, lostFound, ptaMeetings, meals, attendanceCount, cbtCount, resultCount, parentCount, complaintCount, hostelRows] = await Promise.all([
+      const [studentCount, staffCount, feeRows, announcements, openPolls, events, broadcasts, surveys, lostFound, ptaMeetings, meals, attendanceCount, cbtCount, resultCount, parentCount, complaintCount, hostelRows, announcementCount] = await Promise.all([
         safeCount('students'), safeCount('staff'),
-        safeRows('fee_payments', 'amount_paid', 500),
+        safeRows('fee_payments', 'amount_paid,balance,fee_total', 500),
         safeRows('announcements', '*', 5),
         safeRows('polls', '*', 5).then(x=>(x||[]).filter(p=>String(p.status||'open')==='open')),
         safeRows('events', '*', 5),
@@ -1264,13 +1264,20 @@ const App = {
         safeRows('module_records', '*', 5).then(x=>(x||[]).filter(r=>r.module==='cafeteria' || r.module==='menu')),
         safeCount('attendance'), safeCount('cbt_exams'), safeCount('results'),
         safeCount('parent_child'), safeCount('complaints'),
-        safeRows('hostel_allocations', '*', 4)
+        safeRows('hostel_allocations', '*', 4),
+        safeCount('announcements')
       ]);
       const feesPaid = (feeRows || []).reduce((a,b) => a + (Number(b.amount_paid) || 0), 0);
       set('stat-students', studentCount);
       set('stat-staff', staffCount);
       set('stat-fees', feesPaid.toLocaleString());
-      set('stat-announcements', announcements.length);
+      /* V7.8: the Notices tile showed the length of a 5-row PREVIEW list (max
+         "5" forever). Real total count now. */
+      set('stat-announcements', announcementCount);
+      /* V7.8 educator ask: money OWED at a glance, not just money received.
+         Sum of stored/derived balances across fee payments (current data). */
+      const feesOwed = (feeRows || []).reduce((a, b) => a + (b.balance != null ? (Number(b.balance) || 0) : Math.max(0, (Number(b.fee_total) || 0) - (Number(b.amount_paid) || 0))), 0);
+      set('stat-outstanding', feesOwed.toLocaleString());
       set('ov-staff-count', staffCount);
       set('ov-attendance', attendanceCount);
       set('ov-cbt-open', cbtCount);
@@ -1278,6 +1285,74 @@ const App = {
       set('ov-parent-fees', feeRows.length);
       set('ov-parents', parentCount);
       set('ov-complaints', complaintCount);
+      /* V7.8 #2 FIX: eight overview tiles (Payroll Rows, Inventory Items,
+         Applications, Messages, Assignments, Behaviour Rows, Support Plans,
+         Library Items) were declared in dashboard.html but NEVER populated —
+         they sat on "—" forever even with data present. Loaded in a second
+         non-blocking wave so the primary tiles stay as fast as before. */
+      (async () => {
+        const safeCountGeneric = async (module) => {
+          if (!supabase) return 0;
+          try { const r = await supabase.from('module_records').select('id', { count: 'exact', head: true }).eq('module', module);
+            return r && !r.error ? (r.count || 0) : 0; } catch (_) { return 0; }
+        };
+        try {
+          const [payrollCount, inventoryCount, admissionsCount, linkCount, msgCount, msgGeneric, assignmentCount, behaviourCount, supportCount, libraryCount] = await Promise.all([
+            safeCount('payroll'), safeCount('inventory'), safeCount('admissions'), safeCount('admission_links'),
+            safeCount('messages'), safeCountGeneric('messages'),
+            safeCount('assignments'), safeCount('behaviour_points'), safeCount('support_plans'), safeCount('library')
+          ]);
+          set('ov-payroll', payrollCount);
+          set('ov-inventory', inventoryCount);
+          set('ov-applications', admissionsCount + linkCount);
+          set('ov-messages', Math.max(msgCount, msgGeneric));
+          set('ov-assignments', assignmentCount);
+          set('ov-behaviour', behaviourCount);
+          set('ov-support', supportCount);
+          set('ov-library', libraryCount);
+          /* Staff-portal tiles (visible to teachers AND to admins in Oversight
+             Mode) were also never populated — same "—" bug. */
+          const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
+          const myName = String((window.SC_PROFILE || {}).full_name || '').toLowerCase();
+          const [classRows, openCbt, attToday] = await Promise.all([
+            supabase ? supabase.from('classes').select('name,class_teacher').limit(300).then(r => r.data || [], () => []) : [],
+            supabase ? supabase.from('cbt_exams').select('id', { count: 'exact', head: true }).eq('is_open', true).then(r => (r.error ? 0 : (r.count || 0)), () => 0) : 0,
+            supabase ? supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('date', today).then(r => r.count || 0, () => 0) : 0
+          ]);
+          const mine = App.isAdminRole(App.currentRole)
+            ? classRows.length
+            : classRows.filter(c => myName && String(c.class_teacher || '').toLowerCase() === myName).length;
+          set('stat-my-classes', mine);
+          set('stat-open-cbt', openCbt);
+          set('stat-attendance-today', attToday);
+          /* V7.8 #3 EDUCATOR DIGEST: "Action needed today" strip — pending
+             account approvals, unresolved complaints, pending leave requests,
+             open helpdesk tickets, today's birthdays and unapplied promotion
+             drafts, each a one-click jump. Admin-tier only; hidden when all
+             clear. Every count fails soft on older databases. */
+          if (App.isAdminRole(App.currentRole)) {
+            const cnt = async (table, build) => { try { let q = supabase.from(table).select('id', { count: 'exact', head: true }); q = build(q); const r = await q; return r.error ? 0 : (r.count || 0); } catch (_) { return 0; } };
+            const mmdd = new Date().toISOString().slice(5, 10);
+            const [pendAcc, openComp, pendLeave, openTickets, promoDrafts, bdayRows] = await Promise.all([
+              cnt('profiles', q => q.eq('status', 'pending')),
+              cnt('complaints', q => q.in('status', ['open', 'in_progress', 'new'])),
+              cnt('leave_requests', q => q.eq('status', 'pending')),
+              cnt('helpdesk_tickets', q => q.in('status', ['open', 'in_progress'])),
+              cnt('promotions', q => q.in('status', ['draft', 'approved'])),
+              supabase ? supabase.from('birthdays').select('date_of_birth').limit(500).then(r => (r.data || []).filter(b => String(b.date_of_birth || '').slice(5, 10) === mmdd).length, () => 0) : 0
+            ]);
+            const items = [];
+            if (pendAcc) items.push('<a class="btn btn-sm btn-outline" href="approvals.html" style="border-color:#f59e0b">👤 ' + pendAcc + ' account approval' + (pendAcc > 1 ? 's' : '') + ' waiting</a>');
+            if (openComp) items.push('<a class="btn btn-sm btn-outline" href="complaints.html" style="border-color:#f59e0b">📣 ' + openComp + ' open complaint' + (openComp > 1 ? 's' : '') + '</a>');
+            if (pendLeave) items.push('<a class="btn btn-sm btn-outline" href="leave.html" style="border-color:#f59e0b">🗓 ' + pendLeave + ' leave request' + (pendLeave > 1 ? 's' : '') + ' pending</a>');
+            if (openTickets) items.push('<a class="btn btn-sm btn-outline" href="helpdesk.html" style="border-color:#f59e0b">🛠 ' + openTickets + ' helpdesk ticket' + (openTickets > 1 ? 's' : '') + ' open</a>');
+            if (promoDrafts) items.push('<a class="btn btn-sm btn-outline" href="promotion.html" style="border-color:#f59e0b">🎓 ' + promoDrafts + ' promotion draft' + (promoDrafts > 1 ? 's' : '') + ' not applied</a>');
+            if (bdayRows) items.push('<a class="btn btn-sm btn-outline" href="birthdays.html" style="border-color:#f59e0b">🎂 ' + bdayRows + ' birthday' + (bdayRows > 1 ? 's' : '') + ' today</a>');
+            const box = document.getElementById('dash-actions'), body = document.getElementById('dash-actions-body');
+            if (box && body && items.length) { body.innerHTML = items.join(''); box.style.display = 'block'; }
+          }
+        } catch (e) { console.warn('[dashboard] overview tile counts failed:', e); }
+      })();
 
       const annHTML = announcements.length
         ? announcements.map(a => '<div style="padding:10px 0;border-bottom:1px solid var(--gray-200)"><a href="announcements.html"><strong>'+esc(a.title)+'</strong></a><div style="font-size:0.82rem;color:var(--gray-500)">'+(a.created_at ? fmtDMYT(a.created_at) : '')+'</div><div style="font-size:.86rem;color:var(--gray-600)">'+esc(a.body||'').slice(0,120)+'</div></div>').join('')
