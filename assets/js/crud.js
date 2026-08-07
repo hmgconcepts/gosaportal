@@ -880,7 +880,12 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
        Nothing is written to the database; privacy-scoped and learner-owned
        modules never fake data; unauthenticated visitors get it too. */
     let demoGhost = false;
+    /* V7.9 #2: ghost sample rows are for ADMIN/STAFF/visitor showcase only.
+       A signed-in STUDENT/PARENT must never see fabricated rows on class-scoped
+       modules — random ghost classes looked exactly like "students can see
+       other classes' assignments". Role-scoped emptiness is the truthful UI. */
     if ((!filteredData || !filteredData.length) && window.SCHOOL && SCHOOL.demo && SCHOOL.demo.enabled &&
+        !isStudent && !isParent &&
         !privacyScoped.includes(key) && !strictStudentLikeModules.includes(key)) {
       try { const ghost = this.demoShowcaseRows(moduleId, d); if (ghost.length) { filteredData = ghost; demoGhost = true; } } catch(_) {}
     }
