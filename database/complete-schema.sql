@@ -1664,11 +1664,20 @@ begin
              where lower(trim(coalesce(t.teacher,'')))=lower(trim(req.teacher))
                and t.day=dd.day and t.period=p.per::text
                and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')))
-   order by (select count(*) from public.timetable t where t.class=p_class and t.day=dd.day and t.subject=req.subject
+   order by
+            -- V8.0 (a): spread a subject across DIFFERENT days first
+            (select count(*) from public.timetable t where t.class=p_class and t.day=dd.day and t.subject=req.subject
               and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')),
+            -- V8.0 (b): NEVER repeat the same period number for this subject on
+            -- other days when an alternative exists (no more "Maths always 1st")
+            (select count(*) from public.timetable t where t.class=p_class and t.period=p.per::text and t.subject=req.subject
+              and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')),
+            -- V8.0 (c): balance the load across days
             (select count(*) from public.timetable t where t.class=p_class and t.day=dd.day
               and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')),
-            dd.dord, p.per
+            -- V8.0 (d): RANDOMISE among equally-good slots — every regenerate
+            -- produces a fresh arrangement
+            random()
    limit 1;
    if chosen_day is null then
      unplaced:=unplaced+1;

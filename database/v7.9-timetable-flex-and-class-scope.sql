@@ -114,11 +114,14 @@ begin
              where lower(trim(coalesce(t.teacher,'')))=lower(trim(req.teacher))
                and t.day=dd.day and t.period=p.per::text
                and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')))
-   order by (select count(*) from public.timetable t where t.class=p_class and t.day=dd.day and t.subject=req.subject
+   order by
+            (select count(*) from public.timetable t where t.class=p_class and t.day=dd.day and t.subject=req.subject
+              and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')),
+            (select count(*) from public.timetable t where t.class=p_class and t.period=p.per::text and t.subject=req.subject
               and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')),
             (select count(*) from public.timetable t where t.class=p_class and t.day=dd.day
               and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')),
-            dd.dord, p.per
+            random()
    limit 1;
    if chosen_day is null then
      unplaced:=unplaced+1;
