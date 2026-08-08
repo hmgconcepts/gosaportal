@@ -246,3 +246,104 @@ With Layers 1 + 4 alone the project stays alive automatically; Layers 2, 3 and 6
 
 ---
 Maintained by HMG Concepts — School Connect Generator
+
+
+---
+
+## NEW LAYERS (V8.3) — three more independent free schedulers
+
+Research check (2026): the pause rule is unchanged — **any REST/Edge request
+resets the 7-day timer; one ping a week is technically enough, two or more
+independent pingers is the professional standard** (a single scheduler that
+fails silently = paused project). And a caution worth repeating: **pg_cron
+alone can never be your safety net** — it runs INSIDE the database, so once a
+project pauses, pg_cron is paused with it. External pingers are the real
+protection; pg_cron is only a bonus while the project is awake.
+
+### Layer 7 — Vercel Cron (the same account that hosts your site — ~3 minutes)
+Your site already lives on Vercel; Vercel's free Hobby plan includes cron jobs
+(daily granularity — exactly right for a weekly-scale problem).
+
+1. In the site repository create the file **`api/keepalive.js`**:
+   ```js
+   export default async function handler(req, res) {
+     const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_ANON_KEY;
+     if (!url || !key) return res.status(500).json({ ok:false, error:'env missing' });
+     const r = await fetch(url + '/rest/v1/rpc/sc_keep_alive', {
+       method: 'POST', headers: { apikey:key, Authorization:'Bearer '+key, 'Content-Type':'application/json' },
+       body: JSON.stringify({ src:'vercel-cron' })
+     });
+     return res.status(200).json({ ok:r.ok, status:r.status, at:new Date().toISOString() });
+   }
+   ```
+2. Create **`vercel.json`** in the repo root (or merge into the existing one):
+   ```json
+   { "crons": [ { "path": "/api/keepalive", "schedule": "0 5 * * *" } ] }
+   ```
+3. Vercel Dashboard → your project → **Settings → Environment Variables** →
+   add `SUPABASE_URL` and `SUPABASE_ANON_KEY` (same values as `assets/js/config.js`).
+4. Push. Verify under **Project → Cron Jobs** after the next deploy: the job
+   should show a daily successful run. *(Free plan quirk: Vercel may run the
+   job at any time within the scheduled hour — irrelevant here.)*
+
+### Layer 8 — Google Apps Script (runs on Google's servers, needs only the school's Gmail)
+Completely independent of GitHub/Vercel/UptimeRobot — great third leg.
+
+1. Open **script.google.com** (signed in as the school's Google account) →
+   **New project**.
+2. Replace the editor contents with:
+   ```js
+   function keepAlive() {
+     const url = 'https://YOUR-PROJECT.supabase.co/rest/v1/rpc/sc_keep_alive';
+     const key = 'YOUR_ANON_KEY';
+     const res = UrlFetchApp.fetch(url, {
+       method: 'post', contentType: 'application/json',
+       headers: { apikey:key, Authorization:'Bearer '+key },
+       payload: JSON.stringify({ src:'apps-script' }),
+       muteHttpExceptions: true
+     });
+     Logger.log(res.getResponseCode() + ' ' + res.getContentText());
+   }
+   ```
+   (Replace the URL and anon key with the values from `assets/js/config.js`.)
+3. Click **Run** once → approve the permission dialog → check the log shows `200`.
+4. Left sidebar → **Triggers (alarm-clock icon) → + Add Trigger** →
+   function `keepAlive` · event source **Time-driven** · type **Day timer** ·
+   pick any hour window → **Save**.
+5. Done — Google now pings your database daily, forever, free. Apps Script
+   emails the school automatically if the trigger ever starts failing.
+
+### Layer 9 — a second GitHub repository (guards the 60-day Actions freeze)
+GitHub disables *scheduled* workflows in repos with no pushes for 60 days.
+Two cheap counters:
+- **Fork the site repo** to a second GitHub account (a colleague's, or the
+  school's own) and enable the same `keep-supabase-alive.yml` workflow there
+  with the same two secrets. Two accounts → two independent 60-day clocks.
+- OR make the workflow **self-committing** so the clock resets itself: add
+  these lines at the end of the workflow's `steps:` (after the ping step):
+  ```yaml
+      - uses: actions/checkout@v4
+      - name: Self-commit to reset the 60-day scheduler clock
+        run: |
+          git config user.name keepalive-bot && git config user.email bot@school
+          date > .github/last-keepalive.txt
+          git add .github/last-keepalive.txt && git commit -m "keepalive heartbeat" && git push
+  ```
+
+### The complete matrix (9 layers — tick what you have)
+| # | Layer | Runs on | Frequency | Setup time |
+|---|---|---|---|---|
+| 1 | Site-visit heartbeat | every visitor's browser | every visit | 0 |
+| 2 | GitHub Actions | GitHub | every 2 days | 5 min |
+| 3 | Edge Function + UptimeRobot | UptimeRobot | every 5 min | 10 min |
+| 4 | pg_cron `sc-keep-alive` | inside the DB | every 2 days | 0 (bonus only — pauses with the project) |
+| 5 | 💓 Manual button | Platform Health page | on demand | 0 |
+| 6 | cron-job.org | cron-job.org | daily | 5 min |
+| 7 | **Vercel Cron** | Vercel | daily | 3 min |
+| 8 | **Google Apps Script** | Google | daily | 5 min |
+| 9 | **Second repo / self-commit** | GitHub | scheduled | 5 min |
+
+**Recommended minimum:** Layers 1+2+3 (already the default advice) **plus one
+of 7/8** so that three unrelated companies (GitHub, UptimeRobot, Vercel or
+Google) are each independently resetting the 7-day timer. The odds of all of
+them failing in the same week are effectively zero.

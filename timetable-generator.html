@@ -558,6 +558,12 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
       <div class="card" style="margin-bottom:16px" data-staff-only>
         <h3>📚 Step 3 · Add each subject (whole school at once)</h3><p class="help">Add every subject taught in the school ONCE. Its mapped teacher appears automatically. “Periods/week” = how many times it appears Mon–Fri. The class list below starts with ALL your Step-2 classes ticked — just UNTICK the classes that don't take this subject (e.g. Biology → untick JSS classes). <b>Nothing is generated until Step 4.</b></p>
+        <div style="margin:0 0 10px;padding:10px;border:1px dashed #c4b5fd;border-radius:10px;background:#faf5ff">
+          <b>🎓 Department option group (optional)</b> <small style="color:var(--gray-500)">— e.g. SS classes split by department in ONE period: Commerce (Commercial) / CRS (Arts) / Chemistry (Science). Tick 2+ subjects; they are scheduled TOGETHER in the same period, each with its own teacher, and every listed teacher is protected from clashes.</small>
+          <div id="tt-group-subjects" style="display:flex;gap:10px 14px;flex-wrap:wrap;margin-top:6px"></div>
+          <div style="margin-top:6px"><label>Periods per week for this group <input class="form-input" id="tt-group-ppw" type="number" value="4" min="1" max="15" style="width:90px;display:inline-block"></label>
+          <button type="button" class="btn btn-sm btn-primary" onclick="TTG.addGroup()">＋ Add option group</button></div>
+        </div>
         <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject" onchange="TTG.subjectPicked()"><option value="">— choose subject —</option></select><div id="tt-teacher-auto" style="margin-top:6px;font-size:.85rem;color:#166534"></div></div><div class="form-group" id="tt-teacher-wrap" style="display:none"><label>Teacher <small>(only needed when the subject has no mapped teacher)</small></label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div></div>
         <div id="tt-days" style="display:none;margin:4px 0 12px"><b>Days this teacher is available:</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px"><label><input type="checkbox" class="tt-day" value="Monday" onchange="TTG.dayToggled(this)"> Mon</label><label><input type="checkbox" class="tt-day" value="Tuesday" onchange="TTG.dayToggled(this)"> Tue</label><label><input type="checkbox" class="tt-day" value="Wednesday" onchange="TTG.dayToggled(this)"> Wed</label><label><input type="checkbox" class="tt-day" value="Thursday" onchange="TTG.dayToggled(this)"> Thu</label><label><input type="checkbox" class="tt-day" value="Friday" onchange="TTG.dayToggled(this)"> Fri</label></div>
           <!-- V7.9 #1: PERIOD-LEVEL availability. For each ticked day, optionally list the exact
@@ -658,7 +664,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   async init(){if(!sb)return;const [cl,su,st,lo,ap,cfg]=await Promise.all([sb.from('classes').select('name').order('name'),sb.from('subjects').select('name,teacher,teacher_id').order('name'),sb.from('staff').select('full_name,staff_type,status').eq('status','active').order('full_name'),sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'),sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false}),sb.from('timetable_config').select('*').eq('class','ALL').order('position')]);
     /* V8.0 #2: subject → mapped teacher lookup (from the Subjects module). */
     this.subjectTeachers={};(su.data||[]).forEach(s=>{if(s.name)this.subjectTeachers[s.name]=s.teacher||'';});
-    this.lookups.classes=cl.data||[];this.lookups.subjects=su.data||[];this.lookups.teachers=st.data||[];this.lookups.terms=[...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value),...(ap.data||[]).map(x=>x.term)];this.lookups.sessions=[...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value),...(ap.data||[]).map(x=>x.session)];this.fill('tt-class',this.lookups.classes,'choose class');try{const tb=document.getElementById('tb-class');if(tb){(this.lookups.classes||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name||c;o.textContent=c.name||c;tb.appendChild(o);});}this.fillMulticlass();this.listBlocks();}catch(_){}this.fill('tt-subject',this.lookups.subjects,'choose subject');this.fill('tt-teacher',this.lookups.teachers,'choose teacher','full_name');this.fill('tt-term',this.lookups.terms,'choose term','');this.fill('tt-session',this.lookups.sessions,'choose session','');const current=(ap.data||[]).find(x=>x.is_current);if(current){document.getElementById('tt-term').value=current.term||'';document.getElementById('tt-session').value=current.session||'';}const rowsCfg=(cfg.data||[]).filter(x=>x.label!=='__daycounts__'&&Number(x.period_no)!==0);
+    this.lookups.classes=cl.data||[];this.lookups.subjects=su.data||[];this.lookups.teachers=st.data||[];this.lookups.terms=[...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value),...(ap.data||[]).map(x=>x.term)];this.lookups.sessions=[...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value),...(ap.data||[]).map(x=>x.session)];this.fill('tt-class',this.lookups.classes,'choose class');try{const tb=document.getElementById('tb-class');if(tb){(this.lookups.classes||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name||c;o.textContent=c.name||c;tb.appendChild(o);});}this.fillMulticlass();this.listBlocks();this.fillGroupSubjects();}catch(_){}this.fill('tt-subject',this.lookups.subjects,'choose subject');this.fill('tt-teacher',this.lookups.teachers,'choose teacher','full_name');this.fill('tt-term',this.lookups.terms,'choose term','');this.fill('tt-session',this.lookups.sessions,'choose session','');const current=(ap.data||[]).find(x=>x.is_current);if(current){document.getElementById('tt-term').value=current.term||'';document.getElementById('tt-session').value=current.session||'';}const rowsCfg=(cfg.data||[]).filter(x=>x.label!=='__daycounts__'&&Number(x.period_no)!==0);
     if(rowsCfg.length){PC.rows=rowsCfg.map(x=>({period_no:Number(x.period_no),label:x.label,start_time:x.start_time,end_time:x.end_time,is_break:x.is_break}));document.getElementById('pc-count').value=PC.rows.filter(x=>!x.is_break).length;PC.preview();toast('📥 Saved school-day schedule loaded — continue where you stopped.','info',4500);}else PC.build();
     /* V8.0 #3: restore per-day period counts from the carrier row. */
     try{const carrier=(cfg.data||[]).find(x=>x.label==='__daycounts__');if(carrier){if(carrier.start_time){const counts=JSON.parse(carrier.start_time);Object.entries(counts).forEach(([d,n])=>{const inp=document.querySelector('.pc-day-count[data-day="'+d+'"]');if(inp)inp.value=n;});}if(carrier.end_time){try{const lens=JSON.parse(carrier.end_time);Object.entries(lens).forEach(([d,n])=>{const inp=document.querySelector('.pc-day-len[data-day="'+d+'"]');if(inp)inp.value=n;});}catch(_){}}}}catch(_){}
@@ -670,6 +676,32 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   classesTicked(){this.contextChanged();},
   tickedClasses(){return [...document.querySelectorAll('.tt-cls:checked')].map(x=>x.value);},
   /* V8.0 #2: picking a subject reveals its MAPPED teacher automatically. */
+  fillGroupSubjects(){try{const host=document.getElementById('tt-group-subjects');if(!host)return;host.innerHTML=(this.lookups.subjects||[]).map(s=>{const n=s.name||s;return '<label><input type="checkbox" class="tt-gs" value="'+esc(n)+'"> '+esc(n)+'</label>';}).join('');}catch(_){}},
+  /* V8.3 #4: department option group — 'Commerce / CRS / Chemistry' saved as ONE
+     demand whose subject and teacher are slash-joined lists; the SQL engine's
+     list-aware conflict check protects every listed teacher individually. */
+  async addGroup(){const subs=[...document.querySelectorAll('.tt-gs:checked')].map(x=>x.value);
+    if(subs.length<2){toast('Tick at least TWO subjects for an option group (e.g. Commerce + CRS + Chemistry).','warning');return;}
+    const ppw=Number((document.getElementById('tt-group-ppw')||{}).value)||4;
+    const missing=subs.filter(s=>!(this.subjectTeachers||{})[s]);
+    if(missing.length){toast('These subjects have no mapped teacher yet: '+missing.join(', ')+'. Map them in the Subjects module first.','warning',9000);return;}
+    const teachers=subs.map(s=>this.subjectTeachers[s]);
+    const dupT=teachers.filter((t,i)=>teachers.indexOf(t)!==i);
+    if(dupT.length){toast('One teacher ('+dupT[0]+') takes two subjects in this group — they cannot teach both at once. Adjust the group.','danger',9000);return;}
+    const c=this.context();const ticked=this.tickedClasses();
+    if(!ticked.length||!c.term||!c.session){toast('Step 2 first: tick the classes and choose term/session.','warning');return;}
+    const step3=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
+    const targets=[...new Set(step3.length?step3:ticked)];
+    const subject=subs.join(' / '), teacher=teachers.join(' / ');
+    let ok=0,err=null;
+    for(const cls of targets){
+      const r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:null,is_part_time:false,available_periods:null},{onConflict:'class,subject'});
+      if(r.error)err=err||r.error;else ok++;
+    }
+    if(err&&!ok){toast(err.message||err,'danger');return;}
+    toast('🎓 Option group saved for '+ok+' class(es): '+subject+' — one shared slot, '+ppw+'×/week.','success',9000);
+    [...document.querySelectorAll('.tt-gs:checked')].forEach(x=>x.checked=false);
+    await this.loadReqs(targets[0]);},
   subjectPicked(){const s=this.val('tt-subject'),auto=document.getElementById('tt-teacher-auto'),wrap=document.getElementById('tt-teacher-wrap');const t=(this.subjectTeachers||{})[s]||'';
     if(!s){if(auto)auto.innerHTML='';if(wrap)wrap.style.display='none';return;}
     if(t){if(auto)auto.innerHTML='👩‍🏫 Mapped teacher: <b>'+esc(t)+'</b> <small style="color:var(--gray-500)">(from the Subjects module — change it there if wrong)</small>';if(wrap)wrap.style.display='none';const th=document.getElementById('tt-teacher');if(th)th.value='';}
