@@ -590,7 +590,17 @@ const DL={ qs:[],
       }
     }catch(_){ }
     this._books=data;
-    const isStaff = !!(window.App && (window.App.isAdminRole(window.App.currentRole) || ['staff','teacher'].includes(String(window.App.currentRole||'').toLowerCase())));
+    /* V8.3 #3 ROOT-CAUSE FIX: the Edit/Delete buttons "disappeared" because
+       this ran on DOMContentLoaded BEFORE auth resolved — App.currentRole was
+       still empty, so staff/admin rendered as visitors. Now we WAIT for the
+       role (up to ~6s), fall back to the cached profile, and re-render once
+       when the role arrives late. The buttons were never removed — they lost
+       a race; this ends it permanently. */
+    let roleNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    if(!roleNow){try{const cached=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(cached&&cached.role)roleNow=String(cached.role).toLowerCase();}catch(_){ }}
+    if(!roleNow){for(let w=0;w<30&&!roleNow;w++){await new Promise(r=>setTimeout(r,200));roleNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();}}
+    if(!this._roleWatch){this._roleWatch=true;let last=roleNow;setInterval(()=>{const cur=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();if(cur&&cur!==last){last=cur;DL.list();}},1500);}
+    const isStaff = !!(window.App&&App.isAdminRole&&App.isAdminRole(roleNow)) || ['staff','teacher','admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(roleNow);
     box.innerHTML = data.map((b,i) => {
       const canEdit = isStaff;
       return '<div class="card" style="margin:8px 0" data-id="'+esc(b.id)+'"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">'+
@@ -617,8 +627,10 @@ const DL={ qs:[],
   },
   edit(i){
     const b = this._books[i]; if (!b) { toast('Reading not found.', 'warning'); return; }
-    const isStaff = !!(window.App && (window.App.isAdminRole(window.App.currentRole) || ['staff','teacher'].includes(String(window.App.currentRole||'').toLowerCase())));
-    if (!isStaff) { toast('Only staff can edit readings.', 'warning'); return; }
+    let rNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    if(!rNow){try{const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(c&&c.role)rNow=String(c.role).toLowerCase();}catch(_){ }}
+    const isStaff = !!(window.App&&App.isAdminRole&&App.isAdminRole(rNow)) || ['staff','teacher','admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(rNow);
+    if (!isStaff) { toast('Only staff can edit readings. If you ARE staff, wait two seconds for sign-in to finish and try again.', 'warning'); return; }
     const opts = (this._books.map((x, j) => '<option value="'+j+'"'+(j===i?' selected':'')+'>'+esc(x.title)+'</option>').join(''));
     const body =
       '<div class="form-group"><label>Pick a reading</label><select class="form-select" id="dl-edit-pick">' + opts + '</select></div>' +
