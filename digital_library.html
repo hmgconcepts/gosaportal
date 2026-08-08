@@ -494,7 +494,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </div>
         <h4 style="margin:6px 0">❓ Comprehension questions (optional, auto-marked)</h4>
         <div id="dl-qs"></div>
-        <button class="btn btn-outline btn-sm" onclick="DL.addQ()">+ Add question</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="DL.addQ('mcq')">+ Multiple choice</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('multi')">+ Multiple response</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('tf')">+ True/False</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('short')">+ Short answer</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('keyword')">+ Keyword</button></div>
         <div style="margin-top:12px"><button class="btn btn-primary" onclick="DL.save()">💾 Save reading</button></div>
       </div>
 
@@ -538,13 +538,32 @@ const DL={ qs:[],
     try{ const {data:cls}=await sb.from('classes').select('name').order('name'); (function(){var seen=new Set();(cls||[]).forEach(x=>{var v=String(x.name==null?'':x.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.textContent=v;var el=document.getElementById('dl-class');el&&el.appendChild(o);});})(); }catch(e){}
     this.render(); this.list();
   },
-  addQ(){ this.qs.push({q:'',options:['','','',''],answer:''}); this.render(); },
-  render(){ var box=document.getElementById('dl-qs'); if(!box)return; box.innerHTML=this.qs.map((q,i)=>
-    '<div class="card" style="background:#f8fafc;margin:8px 0;padding:10px">'+
-    '<div class="form-group"><label>Q'+(i+1)+'</label><input class="form-input" value="'+esc(q.q)+'" oninput="DL.qs['+i+'].q=this.value"></div>'+
-    '<div class="grid grid-2">'+q.options.map((op,j)=>'<input class="form-input" placeholder="Option '+(j+1)+'" value="'+esc(op)+'" oninput="DL.qs['+i+'].options['+j+']=this.value">').join('')+'</div>'+
-    '<div class="form-group"><label>Correct answer (exact option text)</label><input class="form-input" value="'+esc(q.answer)+'" oninput="DL.qs['+i+'].answer=this.value"></div>'+
-    '<button class="btn btn-sm btn-outline" onclick="DL.qs.splice('+i+',1);DL.render()">Remove</button></div>').join(''); },
+  /* V8.2 #5: FIVE question types — multiple choice (classic), multiple RESPONSE
+     (tick all that apply), True/False, short answer (exact/close match) and
+     KEYWORD (any listed keyword in the student's sentence scores). */
+  addQ(type){ type=type||'mcq';
+    var base={type:type,q:''};
+    if(type==='mcq') Object.assign(base,{options:['','','',''],answer:''});
+    else if(type==='multi') Object.assign(base,{options:['','','',''],answers:[]});
+    else if(type==='tf') Object.assign(base,{answer:'True'});
+    else if(type==='short') Object.assign(base,{answer:''});
+    else if(type==='keyword') Object.assign(base,{keywords:''});
+    this.qs.push(base); this.render(); },
+  render(){ var box=document.getElementById('dl-qs'); if(!box)return; box.innerHTML=this.qs.map((q,i)=>{
+    var t=q.type||'mcq';
+    var head='<div class="card" style="background:#f8fafc;margin:8px 0;padding:10px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center"><b>Q'+(i+1)+' · '+({mcq:'Multiple choice',multi:'Multiple response',tf:'True / False',short:'Short answer',keyword:'Keyword'}[t]||'Question')+'</b>'+
+      '<button class="btn btn-sm btn-outline" onclick="DL.qs.splice('+i+',1);DL.render()">Remove</button></div>'+
+      '<div class="form-group"><label>Question</label><input class="form-input" value="'+esc(q.q)+'" oninput="DL.qs['+i+'].q=this.value"></div>';
+    var body='';
+    if(t==='mcq') body='<div class="grid grid-2">'+q.options.map((op,j)=>'<input class="form-input" placeholder="Option '+(j+1)+'" value="'+esc(op)+'" oninput="DL.qs['+i+'].options['+j+']=this.value">').join('')+'</div>'+
+      '<div class="form-group"><label>Correct answer (exact option text)</label><input class="form-input" value="'+esc(q.answer||'')+'" oninput="DL.qs['+i+'].answer=this.value"></div>';
+    else if(t==='multi') body='<div class="grid grid-2">'+q.options.map((op,j)=>'<input class="form-input" placeholder="Option '+(j+1)+'" value="'+esc(op)+'" oninput="DL.qs['+i+'].options['+j+']=this.value">').join('')+'</div>'+
+      '<div class="form-group"><label>Correct answers (exact option texts, one per line — ALL must be ticked)</label><textarea class="form-input" rows="2" oninput="DL.qs['+i+'].answers=this.value.split(/\\n+/).map(function(s){return s.trim()}).filter(Boolean)">'+esc((q.answers||[]).join('\n'))+'</textarea></div>';
+    else if(t==='tf') body='<div class="form-group"><label>Correct answer</label><select class="form-select" onchange="DL.qs['+i+'].answer=this.value"><option'+(q.answer==='True'?' selected':'')+'>True</option><option'+(q.answer==='False'?' selected':'')+'>False</option></select></div>';
+    else if(t==='short') body='<div class="form-group"><label>Correct answer (case-insensitive; extra spaces ignored)</label><input class="form-input" value="'+esc(q.answer||'')+'" oninput="DL.qs['+i+'].answer=this.value"></div>';
+    else if(t==='keyword') body='<div class="form-group"><label>Accepted keywords (comma-separated — ANY one in the student\'s answer scores)</label><input class="form-input" value="'+esc(q.keywords||'')+'" oninput="DL.qs['+i+'].keywords=this.value" placeholder="photosynthesis, chlorophyll, sunlight"></div>';
+    return head+body+'</div>';}).join(''); },
   async save(){ if(!sb){toast('DB not configured','warning');return;}
     var title=document.getElementById('dl-title').value, link=document.getElementById('dl-link').value;
     if(!title||!link){toast('Title and read link are required','warning');return;}
@@ -559,6 +578,17 @@ const DL={ qs:[],
   async list(){ var box=document.getElementById('dl-list'); if(!sb){box.innerHTML='<p>DB not configured.</p>';return;}
     var {data}=await sb.from('digital_library').select('*').order('created_at',{ascending:false}).limit(200);
     if(!data||!data.length){box.innerHTML='<p style="color:var(--gray-500)">No readings yet.</p>';return;}
+    /* V8.2 #5: CLASS SCOPING — a student sees only readings for THEIR class
+       (or school-wide readings with no class). Staff/admin see everything. */
+    try{
+      var role=String((window.SC_PROFILE&&SC_PROFILE.role)||(window.App&&App.currentRole)||'').toLowerCase();
+      if(role==='student'&&window.SC_PROFILE){
+        var st=await sb.from('students').select('class').eq('user_id',SC_PROFILE.id).maybeSingle();
+        var myCls=String((st.data&&st.data.class)||'').toLowerCase().replace(/\s+/g,'');
+        data=data.filter(function(b){var c=String(b.class||'').toLowerCase().replace(/\s+/g,'');return !c||c==='all'||c===myCls;});
+        if(!data.length){box.innerHTML='<p style="color:var(--gray-500)">No readings assigned to your class yet.</p>';return;}
+      }
+    }catch(_){ }
     this._books=data;
     const isStaff = !!(window.App && (window.App.isAdminRole(window.App.currentRole) || ['staff','teacher'].includes(String(window.App.currentRole||'').toLowerCase())));
     box.innerHTML = data.map((b,i) => {
@@ -642,12 +672,22 @@ const DL={ qs:[],
   drive(u){ if(!u)return '#'; var m=u.match(/drive\.google\.com\/file\/d\/([^/]+)/); return m?('https://drive.google.com/file/d/'+m[1]+'/view'):u; },
   quiz(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[];
     if(!qs.length){toast('No questions on this reading.','info');return;}
-    var html=qs.map((q,j)=>'<div class="form-group"><label>Q'+(j+1)+'. '+esc(q.q)+'</label>'+
-      (q.options||[]).filter(Boolean).map(op=>'<label style="display:block"><input type="radio" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>').join('')+'</div>').join('');
+    var html=qs.map(function(q,j){ var t=q.type||'mcq'; var inner='';
+      if(t==='mcq') inner=(q.options||[]).filter(Boolean).map(function(op){return '<label style="display:block"><input type="radio" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>';}).join('');
+      else if(t==='multi') inner=(q.options||[]).filter(Boolean).map(function(op){return '<label style="display:block"><input type="checkbox" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>';}).join('')+'<small style="color:#64748b">Tick ALL correct options.</small>';
+      else if(t==='tf') inner='<label style="display:block"><input type="radio" name="dq'+j+'" value="True"> True</label><label style="display:block"><input type="radio" name="dq'+j+'" value="False"> False</label>';
+      else inner='<input class="form-input" name="dq'+j+'" placeholder="'+(t==='keyword'?'Answer in your own words…':'Type the answer…')+'">';
+      return '<div class="form-group"><label>Q'+(j+1)+'. '+esc(q.q)+'</label>'+inner+'</div>'; }).join('');
     openModal('Quiz: '+esc(b.title), html, '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="DL.submit('+i+')">Submit</button>');
   },
   async submit(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[]; var correct=0;
-    qs.forEach((q,j)=>{ var sel=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel&&sel.value===q.answer) correct++; });
+    var normTxt=function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();};
+    qs.forEach(function(q,j){ var t=q.type||'mcq';
+      if(t==='mcq'||t==='tf'){ var sel=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel&&sel.value===q.answer) correct++; }
+      else if(t==='multi'){ var picked=[...document.querySelectorAll('input[name="dq'+j+'"]:checked')].map(function(x){return x.value;}).sort(); var want=(q.answers||[]).slice().sort(); if(picked.length&&picked.length===want.length&&picked.every(function(v,k){return normTxt(v)===normTxt(want[k]);})) correct++; }
+      else if(t==='short'){ var inp=document.querySelector('input[name="dq'+j+'"]'); if(inp&&normTxt(inp.value)===normTxt(q.answer)) correct++; }
+      else if(t==='keyword'){ var inp2=document.querySelector('input[name="dq'+j+'"]'); var txt=normTxt(inp2&&inp2.value); var kws=String(q.keywords||'').split(',').map(normTxt).filter(Boolean); if(txt&&kws.some(function(k){return txt.indexOf(k)!==-1;})) correct++; }
+    });
     var max=Number(b.max_score||qs.length); var score=Math.round((correct/qs.length)*max*10)/10;
     var me=(window.App&&App.user)?App.user:null; var name=(me&&me.full_name)||(window.SC_PROFILE&&SC_PROFILE.full_name)||'';
     if(!name){ name=prompt('Enter your full name to record this score:')||''; }
