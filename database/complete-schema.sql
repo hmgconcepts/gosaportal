@@ -1658,12 +1658,16 @@ begin
      and not exists(select 1 from public.timetable t
                      where t.class=p_class and t.day=dd.day and t.period=p.per::text
                        and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,''))
-     -- teacher free across ALL classes this term/session
+     -- teacher free across ALL classes this term/session.
+     -- V8.3 #4: LIST-AWARE — 'Mr A / Mrs B / Mr C' (department option group:
+     -- Commerce/CRS/Chemistry taught simultaneously) conflicts when ANY of the
+     -- listed teachers is already engaged at that day+period anywhere.
      and (coalesce(req.teacher,'')='' or not exists(
             select 1 from public.timetable t
-             where lower(trim(coalesce(t.teacher,'')))=lower(trim(req.teacher))
-               and t.day=dd.day and t.period=p.per::text
-               and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')))
+             where t.day=dd.day and t.period=p.per::text
+               and coalesce(t.session,'')=coalesce(p_session,'') and coalesce(t.term,'')=coalesce(p_term,'')
+               and string_to_array(lower(regexp_replace(coalesce(t.teacher,''),'\s*/\s*','/','g')),'/')
+                && string_to_array(lower(regexp_replace(req.teacher,'\s*/\s*','/','g')),'/')))
    order by
             -- V8.0 (a): spread a subject across DIFFERENT days first
             (select count(*) from public.timetable t where t.class=p_class and t.day=dd.day and t.subject=req.subject
