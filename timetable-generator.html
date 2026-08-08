@@ -488,7 +488,17 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#eff6ff,#f5f3ff);border-color:#93c5fd">
         <h2 style="margin-top:0">🗓️ Admin Timetable Wizard</h2>
         <p style="color:#334155">Complete the four numbered steps. All classes, subjects, teachers, terms and sessions come from platform dropdowns—no spelling variations. Generation is deterministic and checks a teacher is not placed in two classes at the same time.</p>
-        <div class="grid grid-4"><div class="card"><b>1 · School day</b><br><small>Set periods, times and breaks.</small></div><div class="card"><b>2 · Context</b><br><small>Pick class, term and session.</small></div><div class="card"><b>3 · Demand</b><br><small>Add every subject, teacher and weekly frequency.</small></div><div class="card"><b>4 · Generate</b><br><small>Validate, build, review, print.</small></div></div>
+        <div class="card" style="margin-bottom:14px;background:#eef2ff;border-color:#c7d2fe">
+          <h3 style="margin-top:0">🧭 How this wizard works (read once — 1 minute)</h3>
+          <p style="margin:4px 0;line-height:1.7">You are building the timetable for the <b>WHOLE SCHOOL AT ONCE</b> — not class by class. The wizard already knows each subject's teacher (from the Subjects module) and prevents any teacher from being in two classes at the same time.</p>
+          <ol style="margin:6px 0 4px;padding-left:22px;line-height:1.9">
+            <li><b>Step 1 — Describe your school day once:</b> how many periods, how long each is, when the breaks fall. Fridays (or any day) can have FEWER periods and SHORTER periods. Click <b>💾 Save</b> — it is remembered forever.</li>
+            <li><b>Step 2 — Tick the classes</b> you are building (usually <i>Tick all</i>) and pick the term & session.</li>
+            <li><b>Step 3 — Add each subject once:</b> pick the subject (its teacher appears automatically), type how many periods per week, and untick any class that doesn't take it (e.g. Biology → only SSS classes). Repeat for every subject. <i>Nothing is generated yet.</i></li>
+            <li><b>Step 4 — Click ⚙️ Generate:</b> the engine builds EVERY ticked class's timetable in one go — randomised, clash-free, honouring breaks, reserved slots and part-time teachers. Review the master grid, per-class grids and each teacher's personal timetable, then print.</li>
+          </ol>
+          <p style="margin:4px 0 0;font-size:.85rem;color:#4338ca">💡 Generating again gives a fresh random arrangement. Nothing is final until you are happy — regenerate as many times as you like.</p>
+        </div>
         <div id="tt-checklist" class="notice" style="margin-top:10px">Loading setup checklist…</div>
       </div>
       <div class="card" style="margin-bottom:16px" data-staff-only>
@@ -516,24 +526,38 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
             <label>Fri <input class="form-input pc-day-count" data-day="Friday" type="number" min="0" max="12" style="width:70px" placeholder="—"></label>
           </div>
         </div>
+        <!-- V8.1 #1: per-day period LENGTH — Fridays usually run SHORTER periods. Blank = the default length above. -->
+        <div style="margin:6px 0 10px;padding:10px;border:1px dashed var(--gray-300);border-radius:10px"><b>Per-day period length in minutes (optional)</b> <small style="color:var(--gray-500)">— e.g. Friday 30-minute periods while Mon–Thu run 40. Blank = default length.</small>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">
+            <label>Mon <input class="form-input pc-day-len" data-day="Monday" type="number" min="10" max="90" style="width:70px" placeholder="—"></label>
+            <label>Tue <input class="form-input pc-day-len" data-day="Tuesday" type="number" min="10" max="90" style="width:70px" placeholder="—"></label>
+            <label>Wed <input class="form-input pc-day-len" data-day="Wednesday" type="number" min="10" max="90" style="width:70px" placeholder="—"></label>
+            <label>Thu <input class="form-input pc-day-len" data-day="Thursday" type="number" min="10" max="90" style="width:70px" placeholder="—"></label>
+            <label>Fri <input class="form-input pc-day-len" data-day="Friday" type="number" min="10" max="90" style="width:70px" placeholder="—"></label>
+          </div>
+        </div>
         <button class="btn btn-outline" onclick="PC.build()">Preview schedule</button> <button class="btn btn-primary" onclick="PC.save()">💾 Save school-day schedule</button>
         <div id="pc-preview" style="margin-top:12px"></div>
       </div>
       <div class="card" style="margin-bottom:16px" data-staff-only>
         <h3>🏫 Step 2 · Select the timetable context</h3>
         <div class="grid grid-2">
-          <div class="form-group"><label>Classes * <small>(tick every class you are building — the whole school at once is fine)</small></label>
+          <div class="form-group"><label>Classes * <small>(tick every class you are building — the whole school at once)</small></label>
             <div id="tt-classes" style="display:flex;gap:10px 14px;flex-wrap:wrap;border:1px solid var(--gray-200);border-radius:10px;padding:10px"></div>
-            <div style="margin-top:6px"><button type="button" class="btn btn-sm btn-outline" onclick="TTG.tickAllClasses(true)">Tick all</button> <button type="button" class="btn btn-sm btn-outline" onclick="TTG.tickAllClasses(false)">Clear</button>
-            <select class="form-select" id="tt-class" style="display:inline-block;width:auto;margin-left:10px" onchange="TTG.contextChanged()" title="Working class — the one shown in Step 3 lists and the grid below"><option value="">— working class —</option></select></div>
+            <div style="margin-top:6px"><button type="button" class="btn btn-sm btn-outline" onclick="TTG.tickAllClasses(true)">Tick all</button> <button type="button" class="btn btn-sm btn-outline" onclick="TTG.tickAllClasses(false)">Clear</button></div>
+            <select id="tt-class" style="display:none"><option value=""></option></select>
           </div>
-          <div class="form-group"><label>Periods per day</label><input class="form-input" type="number" id="tt-ppd" value="6" min="1" max="12"><small style="color:var(--gray-500)">One value for all ticked classes (per-day overrides in Step 1). Multi-level schools: build Primary, JSS and SSS as separate batches when their day lengths differ.</small></div>
+          <div class="form-group"><label>School-day structure <small>(from Step 1 — nothing to re-type)</small></label>
+            <div id="tt-ppd-info" class="notice" style="margin:0">Save Step 1 first — the day structure will show here.</div>
+            <input type="hidden" id="tt-ppd" value="6">
+            <small style="color:var(--gray-500)">Multi-level schools whose levels run different day lengths (e.g. Primary 5 periods, SSS 8): build each level as its own batch — tick only that level's classes, adjust Step 1, save, generate; repeat for the next level.</small>
+          </div>
           <div class="form-group"><label>Term *</label><select class="form-select" id="tt-term" onchange="TTG.contextChanged()"><option value="">— choose term —</option></select></div>
           <div class="form-group"><label>Session *</label><select class="form-select" id="tt-session" onchange="TTG.contextChanged()"><option value="">— choose session —</option></select></div>
         </div>
       </div>
       <div class="card" style="margin-bottom:16px" data-staff-only>
-        <h3>📚 Step 3 · Add subject demand</h3><p class="help">For the selected class, add each subject once. “Periods/week” means how many times that subject must appear from Monday to Friday.</p>
+        <h3>📚 Step 3 · Add each subject (whole school at once)</h3><p class="help">Add every subject taught in the school ONCE. Its mapped teacher appears automatically. “Periods/week” = how many times it appears Mon–Fri. The class list below starts with ALL your Step-2 classes ticked — just UNTICK the classes that don't take this subject (e.g. Biology → untick JSS classes). <b>Nothing is generated until Step 4.</b></p>
         <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject" onchange="TTG.subjectPicked()"><option value="">— choose subject —</option></select><div id="tt-teacher-auto" style="margin-top:6px;font-size:.85rem;color:#166534"></div></div><div class="form-group" id="tt-teacher-wrap" style="display:none"><label>Teacher <small>(only needed when the subject has no mapped teacher)</small></label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div></div>
         <div id="tt-days" style="display:none;margin:4px 0 12px"><b>Days this teacher is available:</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px"><label><input type="checkbox" class="tt-day" value="Monday" onchange="TTG.dayToggled(this)"> Mon</label><label><input type="checkbox" class="tt-day" value="Tuesday" onchange="TTG.dayToggled(this)"> Tue</label><label><input type="checkbox" class="tt-day" value="Wednesday" onchange="TTG.dayToggled(this)"> Wed</label><label><input type="checkbox" class="tt-day" value="Thursday" onchange="TTG.dayToggled(this)"> Thu</label><label><input type="checkbox" class="tt-day" value="Friday" onchange="TTG.dayToggled(this)"> Fri</label></div>
           <!-- V7.9 #1: PERIOD-LEVEL availability. For each ticked day, optionally list the exact
@@ -543,7 +567,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <!-- V7.9 #1: one teacher usually serves MANY classes. Tick the classes to copy this
              demand to; the same teacher+periods are saved per class and the cross-class
              conflict checker keeps them apart automatically. -->
-        <div style="margin:4px 0 12px"><b>Apply this subject demand to:</b> <small style="color:var(--gray-500)">(the selected class is always included)</small><div id="tt-multiclass" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"></div></div>
+        <div style="margin:4px 0 12px"><b>Classes taking this subject:</b> <small style="color:var(--gray-500)">(pre-ticked from Step 2 — untick the ones that don't take it)</small><div id="tt-multiclass" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"></div></div>
         <button class="btn btn-primary" onclick="TTG.add()">＋ Add / update this subject demand</button>
       </div>
       <div class="card" style="margin-bottom:16px" data-staff-only>
@@ -559,9 +583,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div id="tb-list" style="margin-top:10px"></div>
       </div>
       <div id="tt-reqs"></div>
-      <div class="card" style="margin-bottom:16px" data-staff-only><h3>⚙️ Step 4 · Validate and generate</h3><div id="tt-summary" class="notice">Select a context and add subject demand.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="TTG.validate()">✅ Validate demand</button><button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate / regenerate timetable</button><button class="btn btn-outline" onclick="TTG.printGrid()">🖨️ Print timetable</button><button class="btn btn-outline" onclick="TTG.clearGenerated()">Clear generated timetable</button></div></div>
+      <div class="card" style="margin-bottom:16px" data-staff-only><h3>⚙️ Step 4 · Validate and generate the WHOLE school</h3><p class="help">One click builds every ticked class's grid + the combined master timetable + every teacher's personal timetable. Click again any time for a different random arrangement — nothing is final until you print.</p><div id="tt-summary" class="notice">Tick classes and add subject demand first.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="TTG.validate()">✅ Validate demand</button><button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate / regenerate timetable</button><button class="btn btn-outline" onclick="TTG.printGrid()">🖨️ Print timetable</button><button class="btn btn-outline" onclick="TTG.clearGenerated()">Clear generated timetable</button></div></div>
       <div id="tt-grid"></div>
       <div id="tt-master" style="margin-top:16px"></div>
+      <div id="tt-teachers" style="margin-top:16px"></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -616,12 +641,19 @@ const PC={ rows:[],
       /* V8.0 #3: persist the per-day period counts too (carrier row period_no=0),
          so the WHOLE Step-1 setup restores when you come back later. */
       var counts={};[...document.querySelectorAll('.pc-day-count')].forEach(function(i){var v=String(i.value||'').trim();if(v!=='')counts[i.dataset.day]=parseInt(v,10);});
-      await sb.from('timetable_config').insert({class:'ALL',period_no:0,label:'__daycounts__',start_time:JSON.stringify(counts),end_time:'',is_break:true,position:0});
+      var lens={};[...document.querySelectorAll('.pc-day-len')].forEach(function(i){var v=String(i.value||'').trim();if(v!=='')lens[i.dataset.day]=parseInt(v,10);});
+      await sb.from('timetable_config').insert({class:'ALL',period_no:0,label:'__daycounts__',start_time:JSON.stringify(counts),end_time:JSON.stringify(lens),is_break:true,position:0});
+      try{if(window.TTG&&TTG.refreshPpdInfo)TTG.refreshPpdInfo();}catch(_){}
       toast('✅ School-day schedule saved — it will load automatically next time you open this page.','success',6000); if(window.App&&App.logActivity)App.logActivity('config','timetable_config','ALL');
     }catch(e){ toast(e.message,'danger'); } }
 };
 const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions:[]},
-  val(id){return(document.getElementById(id)||{}).value||'';},context(){return{class:this.val('tt-class'),term:this.val('tt-term'),session:this.val('tt-session'),ppd:Number(this.val('tt-ppd'))||6};},
+  val(id){return(document.getElementById(id)||{}).value||'';},
+  /* V8.1 #4: periods-per-day comes from the SAVED Step-1 schedule — one source of truth. */
+  context(){const teaching=PC.rows.filter(x=>!x.is_break).length||Number(this.val('tt-ppd'))||6;return{class:this.val('tt-class'),term:this.val('tt-term'),session:this.val('tt-session'),ppd:teaching};},
+  refreshPpdInfo(){const el=document.getElementById('tt-ppd-info');if(!el)return;const teaching=PC.rows.filter(x=>!x.is_break).length;const breaks=PC.rows.filter(x=>x.is_break).map(x=>x.label);const counts={};[...document.querySelectorAll('.pc-day-count')].forEach(i=>{if(String(i.value||'').trim()!=='')counts[i.dataset.day]=i.value;});const lens={};[...document.querySelectorAll('.pc-day-len')].forEach(i=>{if(String(i.value||'').trim()!=='')lens[i.dataset.day]=i.value;});
+    el.innerHTML=teaching?('<b>'+teaching+' teaching periods/day</b>'+(breaks.length?' · breaks: '+breaks.map(esc).join(', '):'')+(Object.keys(counts).length?' · fewer periods: '+Object.entries(counts).map(([d,n])=>d.slice(0,3)+'='+n).join(', '):'')+(Object.keys(lens).length?' · shorter periods: '+Object.entries(lens).map(([d,n])=>d.slice(0,3)+'='+n+'min').join(', '):'')):'Save Step 1 first — the day structure will show here.';
+    const hid=document.getElementById('tt-ppd');if(hid&&teaching)hid.value=teaching;},
   fill(id,items,label,key='name'){const el=document.getElementById(id);if(!el)return;const keep=el.value,vals=[...new Set((items||[]).map(x=>typeof x==='string'?x:x[key]).filter(Boolean))].sort();el.innerHTML='<option value="">— '+label+' —</option>'+vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(vals.includes(keep))el.value=keep;},
   async init(){if(!sb)return;const [cl,su,st,lo,ap,cfg]=await Promise.all([sb.from('classes').select('name').order('name'),sb.from('subjects').select('name,teacher,teacher_id').order('name'),sb.from('staff').select('full_name,staff_type,status').eq('status','active').order('full_name'),sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'),sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false}),sb.from('timetable_config').select('*').eq('class','ALL').order('position')]);
     /* V8.0 #2: subject → mapped teacher lookup (from the Subjects module). */
@@ -629,13 +661,13 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     this.lookups.classes=cl.data||[];this.lookups.subjects=su.data||[];this.lookups.teachers=st.data||[];this.lookups.terms=[...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value),...(ap.data||[]).map(x=>x.term)];this.lookups.sessions=[...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value),...(ap.data||[]).map(x=>x.session)];this.fill('tt-class',this.lookups.classes,'choose class');try{const tb=document.getElementById('tb-class');if(tb){(this.lookups.classes||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name||c;o.textContent=c.name||c;tb.appendChild(o);});}this.fillMulticlass();this.listBlocks();}catch(_){}this.fill('tt-subject',this.lookups.subjects,'choose subject');this.fill('tt-teacher',this.lookups.teachers,'choose teacher','full_name');this.fill('tt-term',this.lookups.terms,'choose term','');this.fill('tt-session',this.lookups.sessions,'choose session','');const current=(ap.data||[]).find(x=>x.is_current);if(current){document.getElementById('tt-term').value=current.term||'';document.getElementById('tt-session').value=current.session||'';}const rowsCfg=(cfg.data||[]).filter(x=>x.label!=='__daycounts__'&&Number(x.period_no)!==0);
     if(rowsCfg.length){PC.rows=rowsCfg.map(x=>({period_no:Number(x.period_no),label:x.label,start_time:x.start_time,end_time:x.end_time,is_break:x.is_break}));document.getElementById('pc-count').value=PC.rows.filter(x=>!x.is_break).length;PC.preview();toast('📥 Saved school-day schedule loaded — continue where you stopped.','info',4500);}else PC.build();
     /* V8.0 #3: restore per-day period counts from the carrier row. */
-    try{const carrier=(cfg.data||[]).find(x=>x.label==='__daycounts__');if(carrier&&carrier.start_time){const counts=JSON.parse(carrier.start_time);Object.entries(counts).forEach(([d,n])=>{const inp=document.querySelector('.pc-day-count[data-day="'+d+'"]');if(inp)inp.value=n;});}}catch(_){}
+    try{const carrier=(cfg.data||[]).find(x=>x.label==='__daycounts__');if(carrier){if(carrier.start_time){const counts=JSON.parse(carrier.start_time);Object.entries(counts).forEach(([d,n])=>{const inp=document.querySelector('.pc-day-count[data-day="'+d+'"]');if(inp)inp.value=n;});}if(carrier.end_time){try{const lens=JSON.parse(carrier.end_time);Object.entries(lens).forEach(([d,n])=>{const inp=document.querySelector('.pc-day-len[data-day="'+d+'"]');if(inp)inp.value=n;});}catch(_){}}}}catch(_){}
+    this.refreshPpdInfo();
     /* V8.0 #4: class TICK-LIST for whole-school builds. */
     try{const host=document.getElementById('tt-classes');if(host){host.innerHTML=(this.lookups.classes||[]).map(c=>{const n=c.name||c;return '<label><input type="checkbox" class="tt-cls" value="'+esc(n)+'" onchange="TTG.classesTicked()"> '+esc(n)+'</label>';}).join('');}}catch(_){}
     this.updateChecklist();},
   tickAllClasses(on){[...document.querySelectorAll('.tt-cls')].forEach(c=>{c.checked=!!on;});this.classesTicked();},
-  classesTicked(){const ticked=this.tickedClasses();const sel=document.getElementById('tt-class');
-    if(ticked.length&&sel&&!ticked.includes(sel.value)){sel.value=ticked[0];this.contextChanged();}else this.updateChecklist();},
+  classesTicked(){this.contextChanged();},
   tickedClasses(){return [...document.querySelectorAll('.tt-cls:checked')].map(x=>x.value);},
   /* V8.0 #2: picking a subject reveals its MAPPED teacher automatically. */
   subjectPicked(){const s=this.val('tt-subject'),auto=document.getElementById('tt-teacher-auto'),wrap=document.getElementById('tt-teacher-wrap');const t=(this.subjectTeachers||{})[s]||'';
@@ -643,8 +675,12 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     if(t){if(auto)auto.innerHTML='👩‍🏫 Mapped teacher: <b>'+esc(t)+'</b> <small style="color:var(--gray-500)">(from the Subjects module — change it there if wrong)</small>';if(wrap)wrap.style.display='none';const th=document.getElementById('tt-teacher');if(th)th.value='';}
     else{if(auto)auto.innerHTML='<span style="color:#b45309">⚠ No teacher mapped to this subject yet — pick one below (and map it in the Subjects module for next time).</span>';if(wrap)wrap.style.display='block';}},
   updateChecklist(){const c=this.context(),teaching=PC.rows.filter(x=>!x.is_break).length||c.ppd,req=this.reqs.length,total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),capacity=5*(teaching||6),host=document.getElementById('tt-checklist');if(host)host.innerHTML='<b>Setup status:</b> '+(PC.rows.length?'✅ Day schedule':'❌ Day schedule')+' · '+(c.class&&c.term&&c.session?'✅ Context selected':'❌ Pick class/term/session')+' · '+(req?'✅ '+req+' subject demand(s)':'❌ Add subjects')+' · Requested '+total+' / capacity '+capacity;const sum=document.getElementById('tt-summary');if(sum)sum.innerHTML='<b>'+esc(c.class||'No class selected')+'</b> · '+esc(c.term||'No term')+' · '+esc(c.session||'No session')+' · '+req+' subjects · '+total+' requested periods · '+capacity+' weekly slots'+(total>capacity?' <b style="color:#dc2626">OVER CAPACITY</b>':'');},
-  async contextChanged(){const c=this.context();this.fillMulticlass();if(c.class)await Promise.all([this.loadReqs(c.class),this.grid(c.class),this.listBlocks()]);else{this.reqs=[];document.getElementById('tt-reqs').innerHTML='';document.getElementById('tt-grid').innerHTML='';}this.updateChecklist();},
-  fillMulticlass(){const host=document.getElementById('tt-multiclass');if(!host)return;const cur=this.val('tt-class');host.innerHTML=(this.lookups.classes||[]).map(c=>{const n=c.name||c;const isCur=n===cur;return '<label><input type="checkbox" class="tt-mc" value="'+esc(n)+'"'+(isCur?' checked disabled':'')+'> '+esc(n)+'</label>';}).join('');},
+  /* V8.1 #6: changing context/classes ONLY refreshes lists — timetables are
+     built exclusively by the Step-4 Generate button, never as a side effect. */
+  async contextChanged(){this.fillMulticlass();this.refreshPpdInfo();const first=this.tickedClasses()[0]||'';const sel=document.getElementById('tt-class');if(sel)sel.value=first;if(first)await Promise.all([this.loadReqs(first),this.listBlocks()]);else{this.reqs=[];document.getElementById('tt-reqs').innerHTML='';}this.updateChecklist();},
+  /* V8.1 #5/#6: Step-3 class list = the Step-2 ticked classes, ALL PRE-TICKED
+     and fully editable (untick the classes that don't take this subject). */
+  fillMulticlass(){const host=document.getElementById('tt-multiclass');if(!host)return;const ticked=this.tickedClasses();host.innerHTML=ticked.length?ticked.map(n=>'<label><input type="checkbox" class="tt-mc" value="'+esc(n)+'" checked> '+esc(n)+'</label>').join(''):'<span style="color:var(--gray-500);font-size:.85rem">Tick classes in Step 2 first.</span>';},
   dayToggled(cb){const host=document.getElementById('tt-day-periods');if(!host)return;const id='ttdp-'+cb.value;if(cb.checked){if(!document.getElementById(id)){const w=document.createElement('div');w.id=id;w.style.cssText='margin:4px 0';w.innerHTML='<label style="display:inline-flex;gap:8px;align-items:center">'+cb.value+' periods: <input class="form-input tt-dp" data-day="'+cb.value+'" placeholder="e.g. 1,2,3 (blank = any)" style="width:220px"></label>';host.appendChild(w);}}else{const w=document.getElementById(id);if(w)w.remove();}},
   collectDayPeriods(){const out={};let any=false;[...document.querySelectorAll('.tt-dp')].forEach(inp=>{const day=inp.dataset.day,v=String(inp.value||'').trim();if(!v)return;const arr=v.split(/[\s,;]+/).map(x=>parseInt(x,10)).filter(x=>x>=1&&x<=12);if(arr.length){out[day]=arr;any=true;}});return any?out:null;},
   async addBlock(){const cls=this.val('tb-class')||'ALL',day=this.val('tb-day'),per=Number(this.val('tb-period'))||0,label=this.val('tb-label')||'Free period';if(!day||per<1){toast('Pick a day and period number.','warning');return;}const r=await sb.from('timetable_blocks').upsert({class:cls,day:day,period:per,label:label},{onConflict:'class,day,period'});if(r.error){toast(/timetable_blocks/.test(r.error.message)?'Run the latest complete-schema.sql (or database/v7.9-timetable-flex-and-class-scope.sql) first to enable reserved slots.':r.error.message,'danger',9000);return;}toast('⛔ Reserved: '+cls+' · '+day+' · period '+per+' — '+label,'success');this.listBlocks();},
@@ -662,7 +698,11 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     if(!subject||!teacher||ppw<1){toast(mapped?'Pick a subject and enter periods per week.':'This subject has no mapped teacher — pick one in the Teacher box.','warning');return;}
     const pt=document.getElementById('tt-pt').checked,days=pt?[...document.querySelectorAll('.tt-day:checked')].map(x=>x.value):null;if(pt&&!days.length){toast('Select at least one available day for this restricted-day teacher.','warning');return;}
     const dayPeriods=pt?this.collectDayPeriods():null;
-    const targets=[...new Set([...(ticked.length?ticked:[c.class]),...[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value)])].filter(Boolean);
+    /* V8.1 #5/#6: the Step-3 tick-list IS the target list — exactly the classes
+       taking this subject; e.g. Biology stays SSS-only when JSS is unticked. */
+    const step3=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
+    const targets=[...new Set(step3.length?step3:(ticked.length?ticked:[c.class]))].filter(Boolean);
+    if(!targets.length){toast('Tick at least one class for this subject.','warning');return;}
     let okCount=0,firstErr=null;
     for(const cls of targets){
       let r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:days,is_part_time:!!pt,available_periods:dayPeriods},{onConflict:'class,subject'});
@@ -692,6 +732,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     if(window.App&&App.logActivity)App.logActivity('generate','timetable',classes.join(',')+'|'+c.term+'|'+c.session);
     await this.grid(this.val('tt-class')||classes[0]);
     await this.masterGrid(classes);
+    await this.teacherGrids(classes);
     if(problems.length)openModal('Timetable needs attention','<ul>'+problems.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>');},
   /* V8.0 #5: COMBINED master timetable — every ticked class side by side,
      days as rows and periods as columns (#8), breaks shown from Step 1. */
@@ -707,18 +748,40 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
       h+='<h4 style="margin:14px 0 6px">'+esc(cls)+'</h4><div class="table-wrap"><table><thead><tr><th>Day</th>'+slots.map(s=>'<th>'+(s.is_break?'<i>'+esc(s.label)+'</i>':esc(s.label))+(s.start_time?'<br><small>'+esc(s.start_time)+'–'+esc(s.end_time)+'</small>':'')+'</th>').join('')+'</tr></thead><tbody>';
       days.forEach(d=>{h+='<tr><td><b>'+d.slice(0,3)+'</b></td>'+slots.map(s=>{if(s.is_break)return '<td style="background:var(--gray-100);font-style:italic;text-align:center">'+esc(s.label)+'</td>';const x=data.find(y=>y.class===cls&&y.day===d&&Number(y.period)===Number(s.period_no));return '<td>'+(x?('<b>'+esc(x.subject)+'</b>'+(x.teacher?'<br><small>'+esc(x.teacher)+'</small>':'')):'—')+'</td>';}).join('')+'</tr>';});
       h+='</tbody></table></div>';});
-    h+='<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+' · Teacher conflicts checked across all classes.</p></div><div style="margin-top:8px"><button class="btn btn-outline" onclick="TTG.printMaster()">🖨️ Print master timetable</button></div>';
+    h+=this.dayNotes()+'<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+' · Teacher conflicts checked across all classes.</p></div><div style="margin-top:8px"><button class="btn btn-outline" onclick="TTG.printMaster()">🖨️ Print master timetable</button></div>';
     host.innerHTML=h;},
+  /* V8.1 #3: PERSONAL TEACHER TIMETABLES — one grid per teacher across all
+     their classes; printable pack for the staff room. */
+  async teacherGrids(classes){const host=document.getElementById('tt-teachers');if(!host)return;const c=this.context();
+    const r=await sb.from('timetable').select('*').eq('session',c.session||'').eq('term',c.term||'').limit(8000);
+    if(r.error){host.innerHTML='';return;}
+    const data=(r.data||[]).filter(x=>x.teacher&&String(x.teacher).trim());
+    if(!data.length){host.innerHTML='';return;}
+    const teachers=[...new Set(data.map(x=>x.teacher))].sort();
+    const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    const slots=PC.rows.length?PC.rows:[...new Set(data.map(x=>Number(x.period)))].sort((a,b)=>a-b).map(p=>({period_no:p,label:'Period '+p,is_break:false}));
+    let h='<div class="card" id="tt-teachers-print"><h2 style="text-align:center">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center">TEACHER TIMETABLES · '+esc(c.term)+' · '+esc(c.session)+'</h3>';
+    teachers.forEach(t=>{const mine=data.filter(x=>x.teacher===t);const load=mine.length;
+      h+='<h4 style="margin:14px 0 6px">👩‍🏫 '+esc(t)+' <small style="color:var(--gray-500)">('+load+' periods/week)</small></h4><div class="table-wrap"><table><thead><tr><th>Day</th>'+slots.map(s=>'<th>'+(s.is_break?'<i>'+esc(s.label)+'</i>':esc(s.label))+'</th>').join('')+'</tr></thead><tbody>';
+      days.forEach(d=>{h+='<tr><td><b>'+d.slice(0,3)+'</b></td>'+slots.map(s=>{if(s.is_break)return '<td style="background:var(--gray-100)"></td>';const x=mine.find(y=>y.day===d&&Number(y.period)===Number(s.period_no));return '<td>'+(x?'<b>'+esc(x.class)+'</b><br><small>'+esc(x.subject)+'</small>':'<span style="color:#16a34a">free</span>')+'</td>';}).join('')+'</tr>';});
+      h+='</tbody></table></div>';});
+    h+='</div><div style="margin-top:8px"><button class="btn btn-outline" onclick="TTG.printTeachers()">🖨️ Print all teacher timetables</button></div>';
+    host.innerHTML=h;},
+  printTeachers(){const el=document.getElementById('tt-teachers-print');if(!el){toast('Generate the timetables first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Teacher Timetables</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #111;padding:5px;text-align:center;font-size:11px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
   printMaster(){const el=document.getElementById('tt-master-print');if(!el){toast('Generate the timetables first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Master Timetable</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:14px}th,td{border:1px solid #111;padding:6px;text-align:center;font-size:11px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
   /* V8.0 #8: DAYS AS ROWS, PERIODS AS COLUMNS — with the Step-1 breaks shown in place. */
   async grid(cls){const c=this.context(),target=cls||c.class,r=await Enterprise.timetable.grid(target,c.session,c.term),data=r.data||[],days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const slots=PC.rows.length?PC.rows:[...new Set(data.map(x=>Number(x.period)))].sort((a,b)=>a-b).map(p=>({period_no:p,label:'Period '+p,is_break:false}));
     let h='<div class="card" id="tt-print-area"><h2 style="text-align:center">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center">Class Timetable · '+esc(target)+' · '+esc(c.term)+' · '+esc(c.session)+'</h3><div class="table-wrap"><table><thead><tr><th>Day</th>'+slots.map(s=>'<th>'+(s.is_break?'<i>'+esc(s.label)+'</i>':esc(s.label))+(s.start_time?'<br><small>'+esc(s.start_time)+'–'+esc(s.end_time)+'</small>':'')+'</th>').join('')+'</tr></thead><tbody>';
     days.forEach(d=>{h+='<tr><td><b>'+d+'</b></td>'+slots.map(s=>{if(s.is_break)return '<td style="background:var(--gray-100);font-style:italic;text-align:center">'+esc(s.label)+'</td>';const x=data.find(y=>y.day===d&&Number(y.period)===Number(s.period_no));return '<td>'+(x?'<b>'+esc(x.subject)+'</b>'+(x.teacher?'<br><small>'+esc(x.teacher)+'</small>':'')+ '':'—')+'</td>';}).join('')+'</tr>';});
-    h+='</tbody></table></div><p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+' · Teacher conflicts checked across all classes in this term/session.</p></div>';
+    h+='</tbody></table></div>'+this.dayNotes()+'<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+' · Teacher conflicts checked across all classes in this term/session.</p></div>';
     document.getElementById('tt-grid').innerHTML=data.length?h:'<div class="card">No timetable generated for this exact class, term and session yet.</div>';},
+  /* V8.1 #1: human note describing day differences (fewer periods / shorter periods). */
+  dayNotes(){const counts={};[...document.querySelectorAll('.pc-day-count')].forEach(i=>{if(String(i.value||'').trim()!=='')counts[i.dataset.day]=i.value;});const lens={};[...document.querySelectorAll('.pc-day-len')].forEach(i=>{if(String(i.value||'').trim()!=='')lens[i.dataset.day]=i.value;});
+    const bits=[];Object.entries(counts).forEach(([d,n])=>bits.push(d+': '+n+' periods'));Object.entries(lens).forEach(([d,n])=>bits.push(d+': '+n+'-minute periods'));
+    return bits.length?'<p style="font-size:.8rem;color:#7c3aed;margin:6px 0 0">📌 Day differences — '+esc(bits.join(' · '))+'. Times shown in the header are the Mon–Thu defaults.</p>':'';},
   printGrid(){const el=document.getElementById('tt-print-area');if(!el){toast('Generate or load a timetable first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Class Timetable</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #111;padding:8px;text-align:center}th{background:#e2e8f0}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
-  async clearGenerated(){const c=this.context();if(!c.class||!c.term||!c.session){toast('Select the exact context first.','warning');return;}if(!confirm('Clear generated timetable for '+c.class+' · '+c.term+' · '+c.session+'? Subject demand is retained.'))return;const r=await Enterprise.timetable.clearGenerated(c.class,c.session,c.term);if(r.error){toast(r.error.message||r.error,'danger');return;}toast('Generated timetable cleared; subject demand retained.','success');this.grid(c.class);}
+  async clearGenerated(){const c=this.context();const classes=this.tickedClasses().length?this.tickedClasses():(c.class?[c.class]:[]);if(!classes.length||!c.term||!c.session){toast('Tick the classes and choose term/session first.','warning');return;}if(!confirm('Clear the generated timetable for '+classes.length+' class(es) · '+c.term+' · '+c.session+'? Subject demand is retained.'))return;let ok=0;for(const cls of classes){const r=await Enterprise.timetable.clearGenerated(cls,c.session,c.term);if(!r.error)ok++;}toast('Cleared '+ok+' class timetable(s); subject demand retained.','success');document.getElementById('tt-grid').innerHTML='';document.getElementById('tt-master').innerHTML='';const th=document.getElementById('tt-teachers');if(th)th.innerHTML='';}
 };
 PC.preview=function(){document.getElementById('pc-preview').innerHTML='<div class="table-wrap"><table><thead><tr><th>#</th><th>Label</th><th>Start</th><th>End</th></tr></thead><tbody>'+PC.rows.map(r=>'<tr style="'+(r.is_break?'background:var(--gray-100);font-style:italic':'')+'"><td>'+(r.is_break?'—':r.period_no)+'</td><td>'+esc(r.label)+'</td><td>'+esc(r.start_time)+'</td><td>'+esc(r.end_time)+'</td></tr>').join('')+'</tbody></table></div>';};
 document.addEventListener('DOMContentLoaded',()=>TTG.init());TTG.init();
