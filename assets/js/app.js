@@ -1325,6 +1325,36 @@ const App = {
           set('stat-my-classes', mine);
           set('stat-open-cbt', openCbt);
           set('stat-attendance-today', attToday);
+          /* V8.1 #3: "My Week" — the signed-in teacher's PERSONAL timetable on
+             the dashboard (admins in oversight mode see the whole school's
+             teacher list note instead). Reads the published timetable rows
+             where teacher = my name, plus the saved day structure for breaks. */
+          try {
+            const box = document.getElementById('dash-my-timetable');
+            if (box && supabase) {
+              const cpTT = await supabase.from('academic_periods').select('term,session').eq('is_current', true).maybeSingle().then(r => r.data || {}, () => ({}));
+              let tq = supabase.from('timetable').select('*').limit(4000);
+              if (cpTT.term) tq = tq.eq('term', cpTT.term);
+              if (cpTT.session) tq = tq.eq('session', cpTT.session);
+              const all = (await tq).data || [];
+              const meName2 = String((window.SC_PROFILE || {}).full_name || '').trim().toLowerCase();
+              const mineTT = all.filter(r => String(r.teacher || '').trim().toLowerCase() === meName2);
+              if (!meName2 || (!mineTT.length && App.isAdminRole(App.currentRole))) {
+                box.innerHTML = '<p style="color:var(--gray-500);font-size:.9rem">' + (App.isAdminRole(App.currentRole) ? 'Admins: every teacher sees their own week here. Build timetables in <a href="timetable-generator.html">Auto-Timetable</a> — personal teacher grids are printed there too.' : 'No published periods carry your name yet. Once the admin generates the timetable with you as a subject teacher, your week appears here automatically.') + '</p>';
+              } else if (!mineTT.length) {
+                box.innerHTML = '<p style="color:var(--gray-500);font-size:.9rem">No published periods carry your name yet. Once the admin generates the timetable with you as a subject teacher, your week appears here automatically.</p>';
+              } else {
+                let slots = [];
+                try { const cfg = await supabase.from('timetable_config').select('*').eq('class', 'ALL').order('position'); slots = (cfg.data || []).filter(x => x.label !== '__daycounts__' && Number(x.period_no) !== 0); } catch (_) {}
+                if (!slots.length) slots = [...new Set(mineTT.map(r => Number(r.period)))].sort((a, b) => a - b).map(pp => ({ period_no: pp, label: 'Period ' + pp, is_break: false }));
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                let h = '<div class="table-wrap"><table><thead><tr><th>Day</th>' + slots.map(s => '<th>' + (s.is_break ? '<i>' + esc(s.label) + '</i>' : esc(s.label)) + '</th>').join('') + '</tr></thead><tbody>';
+                days.forEach(d => { h += '<tr><td><b>' + d.slice(0, 3) + '</b></td>' + slots.map(s => { if (s.is_break) return '<td style="background:var(--gray-100)"></td>'; const x = mineTT.find(y => y.day === d && Number(y.period) === Number(s.period_no)); return '<td>' + (x ? '<b>' + esc(x.class) + '</b><br><small>' + esc(x.subject) + '</small>' : '<span style="color:#16a34a;font-size:.8rem">free</span>') + '</td>'; }).join('') + '</tr>'; });
+                h += '</tbody></table></div><p style="font-size:.8rem;color:var(--gray-500);margin:6px 0 0">' + mineTT.length + ' teaching period(s) this week · green = free.</p>';
+                box.innerHTML = h;
+              }
+            }
+          } catch (e) { console.warn('[dashboard] my-week timetable failed:', e); }
           /* V7.8 #3 EDUCATOR DIGEST: "Action needed today" strip — pending
              account approvals, unresolved complaints, pending leave requests,
              open helpdesk tickets, today's birthdays and unapplied promotion

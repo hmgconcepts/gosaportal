@@ -48,7 +48,7 @@ const Voting = {
   },
 
   /* Create a poll (admin/staff only) */
-  async createPoll({ title, description, candidates, type, opens_at, closes_at, allow_multiple, multi_winner, max_votes, anonymous, audience }) {
+  async createPoll({ title, description, candidates, type, opens_at, closes_at, allow_multiple, multi_winner, max_votes, anonymous, audience, class_scope }) {
     const supabase = this.sb || window.sb || null;
     const payload = {
       title: (title || '').trim(),
@@ -61,9 +61,11 @@ const Voting = {
       max_votes: Math.max(1, parseInt(max_votes || (allow_multiple || multi_winner ? 10 : 1), 10) || 1),
       anonymous: !!anonymous,
       audience: audience || 'all',
+      class_scope: class_scope || '',
       status: 'open',
       created_at: new Date().toISOString()
     };
+
 
     // Attach creator when signed in. This improves auditability and lets future RLS
     // policies distinguish the poll owner from other staff.
@@ -91,6 +93,13 @@ const Voting = {
       const legacyPayload = Object.assign({}, payload); delete legacyPayload.max_votes;
       const retry = await supabase.from('polls').insert(legacyPayload).select().single();
       data = retry.data; error = retry.error;
+    }
+    /* V8.2: databases without polls.class_scope yet — retry without it and warn. */
+    if (error && /class_scope/i.test(error.message || '')) {
+      const p2 = Object.assign({}, payload); delete p2.class_scope;
+      const retry2 = await supabase.from('polls').insert(p2).select().single();
+      data = retry2.data; error = retry2.error;
+      if (!error && typeof toast === 'function') toast('Class-scope column missing — run database/v8.2-voting-scope-and-dl.sql to enforce class-only voting.', 'warning', 9000);
     }
     if (error) return { error: error.message };
     await this.broadcastPollOpened(data);
