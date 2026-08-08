@@ -683,12 +683,19 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
   canWrite(moduleId) {
     // Use both App.currentRole and SC_PROFILE.role as fallbacks
     // This ensures role is always available, even before async profile load
-    const role = String(
+    /* V8.3 #1: ADMIN CONTROL IS NEVER LOST TO A RACE. Before auth resolves,
+       App.currentRole is 'guest' — which used to make every page render
+       read-only for admins on first paint. The cached profile (same device,
+       last session) now breaks the tie, exactly like report-cards does. */
+    let role = String(
       (window.App && App.currentRole) ||
       (window.SC_PROFILE && SC_PROFILE.role) ||
       document.body.dataset.currentRole ||
       ''
     ).toLowerCase().replace(/\s+/g,'_');
+    if (!role || role === 'guest') {
+      try { const c = JSON.parse(localStorage.getItem('sc-cached-profile') || 'null'); if (c && c.role) role = String(c.role).toLowerCase().replace(/\s+/g,'_'); } catch(_) {}
+    }
     const key = this.canonicalId(moduleId);
     const allow = this.WRITE_RULES[key];
     const owners=['super_admin','superadmin','admin','administrator','owner','director','proprietor'];if(owners.includes(role)||(window.App&&App.isOwnerRole&&App.isOwnerRole(role)))return true;if(['principal','head_teacher','headteacher','bursar'].includes(role))return !!(window.App&&App.canWriteModule&&App.canWriteModule(key,role));
