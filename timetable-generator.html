@@ -562,7 +562,21 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <b>🎓 Department option group (optional)</b> <small style="color:var(--gray-500)">— e.g. SS classes split by department in ONE period: Commerce (Commercial) / CRS (Arts) / Chemistry (Science). Tick 2+ subjects; they are scheduled TOGETHER in the same period, each with its own teacher, and every listed teacher is protected from clashes.</small>
           <div id="tt-group-subjects" style="display:flex;gap:10px 14px;flex-wrap:wrap;margin-top:6px"></div>
           <div style="margin-top:6px"><label>Periods per week for this group <input class="form-input" id="tt-group-ppw" type="number" value="4" min="1" max="15" style="width:90px;display:inline-block"></label>
+          <label style="margin-left:12px"><input type="checkbox" id="tt-group-pt" onchange="document.getElementById('tt-group-days').style.display=this.checked?'block':'none'"> One of these teachers is part-time / restricted-days</label>
           <button type="button" class="btn btn-sm btn-primary" onclick="TTG.addGroup()">＋ Add option group</button></div>
+          <!-- V8.5 #1: a slashed group inherits the STRICTEST member's availability —
+               the whole group can only sit where EVERY department teacher is present. -->
+          <div id="tt-group-days" style="display:none;margin-top:8px;padding:8px;border:1px dashed var(--gray-300);border-radius:8px">
+            <b>Days the group can hold</b> <small style="color:var(--gray-500)">(= days the part-time member is in school; the whole group meets only when ALL its teachers are available)</small>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px">
+              <label><input type="checkbox" class="tt-gday" value="Monday" onchange="TTG.groupDayToggled(this)"> Mon</label>
+              <label><input type="checkbox" class="tt-gday" value="Tuesday" onchange="TTG.groupDayToggled(this)"> Tue</label>
+              <label><input type="checkbox" class="tt-gday" value="Wednesday" onchange="TTG.groupDayToggled(this)"> Wed</label>
+              <label><input type="checkbox" class="tt-gday" value="Thursday" onchange="TTG.groupDayToggled(this)"> Thu</label>
+              <label><input type="checkbox" class="tt-gday" value="Friday" onchange="TTG.groupDayToggled(this)"> Fri</label>
+            </div>
+            <div id="tt-group-day-periods" style="margin-top:8px"></div>
+          </div>
         </div>
         <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject" onchange="TTG.subjectPicked()"><option value="">— choose subject —</option></select><div id="tt-teacher-auto" style="margin-top:6px;font-size:.85rem;color:#166534"></div></div><div class="form-group" id="tt-teacher-wrap" style="display:none"><label>Teacher <small>(only needed when the subject has no mapped teacher)</small></label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div></div>
         <div id="tt-days" style="display:none;margin:4px 0 12px"><b>Days this teacher is available:</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px"><label><input type="checkbox" class="tt-day" value="Monday" onchange="TTG.dayToggled(this)"> Mon</label><label><input type="checkbox" class="tt-day" value="Tuesday" onchange="TTG.dayToggled(this)"> Tue</label><label><input type="checkbox" class="tt-day" value="Wednesday" onchange="TTG.dayToggled(this)"> Wed</label><label><input type="checkbox" class="tt-day" value="Thursday" onchange="TTG.dayToggled(this)"> Thu</label><label><input type="checkbox" class="tt-day" value="Friday" onchange="TTG.dayToggled(this)"> Fri</label></div>
@@ -680,6 +694,10 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   /* V8.3 #4: department option group — 'Commerce / CRS / Chemistry' saved as ONE
      demand whose subject and teacher are slash-joined lists; the SQL engine's
      list-aware conflict check protects every listed teacher individually. */
+  groupDayToggled(cb){const host=document.getElementById('tt-group-day-periods');if(!host)return;const id='ttgdp-'+cb.value;
+    if(cb.checked){if(!document.getElementById(id)){const w=document.createElement('div');w.id=id;w.style.cssText='margin:4px 0';w.innerHTML='<label style="display:inline-flex;gap:8px;align-items:center">'+cb.value+' periods: <input class="form-input tt-gdp" data-day="'+cb.value+'" placeholder="e.g. 1,2,3 (blank = any)" style="width:220px"></label>';host.appendChild(w);}}
+    else{const w=document.getElementById(id);if(w)w.remove();}},
+  collectGroupDayPeriods(){const out={};let any=false;[...document.querySelectorAll('.tt-gdp')].forEach(inp=>{const day=inp.dataset.day,v=String(inp.value||'').trim();if(!v)return;const arr=v.split(/[\s,;]+/).map(x=>parseInt(x,10)).filter(x=>x>=1&&x<=12);if(arr.length){out[day]=arr;any=true;}});return any?out:null;},
   async addGroup(){const subs=[...document.querySelectorAll('.tt-gs:checked')].map(x=>x.value);
     if(subs.length<2){toast('Tick at least TWO subjects for an option group (e.g. Commerce + CRS + Chemistry).','warning');return;}
     const ppw=Number((document.getElementById('tt-group-ppw')||{}).value)||4;
@@ -693,13 +711,18 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     const step3=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
     const targets=[...new Set(step3.length?step3:ticked)];
     const subject=subs.join(' / '), teacher=teachers.join(' / ');
+    /* V8.5 #1: part-time member? The whole group inherits the restriction. */
+    const gpt=!!(document.getElementById('tt-group-pt')||{}).checked;
+    const gdays=gpt?[...document.querySelectorAll('.tt-gday:checked')].map(x=>x.value):null;
+    if(gpt&&(!gdays||!gdays.length)){toast('Tick the days the part-time member is available — the whole group can only meet on those days.','warning');return;}
+    const gPeriods=gpt?this.collectGroupDayPeriods():null;
     let ok=0,err=null;
     for(const cls of targets){
-      const r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:null,is_part_time:false,available_periods:null},{onConflict:'class,subject'});
+      const r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:gdays,is_part_time:gpt,available_periods:gPeriods},{onConflict:'class,subject'});
       if(r.error)err=err||r.error;else ok++;
     }
     if(err&&!ok){toast(err.message||err,'danger');return;}
-    toast('🎓 Option group saved for '+ok+' class(es): '+subject+' — one shared slot, '+ppw+'×/week.','success',9000);
+    toast('🎓 Option group saved for '+ok+' class(es): '+subject+' — one shared slot, '+ppw+'×/week'+(gpt?' · restricted to '+gdays.map(d=>d.slice(0,3)).join('/')+(gPeriods?' (specific periods set)':''):'')+'.','success',9000);
     [...document.querySelectorAll('.tt-gs:checked')].forEach(x=>x.checked=false);
     await this.loadReqs(targets[0]);},
   subjectPicked(){const s=this.val('tt-subject'),auto=document.getElementById('tt-teacher-auto'),wrap=document.getElementById('tt-teacher-wrap');const t=(this.subjectTeachers||{})[s]||'';

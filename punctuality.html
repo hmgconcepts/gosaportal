@@ -547,6 +547,7 @@
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
+<script src="assets/js/report-engine.js"></script>
 <script src="assets/js/crud.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
@@ -670,6 +671,19 @@ var Punct = {
        ca1/ca2/ca3/exam entries — if no columns exist yet, we say so and stop. */
     let cols = [], terms = [], sessions = [];
     try { if (window.ReportEngine && ReportEngine.reportPickerOptions) { const p = await ReportEngine.reportPickerOptions(); cols = p.columns || []; terms = p.terms || []; sessions = p.sessions || []; } } catch (_) {}
+    /* V8.4 #1 ROOT-CAUSE FIX: this page never loaded report-engine.js, so
+       ReportEngine was undefined and cols stayed [] even when the admin HAD
+       created columns — the "No report-card columns exist yet" message was a
+       false alarm. The script is now loaded above AND this direct fallback
+       reads assessment_columns itself so the modal can never lie again. */
+    if (!cols.length && window.sb) {
+      try {
+        const cr = await sb.from('assessment_columns').select('id,name,max_mark').order('position').limit(500);
+        const seen = new Set();
+        (cr.data || []).forEach(c => { const k = String(c.name||'').trim().toLowerCase(); if (!k || seen.has(k)) return; seen.add(k); cols.push({ id: c.id, name: c.name, max_mark: c.max_mark }); });
+        if (!terms.length) { const lr = await sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'); (lr.data||[]).forEach(l=>{ if(l.kind==='term'&&!terms.includes(l.value))terms.push(l.value); if(l.kind==='session'&&!sessions.includes(l.value))sessions.push(l.value); }); }
+      } catch (_) {}
+    }
     if (!cols.length) { openModal('🚀 Push Punctuality Points → Report Card', '<div class="notice" style="background:#fef3c7;border-color:#fcd34d;color:#92400e"><b>No report-card columns exist yet.</b><br>Punctuality points are written into a column of the official report card, and only an administrator can create columns.<br><br><b>Admin:</b> open <a href="report-cards.html">Report Cards</a> → “School-wide assessment columns (admin only)” → add a column (e.g. a dedicated “Punctuality” column with its maximum mark) → come back and push.</div>', '<button class="btn btn-outline" onclick="closeModal()">Close</button>'); return; }
     const opt = (v, l) => '<option value="' + this.esc(v) + '">' + this.esc(l) + '</option>';
     openModal('🚀 Push Punctuality Points → Report Card',
