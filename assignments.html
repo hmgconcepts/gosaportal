@@ -510,6 +510,25 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
       
       <div class="table-wrap"><table id="assignments-table"><thead><tr><th>Loading…</th></tr></thead><tbody><tr><td><span class="pulse">Loading…</span></td></tr></tbody></table></div>
+      <!-- V8.5 #2: students SEE why assignments matter — the accumulation is the incentive. -->
+      <div class="card" style="margin-top:16px;background:linear-gradient(135deg,#eef2ff,#faf5ff);border-color:#c7d2fe" data-role-allow="student parent">
+        <h3>🏆 Why your assignments earn points</h3>
+        <p style="line-height:1.7;margin:4px 0">Every assignment you complete — written homework, projects, practicals, presentations and CBT assignments — earns points that <b>accumulate for each subject</b> through the term. Your teacher can push your total straight into your <b>report card</b>. Every assignment counts: the more you do, the higher your report-card score climbs. 💪</p>
+        <div id="ap-my-points" style="margin-top:8px"><span class="pulse">Loading your points…</span></div>
+      </div>
+      <div class="card" style="margin-top:16px" data-staff-only>
+        <h3>🏅 Assignment points → Report card</h3>
+        <p class="help">Score any assignment per student (✍️ Score class). Every scored assignment for the same class + subject + term ACCUMULATES; the running totals below can be pushed into any report-card column in one click (scaled to the column's maximum mark).</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <div class="form-group"><label>Class</label><select class="form-select" id="ap-class"><option value="">— class —</option></select></div>
+          <div class="form-group"><label>Subject</label><select class="form-select" id="ap-subject"><option value="">— subject —</option></select></div>
+          <button class="btn btn-outline" onclick="AP.totals()">Σ Show accumulated totals</button>
+          <button class="btn btn-primary" onclick="AP.pushModal()" data-staff-only>🚀 Push totals → Report card</button>
+          <button class="btn btn-outline" onclick="AP.pullCBT()" data-staff-only title="Import CBT-assignment results into the accumulated totals">🖥️ Pull CBT assignment scores</button>
+          <a class="btn btn-outline" href="cbt.html" data-staff-only title="Create an automated CBT assignment — its scores can be pulled here">＋ Create CBT assignment</a>
+        </div>
+        <div id="ap-totals" style="margin-top:10px"></div>
+      </div>
       <script>document.addEventListener('DOMContentLoaded',function(){ if(window.CRUD) CRUD.renderList('assignments'); });</script>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
@@ -540,4 +559,158 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.Enterprise) Enterprise.init(sb);
   if (window.CRUD) CRUD.init(sb);
 </script>
-</body></html>
+
+<script>
+/* ====================================================================
+   V8.4 #2 — Assignment points engine (AP)
+   Score each assignment per student · totals accumulate per class+subject+term
+   · push accumulated % into ANY report-card column (scaled to its max mark).
+   ==================================================================== */
+const AP={
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  async init(){ if(!window.sb)return;
+    this.myPoints();
+    try{const {data}=await sb.from('classes').select('name').order('name');const el=document.getElementById('ap-class');(data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;el.appendChild(o);});}catch(_){ }
+    try{const {data}=await sb.from('subjects').select('name').order('name');const el=document.getElementById('ap-subject');(data||[]).forEach(s0=>{const o=document.createElement('option');o.value=s0.name;o.textContent=s0.name;el.appendChild(o);});}catch(_){ }
+    /* add a ✍️ Score button on every assignment row (staff only) */
+    setInterval(()=>{try{
+      const role=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+      const isStaff=(window.App&&App.isAdminRole&&App.isAdminRole(role))||['staff','teacher'].includes(role);
+      if(!isStaff)return;
+      document.querySelectorAll('#assignments-table tbody tr[data-id]').forEach(tr=>{
+        if(tr.querySelector('.ap-score-btn'))return;
+        const td=tr.querySelector('td:last-child'); if(!td||!/Edit|🔒/.test(td.textContent))return;
+        const b=document.createElement('button'); b.className='btn btn-sm btn-primary ap-score-btn'; b.textContent='✍️ Score class';
+        b.onclick=(e)=>{e.stopPropagation();AP.scoreModal(tr.getAttribute('data-id'));};
+        td.insertBefore(b, td.firstChild);
+      });
+    }catch(_){}} ,1200);
+  },
+  async myPoints(){
+    const box=document.getElementById('ap-my-points'); if(!box)return;
+    try{
+      for(let w=0;w<25&&!(window.SC_PROFILE&&SC_PROFILE.role);w++)await new Promise(r=>setTimeout(r,200));
+      const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if(!['student','parent'].includes(role)){box.innerHTML='';return;}
+      let sids=[];
+      if(role==='student'){const st=await sb.from('students').select('id,full_name').eq('user_id',SC_PROFILE.id);sids=(st.data||[]);}
+      else{const l=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);const ids=(l.data||[]).map(x=>x.student_id);if(ids.length){const st=await sb.from('students').select('id,full_name').in('id',ids);sids=(st.data||[]);}}
+      if(!sids.length){box.innerHTML='<p style="color:var(--gray-500);font-size:.85rem">Your account is not linked to a student record yet — points appear here once the admin links it.</p>';return;}
+      let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+      let q=sb.from('assignment_scores').select('*').in('student_id',sids.map(s=>s.id));
+      if(cp.term)q=q.eq('term',cp.term);
+      const r=await q.limit(2000);
+      if(r.error){box.innerHTML='';return;}
+      const by={};(r.data||[]).forEach(x=>{const k=x.student_name+'|'+x.subject;(by[k]=by[k]||{name:x.student_name,sub:x.subject,got:0,max:0,n:0});by[k].got+=Number(x.score)||0;by[k].max+=Number(x.max_score)||0;by[k].n++;});
+      const list=Object.values(by);
+      box.innerHTML=list.length?'<div class="table-wrap"><table><thead><tr><th>Student</th><th>Subject</th><th>Assignments</th><th>Points</th><th>%</th></tr></thead><tbody>'+list.map(t=>'<tr><td>'+AP.esc(t.name)+'</td><td>'+AP.esc(t.sub)+'</td><td>'+t.n+'</td><td>'+t.got+' / '+t.max+'</td><td><b>'+(t.max?Math.round(t.got/t.max*1000)/10:0)+'%</b></td></tr>').join('')+'</tbody></table></div>':'<p style="color:var(--gray-500);font-size:.85rem">No scored assignments yet this term — every one you submit earns points here.</p>';
+    }catch(_){box.innerHTML='';}
+  },
+  async pullCBT(){
+    const cls=(document.getElementById('ap-class')||{}).value,sub=(document.getElementById('ap-subject')||{}).value;
+    if(!cls||!sub){toast('Pick a class AND subject first.','warning');return;}
+    let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+    let eq=sb.from('cbt_exams').select('id,title,class,subject,term,session,assessment_type,max_score').eq('class',cls).eq('subject',sub);
+    if(cp.term)eq=eq.eq('term',cp.term);
+    const er=await eq.limit(200);
+    if(er.error){toast(er.error.message,'danger');return;}
+    const exams=(er.data||[]).filter(e=>/assign|homework|home work/i.test(String(e.assessment_type||'')+String(e.title||'')));
+    if(!exams.length){toast('No CBT ASSIGNMENTS found for '+cls+' · '+sub+' this term. Tip: put the word "Assignment" in the CBT title or assessment type, then pull again.','info',9000);return;}
+    const rr=await sb.from('cbt_results').select('*').in('exam_id',exams.map(e=>e.id)).limit(5000);
+    if(rr.error){toast(rr.error.message,'danger');return;}
+    const studs=(await sb.from('students').select('id,full_name,admission_no').eq('class',cls)).data||[];
+    const byName=new Map(studs.map(s0=>[String(s0.full_name||'').toLowerCase(),s0]));
+    let rows=[];
+    (rr.data||[]).forEach(x=>{
+      const st=byName.get(String(x.student_name||'').toLowerCase());
+      const ex=exams.find(e=>e.id===x.exam_id)||{};
+      if(!st)return;
+      rows.push({assignment_id:null,student_id:st.id,student_id_ref:st.admission_no||'',student_name:st.full_name,
+        class:cls,subject:sub,term:cp.term||null,session:cp.session||null,
+        score:Number(x.score)||0,max_score:Number(x.total||ex.max_score)||10,recorded_by:(window.SC_PROFILE&&SC_PROFILE.id)||null});
+    });
+    if(!rows.length){toast('CBT assignments exist but no student results yet.','info');return;}
+    let saved=0;
+    for(const row of rows){
+      const {error}=await sb.from('assignment_scores').insert(row);
+      if(!error)saved++;
+    }
+    toast('🖥️ Pulled '+saved+' CBT assignment result(s) into the accumulated totals. Click Σ to refresh.',saved?'success':'warning',9000);
+  },
+  async scoreModal(assignmentId){
+    if(!window.sb){toast('Database not configured','warning');return;}
+    const a=(await sb.from('assignments').select('*').eq('id',assignmentId).maybeSingle()).data;
+    if(!a){toast('Assignment not found','warning');return;}
+    const studs=(await sb.from('students').select('id,full_name,admission_no,class').eq('class',a.class||'').order('full_name')).data||[];
+    if(!studs.length){toast('No students registered in '+(a.class||'this class')+'.','warning');return;}
+    let cp={}; try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+    const existing=(await sb.from('assignment_scores').select('*').eq('assignment_id',assignmentId)).data||[];
+    const prior=new Map(existing.map(x=>[String(x.student_id),x]));
+    const maxDefault=10;
+    const rows=studs.map(s0=>{const pv=prior.get(String(s0.id));return '<tr data-sid="'+s0.id+'" data-ref="'+AP.esc(s0.admission_no||'')+'" data-name="'+AP.esc(s0.full_name)+'"><td>'+AP.esc(s0.full_name)+'<br><small>'+AP.esc(s0.admission_no||'')+'</small></td><td><input class="form-input ap-sc" type="number" min="0" style="width:90px" value="'+(pv?pv.score:'')+'" placeholder="—"></td></tr>';}).join('');
+    openModal('✍️ Score: '+AP.esc(a.title)+' ('+AP.esc(a.class||'')+' · '+AP.esc(a.subject||'')+')',
+      '<div style="display:flex;gap:12px;flex-wrap:wrap"><div class="form-group"><label>Assignment kind</label><select class="form-select" id="ap-kind" style="width:220px"><option>Written homework</option><option>Class exercise</option><option>Project</option><option>Practical</option><option>Presentation</option><option>Group work</option><option>Reading task</option><option>CBT assignment (auto-marked)</option></select></div>'+
+      '<div class="form-group"><label>Maximum mark for THIS assignment</label><input class="form-input" id="ap-max" type="number" value="'+((existing[0]&&existing[0].max_score)||maxDefault)+'" min="1" style="width:120px"></div></div>'+
+      '<div class="table-wrap" style="max-height:50vh;overflow:auto"><table><thead><tr><th>Student</th><th>Score</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<p style="font-size:.8rem;color:var(--gray-500)">Blank = not submitted (excluded from totals). Saved scores accumulate on the Σ totals below.</p>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="AP.saveScores(\''+assignmentId+'\')">💾 Save scores</button>');
+    this._ctx={a:a,cp:cp};
+  },
+  async saveScores(assignmentId){
+    const a=this._ctx&&this._ctx.a, cp=(this._ctx&&this._ctx.cp)||{};
+    const max=Number((document.getElementById('ap-max')||{}).value)||10;
+    const rows=[...document.querySelectorAll('tr[data-sid]')].map(tr=>{
+      const v=tr.querySelector('.ap-sc').value;
+      if(v==='')return null;
+      return {assignment_id:assignmentId,student_id:tr.getAttribute('data-sid'),student_id_ref:tr.getAttribute('data-ref'),student_name:tr.getAttribute('data-name'),
+        class:(a&&a.class)||'',subject:(a&&a.subject)||'',term:cp.term||null,session:cp.session||null,
+        score:Math.min(Number(v)||0,max),max_score:max,recorded_by:(window.SC_PROFILE&&SC_PROFILE.id)||null};
+    }).filter(Boolean);
+    if(!rows.length){toast('Enter at least one score.','warning');return;}
+    const r=await sb.from('assignment_scores').upsert(rows,{onConflict:'assignment_id,student_id'});
+    if(r.error){toast(/assignment_scores/.test(r.error.message)?'Run database/v8.4-assignment-dl-points.sql (or the latest complete-schema.sql) first.':r.error.message,'danger',9000);return;}
+    closeModal();toast('💾 Saved '+rows.length+' score(s). They now count in the accumulated totals.','success',7000);
+  },
+  async totals(){
+    const cls=(document.getElementById('ap-class')||{}).value,sub=(document.getElementById('ap-subject')||{}).value;
+    const box=document.getElementById('ap-totals');
+    if(!cls||!sub){box.innerHTML='<p style="color:var(--gray-500)">Pick a class AND subject first.</p>';return;}
+    let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+    let q=sb.from('assignment_scores').select('*').eq('class',cls).eq('subject',sub);
+    if(cp.term)q=q.eq('term',cp.term); if(cp.session)q=q.eq('session',cp.session);
+    const r=await q.limit(5000);
+    if(r.error){box.innerHTML='<p style="color:#b91c1c">'+AP.esc(/assignment_scores/.test(r.error.message)?'Run database/v8.4-assignment-dl-points.sql first.':r.error.message)+'</p>';return;}
+    const by={};(r.data||[]).forEach(x=>{const k=String(x.student_id);(by[k]=by[k]||{name:x.student_name,ref:x.student_id_ref,sid:x.student_id,got:0,max:0,n:0});by[k].got+=Number(x.score)||0;by[k].max+=Number(x.max_score)||0;by[k].n++;});
+    const list=Object.values(by).sort((a,b)=>(b.got/(b.max||1))-(a.got/(a.max||1)));
+    this._totals={list:list,cls:cls,sub:sub,cp:cp};
+    box.innerHTML=list.length?'<div class="table-wrap"><table><thead><tr><th>Student</th><th>Assignments scored</th><th>Points</th><th>%</th></tr></thead><tbody>'+list.map(t=>'<tr><td><b>'+AP.esc(t.name)+'</b><br><small>'+AP.esc(t.ref||'')+'</small></td><td>'+t.n+'</td><td>'+t.got+' / '+t.max+'</td><td><b>'+(t.max?Math.round(t.got/t.max*1000)/10:0)+'%</b></td></tr>').join('')+'</tbody></table></div>':'<p style="color:var(--gray-500)">No assignment scores recorded yet for '+AP.esc(cls)+' · '+AP.esc(sub)+(cp.term?' · '+AP.esc(cp.term):'')+'. Use ✍️ Score class on an assignment above.</p>';
+  },
+  async pushModal(){
+    if(!this._totals||!this._totals.list.length){toast('Click Σ Show accumulated totals first (pick class + subject).','warning');return;}
+    let cols=[];
+    try{if(window.ReportEngine&&ReportEngine.reportPickerOptions){const p=await ReportEngine.reportPickerOptions();cols=p.columns||[];}}catch(_){ }
+    if(!cols.length&&window.sb){try{const cr=await sb.from('assessment_columns').select('id,name,max_mark').order('position').limit(500);const seen=new Set();(cr.data||[]).forEach(c=>{const k=String(c.name||'').toLowerCase();if(!k||seen.has(k))return;seen.add(k);cols.push(c);});}catch(_){ }}
+    if(!cols.length){openModal('🚀 Push assignment points','<div class="notice">No report-card columns exist yet. Admin: Report Cards → “School-wide assessment columns” → add e.g. an “Assignment” column → return here.</div>','<button class="btn btn-outline" onclick="closeModal()">Close</button>');return;}
+    openModal('🚀 Push accumulated assignment points → Report card',
+      '<p>'+this._totals.list.length+' student total(s) for <b>'+AP.esc(this._totals.cls)+' · '+AP.esc(this._totals.sub)+'</b> will be written into the chosen column, scaled to its max mark.</p>'+
+      '<div class="form-group"><label>Destination column</label><select class="form-select" id="ap-col">'+cols.map(c=>'<option value="'+c.id+'" data-max="'+(c.max_mark||10)+'">'+AP.esc(c.name)+' (max '+(c.max_mark||10)+')</option>').join('')+'</select></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="AP.push()">🚀 Push now</button>');
+  },
+  async push(){
+    const sel=document.getElementById('ap-col'),colId=sel.value,colMax=Number(sel.selectedOptions[0].dataset.max)||10;
+    const t=this._totals;
+    const rows=t.list.map(x=>({column_id:colId,student_id:x.sid||null,student_id_ref:x.ref||'',student_name:x.name,
+      class:t.cls,subject:t.sub,term:(t.cp&&t.cp.term)||'',session:(t.cp&&t.cp.session)||'',
+      score:Math.round(((x.max?x.got/x.max:0)*colMax)*10)/10,source:'assignments'}));
+    let saved=0,failed=0;
+    try{const r=await sb.rpc('sc_save_report_score',{p_rows:rows});
+      if(r.data&&r.data.ok!==false){saved=Number(r.data.saved||rows.length);failed=Number(r.data.blocked||0);}else throw new Error((r.data&&r.data.error)||(r.error&&r.error.message)||'RPC failed');
+    }catch(e){
+      for(const row of rows){const q=await sb.from('report_scores').upsert(row,{onConflict:'column_id,student_id_ref,student_name,class,subject,term,session'});if(q.error)failed++;else saved++;}
+    }
+    closeModal();toast('🚀 Pushed '+saved+' score(s) into the report card'+(failed?' · '+failed+' failed':'')+'. Open Report Cards to see them.',failed?'warning':'success',9000);
+    if(window.App&&App.logActivity)App.logActivity('push','assignment_scores',t.cls+'|'+t.sub);
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>AP.init());
+</script></body></html>

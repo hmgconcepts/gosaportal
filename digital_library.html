@@ -502,6 +502,17 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <h3>📖 Readings</h3>
         <div id="dl-list"><span class="pulse">Loading…</span></div>
       </div>
+      <div class="card" style="margin-top:16px" data-staff-only>
+        <h3>🏅 Digital-library points → Report card</h3>
+        <p class="help">Every quiz a student completes ACCUMULATES per class + subject + term. Show the running totals, then push them into any report-card column in one click (scaled to the column's maximum mark).</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <div class="form-group"><label>Class</label><select class="form-select" id="dlp-class"><option value="">— class —</option></select></div>
+          <div class="form-group"><label>Subject</label><select class="form-select" id="dlp-subject"><option value="">— subject —</option></select></div>
+          <button class="btn btn-outline" onclick="DLP.totals()">Σ Show accumulated totals</button>
+          <button class="btn btn-primary" onclick="DLP.pushModal()">🚀 Push totals → Report card</button>
+        </div>
+        <div id="dlp-totals" style="margin-top:10px"></div>
+      </div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -695,17 +706,75 @@ const DL={ qs:[],
   async submit(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[]; var correct=0;
     var normTxt=function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();};
     qs.forEach(function(q,j){ var t=q.type||'mcq';
-      if(t==='mcq'||t==='tf'){ var sel=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel&&sel.value===q.answer) correct++; }
-      else if(t==='multi'){ var picked=[...document.querySelectorAll('input[name="dq'+j+'"]:checked')].map(function(x){return x.value;}).sort(); var want=(q.answers||[]).slice().sort(); if(picked.length&&picked.length===want.length&&picked.every(function(v,k){return normTxt(v)===normTxt(want[k]);})) correct++; }
+      if(t==='mcq'||t==='tf'){ var sel=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel&&normTxt(sel.value)===normTxt(q.answer)) correct++; }
+      else if(t==='multi'){ var picked=[...document.querySelectorAll('input[name="dq'+j+'"]:checked')].map(function(x){return normTxt(x.value);}).sort(); var want=(q.answers||[]).map(normTxt).sort(); if(picked.length&&picked.length===want.length&&picked.every(function(v,k){return v===want[k];})) correct++; }
       else if(t==='short'){ var inp=document.querySelector('input[name="dq'+j+'"]'); if(inp&&normTxt(inp.value)===normTxt(q.answer)) correct++; }
       else if(t==='keyword'){ var inp2=document.querySelector('input[name="dq'+j+'"]'); var txt=normTxt(inp2&&inp2.value); var kws=String(q.keywords||'').split(',').map(normTxt).filter(Boolean); if(txt&&kws.some(function(k){return txt.indexOf(k)!==-1;})) correct++; }
     });
     var max=Number(b.max_score||qs.length); var score=Math.round((correct/qs.length)*max*10)/10;
     var me=(window.App&&App.user)?App.user:null; var name=(me&&me.full_name)||(window.SC_PROFILE&&SC_PROFILE.full_name)||'';
     if(!name){ name=prompt('Enter your full name to record this score:')||''; }
-    if(sb&&name){ try{ await sb.from('reading_scores').insert({ student_name:name, subject:b.subject, class:b.class, book_id:b.id, score:score, max_score:max, source:'digital_library' }); }catch(e){} }
+    if(sb&&name){ try{
+      let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+      let ref='';try{if(window.SC_PROFILE){const st=await sb.from('students').select('admission_no').eq('user_id',SC_PROFILE.id).maybeSingle();ref=(st.data&&st.data.admission_no)||'';}}catch(_){ }
+      let r=await sb.from('reading_scores').insert({ student_name:name, student_id_ref:ref||null, subject:b.subject, class:b.class, book_id:b.id, score:score, max_score:max, source:'digital_library', term:cp.term||null, session:cp.session||null });
+      if(r.error&&/term|session|student_id_ref/.test(r.error.message||'')){ await sb.from('reading_scores').insert({ student_name:name, subject:b.subject, class:b.class, book_id:b.id, score:score, max_score:max, source:'digital_library' }); }
+    }catch(e){} }
     closeModal(); toast('You scored '+score+' / '+max+' — recorded ✓','success',6000);
   }
 };
 document.addEventListener('DOMContentLoaded',()=>DL.init()); DL.init();
+</script>
+<script>
+/* V8.4 #3 — Digital-library points accumulation + push (DLP). */
+const DLP={
+  esc(s){return String(s==null?'':s).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));},
+  async init(){ if(!window.sb)return;
+    try{const {data}=await sb.from('classes').select('name').order('name');const el=document.getElementById('dlp-class');if(el)(data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;el.appendChild(o);});}catch(_){ }
+    try{const {data}=await sb.from('subjects').select('name').order('name');const el=document.getElementById('dlp-subject');if(el)(data||[]).forEach(s0=>{const o=document.createElement('option');o.value=s0.name;o.textContent=s0.name;el.appendChild(o);});}catch(_){ }
+  },
+  async totals(){
+    const cls=(document.getElementById('dlp-class')||{}).value,sub=(document.getElementById('dlp-subject')||{}).value;
+    const box=document.getElementById('dlp-totals');
+    if(!cls||!sub){box.innerHTML='<p style=\"color:var(--gray-500)\">Pick a class AND subject first.</p>';return;}
+    let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+    let q=sb.from('reading_scores').select('*').eq('class',cls).eq('subject',sub);
+    let r=await q.limit(5000);
+    if(r.error){box.innerHTML='<p style=\"color:#b91c1c\">'+DLP.esc(r.error.message)+'</p>';return;}
+    let rows=r.data||[];
+    /* prefer the current term's rows when the term columns exist and are stamped */
+    if(cp.term&&rows.some(x=>x.term)){rows=rows.filter(x=>!x.term||x.term===cp.term);}
+    const by={};rows.forEach(x=>{const k=(x.student_id_ref||'')+'|'+String(x.student_name||'').toLowerCase();(by[k]=by[k]||{name:x.student_name,ref:x.student_id_ref,got:0,max:0,n:0});by[k].got+=Number(x.score)||0;by[k].max+=Number(x.max_score)||0;by[k].n++;});
+    const list=Object.values(by).sort((a,b)=>(b.got/(b.max||1))-(a.got/(a.max||1)));
+    this._totals={list:list,cls:cls,sub:sub,cp:cp};
+    box.innerHTML=list.length?'<div class=\"table-wrap\"><table><thead><tr><th>Student</th><th>Quizzes</th><th>Points</th><th>%</th></tr></thead><tbody>'+list.map(t=>'<tr><td><b>'+DLP.esc(t.name)+'</b><br><small>'+DLP.esc(t.ref||'')+'</small></td><td>'+t.n+'</td><td>'+t.got+' / '+t.max+'</td><td><b>'+(t.max?Math.round(t.got/t.max*1000)/10:0)+'%</b></td></tr>').join('')+'</tbody></table></div>':'<p style=\"color:var(--gray-500)\">No quiz scores yet for '+DLP.esc(cls)+' · '+DLP.esc(sub)+'. Students take quizzes on the readings above.</p>';
+  },
+  async pushModal(){
+    if(!this._totals||!this._totals.list.length){toast('Click Σ Show accumulated totals first.','warning');return;}
+    let cols=[];
+    try{if(window.ReportEngine&&ReportEngine.reportPickerOptions){const p=await ReportEngine.reportPickerOptions();cols=p.columns||[];}}catch(_){ }
+    if(!cols.length&&window.sb){try{const cr=await sb.from('assessment_columns').select('id,name,max_mark').order('position').limit(500);const seen=new Set();(cr.data||[]).forEach(c=>{const k=String(c.name||'').toLowerCase();if(!k||seen.has(k))return;seen.add(k);cols.push(c);});}catch(_){ }}
+    if(!cols.length){openModal('🚀 Push digital-library points','<div class=\"notice\">No report-card columns exist yet. Admin: Report Cards → “School-wide assessment columns” → add e.g. a “Reading/Project” column → return here.</div>','<button class=\"btn btn-outline\" onclick=\"closeModal()\">Close</button>');return;}
+    openModal('🚀 Push accumulated reading points → Report card',
+      '<p>'+this._totals.list.length+' student total(s) for <b>'+DLP.esc(this._totals.cls)+' · '+DLP.esc(this._totals.sub)+'</b> will be scaled into the chosen column.</p>'+
+      '<div class=\"form-group\"><label>Destination column</label><select class=\"form-select\" id=\"dlp-col\">'+cols.map(c=>'<option value=\"'+c.id+'\" data-max=\"'+(c.max_mark||10)+'\">'+DLP.esc(c.name)+' (max '+(c.max_mark||10)+')</option>').join('')+'</select></div>',
+      '<button class=\"btn btn-outline\" onclick=\"closeModal()\">Cancel</button><button class=\"btn btn-primary\" onclick=\"DLP.push()\">🚀 Push now</button>');
+  },
+  async push(){
+    const sel=document.getElementById('dlp-col'),colId=sel.value,colMax=Number(sel.selectedOptions[0].dataset.max)||10;
+    const t=this._totals;
+    const rows=t.list.map(x=>({column_id:colId,student_id:null,student_id_ref:x.ref||'',student_name:x.name,
+      class:t.cls,subject:t.sub,term:(t.cp&&t.cp.term)||'',session:(t.cp&&t.cp.session)||'',
+      score:Math.round(((x.max?x.got/x.max:0)*colMax)*10)/10,source:'digital_library'}));
+    let saved=0,failed=0;
+    try{const r=await sb.rpc('sc_save_report_score',{p_rows:rows});
+      if(r.data&&r.data.ok!==false){saved=Number(r.data.saved||rows.length);failed=Number(r.data.blocked||0);}else throw new Error((r.data&&r.data.error)||(r.error&&r.error.message)||'RPC failed');
+    }catch(e){
+      for(const row of rows){const q=await sb.from('report_scores').upsert(row,{onConflict:'column_id,student_id_ref,student_name,class,subject,term,session'});if(q.error)failed++;else saved++;}
+    }
+    closeModal();toast('🚀 Pushed '+saved+' reading score(s) into the report card'+(failed?' · '+failed+' failed':'')+'.',failed?'warning':'success',9000);
+    if(window.App&&App.logActivity)App.logActivity('push','reading_scores',t.cls+'|'+t.sub);
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>DLP.init());
 </script></body></html>
