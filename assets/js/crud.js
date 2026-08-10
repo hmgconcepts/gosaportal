@@ -1329,6 +1329,18 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
        V7.5 #4 extends this: today's date, current month/year and the signed-in
        staff member's own name are also pre-filled on NEW records. */
     if (!id) setTimeout(() => { try { this.autofillPeriod(); this.autofillToday(); } catch(_) {} }, 250);
+    /* V8.5 #3: LIVE net-pay preview on the payroll form — earnings minus ALL
+       deductions recompute as the bursar types, so the figure is verifiably
+       right before saving (the DB trigger remains the authority on save). */
+    if (['payroll','hr'].includes(this.canonicalId(moduleId))) setTimeout(() => { try {
+      const F=['basic','allowances','bonus','overtime','tax','pension','loan_deduction','other_deductions'];
+      const netEl=document.getElementById('cf-net_pay'); if(!netEl) return;
+      const recompute=()=>{ const v=k=>Number((document.getElementById('cf-'+k)||{}).value)||0;
+        const net=Math.max(0,(v('basic')+v('allowances')+v('bonus')+v('overtime'))-(v('tax')+v('pension')+v('loan_deduction')+v('other_deductions')));
+        netEl.value=net; netEl.style.fontWeight='800'; netEl.style.color=net>0?'#166534':'#b91c1c'; };
+      F.forEach(k=>{ const el=document.getElementById('cf-'+k); if(el) el.addEventListener('input',recompute); });
+      recompute();
+    } catch(_) {} }, 300);
   },
 
   /* When a ref dropdown with autofill changes (e.g. pick a student), copy
