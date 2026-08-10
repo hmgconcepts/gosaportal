@@ -4747,14 +4747,40 @@ alter table public.payroll add column if not exists other_deductions numeric def
 alter table public.payroll add column if not exists deductions numeric default 0;
 
 do $$
+declare v record; view_defs jsonb := '[]'::jsonb;
 begin
   if exists (
     select 1 from information_schema.columns
      where table_schema='public' and table_name='payroll'
        and column_name='net_pay' and is_generated='ALWAYS') then
+    -- V8.8: dependent views (e.g. staff_salary_overview) block a plain DROP
+    -- COLUMN. Save every dependent view's definition, drop them, rebuild the
+    -- column, then recreate each view exactly as it was.
+    for v in
+      select distinct vcu.view_name
+        from information_schema.view_column_usage vcu
+       where vcu.table_schema='public' and vcu.table_name='payroll'
+         and vcu.view_schema='public'
+    loop
+      view_defs := view_defs || jsonb_build_object(
+        'name', v.view_name,
+        'def',  pg_get_viewdef(('public.'||quote_ident(v.view_name))::regclass, true));
+      execute format('drop view if exists public.%I cascade', v.view_name);
+      raise notice 'Temporarily dropped dependent view %', v.view_name;
+    end loop;
     alter table public.payroll drop column net_pay;
     alter table public.payroll add column net_pay numeric default 0;
     raise notice 'net_pay was GENERATED — rebuilt as a plain trigger-computed column.';
+    for v in select value->>'name' as name, value->>'def' as def
+               from jsonb_array_elements(view_defs)
+    loop
+      begin
+        execute format('create or replace view public.%I as %s', v.name, v.def);
+        raise notice 'Recreated dependent view %', v.name;
+      exception when others then
+        raise notice 'Could not recreate view % automatically (%). Recreate it manually if still needed.', v.name, sqlerrm;
+      end;
+    end loop;
   end if;
   if not exists (
     select 1 from information_schema.columns
