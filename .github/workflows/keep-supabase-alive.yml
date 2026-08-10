@@ -1,5 +1,5 @@
 # ============================================================
-# Keep Supabase Alive — automated free-tier protection
+# Keep Supabase Alive — automated free-tier protection (V8.9)
 # ------------------------------------------------------------
 # Supabase pauses FREE-tier projects after ~7 days without
 # database activity. This workflow performs a REAL database
@@ -13,10 +13,19 @@
 #     SUPABASE_URL        e.g. https://abcdefgh.supabase.co
 #     SUPABASE_ANON_KEY   your project's anon/public key
 #
-# NOTE: GitHub disables scheduled workflows in repos with no
-# commits for 60 days. The site-visit heartbeat built into
-# assets/js/app.js and the optional UptimeRobot monitor cover
-# that gap — see SUPABASE_FREE_TIER_PROTECTION.md.
+# V8.9 — FULLY SELF-SUSTAINING:
+#   1. WATCHDOG: after writing the heartbeat, the workflow now
+#      VERIFIES the database really recorded it ("heartbeat
+#      written" in the RPC response). If verification fails the
+#      run fails loudly and GitHub emails you automatically.
+#   2. SELF-COMMITTING: GitHub disables *scheduled* workflows in
+#      repos with no commits for 60 days. This workflow now
+#      resets that clock BY ITSELF — whenever the repository's
+#      last commit is older than 30 days, it commits a tiny
+#      timestamp file (.github/last-keepalive.txt) and pushes.
+#      Result: the 60-day freeze can never be reached. No human
+#      action, no second account, no external service required.
+#      (Details: SUPABASE_FREE_TIER_PROTECTION.md — Layer 9.)
 # ============================================================
 name: Keep Supabase Alive
 
@@ -26,7 +35,11 @@ on:
     - cron: '17 6 * * 1,4'
   workflow_dispatch: {}
 
-permissions: {}
+# "contents: write" is required ONLY by the self-commit step below (Layer 9).
+# It grants this workflow's built-in GITHUB_TOKEN push access to THIS repo
+# and nothing else.
+permissions:
+  contents: write
 
 jobs:
   heartbeat:
@@ -50,9 +63,47 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"src":"github-actions"}')
           echo "Response: $(cat /tmp/resp.txt)"
-          if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
-            echo "✅ Keep-alive heartbeat written (HTTP $code). Supabase inactivity timer reset."
-          else
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
             echo "::error::Keep-alive failed (HTTP $code). If the RPC is missing, run database/keep-alive.sql (or the full database/complete-schema.sql) in the Supabase SQL Editor."
             exit 1
+          fi
+          # V8.9 WATCHDOG: HTTP 200 alone is not proof — confirm the database
+          # actually confirmed the write. sc_keep_alive() returns the text
+          # "heartbeat written at <timestamp>" only after a successful UPDATE.
+          if grep -q "heartbeat written" /tmp/resp.txt; then
+            echo "✅ Keep-alive heartbeat written AND verified (HTTP $code). Supabase inactivity timer reset."
+          else
+            echo "::error::HTTP $code received but the response does not confirm a database write. Run database/keep-alive.sql once in the Supabase SQL Editor, then re-run this workflow."
+            exit 1
+          fi
+
+      # ---------- V8.9 Layer 9: self-commit — resets GitHub's 60-day clock ----------
+      # GitHub disables scheduled workflows after 60 days without a commit.
+      # Whenever the last commit is older than 30 days, this step commits a
+      # one-line timestamp file, so the repository NEVER looks inactive.
+      # Fully automatic; commits at most ~once a month; "[skip ci]" prevents
+      # the push from triggering other workflows.
+      - name: Check out repository (needed for the self-commit step)
+        uses: actions/checkout@v4
+
+      - name: Self-commit to reset the 60-day scheduler clock (only when needed)
+        run: |
+          set -e
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          age_days=$(( (now - last) / 86400 ))
+          echo "Last commit was ${age_days} day(s) ago."
+          if [ "$age_days" -lt 30 ]; then
+            echo "✅ Repository is active (last commit < 30 days). No self-commit needed — GitHub's 60-day scheduler freeze is not a risk."
+            exit 0
+          fi
+          git config user.name  "sc-keepalive-bot"
+          git config user.email "keepalive-bot@users.noreply.github.com"
+          date -u +"Last automated keepalive commit: %Y-%m-%dT%H:%M:%SZ" > .github/last-keepalive.txt
+          git add .github/last-keepalive.txt
+          git commit -m "chore: automated keepalive commit — resets GitHub's 60-day scheduler clock [skip ci]"
+          if git push; then
+            echo "✅ Self-commit pushed. GitHub's 60-day scheduled-workflow freeze clock has been reset automatically."
+          else
+            echo "::warning::Could not push the keepalive commit (branch protection or restricted workflow permissions?). Enable it via repo Settings → Actions → General → Workflow permissions → 'Read and write permissions', or push any small commit manually before the 60-day mark."
           fi
