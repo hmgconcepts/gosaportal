@@ -491,6 +491,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <div class="form-group" style="grid-column:1/-1"><label>Instructions</label><textarea class="form-input" id="dl-inst" rows="2"></textarea></div>
           <div class="form-group"><label>Due date</label><input class="form-input" type="date" id="dl-due"></div>
           <div class="form-group"><label>Max score (counts to grade)</label><input class="form-input" type="number" id="dl-max" value="10"></div>
+          <div class="form-group"><label>Quiz attempts allowed</label><select class="form-select" id="dl-attempts"><option value="1">Once only (default)</option><option value="2">2 attempts</option><option value="3">3 attempts</option><option value="0">Unlimited (practice)</option></select></div>
         </div>
         <h4 style="margin:6px 0">❓ Comprehension questions (optional, auto-marked)</h4>
         <div id="dl-qs"></div>
@@ -581,8 +582,10 @@ const DL={ qs:[],
     var rec={ title:title, author:document.getElementById('dl-author').value, subject:document.getElementById('dl-subject').value,
       class:document.getElementById('dl-class').value, read_link:link, instructions:document.getElementById('dl-inst').value,
       due_date:document.getElementById('dl-due').value||null, has_quiz:this.qs.length>0, questions:this.qs,
-      max_score:Number(document.getElementById('dl-max').value||0) };
+      max_score:Number(document.getElementById('dl-max').value||0),
+      attempts_allowed:Number((document.getElementById('dl-attempts')||{}).value??1) };
     var {error}=await sb.from('digital_library').insert(rec);
+    if(error&&/attempts_allowed/.test(error.message||'')){delete rec.attempts_allowed;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Attempt-limit column missing on this database — run database/v8.7-payroll-rebuild.sql to enforce limits.','warning',9000);}
     if(error){toast(error.message,'danger',6000);return;} toast('Reading saved ✓','success'); this.qs=[]; this.render(); this.list();
   },
   _books:[],
@@ -715,6 +718,24 @@ const DL={ qs:[],
     if(!Array.isArray(qs))qs=[];
     b.questions=qs;
     if(!qs.length){toast('No questions on this reading.','info');return;}
+    /* V8.7 #1: ATTEMPT LIMIT — once (default) or as set by the teacher. */
+    var allowed=(b.attempts_allowed==null?1:Number(b.attempts_allowed));
+    if(allowed>0&&window.sb){
+      var self=this;
+      return (async function(){
+        var me=(window.SC_PROFILE&&SC_PROFILE.full_name)||'';
+        if(me){
+          var prev=await sb.from('reading_scores').select('id').eq('book_id',b.id).eq('student_name',me).limit(50);
+          var used=(prev.data||[]).length;
+          if(used>=allowed){toast('You have used your '+allowed+' attempt'+(allowed>1?'s':'')+' on this quiz. Your best effort is already recorded — ask your teacher if you need another try.','warning',9000);return;}
+          if(used>0)toast('Attempt '+(used+1)+' of '+allowed+'.','info',5000);
+        }
+        self._openQuiz(i,qs,b);
+      })();
+    }
+    this._openQuiz(i,qs,b);
+  },
+  _openQuiz(i,qs,b){
     var html=qs.map(function(q,j){ var t=q.type||'mcq'; var inner='';
       if(t==='mcq') inner=(q.options||[]).filter(Boolean).map(function(op){return '<label style="display:block"><input type="radio" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>';}).join('');
       else if(t==='multi') inner=(q.options||[]).filter(Boolean).map(function(op){return '<label style="display:block"><input type="checkbox" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>';}).join('')+'<small style="color:#64748b">Tick ALL correct options.</small>';
