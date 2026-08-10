@@ -1539,10 +1539,20 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     if (d.table === 'results' && !id) {
       payload.assessment_source = payload.assessment_source || 'manual';
     }
-    // ENTERPRISE V6 (issue 27): net_pay is a DB-computed column (GENERATED or
-    // trigger). Sending it caused: cannot insert a non-DEFAULT value into
-    // column "net_pay". We now NEVER send it — the database computes it.
-    if (d.table === 'payroll') { delete payload.net_pay; }
+    /* V8.6 #1 ROOT-CAUSE FIX (payroll net wrong AFTER save on some installs):
+       we used to NEVER send net_pay and trust the DB trigger — but databases
+       installed before the trigger existed (or with an older additive-only
+       version) stored a WRONG or stale net. Now the client sends the
+       CORRECTLY computed net (earnings − ALL deductions); on modern DBs the
+       trigger recomputes the identical figure, and on DBs where net_pay is a
+       GENERATED column the self-heal below strips it and retries. Every
+       database version now ends up with the right number. */
+    if (d.table === 'payroll') {
+      const pv = k => Number(payload[k]) || 0;
+      payload.net_pay = Math.max(0,
+        (pv('basic') + pv('allowances') + pv('bonus') + pv('overtime')) -
+        (pv('tax') + pv('pension') + pv('loan_deduction') + pv('other_deductions') + pv('deductions')));
+    }
     if(d.table==='fee_payments'&&window.SC_PROFILE){if(!id&&!payload.received_by)payload.received_by=SC_PROFILE.id||null;if(!payload.received_by_name)payload.received_by_name=SC_PROFILE.full_name||SC_PROFILE.email||'';if(!payload.payment_date)payload.payment_date=new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});}
     // ENTERPRISE V11 (issue 13): auto-compute fee balance when blank
     if (d.table === 'fee_payments' && payload.balance == null && payload.fee_total != null) {
@@ -1596,8 +1606,8 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     // for module_records tables tuck it into data{} instead — and retry.
     let guard = 0;
     while (res.error && guard < 6) {
-      const m = String(res.error.message || '').match(/find the '([A-Za-z0-9_]+)' column|column "?([A-Za-z0-9_]+)"? (?:of|does not exist)/i);
-      const bad = m && (m[1] || m[2]);
+      const m = String(res.error.message || '').match(/find the '([A-Za-z0-9_]+)' column|column "?([A-Za-z0-9_]+)"? (?:of|does not exist)|non-DEFAULT value into column "?([A-Za-z0-9_]+)"?/i);
+      const bad = m && (m[1] || m[2] || m[3]);
       if (!bad || !(bad in payload)) break;
       if (d.generic || d.table === 'module_records') { payload.data = payload.data || {}; payload.data[bad] = payload[bad]; }
       console.warn('[CRUD] Column "' + bad + '" missing in DB — retrying without it. Run database/update-v6-schema.sql to add it permanently.');
@@ -1994,7 +2004,16 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const deductions = [['Tax (PAYE)', n('tax')], ['Pension', n('pension')], ['Loan repayment', n('loan_deduction')], ['Other deductions', n('other_deductions')]].filter(r => r[1]);
     const gross = earnings.reduce((a, b) => a + b[1], 0);
     const totalDed = deductions.reduce((a, b) => a + b[1], 0);
-    const net = p.net_pay != null ? Number(p.net_pay) : gross - totalDed;
+    /* V8.6 #1: the payslip TRUSTS ARITHMETIC, not a possibly-stale stored value.
+       If the stored net disagrees with gross − deductions (legacy rows saved
+       before the trigger), the recomputed figure prints and the row is
+       silently repaired in the database. */
+    const computedNet = Math.max(0, gross - totalDed);
+    let net = p.net_pay != null ? Number(p.net_pay) : computedNet;
+    if (Math.abs(net - computedNet) > 0.01) {
+      net = computedNet;
+      try { this.sb.from('payroll').update({ net_pay: computedNet }).eq('id', id).then(()=>{}); } catch(_) {}
+    }
     const fmt = (v) => cur + Number(v).toLocaleString();
     const rows = (arr) => arr.map(r => '<tr><td style="padding:4px 8px">' + esc(r[0]) + '</td><td style="padding:4px 8px;text-align:right">' + fmt(r[1]) + '</td></tr>').join('');
     const html = '<div style="width:720px;max-width:96vw;font-family:Arial,sans-serif;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">' +
