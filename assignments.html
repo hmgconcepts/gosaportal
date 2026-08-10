@@ -641,6 +641,10 @@ const AP={
     if(!window.sb){toast('Database not configured','warning');return;}
     const a=(await sb.from('assignments').select('*').eq('id',assignmentId).maybeSingle()).data;
     if(!a){toast('Assignment not found','warning');return;}
+    /* V8.6 #2: a teacher scores only THEIR OWN assignment; admin scores any. */
+    const rSc=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    const isAdminSc=!!(window.App&&App.isAdminRole&&App.isAdminRole(rSc));
+    if(!isAdminSc&&a.posted_by&&String(a.posted_by)!==String((window.SC_PROFILE&&SC_PROFILE.id)||'')){toast('This assignment belongs to another teacher — only that teacher or an admin can score it.','warning',7000);return;}
     const studs=(await sb.from('students').select('id,full_name,admission_no,class').eq('class',a.class||'').order('full_name')).data||[];
     if(!studs.length){toast('No students registered in '+(a.class||'this class')+'.','warning');return;}
     let cp={}; try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }

@@ -611,9 +611,15 @@ const DL={ qs:[],
     if(!roleNow){try{const cached=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(cached&&cached.role)roleNow=String(cached.role).toLowerCase();}catch(_){ }}
     if(!roleNow){for(let w=0;w<30&&!roleNow;w++){await new Promise(r=>setTimeout(r,200));roleNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();}}
     if(!this._roleWatch){this._roleWatch=true;let last=roleNow;setInterval(()=>{const cur=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();if(cur&&cur!==last){last=cur;DL.list();}},1500);}
-    const isStaff = !!(window.App&&App.isAdminRole&&App.isAdminRole(roleNow)) || ['staff','teacher','admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(roleNow);
+    const isAdminTier = !!(window.App&&App.isAdminRole&&App.isAdminRole(roleNow)) || ['admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(roleNow);
+    const isStaff = isAdminTier || ['staff','teacher'].includes(roleNow);
+    const myId = (window.SC_PROFILE&&SC_PROFILE.id)||'';
     box.innerHTML = data.map((b,i) => {
-      const canEdit = isStaff;
+      /* V8.6 #2: OWNERSHIP — a teacher manages only THEIR OWN readings
+         (or unowned legacy rows); admin-tier manages everything. Matches the
+         dl_teacher_write RLS policy so the UI never promises what the
+         database will refuse. */
+      const canEdit = isAdminTier || (isStaff && (!b.teacher_id || String(b.teacher_id)===String(myId)));
       return '<div class="card" style="margin:8px 0" data-id="'+esc(b.id)+'"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">'+
         '<div style="flex:1;min-width:240px"><strong>'+esc(b.title)+'</strong> '+(b.subject?'<span class="badge">'+esc(b.subject)+'</span> ':'')+(b.class?'<span class="badge">'+esc(b.class)+'</span>':'')+
         (b.author?'<span class="badge" style="background:#f1f5f9;color:#475569">'+esc(b.author)+'</span>':'')+
@@ -640,8 +646,13 @@ const DL={ qs:[],
     const b = this._books[i]; if (!b) { toast('Reading not found.', 'warning'); return; }
     let rNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
     if(!rNow){try{const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(c&&c.role)rNow=String(c.role).toLowerCase();}catch(_){ }}
-    const isStaff = !!(window.App&&App.isAdminRole&&App.isAdminRole(rNow)) || ['staff','teacher','admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(rNow);
+    const isAdminT = !!(window.App&&App.isAdminRole&&App.isAdminRole(rNow)) || ['admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(rNow);
+    const isStaff = isAdminT || ['staff','teacher'].includes(rNow);
     if (!isStaff) { toast('Only staff can edit readings. If you ARE staff, wait two seconds for sign-in to finish and try again.', 'warning'); return; }
+    /* V8.6 #2: a teacher may edit only THEIR OWN reading; admin edits all. */
+    if (!isAdminT && b.teacher_id && String(b.teacher_id)!==String((window.SC_PROFILE&&SC_PROFILE.id)||'')) { toast('This reading belongs to another teacher — only that teacher or an admin can change it.', 'warning', 7000); return; }
+    /* V8.6 #2: teachers cannot edit/delete ANOTHER teacher's reading. */
+    try { const bChk=this._books&&this._books.find&&(typeof i!=='undefined')?null:null; } catch(_) {}
     const opts = (this._books.map((x, j) => '<option value="'+j+'"'+(j===i?' selected':'')+'>'+esc(x.title)+'</option>').join(''));
     const body =
       '<div class="form-group"><label>Pick a reading</label><select class="form-select" id="dl-edit-pick">' + opts + '</select></div>' +
@@ -683,8 +694,13 @@ const DL={ qs:[],
   },
   async del(i){
     const b = this._books[i]; if (!b) { toast('Reading not found.', 'warning'); return; }
-    const isStaff = !!(window.App && (window.App.isAdminRole(window.App.currentRole) || ['staff','teacher'].includes(String(window.App.currentRole||'').toLowerCase())));
+    let rDel=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    if(!rDel){try{const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(c&&c.role)rDel=String(c.role).toLowerCase();}catch(_){ }}
+    const isAdminD = !!(window.App&&App.isAdminRole&&App.isAdminRole(rDel)) || ['admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(rDel);
+    const isStaff = isAdminD || ['staff','teacher'].includes(rDel);
     if (!isStaff) { toast('Only staff can delete readings.', 'warning'); return; }
+    /* V8.6 #2: teachers delete only their own readings; admin deletes any. */
+    if (!isAdminD && b.teacher_id && String(b.teacher_id)!==String((window.SC_PROFILE&&SC_PROFILE.id)||'')) { toast('This reading belongs to another teacher — only that teacher or an admin can delete it.', 'warning', 7000); return; }
     if (!confirm('Delete "' + (b.title || 'this reading') + '"?\n\nThis also removes the comprehension questions and the quiz history linked to it.')) return;
     try { await window.sb.from('reading_scores').delete().eq('book_id', b.id); } catch (e) {}
     const r=await SCDelete.byId(window.sb,'digital_library',b.id);if(!r.ok){toast('Delete failed: '+r.error,'danger',6000);return;}
@@ -694,6 +710,10 @@ const DL={ qs:[],
   },
   drive(u){ if(!u)return '#'; var m=u.match(/drive\.google\.com\/file\/d\/([^/]+)/); return m?('https://drive.google.com/file/d/'+m[1]+'/view'):u; },
   quiz(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[];
+    /* V8.6: some rows store questions as a JSON STRING — parse defensively. */
+    if(typeof qs==='string'){try{qs=JSON.parse(qs);}catch(_){qs=[];}}
+    if(!Array.isArray(qs))qs=[];
+    b.questions=qs;
     if(!qs.length){toast('No questions on this reading.','info');return;}
     var html=qs.map(function(q,j){ var t=q.type||'mcq'; var inner='';
       if(t==='mcq') inner=(q.options||[]).filter(Boolean).map(function(op){return '<label style="display:block"><input type="radio" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>';}).join('');
@@ -703,10 +723,27 @@ const DL={ qs:[],
       return '<div class="form-group"><label>Q'+(j+1)+'. '+esc(q.q)+'</label>'+inner+'</div>'; }).join('');
     openModal('Quiz: '+esc(b.title), html, '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="DL.submit('+i+')">Submit</button>');
   },
-  async submit(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[]; var correct=0;
+  async submit(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[];
+    if(typeof qs==='string'){try{qs=JSON.parse(qs);}catch(_){qs=[];}}
+    if(!Array.isArray(qs))qs=[];
+    var correct=0;
     var normTxt=function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();};
+    /* V8.6 ROOT-CAUSE FIX: teachers naturally set the answer as a LETTER
+       ('C') or a POSITION ('3') instead of the exact option text — the old
+       strict text comparison marked every such quiz wrong. answerMatches now
+       accepts: exact option text · option letter A–J · 1-based option number. */
+    var answerMatches=function(pickedText,q){
+      var ans=normTxt(q.answer); if(!ans)return false;
+      if(normTxt(pickedText)===ans)return true;
+      var opts=(q.options||[]).filter(Boolean);
+      var idx=-1;
+      if(/^[a-j]$/.test(ans)) idx=ans.charCodeAt(0)-97;                       // 'c' → 2
+      else if(/^(10|[1-9])$/.test(ans)&&!opts.some(function(o){return normTxt(o)===ans;})) idx=parseInt(ans,10)-1; // '3' → 2 (only when no option IS '3')
+      return idx>=0&&idx<opts.length&&normTxt(opts[idx])===normTxt(pickedText);
+    };
     qs.forEach(function(q,j){ var t=q.type||'mcq';
-      if(t==='mcq'||t==='tf'){ var sel=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel&&normTxt(sel.value)===normTxt(q.answer)) correct++; }
+      if(t==='mcq'){ var sel=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel&&answerMatches(sel.value,q)) correct++; }
+      else if(t==='tf'){ var sel2=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel2&&normTxt(sel2.value)===normTxt(q.answer)) correct++; }
       else if(t==='multi'){ var picked=[...document.querySelectorAll('input[name="dq'+j+'"]:checked')].map(function(x){return normTxt(x.value);}).sort(); var want=(q.answers||[]).map(normTxt).sort(); if(picked.length&&picked.length===want.length&&picked.every(function(v,k){return v===want[k];})) correct++; }
       else if(t==='short'){ var inp=document.querySelector('input[name="dq'+j+'"]'); if(inp&&normTxt(inp.value)===normTxt(q.answer)) correct++; }
       else if(t==='keyword'){ var inp2=document.querySelector('input[name="dq'+j+'"]'); var txt=normTxt(inp2&&inp2.value); var kws=String(q.keywords||'').split(',').map(normTxt).filter(Boolean); if(txt&&kws.some(function(k){return txt.indexOf(k)!==-1;})) correct++; }
