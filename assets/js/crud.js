@@ -1827,6 +1827,27 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         return;
       }
     }
+    /* V9.0: deleting a PERSON from the Directory is a whole-account event.
+       The old path deleted only the profiles row, which (a) hit FK errors from
+       audit tables (activity_log_actor_id_fkey) and (b) left a ghost login in
+       auth.users that blocked the email from ever signing up again.
+       sc_delete_user() removes the login + profile in one transaction, clears
+       author pointers (ON DELETE SET NULL, v9.0 SQL) and frees the email. */
+    if (d.table === 'profiles') {
+      if (!confirm('Delete this person?\n\nWhat happens:\n• Their LOGIN ACCOUNT is removed too, so the same email can register again later.\n• History rows they wrote (activity log, records) are KEPT — only the author link is cleared.\n• This cannot be undone.\n\nProceed?')) return;
+      const { data: msg, error: rpcErr } = await this.sb.rpc('sc_delete_user', { p_user: id });
+      if (rpcErr) {
+        if (/could not find|does not exist|schema cache/i.test(rpcErr.message || '')) {
+          toast('Database update needed: run database/v9.0-user-lifecycle.sql (or complete-schema.sql) in the Supabase SQL Editor, then retry.', 'danger', 10000);
+        } else { toast(rpcErr.message, 'danger', 8000); }
+        return;
+      }
+      this.invalidateTableCaches(moduleId);
+      if (window.App && App.logActivity) App.logActivity('delete', 'profiles+auth', id);
+      toast(String(msg || 'Account fully deleted.'), 'success', 7000);
+      await this.renderList(moduleId);
+      return;
+    }
     if (!confirm('Delete this ' + d.title.toLowerCase() + '?')) return;
     const { data:deleted,error } = await this.sb.from(d.table).delete().eq('id', id).select('id');
     if (error) { toast(error.message, 'danger'); return; }if(!deleted||!deleted.length){toast('Nothing was deleted. You may not own this subject/class record.','danger',7000);return;}
