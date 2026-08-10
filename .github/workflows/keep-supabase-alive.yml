@@ -67,13 +67,19 @@ jobs:
             echo "::error::Keep-alive failed (HTTP $code). If the RPC is missing, run database/keep-alive.sql (or the full database/complete-schema.sql) in the Supabase SQL Editor."
             exit 1
           fi
-          # V8.9 WATCHDOG: HTTP 200 alone is not proof — confirm the database
-          # actually confirmed the write. sc_keep_alive() returns the text
-          # "heartbeat written at <timestamp>" only after a successful UPDATE.
-          if grep -q "heartbeat written" /tmp/resp.txt; then
+          # V9.0 WATCHDOG (fixed): HTTP 200 alone is not proof — confirm the
+          # database actually recorded the write. The sc_keep_alive() RPC
+          # returns the NEW last_ping TIMESTAMP (e.g. "2026-08-10T06:17:03…"),
+          # so a timestamp in the body IS the proof of a successful UPDATE.
+          # (The earlier check grepped for "heartbeat written", but that
+          # phrase is produced by the Edge Function wrapper, not by the raw
+          # RPC this workflow calls — causing false failures on success.)
+          if grep -Eq '20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}' /tmp/resp.txt; then
+            echo "✅ Keep-alive heartbeat written AND verified (HTTP $code, timestamp returned). Supabase inactivity timer reset."
+          elif grep -q "heartbeat written" /tmp/resp.txt; then
             echo "✅ Keep-alive heartbeat written AND verified (HTTP $code). Supabase inactivity timer reset."
           else
-            echo "::error::HTTP $code received but the response does not confirm a database write. Run database/keep-alive.sql once in the Supabase SQL Editor, then re-run this workflow."
+            echo "::error::HTTP $code received but the response body ($(cat /tmp/resp.txt)) does not contain the confirmation timestamp the RPC returns. Run database/keep-alive.sql once in the Supabase SQL Editor, then re-run this workflow."
             exit 1
           fi
 
