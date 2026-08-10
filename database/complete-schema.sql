@@ -1783,8 +1783,10 @@ create trigger trg_compute_fee_payment_balance
 before insert or update of fee_total, amount_paid, balance on public.fee_payments
 for each row execute function public.compute_fee_payment_balance();
 drop trigger if exists trg_compute_payroll_net on public.payroll;
+-- V8.5: unconditional — ANY write recomputes net pay (the old UPDATE OF list
+-- let rows keep a stale net_pay when touched via other columns).
 create trigger trg_compute_payroll_net
-before insert or update of basic, allowances, bonus, overtime, tax, pension, loan_deduction, other_deductions, deductions on public.payroll
+before insert or update on public.payroll
 for each row execute function public.compute_payroll_net();
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
@@ -4643,5 +4645,78 @@ create policy "polls_delete" on public.polls for delete
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V8.2 class-scoped voting + audience enforcement installed' as status;
+
+
+-- ============================================================================
+-- EMBEDDED: database/v8.4-assignment-dl-points.sql (last wins)
+-- ============================================================================
+-- ============================================================================
+-- School Connect V8.4 — Assignment & Digital-Library points → report card
+-- ============================================================================
+-- 1. assignment_scores — every assignment a subject teacher gives can now be
+--    SCORED per student; scores accumulate per subject/term and can be pushed
+--    into any report-card column (scaled to the column's max mark).
+-- 2. reading_scores upgraded with term/session/admission-no so multiple
+--    digital-library quizzes accumulate per term and push the same way.
+-- Idempotent — safe to run repeatedly.
+-- ============================================================================
+create table if not exists public.assignment_scores (
+  id uuid primary key default gen_random_uuid(),
+  assignment_id uuid references public.assignments(id) on delete cascade,
+  student_id uuid references public.students(id) on delete cascade,
+  student_id_ref text,
+  student_name text,
+  class text, subject text, term text, session text,
+  score numeric default 0, max_score numeric default 10,
+  recorded_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz default now(),
+  unique(assignment_id, student_id)
+);
+alter table public.assignment_scores enable row level security;
+drop policy if exists asg_scores_staff_all on assignment_scores;
+create policy asg_scores_staff_all on public.assignment_scores
+  for all using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()));
+drop policy if exists asg_scores_self_read on assignment_scores;
+create policy asg_scores_self_read on public.assignment_scores
+  for select using (exists (select 1 from public.students s
+    where s.id = assignment_scores.student_id
+      and (s.user_id = auth.uid() or public.is_parent_of(auth.uid(), s.id))));
+create index if not exists idx_asg_scores_ctx on public.assignment_scores (class, subject, term, session);
+
+alter table public.reading_scores add column if not exists term text;
+alter table public.reading_scores add column if not exists session text;
+alter table public.reading_scores add column if not exists student_id_ref text;
+create index if not exists idx_reading_scores_ctx on public.reading_scores (class, subject, term, session);
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V8.4 assignment/digital-library points installed' as status;
+
+
+-- ============================================================================
+-- EMBEDDED: database/v8.5-payroll-net-fix.sql (last wins)
+-- ============================================================================
+-- ============================================================================
+-- School Connect V8.5 — Payroll net-pay: unconditional trigger + backfill
+-- ============================================================================
+-- Symptom on older installs: net pay = basic+allowances only (deductions
+-- ignored) or blank. Causes covered here:
+--  1. The trigger fired only on UPDATE OF a fixed column list — a row touched
+--     any other way kept its stale net_pay. Now recomputed on EVERY write.
+--  2. Rows saved before the trigger existed were never corrected. One-time
+--     backfill recomputes every stored row.
+-- Idempotent — safe to run repeatedly.
+-- ============================================================================
+-- (compute_payroll_net is defined ONCE in Section 6 above; the standalone
+--  v8.5 file carries it for existing databases.)
+drop trigger if exists trg_compute_payroll_net on public.payroll;
+create trigger trg_compute_payroll_net
+before insert or update on public.payroll
+for each row execute function public.compute_payroll_net();
+
+-- one-time backfill: recompute every existing row
+update public.payroll set basic = basic;   -- touches each row; trigger recomputes net_pay
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V8.5 payroll net-pay trigger + backfill installed' as status;
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
