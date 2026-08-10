@@ -954,6 +954,13 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       // ENTERPRISE FINAL V2 (#8): fee balance reflects in every record —
       // auto-compute for display when the stored value is missing.
       if (c.key === 'balance' && v == null && row.fee_total != null) v = Math.max(0, (Number(row.fee_total) || 0) - (Number(row.amount_paid) || 0));
+      /* V8.7 (c): payroll table shows the ARITHMETIC net, never a stale stored
+         value — earnings incl. bonus/overtime minus every deduction. Displays
+         correctly even before the v8.7 SQL rebuild is run on old databases. */
+      if (c.key === 'net_pay' && ['payroll','hr'].includes(key)) {
+        const nv = k2 => Number(row[k2]) || 0;
+        v = Math.max(0, (nv('basic')+nv('allowances')+nv('bonus')+nv('overtime')) - (nv('tax')+nv('pension')+nv('loan_deduction')+nv('other_deductions')+nv('deductions')));
+      }
       if (c.type === 'checkbox') v = v ? '✓' : '';
       if (v && (c.type === 'date' || c.type === 'datetime' || /(^|_)(date|dob|created_at|issued_on|due_date|ref_date)$/i.test(c.key))) v = CRUD.formatDate(v);
       // Issue 11: render link columns as image/video thumbnails when possible.
@@ -1606,8 +1613,12 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     // for module_records tables tuck it into data{} instead — and retry.
     let guard = 0;
     while (res.error && guard < 6) {
-      const m = String(res.error.message || '').match(/find the '([A-Za-z0-9_]+)' column|column "?([A-Za-z0-9_]+)"? (?:of|does not exist)|non-DEFAULT value into column "?([A-Za-z0-9_]+)"?/i);
-      const bad = m && (m[1] || m[2] || m[3]);
+      /* V8.7: PostgreSQL uses DIFFERENT wordings for generated columns —
+         INSERT: 'cannot insert a non-DEFAULT value into column "x"'
+         UPDATE: 'column "x" can only be updated to DEFAULT'
+         Both now self-heal (strip the column and retry). */
+      const m = String(res.error.message || '').match(/find the '([A-Za-z0-9_]+)' column|column "?([A-Za-z0-9_]+)"? (?:of|does not exist)|non-DEFAULT value into column "?([A-Za-z0-9_]+)"?|column "?([A-Za-z0-9_]+)"? can only be updated to DEFAULT/i);
+      const bad = m && (m[1] || m[2] || m[3] || m[4]);
       if (!bad || !(bad in payload)) break;
       if (d.generic || d.table === 'module_records') { payload.data = payload.data || {}; payload.data[bad] = payload[bad]; }
       console.warn('[CRUD] Column "' + bad + '" missing in DB — retrying without it. Run database/update-v6-schema.sql to add it permanently.');
