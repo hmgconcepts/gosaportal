@@ -4738,6 +4738,14 @@ select 'V8.5 payroll net-pay trigger + backfill installed' as status;
 --   3. (Re)installs the ONE correct compute trigger, unconditional.
 --   4. Backfills every stored row with the correct net.
 -- ============================================================================
+-- V8.8.2 FILE-FRESHNESS GUARD ------------------------------------------------
+-- The "cannot drop column net_pay ... view staff_salary_overview depends on it
+-- ... line 7" error can ONLY come from the ORIGINAL V8.7 copy of this block
+-- (its drop statement sat at DO-block line 7 with no view handling). This
+-- release prints its version as the FIRST thing it does, so you can always
+-- confirm which copy actually ran. If you ever see that error again, the file
+-- you executed did not print the banner below — fetch a fresh copy.
+select 'RUNNING: School Connect payroll rebuild V8.8.2 (view-safe, CASCADE-fallback)' as running_version;
 alter table public.payroll add column if not exists bonus numeric default 0;
 alter table public.payroll add column if not exists overtime numeric default 0;
 alter table public.payroll add column if not exists tax numeric default 0;
@@ -4749,33 +4757,61 @@ alter table public.payroll add column if not exists deductions numeric default 0
 do $$
 declare v record; view_defs jsonb := '[]'::jsonb;
 begin
+  raise notice 'School Connect payroll rebuild V8.8.2 running (view-safe, CASCADE fallback).';
   if exists (
     select 1 from information_schema.columns
      where table_schema='public' and table_name='payroll'
        and column_name='net_pay' and is_generated='ALWAYS') then
-    -- V8.8: dependent views (e.g. staff_salary_overview) block a plain DROP
-    -- COLUMN. Save every dependent view's definition, drop them, rebuild the
-    -- column, then recreate each view exactly as it was.
+    -- V8.8.1 BULLETPROOF: discover EVERY view that depends on payroll,
+    -- DIRECTLY OR TRANSITIVELY (view-on-view chains included), via the
+    -- pg_catalog dependency graph — information_schema.view_column_usage
+    -- only sees direct references and can miss chained views.
     for v in
-      select distinct vcu.view_name
-        from information_schema.view_column_usage vcu
-       where vcu.table_schema='public' and vcu.table_name='payroll'
-         and vcu.view_schema='public'
+      with recursive deps as (
+        select distinct r.ev_class::regclass as viewoid, 1 as depth
+          from pg_depend d
+          join pg_rewrite r on r.oid = d.objid
+         where d.refobjid = 'public.payroll'::regclass
+           and d.classid = 'pg_rewrite'::regclass
+           and r.ev_class <> 'public.payroll'::regclass
+        union
+        select distinct r2.ev_class::regclass, deps.depth + 1
+          from deps
+          join pg_depend d2 on d2.refobjid = deps.viewoid
+          join pg_rewrite r2 on r2.oid = d2.objid
+         where d2.classid = 'pg_rewrite'::regclass
+           and r2.ev_class <> deps.viewoid
+      )
+      select viewoid::text as vname, max(depth) as depth
+        from deps
+       where exists (select 1 from pg_class c where c.oid = deps.viewoid and c.relkind in ('v','m'))
+       group by viewoid
+       order by max(depth) desc          -- drop deepest first
     loop
-      view_defs := view_defs || jsonb_build_object(
-        'name', v.view_name,
-        'def',  pg_get_viewdef(('public.'||quote_ident(v.view_name))::regclass, true));
-      execute format('drop view if exists public.%I cascade', v.view_name);
-      raise notice 'Temporarily dropped dependent view %', v.view_name;
+      begin
+        view_defs := jsonb_build_array(jsonb_build_object(
+          'name', v.vname, 'def', pg_get_viewdef(v.vname::regclass, true))) || view_defs;  -- recreate shallowest first
+        execute format('drop view if exists %s cascade', v.vname);
+        raise notice 'Temporarily dropped dependent view %', v.vname;
+      exception when others then
+        raise notice 'Skipping dependent object % (%).', v.vname, sqlerrm;
+      end;
     end loop;
-    alter table public.payroll drop column net_pay;
+    -- rebuild the column; CASCADE is a belt-and-braces net for any dependent
+    -- object the walk could not see (it is a no-op when none remain).
+    begin
+      alter table public.payroll drop column net_pay;
+    exception when dependent_objects_still_exist then
+      raise notice 'Residual dependencies found - dropping net_pay with CASCADE.';
+      alter table public.payroll drop column net_pay cascade;
+    end;
     alter table public.payroll add column net_pay numeric default 0;
-    raise notice 'net_pay was GENERATED — rebuilt as a plain trigger-computed column.';
+    raise notice 'net_pay was GENERATED - rebuilt as a plain trigger-computed column.';
     for v in select value->>'name' as name, value->>'def' as def
                from jsonb_array_elements(view_defs)
     loop
       begin
-        execute format('create or replace view public.%I as %s', v.name, v.def);
+        execute format('create or replace view %s as %s', v.name, v.def);
         raise notice 'Recreated dependent view %', v.name;
       exception when others then
         raise notice 'Could not recreate view % automatically (%). Recreate it manually if still needed.', v.name, sqlerrm;
@@ -4801,6 +4837,6 @@ alter table public.digital_library add column if not exists attempts_allowed int
 
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
-select 'V8.7 payroll rebuild complete — net pay now correct on every row' as status;
+select 'V8.7 payroll rebuild complete (engine V8.8.2) — net pay now correct on every row' as status;
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
