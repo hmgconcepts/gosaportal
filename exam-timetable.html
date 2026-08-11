@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Admin Data • God of Seed Academy</title>
-<meta name="description" content="God of Seed Academy — Admin Data. Comprehensive school management platform.">
+<title>Exam Timetable • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
 <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-<meta property="og:title" content="Admin Data • God of Seed Academy">
+<meta property="og:title" content="Timetable • God of Seed Academy">
 <meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
@@ -61,19 +61,19 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 @media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
 </style>
 
-    <meta name="description" content="God of Seed Academy — Admin Data. Comprehensive school management platform.">
+    <meta name="description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
     <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="./admin-data.html">
-    <meta property="og:title" content="Admin Data • God of Seed Academy">
-    <meta property="og:description" content="God of Seed Academy — Admin Data. Comprehensive school management platform.">
-    <meta property="og:url" content="./admin-data.html">
+    <link rel="canonical" href="./timetable.html">
+    <meta property="og:title" content="Timetable • God of Seed Academy">
+    <meta property="og:description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
+    <meta property="og:url" content="./timetable.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Admin Data • God of Seed Academy">
-    <meta name="twitter:description" content="God of Seed Academy — Admin Data. Comprehensive school management platform.">
+    <meta name="twitter:title" content="Timetable • God of Seed Academy">
+    <meta name="twitter:description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
     <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
   </head>
 <body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
@@ -116,7 +116,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div id="modal-footer" class="modal-footer"></div>
   </div>
 </div>
-<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar">
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
         <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
@@ -477,7 +477,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   <main class="app-main">
     <header class="app-topbar">
       <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
-      <h1 class="app-page-title">Admin Data</h1>
+      <h1 class="app-page-title">Exam Timetable</h1>
       <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
         
         <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
@@ -488,81 +488,18 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     </header>
     <div class="app-content">
       
-      <div class="card" style="margin-bottom:16px">
-        <p style="color:var(--gray-600);margin:0">Admin-only data console: <strong>view</strong> any table,
-        <strong>delete</strong> records, take a full <strong>backup</strong> (JSON download) and
-        <strong>restore</strong> from a backup. Every action is written to the Activity Log.</p>
-      </div>
-            <div class="card" style="margin-bottom:16px;border:2px solid #f9a8d4" data-admin-only>
-        <h3>🎬 One-Click Demo Sample Data</h3>
-        <p style="color:var(--gray-600);margin-top:4px">Instantly fill every showcase page with believable rows — payroll run, asset register, application links, messages, assignments, behaviour points, support plans, library shelf, help-desk tickets, house points, cafeteria menu, lost &amp; found, PTA meetings and more. <b>Idempotent:</b> tables that already have data are skipped, so clicking twice never duplicates. Perfect before showing the platform to a prospective school.</p>
-        <button class="btn btn-primary" onclick="DS.fill()">🎬 Load sample data now</button>
-        <div id="ds-log" style="margin-top:10px;font-size:.85rem;color:var(--gray-600)"></div>
-      </div>
-<div class="card" style="margin-bottom:16px" data-admin-only>
-        <h3>🗄️ Full backup & restore</h3>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
-          <button class="btn btn-primary" onclick="DataTools.backupAll()">⬇ Download full backup (JSON)</button> <a class="btn btn-outline" href="platform-health.html">🛡️ Platform Health Console</a>
-          <label class="btn btn-outline">⬆ Restore from backup<input type="file" accept=".json" hidden onchange="DataTools.restore(event)"></label>
-        </div>
-      </div>
-            <div class="card" style="margin-bottom:16px;border:2px solid #a5b4fc" data-admin-only>
-        <h3>☁️ Google Drive Backup & Sync (school-owned, free)</h3>
-        <p style="color:var(--gray-600);margin-top:4px">Back up the <b>entire school database</b> straight into the school’s own Google Drive with one click, restore from Drive with one click, and let the platform <b>re-back-up automatically on a schedule</b>. Backups are the same portable JSON archives used everywhere else, so they restore perfectly. The connection uses Google’s <code>drive.file</code> permission: this site can only see the backup files it created — never the rest of the school’s Drive.</p>
-        <div id="gd-status" style="margin:8px 0"></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-          <button class="btn btn-primary" onclick="GD.backup()">☁️⬇ Back up now to Google Drive</button>
-          <button class="btn btn-outline" onclick="GD.list()">📂 List Drive backups (restore)</button>
-        </div>
-        <div id="gd-progress" style="color:var(--gray-600);font-size:.9rem;margin-bottom:8px"></div>
-        <div id="gd-list"></div>
-        <details style="margin-top:10px">
-          <summary style="cursor:pointer;font-weight:600">⚙️ Setup & automatic sync schedule (owner only)</summary>
-          <div class="grid grid-3" style="margin-top:10px">
-            <div class="form-group" style="grid-column:1/-1"><label>Google OAuth Client ID (one-time setup — see the guide)</label><input class="form-input" id="gd-client" placeholder="1234567890-abc123.apps.googleusercontent.com"></div>
-            <div class="form-group"><label>Automatic backup</label><select class="form-select" id="gd-enabled"><option value="false">Off (manual only)</option><option value="true">On (scheduled)</option></select></div>
-            <div class="form-group"><label>Every (days)</label><input class="form-input" id="gd-days" type="number" min="1" value="7"></div>
-            <div style="display:flex;align-items:end"><button class="btn btn-primary" onclick="GD.save()">💾 Save Drive settings</button></div>
-          </div>
-          <p style="font-size:.82rem;color:var(--gray-500);margin:6px 0 0">How auto-sync works on a free stack: whenever an admin opens any page and a backup is due, it uploads silently in the background (after the first authorisation in that browser). Full setup steps: <code>docs/GOOGLE-DRIVE-SYNC-GUIDE.md</code> in this package. One-time DB update for older installs: run <code>database/drive-sync.sql</code>.</p>
-        </details>
-      </div>
-      <div class="card" style="margin-bottom:16px;border:2px solid #38bdf8" data-admin-only>
-        <details>
-        <summary style="cursor:pointer;font-weight:800;font-size:1.05rem">🚑 Disaster Recovery Wizard — restore a school onto a FRESH database from Google Drive (click to open)</summary>
-        <p style="color:var(--gray-600);margin-top:10px"><b>When to use this:</b> the school’s old Supabase project was paused too long / deleted / permanently lost, but backups exist in the school’s Google Drive. This wizard rebuilds everything on a brand-new database in ~30–45 minutes with free tools. (If the old project is merely <i>paused</i>, do NOT use this — just restore it at supabase.com and press the 💓 heartbeat on the Platform Health Console.)</p>
-        <ol style="line-height:2;color:var(--gray-700);padding-left:20px">
-          <li><b>Create the fresh database:</b> <a href="https://supabase.com" target="_blank" rel="noopener">supabase.com</a> → New project → copy the new <b>Project URL</b> and <b>anon public key</b> (Project Settings → API).</li>
-          <li><b>Install the schema:</b> new project → SQL Editor → paste the ENTIRE <code>database/complete-schema.sql</code> from the site files → Run → wait for “installed successfully ✅”. (This auto-installs keep-alive, the vault, Drive-sync and security settings.)</li>
-          <li><b>Reconnect this website:</b> edit <code>assets/js/config.js</code> — replace the old SUPABASE_URL and SUPABASE_ANON_KEY with the new values — push to GitHub; Vercel redeploys the SAME site onto the fresh database.</li>
-          <li><b>Recreate the first admin:</b> Login page → Request access → sign up; then in Supabase → Table Editor → <code>profiles</code> → set that row to <code>role = super_admin</code>, <code>status = approved</code>.</li>
-          <li><b>Reconnect Google Drive:</b> sign in here as that admin → expand <b>⚙️ Setup</b> in the ☁️ Google Drive card above → paste the school’s existing OAuth <b>Client ID</b> (it is tied to the site URL, not the database, so the SAME one still works) → Save.</li>
-          <li><b>One-click restore:</b> click <b>📂 List Drive backups</b> above → authorise with the school’s Google account → every past backup appears → on the NEWEST one click <b>🚑 Recover to new project</b> (not plain Restore). Recovery mode imports every school record, skips dead login accounts, clears stale references, retries row-by-row, and verifies the SHA-256 seal first.</li>
-          <li><b>Re-onboard people:</b> staff/parents/students sign up again (send one broadcast); approve them on <a href="approvals.html">Approvals</a> — restored records re-link by admission/staff number and email.</li>
-          <li><b>Re-arm ALL safeguards:</b> open the <a href="platform-health.html">🛡️ Platform Health Console</a> → press <b>💓 heartbeat</b>, re-add the two GitHub Action secrets with the NEW url/key, repoint UptimeRobot at the new project, switch Drive <b>auto-sync back ON</b> and run one fresh backup. Every tile must be green.</li>
-        </ol>
-        <p style="font-size:.85rem;color:var(--gray-500)">Full printable runbook with a “what survives / what doesn’t” table: <code>docs/DISASTER-RECOVERY-RUNBOOK.md</code> (included in this package). Prevention: keep auto-sync ON and glance at the Health Console weekly — then this wizard is never needed.</p>
-        </details>
-      </div>
-
-<div class="card" style="margin-bottom:16px" data-admin-only>
-        <h3>♻️ Portable Data Archive Center</h3>
-        <p style="color:var(--gray-600)"><b>Every machine-readable export can come back.</b> Portable JSON preserves UUIDs, dates, arrays and JSON fields for later restoration/analysis; CSV remains available for spreadsheets and can be re-imported into the selected table. Files are processed locally and are never stored in Supabase.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="DataTools.portableFull()">⬇ Export all portable JSON</button><button class="btn btn-outline" onclick="DataTools.portableSelected()">⬇ Export selected table JSON</button><button class="btn btn-outline" onclick="DataTools.choosePortableImport()">⬆ Import JSON / CSV with preview</button></div>
-        <div class="notice" style="margin-top:10px;background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>Auth note:</b> profile UUIDs belong to Supabase Auth users. A full archive restores most reliably into the same project. On a new project, create/adopt users first, then import operational tables.</div>
-        <div id="dt-portable-report"></div>
-      </div>
-      <div class="card">
-        <h3>🔎 Browse & delete a table</h3>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:10px">
-          <div class="form-group" style="margin:0"><label>Table</label>
-            <select class="form-select" id="dt-table" onchange="DataTools.view()"><option>students</option><option>staff</option><option>classes</option><option>subjects</option><option>attendance</option><option>results</option><option>fee_payments</option><option>finance_entries</option><option>cbt_exams</option><option>cbt_results</option><option>assessment_columns</option><option>report_scores</option><option>report_cards</option><option>polls</option><option>poll_votes</option><option>announcements</option><option>events</option><option>messages</option><option>complaints</option><option>admissions</option><option>donations</option><option>activity_log</option><option>profiles</option><option>parent_child</option><option>academic_periods</option><option>certificates</option></select>
-          </div>
-          <button class="btn btn-outline" onclick="DataTools.view()">View</button>
-          <button class="btn btn-outline" onclick="DataTools.exportTable()">⬇ Export this table (CSV)</button><button class="btn btn-outline" onclick="DataTools.importCSV()">⬆ Re-import CSV</button>
-        </div>
-        <div id="dt-grid" style="margin-top:12px"></div>
-      </div>
+      <div class="card" style="margin-bottom:16px;background:#fef3c7;border-color:#fcd34d"><h3 style="margin-top:0">🗓️ Examination Timetable</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">The official exam schedule for the selected term. Staff/admin build it below (manually or with the ⚡ auto-spread helper); students and parents see their class's papers with dates, times, venues and invigilators. Clashes (same class, same date+time) are detected automatically.</p></div>
+      <div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <div class="form-group"><label>Class</label><select class="form-select" id="ex-class" onchange="EXT.load()"><option value="">All classes</option></select></div>
+        <div class="form-group"><label>Term</label><select class="form-select" id="ex-term"><option>First Term</option><option>Second Term</option><option>Third Term</option></select></div>
+        <div class="form-group"><label>Session</label><input class="form-input" id="ex-session" placeholder="e.g. 2026/2027" style="width:130px"></div>
+        <button class="btn btn-outline" onclick="EXT.load()">Refresh</button>
+        <button class="btn btn-primary" data-staff-only onclick="EXT.addModal()">+ Add paper</button>
+        <button class="btn btn-outline" data-staff-only onclick="EXT.autoModal()">⚡ Auto-spread subjects</button>
+        <button class="btn btn-outline" onclick="EXT.print()">🖨️ Print</button>
+      </div></div>
+      <div id="ex-clashes"></div>
+      <div id="ex-view"><p class="pulse">Loading exam timetable…</p></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -574,7 +511,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
-<script src="assets/js/data-portability.js"></script>
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
@@ -595,89 +531,102 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
-const DataTools = {
-  TABLES: (window.DataPortability&&DataPortability.TABLES)||["students","staff","classes","subjects","attendance","results","fee_payments","cbt_exams","cbt_results","assessment_columns","report_scores","report_cards"],
-  init(){if(window.DataPortability)DataPortability.init(sb);const sel=document.getElementById('dt-table');if(sel){const keep=sel.value;sel.innerHTML=this.TABLES.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');if(this.TABLES.includes(keep))sel.value=keep;}},
-  async portableFull(){try{toast('Preparing paginated portable archive…','info');const env=await DataPortability.exportFull(this.TABLES);toast('✅ Exported '+env.meta.row_count+' rows from '+env.meta.table_count+' tables.','success',7000);}catch(e){toast(e.message||e,'danger',9000);}},
-  async portableSelected(){const t=document.getElementById('dt-table').value;try{const n=await DataPortability.exportTable(t);toast('✅ '+n+' '+t+' row(s) exported as re-importable JSON.','success');}catch(e){toast(e.message||e,'danger');}},
-  choosePortableImport(){const inp=document.createElement('input');inp.type='file';inp.accept='.json,.csv,application/json,text/csv';inp.onchange=async()=>{const f=inp.files[0];if(!f)return;try{const archive=await DataPortability.inspectFile(f,document.getElementById('dt-table').value),summary=Object.entries(archive.tables).map(([t,r])=>'<tr><td>'+esc(t)+'</td><td>'+r.length+'</td></tr>').join('');DataTools._pendingArchive=archive;openModal('Preview portable import','<p><b>File:</b> '+esc(f.name)+'</p><div class="table-wrap"><table><thead><tr><th>Table</th><th>Rows</th></tr></thead><tbody>'+summary+'</tbody></table></div><p>No file is uploaded. Import uses chunked upserts and reports every failed table.</p>','<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-outline" onclick="DataTools.analysePendingArchive()">Analyse locally (no import)</button><button class="btn btn-primary" onclick="DataTools.runPortableImport()">Import / update these rows</button>');}catch(e){toast('Cannot read archive: '+(e.message||e),'danger',10000);}};inp.click();},
-  analysePendingArchive(){const a=this._pendingArchive;if(!a)return;const summaries=Object.entries(a.tables).map(([t,rows])=>{const nums={};(rows||[]).forEach(r=>Object.entries(r).forEach(([k,v])=>{if(typeof v==='number'&&Number.isFinite(v)){const x=nums[k]||(nums[k]={sum:0,min:v,max:v,n:0});x.sum+=v;x.min=Math.min(x.min,v);x.max=Math.max(x.max,v);x.n++;}}));const metrics=Object.entries(nums).slice(0,5).map(([k,x])=>esc(k)+': avg '+(x.sum/x.n).toFixed(2)+' · '+x.min+'–'+x.max).join('<br>');return'<tr><td>'+esc(t)+'</td><td>'+rows.length+'</td><td>'+metrics+'</td></tr>';}).join('');openModal('Local archive analysis','<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534">The archive is analysed in this browser only. No rows have been uploaded to Supabase.</div><div class="table-wrap"><table><thead><tr><th>Dataset</th><th>Rows</th><th>Numeric overview</th></tr></thead><tbody>'+summaries+'</tbody></table></div>','<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="DataTools.runPortableImport()">Import archive</button>');},
-  async runPortableImport(){if(!this._pendingArchive)return;closeModal();toast('Importing archive in dependency order…','info');const report=await DataPortability.importArchive(this._pendingArchive,'upsert');document.getElementById('dt-portable-report').innerHTML=DataPortability.reportHTML(report);if(App&&App.logActivity)App.logActivity('portable-import','platform',report.reduce((a,x)=>a+x.saved,0)+' rows');toast('Portable import completed. Review the table report.','success',7000);this._pendingArchive=null;this.view();},
-  async view(){
-    if(!sb){ toast('Database not configured.','warning'); return; }
-    const t=document.getElementById('dt-table').value;
-    const { data, error } = await sb.from(t).select('*').order('created_at',{ascending:false}).limit(200);
-    const box=document.getElementById('dt-grid');
-    if(error){ box.innerHTML='<p style="color:#dc2626">'+esc(error.message)+'</p>'; return; }
-    if(!data||!data.length){ box.innerHTML='<p>No rows.</p>'; return; }
-    const cols=Object.keys(data[0]).slice(0,7);
-    box.innerHTML='<div class="table-wrap"><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+'<th>Delete</th></tr></thead><tbody>'+
-      data.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(String(r[c]).slice(0,40))+'</td>').join('')+'<td><button class="btn btn-sm btn-outline" onclick="DataTools.del(\''+t+'\',\''+r.id+'\')">✕</button></td></tr>').join('')+
-      '</tbody></table></div><p style="color:var(--gray-500);font-size:.8rem">Showing up to 200 rows.</p>';
-  },
-  async del(table,id){
-    if(!confirm('Permanently delete this record from '+table+'?'))return;
-    const r=await SCDelete.byId(sb,table,id);if(!r.ok){toast(r.error,'danger');return;}if(App&&App.logActivity)App.logActivity('delete',table,id);toast('Deleted permanently and verified.','success');DataTools.view();
-  },
-  async exportTable(){const t=document.getElementById('dt-table').value;try{const n=await DataPortability.exportCSV(t);toast('✅ '+n+' row(s) exported. Select the same table and use Import to restore this CSV.','success',7000);}catch(e){toast(e.message||e,'danger');}},
-  importCSV(){this.choosePortableImport();},
-  parseCSV(text){
-    const rows=[]; let r=[],c='',q=false;
-    for(let i=0;i<text.length;i++){
-      const ch=text[i], nx=text[i+1];
-      if(ch==='\"'&&q&&nx==='\"'){ c+='\"'; i++; }
-      else if(ch==='\"') q=!q;
-      else if(ch===','&&!q){ r.push(c); c=''; }
-      else if((ch==='\n'||ch==='\r')&&!q){ if(ch==='\r'&&nx==='\n') i++; r.push(c); rows.push(r); r=[]; c=''; }
-      else c+=ch;
-    }
-    if(c||r.length){ r.push(c); rows.push(r); }
-    return rows;
-  },
-  async backupAll(){return this.portableFull();},
-  restore(ev){
-    const f=ev.target.files[0]; if(!f)return;
-    const r=new FileReader();
-    r.onload=async()=>{
-      let dump; try{ dump=JSON.parse(r.result); }catch(e){ toast('Invalid backup file.','danger'); return; }
-      if(!confirm('Restore will UPSERT records from this backup into the live database. Continue?'))return;
-      let ok=0,fail=0;
-      for(const t of this.TABLES){ const rows=dump[t]; if(!Array.isArray(rows)||!rows.length)continue;
-        try{ const { error } = await sb.from(t).upsert(rows,{ onConflict:'id' }); if(error)fail++; else ok++; }catch(e){ fail++; } }
-      if(App&&App.logActivity)App.logActivity('restore','platform','tables:'+ok);
-      toast('Restore complete. Tables restored: '+ok+(fail?' · failed: '+fail:''), fail?'warning':'success',6000);
-    };
-    r.readAsText(f);
-  }
+/* ===== EXT — Examination Timetable engine (V9.1) =====
+   exam_timetable table · staff build, everyone reads · clash detection ·
+   auto-spread (one paper per subject over a date range, morning/afternoon
+   slots, weekends skipped) · per-class landing for students/parents · print. */
+const EXT={
+  async init(){
+    try{const {data}=await sb.from('classes').select('name').order('name');const sel=document.getElementById('ex-class');(function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();}catch(e){}
+    try{const cp=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();if(cp.data){if(cp.data.term)document.getElementById('ex-term').value=cp.data.term;if(cp.data.session)document.getElementById('ex-session').value=cp.data.session;}}catch(e){}
+    /* students/parents land on their own class */
+    try{for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+      const role=String((window.SC_PROFILE||{}).role||'').toLowerCase(),sel=document.getElementById('ex-class');
+      if(role==='student'){const r=await sb.from('students').select('class').eq('user_id',SC_PROFILE.id).maybeSingle();if(r.data&&r.data.class&&[...sel.options].some(o=>o.value===r.data.class))sel.value=r.data.class;}
+      else if(role==='parent'){const l=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);const ids=(l.data||[]).map(x=>x.student_id);if(ids.length){const st=await sb.from('students').select('class').in('id',ids).limit(1);if(st.data&&st.data[0]&&st.data[0].class&&[...sel.options].some(o=>o.value===st.data[0].class))sel.value=st.data[0].class;}}
+    }catch(_){}
+    this.load();},
+  ctx(){return{cls:document.getElementById('ex-class').value,term:document.getElementById('ex-term').value,session:(document.getElementById('ex-session').value||'').trim()};},
+  async load(){
+    if(!sb)return;const c=this.ctx();
+    let q=sb.from('exam_timetable').select('*').order('exam_date').order('start_time').limit(2000);
+    if(c.cls)q=q.eq('class',c.cls);if(c.term)q=q.eq('term',c.term);if(c.session)q=q.eq('session',c.session);
+    const {data,error}=await q;const box=document.getElementById('ex-view');
+    if(error){box.innerHTML='<div class="card">'+(/does not exist|schema cache/i.test(error.message)?'Database update needed: run <code>database/v9.1-enterprise-pack.sql</code> (or complete-schema.sql) once in the Supabase SQL Editor.':esc(error.message))+'</div>';return;}
+    const rows=data||[];this.rows=rows;
+    /* clash detection: same class, same date, overlapping time */
+    const clashes=[];for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++){const a=rows[i],b=rows[j];
+      if(a.class===b.class&&a.exam_date===b.exam_date&&(a.start_time<b.end_time&&b.start_time<a.end_time))clashes.push(a.class+' · '+a.exam_date+': '+a.subject+' ('+a.start_time+'–'+a.end_time+') overlaps '+b.subject+' ('+b.start_time+'–'+b.end_time+')');}
+    document.getElementById('ex-clashes').innerHTML=clashes.length?'<div class="card" style="border-color:#fca5a5;background:#fef2f2;margin-bottom:16px"><b style="color:#b91c1c">⛔ '+clashes.length+' clash(es) found</b><ul style="margin:6px 0 0;padding-left:18px;font-size:.85rem">'+clashes.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'';
+    if(!rows.length){box.innerHTML='<div class="card">No exam papers scheduled yet'+(c.cls?' for '+esc(c.cls):'')+'. Staff can add papers or use ⚡ Auto-spread.</div>';return;}
+    /* group by date */
+    const dates=[...new Set(rows.map(r=>r.exam_date))].sort();
+    const isStaff=window.App&&App.isStaffRole&&App.isStaffRole(App.currentRole);
+    let h='<div class="card" id="ex-print-area"><h2 style="text-align:center">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center">EXAMINATION TIMETABLE'+(c.cls?' · '+esc(c.cls):'')+(c.term?' · '+esc(c.term):'')+(c.session?' · '+esc(c.session):'')+'</h3>';
+    dates.forEach(dt=>{const day=new Date(dt+'T12:00:00');const dn=day.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+      h+='<h4 style="margin:14px 0 6px;border-bottom:2px solid var(--gray-200);padding-bottom:4px">📅 '+esc(dn)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th>'+(c.cls?'':'<th>Class</th>')+'<th>Subject</th><th>Paper</th><th>Venue</th><th>Invigilator</th>'+(isStaff?'<th></th>':'')+'</tr></thead><tbody>';
+      rows.filter(r=>r.exam_date===dt).sort((a,b)=>(a.start_time+a.class).localeCompare(b.start_time+b.class)).forEach(r=>{
+        h+='<tr><td><b>'+esc(r.start_time)+'–'+esc(r.end_time)+'</b></td>'+(c.cls?'':'<td>'+esc(r.class)+'</td>')+'<td><b>'+esc(r.subject)+'</b>'+(r.notes?'<br><small style="color:var(--gray-500)">'+esc(r.notes)+'</small>':'')+'</td><td>'+esc(r.paper||'—')+'</td><td>'+esc(r.venue||'—')+'</td><td>'+esc(r.invigilator||'—')+'</td>'+(isStaff?'<td><button class="btn btn-sm btn-outline" onclick="EXT.edit(\''+r.id+'\')">✏️</button> <button class="btn btn-sm btn-outline" onclick="EXT.del(\''+r.id+'\')">🗑</button></td>':'')+'</tr>';});
+      h+='</tbody></table></div>';});
+    h+='<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+'</p></div>';
+    box.innerHTML=h;},
+  formHtml(r){r=r||{};const c=this.ctx();
+    return '<div class="grid grid-2">'+
+    '<div class="form-group"><label>Class</label><select class="form-select" id="exf-class">'+[...document.getElementById('ex-class').options].filter(o=>o.value).map(o=>'<option'+((r.class||c.cls)===o.value?' selected':'')+'>'+esc(o.value)+'</option>').join('')+'</select></div>'+
+    '<div class="form-group"><label>Subject</label><input class="form-input" id="exf-subject" value="'+esc(r.subject||'')+'" list="exf-subjects"><datalist id="exf-subjects"></datalist></div>'+
+    '<div class="form-group"><label>Date</label><input class="form-input" id="exf-date" type="date" value="'+esc(r.exam_date||'')+'"></div>'+
+    '<div class="form-group"><label>Start</label><input class="form-input" id="exf-start" type="time" value="'+esc(r.start_time||'09:00')+'"></div>'+
+    '<div class="form-group"><label>End</label><input class="form-input" id="exf-end" type="time" value="'+esc(r.end_time||'11:00')+'"></div>'+
+    '<div class="form-group"><label>Paper (optional)</label><input class="form-input" id="exf-paper" value="'+esc(r.paper||'')+'" placeholder="e.g. Paper 1 · Objective"></div>'+
+    '<div class="form-group"><label>Venue</label><input class="form-input" id="exf-venue" value="'+esc(r.venue||'')+'" placeholder="e.g. Main Hall"></div>'+
+    '<div class="form-group"><label>Invigilator</label><input class="form-input" id="exf-inv" value="'+esc(r.invigilator||'')+'"></div>'+
+    '<div class="form-group" style="grid-column:1/-1"><label>Notes</label><input class="form-input" id="exf-notes" value="'+esc(r.notes||'')+'" placeholder="e.g. Bring mathematical set"></div></div>';},
+  async fillSubjects(){try{const {data}=await sb.from('subjects').select('name').order('name');const dl=document.getElementById('exf-subjects');if(dl)dl.innerHTML=(data||[]).map(s=>'<option value="'+esc(s.name)+'">').join('');}catch(e){}},
+  addModal(){openModal('Add exam paper',this.formHtml(null),'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.save()">💾 Save paper</button>');this.fillSubjects();},
+  async edit(id){const r=(this.rows||[]).find(x=>x.id===id);if(!r)return;this._editing=id;openModal('Edit exam paper',this.formHtml(r),'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.save(\''+id+'\')">💾 Save changes</button>');this.fillSubjects();},
+  async save(id){const c=this.ctx();
+    const row={class:document.getElementById('exf-class').value,subject:(document.getElementById('exf-subject').value||'').trim(),exam_date:document.getElementById('exf-date').value,start_time:document.getElementById('exf-start').value,end_time:document.getElementById('exf-end').value,paper:(document.getElementById('exf-paper').value||'').trim(),venue:(document.getElementById('exf-venue').value||'').trim(),invigilator:(document.getElementById('exf-inv').value||'').trim(),notes:(document.getElementById('exf-notes').value||'').trim(),term:c.term,session:c.session};
+    if(!row.class||!row.subject||!row.exam_date){toast('Class, subject and date are required.','warning');return;}
+    if(row.end_time<=row.start_time){toast('End time must be after start time.','warning');return;}
+    const r=id?await sb.from('exam_timetable').update(row).eq('id',id):await sb.from('exam_timetable').insert(row);
+    if(r.error){toast(r.error.message,'danger',8000);return;}
+    closeModal();toast('💾 Exam paper saved.','success');this.load();},
+  async del(id){if(!confirm('Remove this exam paper?'))return;const r=await sb.from('exam_timetable').delete().eq('id',id);if(r.error){toast(r.error.message,'danger');return;}toast('Removed.','success');this.load();},
+  autoModal(){const c=this.ctx();
+    openModal('⚡ Auto-spread subjects into an exam timetable',
+      '<p style="font-size:.85rem;color:var(--gray-600)">One paper per subject for the selected class(es), spread across the date range. Weekends are skipped; each day gets a morning slot and (optionally) an afternoon slot. Review and adjust afterwards — existing papers for the class/term/session are replaced.</p>'+
+      '<div class="grid grid-2">'+
+      '<div class="form-group"><label>Class (one, or ALL)</label><select class="form-select" id="exa-class"><option value="__ALL__">ALL classes</option>'+[...document.getElementById('ex-class').options].filter(o=>o.value).map(o=>'<option'+(c.cls===o.value?' selected':'')+'>'+esc(o.value)+'</option>').join('')+'</select></div>'+
+      '<div class="form-group"><label>First exam day</label><input class="form-input" id="exa-start" type="date"></div>'+
+      '<div class="form-group"><label>Morning slot</label><input class="form-input" id="exa-m" value="09:00-11:00" placeholder="09:00-11:00"></div>'+
+      '<div class="form-group"><label>Afternoon slot (blank = mornings only)</label><input class="form-input" id="exa-a" value="12:00-14:00" placeholder="12:00-14:00"></div>'+
+      '<div class="form-group"><label>Default venue</label><input class="form-input" id="exa-venue" placeholder="e.g. Main Hall"></div></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.autoRun()">⚡ Build timetable</button>');},
+  async autoRun(){const c=this.ctx();
+    const clsPick=document.getElementById('exa-class').value,start=document.getElementById('exa-start').value,venue=(document.getElementById('exa-venue').value||'').trim();
+    const mm=(document.getElementById('exa-m').value||'').match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+    const aa=(document.getElementById('exa-a').value||'').match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
+    if(!start||!mm){toast('Pick the first exam day and a valid morning slot like 09:00-11:00.','warning');return;}
+    const classes=clsPick==='__ALL__'?[...document.getElementById('ex-class').options].map(o=>o.value).filter(Boolean):[clsPick];
+    const subj=await sb.from('subjects').select('name,class').order('name');
+    if(subj.error){toast(subj.error.message,'danger');return;}
+    let made=0;
+    for(const cls of classes){
+      let subjects=[...new Set((subj.data||[]).filter(s=>!s.class||s.class===cls).map(s=>s.name))];
+      if(!subjects.length)subjects=[...new Set((subj.data||[]).map(s=>s.name))];
+      if(!subjects.length)continue;
+      await sb.from('exam_timetable').delete().eq('class',cls).eq('term',c.term).eq('session',c.session);
+      const slots=[[mm[1],mm[2]]];if(aa)slots.push([aa[1],aa[2]]);
+      let d=new Date(start+'T12:00:00'),si=0;const rows=[];
+      const next=()=>{si++;if(si>=slots.length){si=0;d.setDate(d.getDate()+1);while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);}};
+      while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);
+      subjects.forEach(s=>{rows.push({class:cls,subject:s,exam_date:d.toISOString().slice(0,10),start_time:slots[si][0],end_time:slots[si][1],venue:venue,term:c.term,session:c.session,paper:'',invigilator:'',notes:''});next();});
+      const r=await sb.from('exam_timetable').insert(rows);
+      if(r.error){toast(cls+': '+r.error.message,'danger',8000);continue;}
+      made+=rows.length;}
+    closeModal();toast('⚡ '+made+' paper(s) scheduled across '+classes.length+' class(es). Review the grid and adjust as needed.','success',8000);
+    if(window.App&&App.logActivity)App.logActivity('generate','exam_timetable',classes.join(','));this.load();},
+  print(){const el=document.getElementById('ex-print-area');if(!el){toast('Nothing to print yet.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Exam Timetable</title><style>@page{size:A4;margin:10mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #111;padding:6px;text-align:left;font-size:12px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();}
 };
-document.addEventListener('DOMContentLoaded',()=>DataTools.init());if(document.readyState!=='loading')DataTools.init();
-</script><script src="assets/js/drive-sync.js"></script>
-<script>
-const GD={
-  fmt(b){b=Number(b)||0;return b>1048576?(b/1048576).toFixed(2)+' MB':b>1024?(b/1024).toFixed(1)+' KB':b+' B';},
-  prog(m){const e=document.getElementById('gd-progress');if(e)e.textContent=m||'';},
-  async refreshStatus(){await DriveSync.loadCfg();const e=document.getElementById('gd-status');if(!e)return;const c=DriveSync.cfg;const last=c.lastBackup?new Date(c.lastBackup).toLocaleString():'never';e.innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value" style="font-size:1rem">'+(c.clientId?'Configured ✓':'Not configured')+'</div><div class="stat-label">Google connection</div></div><div class="stat-card"><div class="stat-value" style="font-size:1rem">'+(c.enabled?'Every '+c.days+' day(s)':'Off')+'</div><div class="stat-label">Automatic sync</div></div><div class="stat-card"><div class="stat-value" style="font-size:1rem">'+esc(last)+'</div><div class="stat-label">Last Drive backup</div></div></div>';const ce=document.getElementById('gd-client'),en=document.getElementById('gd-enabled'),dy=document.getElementById('gd-days');if(ce&&!ce.value)ce.value=c.clientId||'';if(en)en.value=String(!!c.enabled);if(dy)dy.value=c.days||7;},
-  async save(){try{await DriveSync.loadCfg();await DriveSync.saveCfg({clientId:document.getElementById('gd-client').value.trim(),enabled:document.getElementById('gd-enabled').value==='true',days:Math.max(1,Number(document.getElementById('gd-days').value)||7)});toast('Google Drive settings saved for the whole school ✓','success');this.refreshStatus();}catch(e){toast(e.message||e,'danger',8000);}},
-  async backup(){try{await DriveSync.loadCfg();this.prog('Starting backup…');const r=await DriveSync.backupNow({interactive:true,onProgress:m=>this.prog(m)});this.prog('');toast('✅ Backup uploaded to Google Drive: '+r.file.name+' ('+r.rows+' rows, '+this.fmt(r.bytes)+'). Find it in the “'+DriveSync.folderName()+'” folder of the authorised Google account.','success',10000);this.refreshStatus();this.list();}catch(e){this.prog('');toast(e.message||e,'danger',10000);}},
-  async list(){const b=document.getElementById('gd-list');b.textContent='Loading Drive backups…';try{await DriveSync.loadCfg();const files=await DriveSync.listBackups();if(!files.length){b.innerHTML='<p style="color:var(--gray-500)">No backups in Drive yet. Click “Back up now” to create the first one.</p>';return;}b.innerHTML='<div class="table-wrap"><table><thead><tr><th>Backup file</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead><tbody>'+files.map(f=>'<tr><td style="word-break:break-all">'+esc(f.name)+'</td><td>'+this.fmt(f.size)+'</td><td>'+esc(String(f.createdTime).slice(0,16).replace('T',' '))+'</td><td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="GD.restore(\''+f.id+'\',\''+esc(f.name)+'\')">↩ Restore</button> <button class="btn btn-sm btn-outline" style="color:#0369a1;border-color:#0369a1" onclick="GD.recover(\''+f.id+'\',\''+esc(f.name)+'\')" title="Restore into a brand-new Supabase project (old project lost)">🚑 Recover to new project</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="GD.del(\''+f.id+'\',\''+esc(f.name)+'\')">🗑</button></td></tr>').join('')+'</tbody></table></div>';}catch(e){b.innerHTML='<p style="color:#b91c1c">'+esc(e.message||e)+'</p>';}},
-  async recover(id,name){if(!confirm('🚑 DISASTER RECOVERY MODE\n\nUse this ONLY when restoring “'+name+'” into a BRAND-NEW Supabase project because the old project was paused too long or deleted.\n\nWhat it does:\n• Imports every school record (students, results, fees, CBT, settings…)\n• Skips old user accounts (they belong to the dead project — users simply sign up again and you re-approve them)\n• Clears stale ownership references so nothing is rejected\n• Retries row-by-row so one bad row never blocks the rest\n\nBEFORE clicking OK, make sure you have already run database/complete-schema.sql in the new project.\n\nProceed?'))return;try{this.prog('Disaster recovery: downloading from Drive and importing…');const rep=await DriveSync.restoreFrom(id,'recovery');this.prog('');const saved=rep.reduce((a,x)=>a+x.saved,0),failed=rep.reduce((a,x)=>a+x.failed,0);document.getElementById('gd-list').insertAdjacentHTML('afterbegin',DataPortability.reportHTML(rep));toast('🚑 Recovery finished: '+saved+' row(s) salvaged'+(failed?', '+failed+' skipped (see report — usually old account references)':'')+'. Next: ask staff/parents/students to sign up again, then re-approve them on Approvals.',failed?'warning':'success',12000);}catch(e){this.prog('');toast(e.message||e,'danger',10000);}},
-  async restore(id,name){if(!confirm('Restore “'+name+'” from Google Drive into the database?\n\nExisting rows with the same id are updated; missing rows are re-created. Nothing is deleted.'))return;try{this.prog('Downloading from Drive and importing…');const rep=await DriveSync.restoreFrom(id,'upsert');this.prog('');const saved=rep.reduce((a,x)=>a+x.saved,0),failed=rep.reduce((a,x)=>a+x.failed,0);document.getElementById('gd-list').insertAdjacentHTML('afterbegin',DataPortability.reportHTML(rep));toast('Restore finished: '+saved+' row(s) imported'+(failed?', '+failed+' failed (see report)':'')+' ✓',failed?'warning':'success',9000);}catch(e){this.prog('');toast(e.message||e,'danger',10000);}},
-  async del(id,name){if(!confirm('Delete the Drive backup “'+name+'” permanently?'))return;try{await DriveSync.deleteBackup(id);toast('Drive backup deleted.','info');this.list();}catch(e){toast(e.message||e,'danger');}}
-};
-document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>GD.refreshStatus(),800);});
-</script>
-<script src="assets/js/demo-sample-data.js"></script>
-<script>
-const DS={
-  async fill(){
-    if(!window.DemoSampleData){toast('Sample-data engine still loading — try again in a second.','warning');return;}
-    if(!confirm('Load demo sample data now?\n\nEvery sparse table is topped up with believable rows (tables that already have data are skipped). Recommended for DEMO deployments — you can delete any row later from its page or Admin Data.'))return;
-    const box=document.getElementById('ds-log');box.innerHTML='<span class="pulse">Loading sample data…</span>';
-    try{const log=await DemoSampleData.run(l=>{box.innerHTML=l.map(x=>'<div>'+x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');});
-      box.innerHTML=log.map(x=>'<div>'+x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('')+'<div style="margin-top:6px"><b>Done ✓</b> Open any page in the sidebar to see the data live.</div>';
-      toast('🎬 Sample data loaded — every showcase page now has rows.','success',8000);
-    }catch(e){box.textContent='';toast(e.message||e,'danger',9000);}
-  }
-};
-</script>
-</body></html>
+document.addEventListener('DOMContentLoaded',()=>EXT.init());EXT.init();
+</script></body></html>

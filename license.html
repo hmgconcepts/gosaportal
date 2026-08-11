@@ -40,6 +40,26 @@
     </div>
   </div>
 
+  <!-- V9.1 ENTERPRISE: activation keys + key-lock + audit trail -->
+  <div class="card" id="key-card" style="margin-top:16px">
+    <h3 style="margin-top:0">🎟️ Activation key</h3>
+    <p style="color:var(--gray-600);font-size:.85rem">When this site is <b>key-locked</b>, the subscription can only be changed with a signed HMG activation key (<code>SC1.…</code>). Paste the key you received and apply — the server verifies its signature, applies the new expiry/status, and each key works exactly once.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <div class="form-group" style="flex:1;min-width:260px"><label>Activation key</label><input id="lic-key" class="form-input" placeholder="SC1.eyJleHBpcmVzX29uIjoi….3fb2…"></div>
+      <button class="btn btn-primary" onclick="applyActivationKey()">✅ Apply key</button>
+    </div>
+    <div id="lic-key-msg" style="font-size:.85rem;margin-top:6px;color:var(--gray-600)"></div>
+    <div id="lock-tools" style="display:none;border-top:1px solid var(--gray-200);margin-top:12px;padding-top:12px">
+      <h4 style="margin:0 0 6px">🔐 Key-lock this site (HMG — one time, at handover)</h4>
+      <p style="color:var(--gray-600);font-size:.83rem;margin:0 0 8px">Locking stores a secret salt <b>inside the database</b> (schema <code>sc_private</code>, unreachable via the API). After locking: the form above stops working for everyone including admins, and only keys signed with that salt can modify the subscription. <b>This cannot be undone from the app.</b> Generate keys with <code>tools/make-license-key.mjs</code>.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+        <div class="form-group" style="flex:1;min-width:220px"><label>Secret salt (min 12 chars — keep it safe at HMG)</label><input id="lic-salt" class="form-input" type="password" placeholder="e.g. a long random phrase"></div>
+        <button class="btn btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="lockLicense()">🔐 Lock license permanently</button>
+      </div>
+    </div>
+    <div id="lic-events" style="margin-top:12px"></div>
+  </div>
+
   <div class="card" style="margin-top:16px">
     <h3 style="margin-top:0">❓ How enforcement works</h3>
     <ol style="margin:0;padding-left:20px;color:var(--gray-700);font-size:.88rem;line-height:1.7">
@@ -132,5 +152,41 @@ function quickExtend(days){
   document.getElementById('lic-status').value='active';
   saveLicense();
 }
-load();
+/* ---------- V9.1 enterprise: activation keys, key-lock, audit ---------- */
+async function applyActivationKey(){
+  var box=document.getElementById('lic-key-msg');
+  var key=(document.getElementById('lic-key').value||'').trim();
+  if(!key){box.textContent='Paste the key first.';return;}
+  box.textContent='Verifying key on the server…';
+  var res=await window.License.applyKey(key);
+  if(res&&res.ok){box.innerHTML='<b style="color:#16a34a">✅ '+esc(res.message||'Key applied.')+'</b>'+(res.expires_on?' New expiry: <b>'+esc(res.expires_on)+'</b>.':'')+' The whole portal picks this up within 15 minutes.';document.getElementById('lic-key').value='';__lic=await window.License.refresh();render();loadKeyState();}
+  else box.innerHTML='<b style="color:#b91c1c">'+esc((res&&res.error)||'Key rejected.')+'</b>';
+}
+async function lockLicense(){
+  var salt=(document.getElementById('lic-salt').value||'').trim();
+  if(salt.length<12){alert('Salt must be at least 12 characters.');return;}
+  if(!confirm('LOCK this site permanently?\n\nAfter locking:\n• The manage form stops working for EVERYONE (including you).\n• Only signed HMG activation keys can change the subscription.\n• This cannot be undone from the app.\n\nKeep the salt safe at HMG — it is needed to generate every future key.'))return;
+  var r=await sb.rpc('sc_license_set_salt',{p_salt:salt});
+  if(r.error)alert('Error: '+r.error.message);
+  else{alert(r.data||'Locked.');document.getElementById('lic-salt').value='';loadKeyState();}
+}
+async function loadKeyState(){
+  try{
+    var locked=false;
+    try{var s=await sb.rpc('sc_license_locked');locked=!!(s&&s.data===true);}catch(e){}
+    var lt=document.getElementById('lock-tools');
+    if(lt)lt.style.display=(__isAdmin&&!locked)?'':'none';
+    var mc=document.getElementById('manage-card');
+    if(mc&&locked){mc.querySelectorAll('input,select,textarea,button').forEach(function(el){el.disabled=true;});
+      var note=document.createElement('p');note.style.cssText='color:#b91c1c;font-size:.85rem;font-weight:700';note.textContent='🔐 This site is key-locked: the form is read-only. Use an HMG activation key above to modify the subscription.';mc.appendChild(note);}
+    if(__isAdmin){
+      var ev=await sb.from('license_events').select('*').order('at',{ascending:false}).limit(15);
+      if(ev&&ev.data&&ev.data.length){
+        document.getElementById('lic-events').innerHTML='<h4 style="margin:0 0 6px">📜 License history</h4><div class="table-wrap"><table><thead><tr><th>When</th><th>Action</th><th>Details</th></tr></thead><tbody>'+
+          ev.data.map(function(x){return '<tr><td>'+esc(new Date(x.at).toLocaleString())+'</td><td>'+esc(x.action)+'</td><td style="font-size:.8rem">'+esc(JSON.stringify(x.details||{}))+'</td></tr>';}).join('')+'</tbody></table></div>';
+      }
+    }
+  }catch(e){}
+}
+load().then(loadKeyState).catch(function(){setTimeout(loadKeyState,1200);});
 </script></body></html>

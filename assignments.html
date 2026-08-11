@@ -119,7 +119,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
           <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
@@ -168,6 +168,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
         </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Auto-Timetable</span>
@@ -523,6 +526,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <div class="form-group"><label>Class</label><select class="form-select" id="ap-class"><option value="">— class —</option></select></div>
           <div class="form-group"><label>Subject</label><select class="form-select" id="ap-subject"><option value="">— subject —</option></select></div>
           <button class="btn btn-outline" onclick="AP.totals()">Σ Show accumulated totals</button>
+          <button class="btn btn-outline" onclick="AP.matrix()" data-staff-only title="Every assignment as a column, every student as a row — the full term's collation sheet">📋 Term score sheet</button>
+          <button class="btn btn-outline" onclick="AP.quickAssignment()" data-staff-only title="Record a physical/paper assignment and score it immediately">➕ Quick physical assignment</button>
           <button class="btn btn-primary" onclick="AP.pushModal()" data-staff-only>🚀 Push totals → Report card</button>
           <button class="btn btn-outline" onclick="AP.pullCBT()" data-staff-only title="Import CBT-assignment results into the accumulated totals">🖥️ Pull CBT assignment scores</button>
           <a class="btn btn-outline" href="cbt.html" data-staff-only title="Create an automated CBT assignment — its scores can be pulled here">＋ Create CBT assignment</a>
@@ -545,6 +550,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
@@ -688,6 +694,64 @@ const AP={
     const list=Object.values(by).sort((a,b)=>(b.got/(b.max||1))-(a.got/(a.max||1)));
     this._totals={list:list,cls:cls,sub:sub,cp:cp};
     box.innerHTML=list.length?'<div class="table-wrap"><table><thead><tr><th>Student</th><th>Assignments scored</th><th>Points</th><th>%</th></tr></thead><tbody>'+list.map(t=>'<tr><td><b>'+AP.esc(t.name)+'</b><br><small>'+AP.esc(t.ref||'')+'</small></td><td>'+t.n+'</td><td>'+t.got+' / '+t.max+'</td><td><b>'+(t.max?Math.round(t.got/t.max*1000)/10:0)+'%</b></td></tr>').join('')+'</tbody></table></div>':'<p style="color:var(--gray-500)">No assignment scores recorded yet for '+AP.esc(cls)+' · '+AP.esc(sub)+(cp.term?' · '+AP.esc(cp.term):'')+'. Use ✍️ Score class on an assignment above.</p>';
+  },
+  /* ==== V9.1 (4f): TERM SCORE SHEET — every assignment as a column ==== */
+  async matrix(){
+    const cls=(document.getElementById('ap-class')||{}).value,sub=(document.getElementById('ap-subject')||{}).value;
+    const box=document.getElementById('ap-totals');
+    if(!cls||!sub){box.innerHTML='<p style="color:var(--gray-500)">Pick a class AND subject first.</p>';return;}
+    let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+    let q=sb.from('assignment_scores').select('*').eq('class',cls).eq('subject',sub);
+    if(cp.term)q=q.eq('term',cp.term); if(cp.session)q=q.eq('session',cp.session);
+    const r=await q.limit(8000);
+    if(r.error){box.innerHTML='<p style="color:#b91c1c">'+AP.esc(r.error.message)+'</p>';return;}
+    const scores=r.data||[];
+    if(!scores.length){box.innerHTML='<p style="color:var(--gray-500)">No assignment scores yet for '+AP.esc(cls)+' · '+AP.esc(sub)+' this term.</p>';return;}
+    /* resolve assignment titles */
+    const aids=[...new Set(scores.map(x=>x.assignment_id).filter(Boolean))];
+    let titles={};
+    if(aids.length){const ar=await sb.from('assignments').select('id,title,due_date').in('id',aids);(ar.data||[]).forEach(a=>titles[a.id]=a.title||'Assignment');}
+    const colKeys=[...new Set(scores.map(x=>x.assignment_id||'cbt-pull'))];
+    const colLabel=k=>k==='cbt-pull'?'CBT pulls':(titles[k]||'Assignment');
+    /* rows: full class register so unscored students are visible too */
+    const studs=(await sb.from('students').select('id,full_name,admission_no').eq('class',cls).order('full_name')).data||[];
+    const byStud={};scores.forEach(x=>{const k=String(x.student_id);(byStud[k]=byStud[k]||{}); const ck=x.assignment_id||'cbt-pull'; (byStud[k][ck]=byStud[k][ck]||{got:0,max:0}); byStud[k][ck].got+=Number(x.score)||0; byStud[k][ck].max+=Number(x.max_score)||0;});
+    let h='<div class="table-wrap" id="ap-matrix-print"><h4 style="margin:6px 0">📋 Term score sheet · '+AP.esc(cls)+' · '+AP.esc(sub)+(cp.term?' · '+AP.esc(cp.term):'')+(cp.session?' · '+AP.esc(cp.session):'')+'</h4><table><thead><tr><th>Student</th>'+colKeys.map(k=>'<th style="font-size:.75rem">'+AP.esc(colLabel(k)).slice(0,24)+'</th>').join('')+'<th>Total</th><th>%</th></tr></thead><tbody>';
+    studs.forEach(s0=>{const row=byStud[String(s0.id)]||{};let got=0,max=0;
+      h+='<tr><td><b>'+AP.esc(s0.full_name)+'</b><br><small>'+AP.esc(s0.admission_no||'')+'</small></td>'+colKeys.map(k=>{const c=row[k];if(c){got+=c.got;max+=c.max;return '<td>'+c.got+'/'+c.max+'</td>';}return '<td style="color:var(--gray-400)">—</td>';}).join('')+'<td><b>'+got+' / '+max+'</b></td><td><b>'+(max?Math.round(got/max*1000)/10:0)+'%</b></td></tr>';});
+    h+='</tbody></table></div><div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="AP.printMatrix()">🖨️ Print score sheet</button><button class="btn btn-outline btn-sm" onclick="AP.exportMatrixCSV()">⬇ CSV</button></div>';
+    this._matrix={studs:studs,byStud:byStud,colKeys:colKeys,colLabel:colLabel,cls:cls,sub:sub,cp:cp};
+    box.innerHTML=h;
+  },
+  printMatrix(){const el=document.getElementById('ap-matrix-print');if(!el){toast('Open the score sheet first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Assignment Score Sheet</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #111;padding:5px;text-align:center;font-size:11px}th{background:#e2e8f0}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
+  exportMatrixCSV(){const m=this._matrix;if(!m){toast('Open the score sheet first.','warning');return;}
+    let csv='Student,Admission No,'+m.colKeys.map(k=>'"'+m.colLabel(k).replace(/"/g,'""')+'"').join(',')+',Total,Max,%\n';
+    m.studs.forEach(s0=>{const row=m.byStud[String(s0.id)]||{};let got=0,max=0;const cells=m.colKeys.map(k=>{const c=row[k];if(c){got+=c.got;max+=c.max;return c.got+'/'+c.max;}return '';});
+      csv+='"'+String(s0.full_name).replace(/"/g,'""')+'","'+(s0.admission_no||'')+'",'+cells.join(',')+','+got+','+max+','+(max?Math.round(got/max*1000)/10:0)+'\n';});
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='assignment-scores-'+m.cls.replace(/\s+/g,'_')+'-'+m.sub.replace(/\s+/g,'_')+'.csv';a.click();},
+  /* ==== V9.1 (4f): QUICK PHYSICAL ASSIGNMENT — record + score in one flow ==== */
+  async quickAssignment(){
+    const cls=(document.getElementById('ap-class')||{}).value,sub=(document.getElementById('ap-subject')||{}).value;
+    if(!cls||!sub){toast('Pick a class AND subject first (top of this card).','warning');return;}
+    openModal('➕ Quick physical assignment · '+AP.esc(cls)+' · '+AP.esc(sub),
+      '<p style="font-size:.85rem;color:var(--gray-600)">For paper/physical homework: give it a short title, save, and the scoring sheet opens immediately with the full class register.</p>'+
+      '<div class="form-group"><label>Title *</label><input class="form-input" id="qa-title" placeholder="e.g. Essay: My last holiday · Exercise 4.2"></div>'+
+      '<div class="grid grid-2"><div class="form-group"><label>Kind</label><select class="form-select" id="qa-kind"><option>Written homework</option><option>Class exercise</option><option>Project</option><option>Practical</option><option>Presentation</option><option>Group work</option><option>Reading task</option></select></div>'+
+      '<div class="form-group"><label>Given on</label><input class="form-input" id="qa-date" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="AP.quickSave()">💾 Save & open scoring sheet</button>');
+  },
+  async quickSave(){
+    const cls=(document.getElementById('ap-class')||{}).value,sub=(document.getElementById('ap-subject')||{}).value;
+    const title=(document.getElementById('qa-title').value||'').trim(),kind=document.getElementById('qa-kind').value,date=document.getElementById('qa-date').value;
+    if(!title){toast('Give the assignment a title.','warning');return;}
+    const row={title:title,class:cls,subject:sub,due_date:date||null,description:kind+' (recorded via Quick physical assignment)',posted_by:(window.SC_PROFILE&&SC_PROFILE.id)||null};
+    let r=await sb.from('assignments').insert(row).select('id');
+    if(r.error){ /* self-heal unknown columns */ const clean={title:title,class:cls,subject:sub,posted_by:row.posted_by}; r=await sb.from('assignments').insert(clean).select('id'); }
+    if(r.error){toast(r.error.message,'danger',8000);return;}
+    const id=r.data&&r.data[0]&&r.data[0].id;
+    closeModal();toast('💾 Assignment recorded. Opening the scoring sheet…','success');
+    if(id)setTimeout(()=>AP.scoreModal(id),350);
+    if(window.CRUD)CRUD.renderList('assignments');
   },
   async pushModal(){
     if(!this._totals||!this._totals.list.length){toast('Click Σ Show accumulated totals first (pick class + subject).','warning');return;}

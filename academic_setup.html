@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Academic Setup • God of Seed Academy">
-<meta property="og:description" content="God of Seed Academy — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -168,6 +168,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
         </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Auto-Timetable</span>
@@ -509,6 +512,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
@@ -527,11 +531,11 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 const AS={
  _loadSeq:0,
  async init(){ await this.load(); },
- async load(){ if(!sb){return;} const seq=++this._loadSeq, [d,l,p]=await Promise.all([sb.from('departments').select('*').order('name'),sb.from('lookups').select('*').order('kind').order('position'),sb.from('academic_periods').select('*').order('created_at',{ascending:false}).limit(50)]); if(seq!==this._loadSeq)return; document.getElementById('as-depts').innerHTML=this.list(d.data||[],['name','head'],'departments'); document.getElementById('as-lookups').innerHTML=this.list(l.data||[],['kind','value'],'lookups'); document.getElementById('as-periods').innerHTML=this.list(p.data||[],['session','term','starts_on','ends_on','is_current'],'academic_periods'); const fill=(id,kind)=>{const e=document.getElementById(id);if(!e)return;const cur=e.value;e.innerHTML='<option value="">— select registered '+kind+' —</option>'+[...new Set((l.data||[]).filter(x=>x.kind===kind).map(x=>x.value))].map(x=>'<option>'+esc(x)+'</option>').join('');if(cur)e.value=cur;}; fill('as-p-session','session'); fill('as-p-term','term'); },
+ async load(){if(!sb)return;const seq=++this._loadSeq,[d,l,p]=await Promise.all([sb.from('departments').select('*').order('name'),sb.from('lookups').select('*').order('kind').order('position'),sb.from('academic_periods').select('*').order('created_at',{ascending:false}).limit(50)]);if(seq!==this._loadSeq)return;for(const r of[d,l,p])if(r.error){toast('Could not refresh Academic Setup: '+r.error.message,'danger');return;}document.getElementById('as-depts').innerHTML=this.list(d.data||[],['name','head'],'departments');document.getElementById('as-lookups').innerHTML=this.list(l.data||[],['kind','value'],'lookups');document.getElementById('as-periods').innerHTML=this.list(p.data||[],['session','term','starts_on','ends_on','is_current'],'academic_periods');const fill=(id,kind)=>{const e=document.getElementById(id),cur=e.value;e.innerHTML='<option value="">— select registered '+kind+' —</option>'+[...new Set((l.data||[]).filter(x=>x.kind===kind).map(x=>x.value))].map(x=>'<option>'+esc(x)+'</option>').join('');if(cur)e.value=cur};fill('as-p-session','session');fill('as-p-term','term');},
  list(rows,cols,table){ if(!rows.length)return '<p style="color:var(--gray-500)">No records yet.</p>'; return '<div class="table-wrap"><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+(table?'<th>Action</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c]??'')+'</td>').join('')+(table?'<td><button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="AS.del(\''+table+'\',\''+r.id+'\')">🗑 Delete</button></td>':'')+'</tr>').join('')+'</tbody></table></div>'; },
  async addDepartment(){ if(!sb)return; const name=document.getElementById('as-dept').value.trim(); if(!name){toast('Enter department name','warning');return;} const {error}=await sb.from('departments').insert({name,head:document.getElementById('as-head').value.trim()||null}); if(error){toast(error.message,'danger');return;} toast('Department added','success'); this.load(); },
  async addLookup(){ if(!sb)return; const kind=document.getElementById('as-kind').value, value=document.getElementById('as-value').value.trim(); if(!value){toast('Enter value','warning');return;} const {error}=await sb.from('lookups').insert({kind,value,position:0}); if(error){toast(error.message,'danger');return;} toast('Lookup added','success'); this.load(); },
- async del(table,id){ if(!confirm('Delete this setup item?'))return; const {error}=await sb.from(table).delete().eq('id',id); if(error){toast(error.message,'danger');return;} toast('Deleted.','info'); this.load(); },
+ async del(table,id){if(!confirm('Delete this setup item permanently? Existing reports keep their text values.'))return;const{data,error}=await sb.from(table).delete().eq('id',id).select('id');if(error){toast(error.message,'danger');return;}if(!data||!data.length){toast('Nothing was deleted. Your role may not have permission, or the record was already removed.','danger',7000);await this.load();return;}try{Object.keys(sessionStorage).filter(k=>k.startsWith('sc-table-cache:')).forEach(k=>sessionStorage.removeItem(k));}catch(_){}const v=await sb.from(table).select('id').eq('id',id).maybeSingle();if(v.data){toast('Delete verification failed; the record still exists.','danger');return;}toast('Deleted permanently and verified.','success');await this.load();},
  async addPeriod(){ if(!sb)return; const row={session:document.getElementById('as-p-session').value.trim(),term:document.getElementById('as-p-term').value.trim(),starts_on:document.getElementById('as-start').value||null,ends_on:document.getElementById('as-end').value||null,is_current:document.getElementById('as-current').checked}; if(!row.session||!row.term){toast('Select a registered session and term (add them in the Terms / Sessions / Arms card above first)','warning');return;} if(row.is_current) await sb.from('academic_periods').update({is_current:false}).neq('id','00000000-0000-0000-0000-000000000000'); const {error}=await sb.from('academic_periods').upsert(row,{onConflict:'session,term'}); if(error){toast(error.message,'danger');return;} toast('Academic period saved','success'); this.load(); }
 };
 document.addEventListener('DOMContentLoaded',()=>AS.init()); AS.init();
