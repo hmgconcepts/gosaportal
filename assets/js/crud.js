@@ -18,7 +18,7 @@ const CRUD = {
     classes:[], subjects:[], attendance:['staff','teacher'],
     results:['staff','teacher'], academic_records:['staff','teacher'], report_cards:['staff','teacher'],
     cbt:['staff','teacher'], cbt_prompts:['staff','teacher'], assignments:['staff','teacher'],
-    timetable:[], timetable_generator:[], sow:['staff','teacher'],
+    timetable:[], timetable_generator:[], exam_timetable:['staff','teacher'], sow:['staff','teacher'],
     lesson_plans:['staff','teacher'], announcements:[], events:[],
     gallery:[], library:[], digital_library:['staff','teacher'],
     eresources:['staff','teacher'], directory:[], broadcast:[],
@@ -120,6 +120,17 @@ const CRUD = {
       {key:'ca1',label:'CA1',type:'number'},{key:'ca2',label:'CA2',type:'number'},
       {key:'ca3',label:'CA3',type:'number'},{key:'exam',label:'Exam',type:'number'},
       {key:'grade',label:'Grade',type:'text',help:'auto-suggested from total'},{key:'remark',label:'Remark',type:'text'}
+    ]},
+    exam_timetable: { table:'exam_timetable', title:'Exam paper', cols:[
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
+      {key:'exam_date',label:'Date',type:'date'},
+      {key:'start_time',label:'Start',type:'text'},
+      {key:'end_time',label:'End',type:'text'},
+      {key:'venue',label:'Venue',type:'text'},
+      {key:'invigilator',label:'Invigilator',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value'},
+      {key:'paper',label:'Paper',type:'text'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'}
     ]},
     timetable: { table:'timetable', title:'Timetable slot', cols:[
       {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},

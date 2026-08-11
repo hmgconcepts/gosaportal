@@ -135,24 +135,77 @@
     return null;
   }
 
-  /** Resolve effective license: registry → database → config, with caching. */
+  /* V9.1 ENTERPRISE: server-computed license state (sc_license_status RPC).
+     The DATABASE decides the state using ITS OWN clock and the stored row, so
+     winding the device clock back, editing localStorage or blocking the
+     registry no longer changes anything. When the site is key-locked
+     (sc_license_set_salt run at handover), even the client's admin cannot
+     extend the term — only signed activation keys from HMG can. */
+  async function fromServer() {
+    try {
+      if (!window.sb) return null;
+      var r = await window.sb.rpc('sc_license_status');
+      if (r && r.data && r.data.state) {
+        var d = r.data;
+        var lic = normalize({
+          model: d.state === 'lifetime' ? 'lifetime' : 'subscription',
+          plan: d.plan, cycle: d.cycle, expires_on: d.expires_on,
+          grace_days: d.grace_days, status: d.status,
+          renew_url: d.renew_url, lock_message: d.lock_message
+        });
+        var result;
+        if (d.state === 'lifetime') result = { state: 'lifetime', lic: lic };
+        else if (d.state === 'suspended') result = { state: 'suspended', lic: lic };
+        else if (d.state === 'expired') result = { state: 'expired', lic: lic, daysOver: Math.max(1, +d.days || 1) };
+        else if (d.state === 'grace') result = { state: 'grace', lic: lic, daysLeft: Math.max(1, +d.days || 1) };
+        else if (d.state === 'warning') result = { state: 'warning', lic: lic, daysLeft: Math.max(1, +d.days || 1) };
+        else result = { state: 'active', lic: lic, daysLeft: +d.days || 0 };
+        return { lic: lic, source: 'server', locked: !!d.locked, result: result, serverDate: d.server_date };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  /** Resolve effective license: server RPC → registry → database → config.
+      V9.1: the server-side verdict (sc_license_status) has TOP priority —
+      it is computed on the database's clock and cannot be spoofed locally. */
   async function status() {
     if (cfg().demo) { var d = { lic: normalize({ model: 'lifetime', plan: 'Demo deployment' }), source: 'demo' }; d.result = evaluate(d.lic); return d; }
+    var srv = await fromServer();
+    if (srv) { writeCache({ at: Date.now(), lic: srv.lic, source: 'server', state: srv.result.state }); return srv; }
     var reg = await fromRegistry();
-    if (reg) { reg.result = evaluate(reg.lic); writeCache({ at: Date.now(), lic: reg.lic, source: reg.source }); return reg; }
+    if (reg) { reg.result = evaluate(reg.lic); writeCache({ at: Date.now(), lic: reg.lic, source: reg.source, state: reg.result.state }); return reg; }
     var db = await fromDb();
     if (db) {
       var sig = await signature(db.lic);
       db.tampered = !!(db.lic.signature && cfg().salt && sig && db.lic.signature !== sig);
       db.result = evaluate(db.lic);
-      writeCache({ at: Date.now(), lic: db.lic, source: db.source });
+      writeCache({ at: Date.now(), lic: db.lic, source: db.source, state: db.result.state });
       return db;
+    }
+    /* V9.1 ANTI-BYPASS: if the last confirmed verdict was a LOCK state
+       (expired/suspended) and every live source is now unreachable — e.g. the
+       network is blocked to dodge the check — the lock STAYS until a live
+       source confirms otherwise. Going offline can never unlock the portal. */
+    var cached = readCache();
+    if (cached && (cached.state === 'expired' || cached.state === 'suspended')) {
+      var lk = normalize(cached.lic || { model: 'subscription', status: cached.state === 'suspended' ? 'suspended' : 'active' });
+      return { lic: lk, source: 'cache-lock', result: cached.state === 'suspended' ? { state: 'suspended', lic: lk } : { state: 'expired', lic: lk, daysOver: 1 } };
     }
     var c = cfg().license;
     if (c) { var out = { lic: normalize(c), source: 'config' }; out.result = evaluate(out.lic); return out; }
-    var cached = readCache();
     if (cached && cached.lic) return { lic: normalize(cached.lic), source: 'cache', result: evaluate(cached.lic) };
     return { lic: normalize({ model: 'lifetime' }), source: 'default', result: evaluate({ model: 'lifetime' }) };
+  }
+
+  /** V9.1: apply an HMG activation key (SC1.<payload>.<sig>) via the server. */
+  async function applyKey(key) {
+    if (!window.sb) return { ok: false, error: 'Database not configured.' };
+    try {
+      var r = await window.sb.rpc('sc_license_apply', { p_key: String(key || '').trim() });
+      if (r.error) return { ok: false, error: r.error.message };
+      return r.data || { ok: false, error: 'No response.' };
+    } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   }
 
   /* ---------------- UI: shadow-DOM banner & lock ---------------- */
@@ -249,6 +302,7 @@
     status: status,
     applyUi: applyUi,
     normalize: normalize,
+    applyKey: applyKey,
     refresh: tick
   };
 

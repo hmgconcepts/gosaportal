@@ -170,7 +170,7 @@ ${T.modal()}
       <p style="margin-top:12px;font-size:0.82rem;color:var(--gray-500);text-align:center">Your account will be reviewed by the school admin before sign-in is enabled.</p>
     </form>
     <p style="margin-top:24px;text-align:center;font-size:0.78rem;color:var(--gray-400)">
-      Powered by <a href="${T.esc(config.hmgLink || 'https://hmgconcepts.pages.dev/')}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">HMG Concepts</a>
+      Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
     </p>
   </div>
 </div>
@@ -181,6 +181,7 @@ ${T.modal()}
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
@@ -244,7 +245,7 @@ ${T.setupRequiredBanner()}
       <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
         ${config.campuses && config.campuses.length > 1 ? T.campusSwitcher(config) : ''}
         <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
-        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Guest</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">not signed in</small></span></div>
+        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
         <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle theme">🌙</button>
         <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout style="display:none">Sign out</button>
       </div>
@@ -253,7 +254,7 @@ ${T.setupRequiredBanner()}
       ${content}
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
-      © ${new Date().getFullYear()} ${T.esc(config.schoolName)} · Built by <a href="https://cssadewale.pages.dev" target="_blank" rel="noopener">Adewale Samson Adeagbo</a> · Powered by <a href="${T.esc(config.hmgLink || 'https://hmgconcepts.pages.dev/')}" target="_blank" rel="noopener">HMG Concepts</a> · <a href="developer.html">About the developer</a>
+      © ${new Date().getFullYear()} ${T.esc(config.schoolName)} · Developed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
     </footer>
   </main>
 </div>
@@ -266,6 +267,7 @@ ${T.setupRequiredBanner()}
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
@@ -311,7 +313,7 @@ ${T.setupRequiredBanner()}
         }).join('')}
       </nav>
       <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
-        Powered by <a href="${T.esc(config.hmgLink || 'https://hmgconcepts.pages.dev/')}" target="_blank" rel="noopener">HMG Concepts</a>
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a>
       </div>
     </aside>`;
   },
@@ -349,18 +351,20 @@ ${T.setupRequiredBanner()}
       'dashboard','profile','change_password','notifications','feature_guide','teacher_overview',
       'students','classes','subjects','attendance','results','report_cards','academic_records',
       'cbt','cbt_prompts','entrance','assignments','timetable','timetable_generator','sow',
-      'lesson_plans','library','digital_library','eresources','announcements','events','messages','inbox',
+      'lesson_plans','library','digital_library','eresources','announcements','events','messages','inbox','exam_timetable',
       'complaints','broadcast','diary','checkin','checkin_staff','checkin-staff','punctuality','behaviour','conduct','health','support_plans',
-      'certificates','reports','directory','rubrics','counselling','substitutions','helpdesk','book_request', 'ecosystem_products','hmg_digital_products'
+      'certificates','reports','directory','rubrics','counselling','substitutions','helpdesk','book_request', 'ecosystem_products','hmg_digital_products',
+      /* V6.4 #5: teachers fill domain ratings & report comments for their students */
+      'affective_traits','psychomotor_traits','report_comments'
     ]);
     const parentSet = new Set([
       'dashboard','profile','change_password','notifications','feature_guide','student_profile','fees','payments_online','results',
-      'report_cards','attendance','assignments','diary','timetable','announcements','events','messages','inbox',
+      'report_cards','attendance','assignments','diary','timetable','exam_timetable','announcements','events','messages','inbox',
       'complaints','eresources','certificates','school_calendar','voting','idcards', 'ecosystem_products','hmg_digital_products'
     ]);
     const studentSet = new Set([
       'dashboard','profile','change_password','notifications','feature_guide','student_profile','cbt_exam','assignments','digital_library',
-      'eresources','timetable','results','report_cards','attendance','announcements','events','messages','inbox',
+      'eresources','timetable','exam_timetable','results','report_cards','attendance','announcements','events','messages','inbox',
       'complaints','certificates','diary','school_calendar','voting','idcards', 'ecosystem_products','hmg_digital_products'
     ]);
 
@@ -374,7 +378,7 @@ ${T.setupRequiredBanner()}
   iconFor(id) {
     const map = {
       dashboard:'🏠', about:'🏫', contact:'☎️', apply:'📝', 'feature-guide':'📘', 'verify-certificate':'🔎', 'teacher-overview':'👨‍🏫', 'cbt-exam':'🧪', 'cbt-multi':'🧪', profile:'👤', 'change-password':'🔐', 'academic-records':'📄', academic_setup:'⚙️', students:'👨‍🎓', staff:'👨‍🏫', classes:'📚', attendance:'📋', results:'📊',
-      timetable:'🗓️', sow:'📋', cbt:'💻', assignments:'📝', library:'📖', conduct:'⚖️', health:'🩺',
+      timetable:'🗓️', exam_timetable:'🗓️', sow:'📋', cbt:'💻', assignments:'📝', library:'📖', conduct:'⚖️', health:'🩺',
       promotion:'🎓', fees:'💰', finance:'💵', leave:'🏖️', visitors:'🚪', transport:'🚌',
       announcements:'📢', events:'🎭', messages:'📱', inbox:'💬', complaints:'📨', broadcast:'📨',
       voting:'🗳️', gallery:'🖼️', eresources:'📁', birthdays:'🎂', idcards:'🪪', reports:'📈',
@@ -400,7 +404,7 @@ ${T.setupRequiredBanner()}
     const map = {
       dashboard:'Dashboard', about:'About', contact:'Contact', apply:'Apply', 'feature-guide':'Feature Guide', 'verify-certificate':'Verify Certificate', 'teacher-overview':'Teacher Overview', 'cbt-exam':'Take Exam', 'cbt-multi':'Multi-Subject CBT', profile:'My Profile', 'change-password':'Change Password', 'student-profile':'Student Profile', academic_records:'Academic Records', academic_setup:'Academic Setup', students:'Students', staff:'Staff', classes:'Classes',
       ecosystem_products:'HMG Ecosystem', ecosystem:'HMG Ecosystem', hmg_digital_products:'HMG Digital Products', school_fees:'School Fee Structure', school_products:'School Products', status_manager:'Role & Status Manager',
-      attendance:'Attendance', punctuality:'Punctuality', results:'Results', timetable:'Timetable',
+      attendance:'Attendance', punctuality:'Punctuality', results:'Results', timetable:'Timetable', exam_timetable:'Exam Timetable',
       'timetable-generator':'Auto-Timetable', sow:'Scheme', cbt:'CBT', assignments:'Assignments',
       library:'Library', conduct:'Conduct', health:'Health', promotion:'Promotion',
       fees:'Fees', finance:'Finance', leave:'Leave', visitors:'Visitors', transport:'Transport',
@@ -530,8 +534,10 @@ ${T.setupRequiredBanner()}
           <div class="stat-card"><div class="stat-value" id="stat-students">—</div><div class="stat-label">Students</div></div>
           <div class="stat-card"><div class="stat-value" id="stat-staff">—</div><div class="stat-label">Staff</div></div>
           <div class="stat-card"><div class="stat-value" id="stat-fees">—</div><div class="stat-label">Fees Paid</div></div>
+          <div class="stat-card"><div class="stat-value" id="stat-outstanding" style="color:#b45309">—</div><div class="stat-label">Fees Outstanding</div></div>
           <div class="stat-card"><div class="stat-value" id="stat-announcements">—</div><div class="stat-label">Notices</div></div>
         </div>
+        <div id="dash-actions" class="card" style="display:none;margin-bottom:16px;background:#fff7ed;border-color:#fdba74"><h3 style="margin:0 0 8px">⚡ Action needed today</h3><div id="dash-actions-body" style="display:flex;gap:10px;flex-wrap:wrap"></div></div>
         <div class="grid grid-2">
           <div class="card"><h3>🏛️ Admin / Super Admin Command Centre</h3><p>Full school-control dashboard: setup, users, approvals, academics, finance, HR, compliance, records, backups and communications.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${buttons(adminLinks)}</div></div>
           <div class="card"><h3>📊 Executive Analytics</h3><p style="color:var(--gray-600);margin-bottom:10px">Whole-school KPIs for proprietor/principal oversight.</p><canvas id="dash-chart" style="margin-top:12px;max-height:240px"></canvas></div>
@@ -548,6 +554,7 @@ ${T.setupRequiredBanner()}
         <div class="card" data-admin-only style="margin-bottom:16px;background:#fef3c7;border-color:#f59e0b"><h3 style="margin:0">👁️ Admin Oversight Mode (Staff Portal)</h3><p style="margin:4px 0 10px;color:#92400e">You are inspecting the Staff/Teacher portal as an Admin.</p><button class="btn btn-primary btn-sm" onclick="['dash-sec-admin','dash-sec-staff','dash-sec-parent','dash-sec-student'].forEach(id=>{var e=document.getElementById(id);if(e)e.style.display='none';});document.getElementById('dash-sec-admin').style.display='block';">← Return to Admin Command Centre</button></div>
         <div class="stats-grid"><div class="stat-card"><div class="stat-value" id="stat-my-classes">—</div><div class="stat-label">My Classes</div></div><div class="stat-card"><div class="stat-value" id="stat-open-cbt">—</div><div class="stat-label">Open CBT</div></div><div class="stat-card"><div class="stat-value" id="stat-attendance-today">—</div><div class="stat-label">Attendance Today</div></div></div>
         <div class="grid grid-2"><div class="card"><h3>👨‍🏫 Staff / Teacher Workspace</h3><p>Academic and classroom operations only — no proprietor finance, HR payroll, storage, compliance or system-backup tools.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${buttons(staffLinks)}</div></div><div class="card"><h3>📢 Staff Notices</h3><div id="dash-announcements"><span class="pulse">Loading…</span></div></div></div>
+        <div class="card" style="margin-top:16px"><h3>🗓️ My Week — personal teaching timetable</h3><div id="dash-my-timetable"><span class="pulse">Loading your timetable…</span></div></div>
       </section>
 
       <section id="dash-sec-parent" data-dash-role="parent" style="display:none">
@@ -815,7 +822,7 @@ ${T.setupRequiredBanner()}
     birthdays:   { what:'Celebrates student & staff birthdays, grouped by birth month.', who:'Everyone can view; staff manage.', steps:['Click <b>🎂 Import student birthdays</b> to pull dates from the student register.','Birthdays are grouped by month, showing each student\'s name and class.','Use it to plan celebrations and shout-outs.'] },
     gamification:{ what:'Reward points & badges for good behaviour and effort (PBIS).', who:'Teachers award points; students/parents see them.', steps:['Click <b>+ Add new</b>, pick the student, enter points and a reason.','Points are logged transparently and can appear on the student dashboard.','Use badges to reinforce positive behaviour.'] },
     library:     { what:'The physical book catalogue and lending records.', who:'Librarian/staff manage; everyone can browse.', steps:['Click <b>+ Add new</b> to catalogue a book (title, author, copies).','Track how many are lent out.','For online reading + quizzes that count toward grades, use <b>Digital Library</b>.'] },
-    activity_log:{ what:'A tamper-evident audit trail of every important action.', who:'Admin/super-admin only — read-only.', steps:['Every create, update, delete, import and login is recorded here automatically.','You cannot add rows manually — the system writes them.','Filter/export for accountability and security reviews.'] },
+    activity_log:{ what:'A tamper-evident audit trail of every important action — with owner-controlled retention.', who:'Admin/super-admin only — read-only (the system writes rows automatically).', steps:['Every create, update, delete, import and login is recorded here automatically.','You cannot add rows manually — the system writes them.','Filter/export for accountability and security reviews.','Owners: use the 🧹 Retention & Purge card to EXPORT (sealed portable JSON) then PURGE entries older than a chosen period (1 week → 2 years, or custom days) so the log never fills the free 500 MB database.'] },
     announcements:{ what:'Post notices to the whole school or a chosen audience.', who:'Staff post; everyone receives.', steps:['Click <b>+ Add new</b>; write the title and body.','Choose the <b>audience</b> (all / students / parents / staff / a class) from the dropdown.','Pin urgent notices to the top.'] },
     hr:          { what:'Run staff salaries and print professional payslips.', who:'Bursar / HR / proprietor.', steps:['Click <b>+ Add new</b>; pick the staff member from the list.','Enter basic, allowances, bonus, overtime and any deductions (tax, pension, loan).','Leave <b>Net pay</b> blank — it is calculated automatically.','Click <b>Payslip</b> on any row to print a branded payslip.'], advantages:['Automatic net-pay calculation','Professional, printable payslips','Pick staff from a list — no typing errors'], benefit:'Accurate, on-time salaries that boost morale and keep you compliant.' },
     payroll:     { what:'The full monthly salary register for all staff.', who:'Bursar / HR / proprietor.', steps:['Add a salary record per staff per month (net pay auto-computes).','Approve and mark as paid.','Print individual or bulk payslips.'], advantages:['One register for the whole school','Auto net-pay','Audit-friendly'], benefit:'A single source of truth for staff pay and budgeting.' },
@@ -1036,6 +1043,56 @@ ${T.setupRequiredBanner()}
         <div style="margin-top:12px;padding:12px;border-radius:12px;background:#f8fafc;border:1px solid var(--gray-200)"><strong>Recommended daily workflow:</strong><br>1. Use <b>Messages</b> to compose to a person or audience. 2. The item appears in <b>Inbox</b> as an internal record. 3. Recipients open it from the dashboard live feed, notification bell, or Inbox page. 4. Staff mark it read/archived after action. 5. Complaints requiring formal action should be transferred/recorded on the Complaints page with a status trail.</div>
       </div>
 ` : ''}
+      ${moduleId === 'activity_log' ? `<div class="card" data-owner-only style="margin-bottom:16px;border:2px solid #fcd34d">
+        <h3>🧹 Audit Log Retention & Purge (owner only)</h3>
+        <p style="color:var(--gray-700);margin-top:4px">Audit trails grow forever if never pruned and quietly eat the free 500&nbsp;MB database. Purge old entries here — by days, weeks, months or years — after exporting them. <b>Safe workflow:</b> ① Export (portable JSON — restorable any time) → ② Purge older than the chosen period. Only owner-level admins can do this; the purge itself is also recorded in the log.</p>
+        <div class="grid grid-3">
+          <div class="form-group"><label>Log</label><select class="form-select" id="alp-table"><option value="activity_log">Activity log (audit trail)</option><option value="login_audit">Login audit (sign-in history)</option></select></div>
+          <div class="form-group"><label>Delete entries older than</label><select class="form-select" id="alp-days"><option value="7">1 week (7 days)</option><option value="14">2 weeks (14 days)</option><option value="30">1 month (30 days)</option><option value="90">3 months (90 days)</option><option value="180" selected>6 months (180 days)</option><option value="365">1 year (365 days)</option><option value="730">2 years (730 days)</option></select></div>
+          <div class="form-group"><label>Or custom days</label><input class="form-input" id="alp-custom" type="number" min="1" placeholder="e.g. 45"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="ALP.exportFirst()">⬇ 1. Export this log first (portable JSON)</button>
+          <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="ALP.purge()">🗑 2. Purge old entries</button>
+          <a class="btn btn-outline" href="storage.html">📦 Archive to File Storage instead (Vault)</a>
+        </div>
+        <div id="alp-result" style="margin-top:10px;color:var(--gray-600)"></div>
+      </div>
+      <script>
+      const ALP={
+        days(){const c=Number(document.getElementById('alp-custom').value);return c>0?c:Number(document.getElementById('alp-days').value)||180;},
+        async exportFirst(){if(!window.DataPortability){toast('Data engine still loading — try again in a moment.','warning');return;}DataPortability.init(window.sb);const t=document.getElementById('alp-table').value;try{const n=await DataPortability.exportTable(t);toast('✅ '+n+' row(s) exported as sealed portable JSON. Keep the file — it can be re-imported or inspected any time. Now it is safe to purge.','success',9000);}catch(e){toast(e.message||e,'danger');}},
+        async purge(){if(!window.sb){toast('Database not configured','warning');return;}const t=document.getElementById('alp-table').value,d=this.days();
+          if(!confirm('Permanently delete '+(t==='activity_log'?'activity log':'login audit')+' entries older than '+d+' day(s)?\\n\\nDid you export them first? Purged rows cannot be recovered without an export.'))return;
+          const r=await sb.rpc('purge_old',{p_table:t,p_days:d});
+          if(r.error){toast(r.error.message,'danger',8000);return;}
+          document.getElementById('alp-result').textContent='🧹 Purged '+(r.data||0)+' entrie(s) older than '+d+' day(s) from '+t+'.';
+          toast('Purged '+(r.data||0)+' old entrie(s) ✓ Database space reclaimed.','success',7000);
+          if(window.CRUD)CRUD.renderList('activity_log');}
+      };
+      </script>` : ''}
+      ${moduleId === 'leave' ? `<div class="card" data-admin-only style="margin-bottom:16px;border:2px solid #86efac">
+        <h3>✅ Leave Decision Panel (admin only)</h3>
+        <p style="color:var(--gray-600);margin-top:4px">Every pending request appears here. Click <b>Approve</b> or <b>Reject</b> — the decision is stamped with your name and time by the database. Staff cannot alter the status; only administrators decide.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="btn btn-outline" onclick="LV.load()">↻ Refresh pending requests</button></div>
+        <div id="lv-pending"><span class="pulse">Loading pending leave requests…</span></div>
+      </div>
+      <script>
+      const LV={
+        esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
+        async load(){const box=document.getElementById('lv-pending');if(!box)return;if(!window.sb){box.textContent='Database not configured.';return;}
+          const r=await sb.from('leave_requests').select('*, staff:staff_id(full_name,staff_no)').eq('status','pending').order('created_at',{ascending:true});
+          if(r.error){box.innerHTML='<p style="color:#b91c1c">'+this.esc(r.error.message)+'</p>';return;}
+          const rows=r.data||[];if(!rows.length){box.innerHTML='<p style="color:var(--gray-500)">No pending requests — everything is decided. 🎉</p>';return;}
+          box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Staff</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Decision</th></tr></thead><tbody>'+rows.map(x=>{const nm=(x.staff&&x.staff.full_name)||'Staff';return '<tr><td><b>'+this.esc(nm)+'</b></td><td>'+this.esc(x.type||'')+'</td><td>'+this.esc(x.start_date||'')+'</td><td>'+this.esc(x.end_date||'')+'</td><td>'+this.esc(x.days||'')+'</td><td style="max-width:220px">'+this.esc(x.reason||'')+'</td><td style="white-space:nowrap"><button class="btn btn-sm btn-primary" onclick="LV.decide(&#39;'+x.id+'&#39;,&#39;approved&#39;)">✅ Approve</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="LV.decide(&#39;'+x.id+'&#39;,&#39;rejected&#39;)">✖ Reject</button></td></tr>';}).join('')+'</tbody></table></div>';},
+        async decide(id,status){if(!confirm((status==='approved'?'APPROVE':'REJECT')+' this leave request? The decision is stamped and final.'))return;
+          const r=await sb.from('leave_requests').update({status:status}).eq('id',id).select('id');
+          if(r.error){toast('Decision failed: '+r.error.message,'danger',8000);return;}
+          if(!r.data||!r.data.length){toast('Decision not saved — only admin-tier roles decide leave.','danger',8000);return;}
+          toast('Leave '+status+' ✓','success',6000);this.load();if(window.CRUD)CRUD.renderList('leave');}
+      };
+      document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>LV.load(),900);});
+      </script>` : ''}
       ${moduleId === 'birthdays' ? '<div id="birthdays-bymonth"></div>' : ''}
       ${moduleId === 'parents' ? '<div class="card" style="margin:16px 0"><h3>Linked Parent–Child Records</h3><p style="color:var(--gray-600)">Existing mappings are shown here. Use this to confirm that parents are already linked to their children.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button class="btn btn-primary" onclick="CRUD.openForm(\'parent_child\')" data-admin-only>+ Link parent to child</button><button class="btn btn-outline" onclick="CRUD.renderList(\'parent_child\')">↻ Refresh links</button></div><div class="table-wrap"><table id="parent_child-table"><thead><tr><th>Loading…</th></tr></thead><tbody><tr><td><span class="pulse">Loading…</span></td></tr></tbody></table></div></div><script>document.addEventListener("DOMContentLoaded",function(){ if(window.CRUD) CRUD.renderList("parent_child"); });</script>' : ''}
       <div class="table-wrap"><table id="${T.esc(moduleId)}-table"><thead><tr><th>Loading…</th></tr></thead><tbody><tr><td><span class="pulse">Loading…</span></td></tr></tbody></table></div>
