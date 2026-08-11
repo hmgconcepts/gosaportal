@@ -119,7 +119,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
           <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
@@ -168,6 +168,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
         </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Auto-Timetable</span>
@@ -503,6 +506,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
@@ -525,7 +529,19 @@ const TT={days:['Monday','Tuesday','Wednesday','Thursday','Friday'], async init(
       if(role==='student'){const r=await sb.from('students').select('class').eq('user_id',SC_PROFILE.id).maybeSingle();if(r.data&&r.data.class&&[...sel.options].some(o=>o.value===r.data.class))sel.value=r.data.class;}
       else if(role==='parent'){const l=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);const ids=(l.data||[]).map(x=>x.student_id);if(ids.length){const st=await sb.from('students').select('class').in('id',ids).limit(1);if(st.data&&st.data[0]&&st.data[0].class&&[...sel.options].some(o=>o.value===st.data[0].class))sel.value=st.data[0].class;}}
     }catch(_){}
-  }catch(e){} this.load();}, async load(){ if(!sb)return; let q=sb.from('timetable').select('*').limit(2000); const cls=document.getElementById('tt-class').value; if(cls)q=q.eq('class',cls); const {data,error}=await q; const box=document.getElementById('tt-view'); if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;} const rows=data||[]; if(!rows.length){box.innerHTML='<div class="card">No timetable has been published yet. Staff can add slots or use Auto-Timetable.</div>';return;}
+  }catch(e){} this.load();}, async load(){ if(!sb)return;
+    /* V9.1 (4d/4e) SYNC FIX: the published page previously showed rows from EVERY
+       term/session mixed together, so it could disagree with the wizard's master
+       grid (which filters by the current term). Now: filter to the CURRENT
+       academic period when one exists (fallback: newest rows), and de-duplicate
+       per class+day+period so every view renders the same single source of truth. */
+    let curTerm='',curSession='';try{const cp=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();if(cp.data){curTerm=cp.data.term||'';curSession=cp.data.session||'';}}catch(_){ }
+    let q=sb.from('timetable').select('*').limit(4000); const cls=document.getElementById('tt-class').value; if(cls)q=q.eq('class',cls);
+    let {data,error}=await q; const box=document.getElementById('tt-view'); if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;}
+    let rows=data||[];
+    if(curTerm||curSession){const scoped=rows.filter(r=>(!curTerm||(r.term||'')===curTerm)&&(!curSession||(r.session||'')===curSession));if(scoped.length)rows=scoped;}
+    (function(){const seen={};const out=[];for(let i=rows.length-1;i>=0;i--){const r=rows[i],k=(r.class||'')+'|'+(r.day||'')+'|'+(r.period||'');if(seen[k])continue;seen[k]=1;out.push(r);}rows=out.reverse();})();
+    if(!rows.length){box.innerHTML='<div class="card">No timetable has been published yet. Staff can add slots or use Auto-Timetable.</div>';return;}
     /* V8.0 #8: DAYS AS ROWS, PERIODS AS COLUMNS — and the school's saved break
        schedule (short/long/third break) is rendered in place. */
     let slots=[];try{const cfg=await sb.from('timetable_config').select('*').eq('class','ALL').order('position');slots=(cfg.data||[]).filter(x=>x.label!=='__daycounts__'&&Number(x.period_no)!==0);}catch(_){ }

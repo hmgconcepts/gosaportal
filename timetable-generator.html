@@ -168,6 +168,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
         </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Auto-Timetable</span>
@@ -578,7 +581,14 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
             <div id="tt-group-day-periods" style="margin-top:8px"></div>
           </div>
         </div>
-        <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject" onchange="TTG.subjectPicked()"><option value="">— choose subject —</option></select><div id="tt-teacher-auto" style="margin-top:6px;font-size:.85rem;color:#166534"></div></div><div class="form-group" id="tt-teacher-wrap" style="display:none"><label>Teacher <small>(only needed when the subject has no mapped teacher)</small></label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div></div>
+        <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject" onchange="TTG.subjectPicked()"><option value="">— choose subject —</option></select><div id="tt-teacher-auto" style="margin-top:6px;font-size:.85rem;color:#166534"></div></div><div class="form-group" id="tt-teacher-wrap" style="display:none"><label>Teacher <small>(only needed when the subject has no mapped teacher)</small></label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div>
+        <!-- V9.1 (4a): DOUBLE PERIODS — how many of the weekly periods should be
+             placed as back-to-back pairs (e.g. practicals). 1 double = 2 of the
+             weekly periods on adjacent slots of the same day. -->
+        <div class="form-group"><label>Double periods <small>(pairs of adjacent slots; 0 = none)</small></label><input class="form-input" type="number" id="tt-dbl" value="0" min="0" max="5"></div>
+        <!-- V9.1 (4c): EARLY-PERIOD RULE — cap this subject to the first N
+             periods of any day (e.g. 4 keeps Mathematics in the morning). -->
+        <div class="form-group"><label>Latest allowed period <small>(blank = any; e.g. 4 = mornings only)</small></label><input class="form-input" type="number" id="tt-maxp" min="1" max="12" placeholder="any"></div></div>
         <div id="tt-days" style="display:none;margin:4px 0 12px"><b>Days this teacher is available:</b><div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px"><label><input type="checkbox" class="tt-day" value="Monday" onchange="TTG.dayToggled(this)"> Mon</label><label><input type="checkbox" class="tt-day" value="Tuesday" onchange="TTG.dayToggled(this)"> Tue</label><label><input type="checkbox" class="tt-day" value="Wednesday" onchange="TTG.dayToggled(this)"> Wed</label><label><input type="checkbox" class="tt-day" value="Thursday" onchange="TTG.dayToggled(this)"> Thu</label><label><input type="checkbox" class="tt-day" value="Friday" onchange="TTG.dayToggled(this)"> Fri</label></div>
           <!-- V7.9 #1: PERIOD-LEVEL availability. For each ticked day, optionally list the exact
                periods the part-timer covers (e.g. Monday "1,2,3" and Thursday "4,5,6"). Blank = any period that day. -->
@@ -622,6 +632,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
@@ -758,9 +769,14 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     const step3=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
     const targets=[...new Set(step3.length?step3:(ticked.length?ticked:[c.class]))].filter(Boolean);
     if(!targets.length){toast('Tick at least one class for this subject.','warning');return;}
+    /* V9.1 (4a/4c): double periods + early-period cap flow into the engine. */
+    const dbl=Math.max(0,Number(this.val('tt-dbl'))||0);
+    const maxpRaw=this.val('tt-maxp');const maxp=maxpRaw?Math.max(1,Math.min(12,Number(maxpRaw)||0)):null;
+    if(dbl*2>ppw){toast('Double periods ×2 cannot exceed periods/week ('+ppw+').','warning');return;}
     let okCount=0,firstErr=null;
     for(const cls of targets){
-      let r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:days,is_part_time:!!pt,available_periods:dayPeriods},{onConflict:'class,subject'});
+      let r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:days,is_part_time:!!pt,available_periods:dayPeriods,double_periods:dbl,max_period:maxp},{onConflict:'class,subject'});
+      if(r.error&&/double_periods|max_period/.test(r.error.message||'')){r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:days,is_part_time:!!pt,available_periods:dayPeriods},{onConflict:'class,subject'});if(!r.error&&(dbl||maxp))toast('Double periods / early-period rules need the latest SQL update (v9.1) — saved without them for now.','warning',9000);}
       if(r.error&&/available_periods/.test(r.error.message||'')){r=await Enterprise.timetable.addRequirement(cls,subject,teacher,ppw,days,pt);}
       if(r&&r.error){firstErr=firstErr||r.error;}else okCount++;
     }
@@ -768,7 +784,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     toast('Demand saved for '+okCount+' class'+(okCount>1?'es':'')+': '+subject+' · '+ppw+'/week · '+teacher+(dayPeriods?' · limited periods set':''),'success',8000);
     if(firstErr)toast('Some classes failed: '+(firstErr.message||firstErr),'warning',8000);
     await this.loadReqs(c.class);},
-  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td><b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([d,a])=>d.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="5">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div></div>';this.updateChecklist();},
+  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Doubles</th><th>Latest period</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td><b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+(Number(x.double_periods||0)?('<b style="color:#7c3aed">'+Number(x.double_periods)+' × double</b>'):'—')+'</td><td>'+(x.max_period?('≤ P'+x.max_period+' 🌅'):'any')+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([d,a])=>d.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="7">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div></div>';this.updateChecklist();},
   async removeReq(id){if(!confirm('Remove this subject demand?'))return;const r=await Enterprise.timetable.removeRequirement(id);if(r.error){toast(r.error.message||r.error,'danger');return;}await this.loadReqs(this.context().class);},
   validate(){const c=this.context(),total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),capacity=5*c.ppd,missing=this.reqs.filter(x=>!x.teacher);if((!c.class&&!this.tickedClasses().length)||!c.term||!c.session){toast('Tick the classes and choose term/session.','warning');return false;}if(!this.reqs.length){toast('Add at least one subject demand.','warning');return false;}if(total>capacity){toast('Requested '+total+' periods but only '+capacity+' slots exist. Reduce demand or increase periods/day.','danger',9000);return false;}if(missing.length){toast('Every subject must have a teacher.','danger');return false;}toast('✅ Demand is valid: '+total+' of '+capacity+' weekly slots requested.','success');return true;},
   async generate(){const c=this.context();const classes=this.tickedClasses().length?this.tickedClasses():(c.class?[c.class]:[]);

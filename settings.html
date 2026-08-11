@@ -168,6 +168,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
         </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
           <span class="app-nav-icon">🗓️</span>
           <span>Auto-Timetable</span>
@@ -634,7 +637,44 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <a class="btn btn-primary btn-sm" href="license.html">Open Site License &amp; Subscription →</a>
         </div>
       </div>
+      <!-- V9.1: OPTIONAL AI assistant — bring-your-own-key, OFF by default -->
+      <div class="card" style="margin-top:16px" id="ai-card" data-admin-only>
+        <h3 style="margin-top:0">🤖 AI Assistant (optional — bring your own key)</h3>
+        <p style="color:var(--gray-600);font-size:.87rem;line-height:1.6">School Connect never requires AI. If YOUR school wants AI drafting help (lesson plans, report comments, announcements, quiz questions), connect any <b>OpenAI-compatible</b> provider with the school's own key. Calls go straight from the staff member's browser to your provider — HMG is never involved and never billed. Free-tier friendly options: <b>Groq</b> (free tier, <code>https://api.groq.com/openai/v1</code>), <b>OpenRouter</b> (free models, <code>https://openrouter.ai/api/v1</code>), a local <b>Ollama</b> server, or OpenAI/DeepSeek/Together with a paid key. Keys are stored server-side with staff-only read access — students and parents can never see or use them.</p>
+        <div class="grid grid-2">
+          <div class="form-group"><label>Enable AI assistant</label><select class="form-select" id="ai-enabled"><option value="false">Disabled (default)</option><option value="true">Enabled for staff</option></select></div>
+          <div class="form-group"><label>Model</label><input class="form-input" id="ai-model" placeholder="e.g. llama-3.3-70b-versatile · gpt-4o-mini"></div>
+          <div class="form-group"><label>Base URL (OpenAI-compatible)</label><input class="form-input" id="ai-base" placeholder="https://api.groq.com/openai/v1"></div>
+          <div class="form-group"><label>API key</label><input class="form-input" id="ai-key" type="password" placeholder="sk-… / gsk_…"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-primary" onclick="AISET.save()">💾 Save AI settings</button>
+          <button class="btn btn-outline" onclick="AISET.test()">🧪 Test connection</button>
+          <span id="ai-msg" style="font-size:.85rem;color:var(--gray-600)"></span>
+        </div>
+        <p style="font-size:.78rem;color:var(--gray-500);margin:10px 0 0">Where it appears once enabled: ✨ buttons for staff on Lesson Plans, Scheme of Work, Announcements and Messages, plus <code>AI.openBox()</code> for ad-hoc drafting. AI output is always a suggestion for a human to review — never an automatic decision.</p>
+      </div>
     </div>
+<script>
+/* V9.1 AI settings loader/saver (admin-only card) */
+var AISET={
+  async load(){try{
+    var r=await sb.from('sc_ai_settings').select('*').eq('id',1).maybeSingle();
+    if(r&&r.data){document.getElementById('ai-enabled').value=String(!!r.data.enabled);document.getElementById('ai-model').value=r.data.model||'';document.getElementById('ai-base').value=r.data.base_url||'';document.getElementById('ai-key').value=r.data.api_key||'';}
+  }catch(e){}},
+  async save(){var m=document.getElementById('ai-msg');
+    var row={id:1,enabled:document.getElementById('ai-enabled').value==='true',model:(document.getElementById('ai-model').value||'').trim(),base_url:(document.getElementById('ai-base').value||'').trim(),api_key:(document.getElementById('ai-key').value||'').trim(),updated_at:new Date().toISOString()};
+    if(row.enabled&&(!row.base_url||!row.api_key)){m.textContent='Base URL and API key are required to enable.';return;}
+    var r=await sb.from('sc_ai_settings').upsert(row,{onConflict:'id'});
+    if(r.error){m.textContent=/does not exist|schema cache/i.test(r.error.message)?'Run database/v9.1-enterprise-pack.sql first.':('Error: '+r.error.message);return;}
+    m.textContent='Saved ✔'+(row.enabled?' — staff now see ✨ AI buttons after their next page load.':' — AI assistant disabled.');
+    if(window.AI)AI.reload();},
+  async test(){var m=document.getElementById('ai-msg');m.textContent='Testing…';
+    try{if(window.AI)await AI.reload();var out=await AI.ask('Reply with exactly: OK');m.textContent=/ok/i.test(out)?'✅ Connection works ("'+out.slice(0,40)+'")':'⚠️ Provider replied: '+out.slice(0,80);}
+    catch(e){m.textContent='❌ '+(e&&e.message||e);}}
+};
+document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){AISET.load();},600);});
+</script>
 <script>
 (function(){function done(){try{if(!window.License)return;var el=document.getElementById('st-license-summary');if(!el)return;License.status().then(function(res){var l=res.lic,r=res.result;if(!r)return;var txt={'lifetime':'💎 One-time purchase — lifetime ownership. No recurring payments.','active':'✅ Subscription active'+(l.expires_on?' until '+l.expires_on:''),'warning':'🔔 Subscription expires in '+(r.daysLeft||'?')+' day(s) on '+l.expires_on,'grace':'⚠️ Subscription expired on '+l.expires_on+' — grace period: '+(r.daysLeft||'?')+' day(s) left','expired':'🔴 Subscription expired — portal is in renewal-locked state','suspended':'⛔ License suspended by HMG'}[r.state]||r.state;el.innerHTML='<b>Current license:</b> '+txt;});}catch(e){}}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',done);else done();})();
@@ -653,6 +693,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
 <script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
