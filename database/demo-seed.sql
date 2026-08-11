@@ -843,6 +843,18 @@ begin
       ('SS 2','Tuesday','1','Chemistry','Hauwa Suleiman','Chemistry Lab','2025/2026','Third Term'),
       ('SS 2','Tuesday','2','Biology','Olumide Ajayi','Biology Lab','2025/2026','Third Term');
   end if;
+  -- V9.1: examination timetable sample (guarded — table exists once v9.1/complete schema ran)
+  begin
+    if (select count(*) from public.exam_timetable)=0 then
+      insert into public.exam_timetable (class,subject,exam_date,start_time,end_time,venue,invigilator,paper,term,session) values
+        ('SS 2','Mathematics',   current_date+7, '09:00','11:00','Main Hall','Funke Alabi','Paper 1 · Objective + Theory','Third Term','2025/2026'),
+        ('SS 2','English Language',current_date+8,'09:00','11:00','Main Hall','Chukwuemeka Nwachukwu','Paper 1','Third Term','2025/2026'),
+        ('SS 2','Physics',       current_date+9, '09:00','11:00','Physics Lab','Hauwa Suleiman','Practical + Theory','Third Term','2025/2026'),
+        ('JSS 1','Mathematics',  current_date+7, '12:00','13:30','Block B Hall','Olumide Ajayi','','Third Term','2025/2026'),
+        ('JSS 1','English Studies',current_date+8,'12:00','13:30','Block B Hall','Funke Alabi','','Third Term','2025/2026');
+    end if;
+  exception when undefined_table then null;
+  end;
 
   if (select count(*) from public.transport)=0 then
     insert into public.transport (route_name,driver,vehicle_no,capacity,assigned_students) values
