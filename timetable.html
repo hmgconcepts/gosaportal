@@ -522,7 +522,16 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
-const TT={days:['Monday','Tuesday','Wednesday','Thursday','Friday'], async init(){ try{const {data}=await sb.from('classes').select('name').order('name'); const sel=document.getElementById('tt-class'); (function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();
+const TT={days:['Monday','Tuesday','Wednesday','Thursday','Friday'],
+  /* V9.2 (issue 6): published timetable edit = admin or authorized editor only. */
+  async gateEdit(){try{
+    for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+    const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+    if(window.App&&App.isAdminRole&&App.isAdminRole(role))return;
+    let can=false;try{const r=await sb.rpc('sc_can_edit',{p_module:'timetable'});can=!!(r&&r.data===true);}catch(_){can=false;}
+    if(!can)document.querySelectorAll('.app-content [data-staff-only]').forEach(el=>el.style.display='none');
+  }catch(_){}},
+  async init(){ this.gateEdit(); try{const {data}=await sb.from('classes').select('name').order('name'); const sel=document.getElementById('tt-class'); (function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();
     /* V7.9: students/parents land on THEIR OWN class timetable automatically. */
     try{for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
       const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();

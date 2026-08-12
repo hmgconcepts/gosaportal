@@ -491,6 +491,16 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#eff6ff,#f5f3ff);border-color:#93c5fd">
         <h2 style="margin-top:0">🗓️ Admin Timetable Wizard</h2>
         <p style="color:#334155">Complete the four numbered steps. All classes, subjects, teachers, terms and sessions come from platform dropdowns—no spelling variations. Generation is deterministic and checks a teacher is not placed in two classes at the same time.</p>
+        <!-- V9.2 (issue 6): admin grants/revokes timetable edit rights; everyone else is read-only -->
+        <div class="card" id="tt-editors-card" data-admin-only style="margin-bottom:14px;background:#fff7ed;border-color:#fdba74">
+          <h3 style="margin-top:0">🔐 Authorized timetable editors</h3>
+          <p class="help" style="margin:2px 0 8px">The published timetable, this wizard and the exam timetable are <b>admin-only</b> by default (v9.2 database update). Grant specific staff edit rights here — everyone else can view but never change a published schedule.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+            <div class="form-group" style="min-width:240px"><label>Staff member</label><select class="form-select" id="tte-user"><option value="">— choose staff —</option></select></div>
+            <button class="btn btn-primary btn-sm" onclick="TTE.grant()">➕ Grant edit access</button>
+          </div>
+          <div id="tte-list" style="margin-top:8px"></div>
+        </div>
         <div class="card" style="margin-bottom:14px;background:#eef2ff;border-color:#c7d2fe">
           <h3 style="margin-top:0">🧭 How this wizard works (read once — 1 minute)</h3>
           <p style="margin:4px 0;line-height:1.7">You are building the timetable for the <b>WHOLE SCHOOL AT ONCE</b> — not class by class. The wizard already knows each subject's teacher (from the Subjects module) and prevents any teacher from being in two classes at the same time.</p>
@@ -564,7 +574,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div style="margin:0 0 10px;padding:10px;border:1px dashed #c4b5fd;border-radius:10px;background:#faf5ff">
           <b>🎓 Department option group (optional)</b> <small style="color:var(--gray-500)">— e.g. SS classes split by department in ONE period: Commerce (Commercial) / CRS (Arts) / Chemistry (Science). Tick 2+ subjects; they are scheduled TOGETHER in the same period, each with its own teacher, and every listed teacher is protected from clashes.</small>
           <div id="tt-group-subjects" style="display:flex;gap:10px 14px;flex-wrap:wrap;margin-top:6px"></div>
-          <div style="margin-top:6px"><label>Periods per week for this group <input class="form-input" id="tt-group-ppw" type="number" value="4" min="1" max="15" style="width:90px;display:inline-block"></label>
+          <div style="margin-top:6px"><label>Periods per week for this group (per class) <input class="form-input" id="tt-group-ppw" type="number" value="4" min="1" max="15" style="width:90px;display:inline-block"></label> <small style="color:var(--gray-500)">applies to EACH ticked class</small>
+          <!-- V9.2 (issue 3): departmental groups can also be double-period or morning-only -->
+          <label style="margin-left:12px">Double periods <input class="form-input" id="tt-group-dbl" type="number" value="0" min="0" max="5" style="width:70px;display:inline-block" title="Pairs of adjacent slots (e.g. practicals). 0 = none."></label>
+          <label style="margin-left:12px">Latest allowed period <input class="form-input" id="tt-group-maxp" type="number" min="1" max="12" placeholder="any" style="width:70px;display:inline-block" title="e.g. 4 keeps this option group in the first four periods of any day."></label>
           <label style="margin-left:12px"><input type="checkbox" id="tt-group-pt" onchange="document.getElementById('tt-group-days').style.display=this.checked?'block':'none'"> One of these teachers is part-time / restricted-days</label>
           <button type="button" class="btn btn-sm btn-primary" onclick="TTG.addGroup()">＋ Add option group</button></div>
           <!-- V8.5 #1: a slashed group inherits the STRICTEST member's availability —
@@ -581,7 +594,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
             <div id="tt-group-day-periods" style="margin-top:8px"></div>
           </div>
         </div>
-        <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject" onchange="TTG.subjectPicked()"><option value="">— choose subject —</option></select><div id="tt-teacher-auto" style="margin-top:6px;font-size:.85rem;color:#166534"></div></div><div class="form-group" id="tt-teacher-wrap" style="display:none"><label>Teacher <small>(only needed when the subject has no mapped teacher)</small></label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div>
+        <div class="grid grid-2"><div class="form-group"><label>Subject *</label><select class="form-select" id="tt-subject" onchange="TTG.subjectPicked()"><option value="">— choose subject —</option></select><div id="tt-teacher-auto" style="margin-top:6px;font-size:.85rem;color:#166534"></div></div><div class="form-group" id="tt-teacher-wrap" style="display:none"><label>Teacher <small>(only needed when the subject has no mapped teacher)</small></label><select class="form-select" id="tt-teacher"><option value="">— choose teacher —</option></select></div><div class="form-group"><label>Periods per week (per class) *</label><input class="form-input" type="number" id="tt-ppw" value="5" min="1" max="20"><small style="color:var(--gray-500);display:block;margin-top:2px">Applies to EACH class ticked below — e.g. 5 means every ticked class gets this subject 5×/week.</small></div><div class="form-group"><label><input type="checkbox" id="tt-pt" onchange="document.getElementById('tt-days').style.display=this.checked?'block':'none'"> Part-time / restricted-day teacher</label></div>
         <!-- V9.1 (4a): DOUBLE PERIODS — how many of the weekly periods should be
              placed as back-to-back pairs (e.g. practicals). 1 double = 2 of the
              weekly periods on adjacent slots of the same day. -->
@@ -712,6 +725,8 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   async addGroup(){const subs=[...document.querySelectorAll('.tt-gs:checked')].map(x=>x.value);
     if(subs.length<2){toast('Tick at least TWO subjects for an option group (e.g. Commerce + CRS + Chemistry).','warning');return;}
     const ppw=Number((document.getElementById('tt-group-ppw')||{}).value)||4;
+    const _gd=Math.max(0,Number((document.getElementById('tt-group-dbl')||{}).value)||0);
+    if(_gd*2>ppw){toast('Group double periods ×2 cannot exceed the group periods/week ('+ppw+').','warning');return;}
     const missing=subs.filter(s=>!(this.subjectTeachers||{})[s]);
     if(missing.length){toast('These subjects have no mapped teacher yet: '+missing.join(', ')+'. Map them in the Subjects module first.','warning',9000);return;}
     const teachers=subs.map(s=>this.subjectTeachers[s]);
@@ -729,7 +744,10 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     const gPeriods=gpt?this.collectGroupDayPeriods():null;
     let ok=0,err=null;
     for(const cls of targets){
-      const r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:gdays,is_part_time:gpt,available_periods:gPeriods},{onConflict:'class,subject'});
+      const gdbl=Math.max(0,Number((document.getElementById('tt-group-dbl')||{}).value)||0);
+      const gmaxRaw=(document.getElementById('tt-group-maxp')||{}).value;const gmax=gmaxRaw?Math.max(1,Math.min(12,Number(gmaxRaw)||0)):null;
+      let r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:gdays,is_part_time:gpt,available_periods:gPeriods,double_periods:gdbl,max_period:gmax},{onConflict:'class,subject'});
+      if(r.error&&/double_periods|max_period/.test(r.error.message||'')){r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:gdays,is_part_time:gpt,available_periods:gPeriods},{onConflict:'class,subject'});if(!r.error&&(gdbl||gmax))toast('Group double periods / early-period rules need the latest SQL update (v9.1+) — saved without them for now.','warning',9000);}
       if(r.error)err=err||r.error;else ok++;
     }
     if(err&&!ok){toast(err.message||err,'danger');return;}
@@ -784,7 +802,12 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     toast('Demand saved for '+okCount+' class'+(okCount>1?'es':'')+': '+subject+' · '+ppw+'/week · '+teacher+(dayPeriods?' · limited periods set':''),'success',8000);
     if(firstErr)toast('Some classes failed: '+(firstErr.message||firstErr),'warning',8000);
     await this.loadReqs(c.class);},
-  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Doubles</th><th>Latest period</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td><b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+(Number(x.double_periods||0)?('<b style="color:#7c3aed">'+Number(x.double_periods)+' × double</b>'):'—')+'</td><td>'+(x.max_period?('≤ P'+x.max_period+' 🌅'):'any')+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([d,a])=>d.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="7">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div></div>';this.updateChecklist();},
+  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><p class="help" style="margin:2px 0 8px">Only what YOU add appears here. Seeing subjects you never added? They came from older sample/demo data — remove them individually or use <b>🧹 Clear ALL demand for this class</b> and rebuild the list cleanly. <small>(Sample data no longer re-seeds once this table has rows — v9.2.)</small></p><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Doubles</th><th>Latest period</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td><b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+(Number(x.double_periods||0)?('<b style="color:#7c3aed">'+Number(x.double_periods)+' × double</b>'):'—')+'</td><td>'+(x.max_period?('≤ P'+x.max_period+' 🌅'):'any')+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([d,a])=>d.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="7">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div><div style="margin-top:8px">'+(this.reqs.length?'<button class="btn btn-sm btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="TTG.clearReqs(\''+esc(cls)+'\')">🧹 Clear ALL demand for this class</button>':'')+'</div></div>';this.updateChecklist();},
+  /* V9.2 (issue 2): one-click removal of stale/seeded demand rows. */
+  async clearReqs(cls){if(!confirm('Remove ALL '+this.reqs.length+' subject demand row(s) for '+cls+'?\n\nUse this to wipe old sample data, then add only the subjects you actually teach. Generated timetables are not touched.'))return;
+    const r=await sb.from('timetable_requirements').delete().eq('class',cls);
+    if(r.error){toast(r.error.message,'danger');return;}
+    toast('🧹 All demand rows for '+cls+' removed. Add your real subjects now.','success');await this.loadReqs(cls);},
   async removeReq(id){if(!confirm('Remove this subject demand?'))return;const r=await Enterprise.timetable.removeRequirement(id);if(r.error){toast(r.error.message||r.error,'danger');return;}await this.loadReqs(this.context().class);},
   validate(){const c=this.context(),total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),capacity=5*c.ppd,missing=this.reqs.filter(x=>!x.teacher);if((!c.class&&!this.tickedClasses().length)||!c.term||!c.session){toast('Tick the classes and choose term/session.','warning');return false;}if(!this.reqs.length){toast('Add at least one subject demand.','warning');return false;}if(total>capacity){toast('Requested '+total+' periods but only '+capacity+' slots exist. Reduce demand or increase periods/day.','danger',9000);return false;}if(missing.length){toast('Every subject must have a teacher.','danger');return false;}toast('✅ Demand is valid: '+total+' of '+capacity+' weekly slots requested.','success');return true;},
   async generate(){const c=this.context();const classes=this.tickedClasses().length?this.tickedClasses():(c.class?[c.class]:[]);
@@ -855,5 +878,33 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   async clearGenerated(){const c=this.context();const classes=this.tickedClasses().length?this.tickedClasses():(c.class?[c.class]:[]);if(!classes.length||!c.term||!c.session){toast('Tick the classes and choose term/session first.','warning');return;}if(!confirm('Clear the generated timetable for '+classes.length+' class(es) · '+c.term+' · '+c.session+'? Subject demand is retained.'))return;let ok=0;for(const cls of classes){const r=await Enterprise.timetable.clearGenerated(cls,c.session,c.term);if(!r.error)ok++;}toast('Cleared '+ok+' class timetable(s); subject demand retained.','success');document.getElementById('tt-grid').innerHTML='';document.getElementById('tt-master').innerHTML='';const th=document.getElementById('tt-teachers');if(th)th.innerHTML='';}
 };
 PC.preview=function(){document.getElementById('pc-preview').innerHTML='<div class="table-wrap"><table><thead><tr><th>#</th><th>Label</th><th>Start</th><th>End</th></tr></thead><tbody>'+PC.rows.map(r=>'<tr style="'+(r.is_break?'background:var(--gray-100);font-style:italic':'')+'"><td>'+(r.is_break?'—':r.period_no)+'</td><td>'+esc(r.label)+'</td><td>'+esc(r.start_time)+'</td><td>'+esc(r.end_time)+'</td></tr>').join('')+'</tbody></table></div>';};
-document.addEventListener('DOMContentLoaded',()=>TTG.init());TTG.init();
+/* ===== TTE — Authorized timetable editors (V9.2, admin-only panel) ===== */
+const TTE={
+  async init(){try{
+    for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+    const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+    if(!(window.App&&App.isAdminRole&&App.isAdminRole(role))){const c=document.getElementById('tt-editors-card');if(c)c.style.display='none';return;}
+    const st=await sb.from('profiles').select('id,full_name,email,role').in('role',['staff','teacher']).eq('status','approved').order('full_name');
+    const sel=document.getElementById('tte-user');(st.data||[]).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=(p.full_name||p.email)+' ('+p.role+')';sel.appendChild(o);});
+    await this.list();
+  }catch(_){}},
+  async list(){const box=document.getElementById('tte-list');if(!box)return;
+    const r=await sb.from('sc_module_editors').select('*').eq('module','timetable').order('granted_at');
+    if(r.error){box.innerHTML='<p style="font-size:.8rem;color:#b45309">'+(/does not exist|schema cache/i.test(r.error.message)?'Run database/v9.2-access-and-fixes.sql to activate editor control. Until then, database rules still apply from your previous update.':esc(r.error.message))+'</p>';return;}
+    const rows=r.data||[];
+    if(!rows.length){box.innerHTML='<p style="font-size:.82rem;color:var(--gray-500)">No extra editors — only the admin tier can modify timetables right now.</p>';return;}
+    const ids=rows.map(x=>x.user_id);
+    const pr=await sb.from('profiles').select('id,full_name,email').in('id',ids);
+    const names=new Map((pr.data||[]).map(p=>[p.id,p.full_name||p.email]));
+    box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Authorized editor</th><th>Since</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(names.get(x.user_id)||x.user_id)+'</b></td><td>'+esc(new Date(x.granted_at).toLocaleDateString())+'</td><td><button class="btn btn-sm btn-outline" onclick="TTE.revoke(\''+x.id+'\')">🚫 Revoke</button></td></tr>').join('')+'</tbody></table></div>';},
+  async grant(){const uid=document.getElementById('tte-user').value;if(!uid){toast('Choose a staff member.','warning');return;}
+    const r=await sb.from('sc_module_editors').upsert({module:'timetable',user_id:uid,granted_by:(window.SC_PROFILE&&SC_PROFILE.id)||null},{onConflict:'module,user_id'});
+    if(r.error){toast(/does not exist|schema cache/i.test(r.error.message)?'Run database/v9.2-access-and-fixes.sql first.':r.error.message,'danger',8000);return;}
+    toast('✅ Edit access granted for timetables (published + wizard + exam).','success');await this.list();},
+  async revoke(id){if(!confirm('Revoke this editor\'s timetable access?'))return;
+    const r=await sb.from('sc_module_editors').delete().eq('id',id);
+    if(r.error){toast(r.error.message,'danger');return;}
+    toast('Access revoked.','success');await this.list();}
+};
+document.addEventListener('DOMContentLoaded',()=>{TTG.init();TTE.init();});TTG.init();TTE.init();
 </script></body></html>
