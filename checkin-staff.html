@@ -30,8 +30,8 @@ video{width:100%;height:100%;object-fit:cover}
 </style>
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <meta name="author" content="HMG Concepts">
-    <link rel="canonical" href="https://gosaportal.vercel.app/checkin-staff.html">
-    <meta property="og:url" content="https://gosaportal.vercel.app/checkin-staff.html">
+    <link rel="canonical" href="./checkin-staff.html">
+    <meta property="og:url" content="./checkin-staff.html">
     <meta name="twitter:card" content="summary_large_image">
 <style>
 /* V6.3 NAV-UNIFY: single canonical navigation look on every page. */
@@ -47,7 +47,7 @@ video{width:100%;height:100%;object-fit:cover}
 <div class="app-layout sidebar">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
           <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
@@ -504,6 +504,38 @@ const CK = {
     if (nameEl && window.SC_PROFILE) nameEl.textContent = window.SC_PROFILE.full_name || 'Staff User';
   },
 
+  /* V9.3 (#2) ROOT-CAUSE FIX for "GPS permission/error: Timeout expired":
+     the old call gave the browser only 5 seconds with enableHighAccuracy+
+     maximumAge:0 — a cold GPS fix on a phone routinely needs 10–30 s, so the
+     API gave up BEFORE the GPS locked and enforcement then blocked the staff
+     member. Robust multi-stage acquisition (enforcement itself is unchanged —
+     still fail-closed):
+       Stage 1: high accuracy, 20 s, accept a fix cached up to 30 s.
+       Stage 2: low accuracy (network/wifi), 15 s, accept up to 5-min cache.
+       Stage 3: watchPosition for 20 s — lets the GPS warm up and delivers
+                the first fix the hardware produces.
+     Plus a 🔄 Retry button so a slow first lock never dead-ends the page. */
+  acquirePosition() {
+    const tryOnce = (opts) => new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, opts));
+    return tryOnce({ enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 })
+      .catch((e1) => {
+        if (e1 && e1.code === 1) throw e1; // permission denied — retrying won't help
+        CK.updateLocationBadge(false, '📡 Still locking GPS — trying network location…');
+        return tryOnce({ enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+      })
+      .catch((e2) => {
+        if (e2 && e2.code === 1) throw e2;
+        CK.updateLocationBadge(false, '📡 Waiting for the GPS chip to warm up (up to 20 s)…');
+        return new Promise((res, rej) => {
+          let done = false;
+          const id = navigator.geolocation.watchPosition(
+            (pos) => { if (!done) { done = true; navigator.geolocation.clearWatch(id); res(pos); } },
+            (err) => { if (!done && err && err.code === 1) { done = true; navigator.geolocation.clearWatch(id); rej(err); } },
+            { enableHighAccuracy: true, maximumAge: 0 });
+          setTimeout(() => { if (!done) { done = true; navigator.geolocation.clearWatch(id); rej(new Error('GPS could not get a fix. Move near a window/outdoors and retry.')); } }, 20000);
+        });
+      });
+  },
   async verifyGeofence() {
     return new Promise((resolve) => {
       // V12 strict staff geofence: never bypass GPS when enforcement is enabled.
@@ -514,7 +546,8 @@ const CK = {
         resolve(!enforce);
         return;
       }
-      navigator.geolocation.getCurrentPosition(
+      this.updateLocationBadge(false, '📍 Checking GPS coordinates… (first fix can take up to 20 s)');
+      this.acquirePosition().then(
         (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
@@ -546,22 +579,34 @@ const CK = {
           }
         },
         (err) => {
-          // FIX GEO-01 (#7): actionable guidance. The root cause (geolocation
-          // disabled by Permissions-Policy) is fixed by deploying with
-          // geolocation=(self) in _headers / vercel.json. If it STILL fails
-          // it means the browser-level permission was denied — guide the user.
-          let hint = err.message || 'Geolocation unavailable';
-          if (/permission|policy|denied/i.test(hint)) {
+          // FIX GEO-01 (#7) + V9.3: actionable guidance per failure type.
+          let hint = (err && err.message) || 'Geolocation unavailable';
+          if (err && err.code === 1) {
             hint = 'GPS permission was blocked. On the server, ensure _headers / vercel.json set geolocation=(self). On your device, tap the lock/ⓘ icon next to the address bar → Site settings → Location → Allow, then reload.';
+          } else if (/timeout|expired|fix/i.test(hint)) {
+            hint = 'GPS timed out — the phone could not get a satellite fix in time. Step outside or near a window, make sure Location/GPS is switched ON in the phone\'s quick settings, then tap Retry.';
           }
-          CK.updateLocationBadge(false, '❌ GPS permission/error: ' + hint + (enforce ? ' Staff check-in is blocked while on-premises attendance is enforced.' : ' Geofence is off — you can still check in.'));
+          CK.updateLocationBadge(false, '❌ GPS: ' + hint + (enforce ? ' Staff check-in stays blocked until location is verified (on-premises attendance is enforced).' : ' Geofence is off — you can still check in.'));
+          CK.showRetry();
           // Fail closed whenever the school has enabled on-premises attendance.
           if (enforce) { resolve(false); return; }
           resolve(true);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        }
       );
     });
+  },
+  /* V9.3: one-tap GPS retry — a slow first lock is normal; never a dead end. */
+  showRetry() {
+    try {
+      if (document.getElementById('ck-gps-retry')) return;
+      const badge = document.getElementById('location-indicator');
+      if (!badge) return;
+      const b = document.createElement('button');
+      b.id = 'ck-gps-retry'; b.className = 'btn btn-sm btn-primary'; b.textContent = '🔄 Retry GPS';
+      b.style.marginLeft = '10px';
+      b.onclick = async () => { b.remove(); CK.updateLocationBadge(false, '📍 Re-checking GPS…'); await CK.verifyGeofence(); };
+      badge.appendChild(b);
+    } catch (_) {}
   },
 
   updateLocationBadge(isOk, text) {

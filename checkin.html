@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="QR Check-in • God of Seed Academy">
-<meta property="og:description" content="God of Seed Academy — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -119,7 +119,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
           <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
@@ -589,7 +589,12 @@ const CK={ done:[], stream:null, scanning:false, last:'', lastAt:0,
         resolve(true);
         return;
       }
-      navigator.geolocation.getCurrentPosition(
+      /* V9.3: same robust multi-stage GPS acquisition as the staff page —
+         5 s was shorter than a cold GPS fix, causing spurious "Timeout expired". */
+      const tryOnce = (opts) => new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, opts));
+      tryOnce({ enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 })
+        .catch((e1) => { if (e1 && e1.code === 1) throw e1; return tryOnce({ enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }); })
+        .then(
         (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
@@ -615,10 +620,9 @@ const CK={ done:[], stream:null, scanning:false, last:'', lastAt:0,
           }
         },
         (err) => {
-          toast('⚠️ GPS error: ' + err.message + '. Defaulting to verified for safety.', 'warning');
+          toast('⚠️ GPS error: ' + (err && err.message || err) + '. Defaulting to verified for safety.', 'warning');
           resolve(true); 
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        }
       );
     });
   },
