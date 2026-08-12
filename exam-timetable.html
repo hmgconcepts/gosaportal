@@ -497,6 +497,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <button class="btn btn-primary" data-staff-only onclick="EXT.addModal()">+ Add paper</button>
         <button class="btn btn-outline" data-staff-only onclick="EXT.autoModal()">⚡ Auto-spread subjects</button>
         <button class="btn btn-outline" onclick="EXT.toggleCompact()" id="ex-compact-btn" title="One-row-per-sitting compact card per class — ideal for photocopying">🗜️ Compact view</button>
+        <button class="btn btn-outline" data-staff-only onclick="EXT.shiftModal()" title="School closed unexpectedly? Move every paper from one day onwards by N days">↔️ Shift days</button>
+        <button class="btn btn-outline" onclick="EXT.exportCSV()" title="Download the filtered schedule as CSV">⬇ CSV</button>
         <button class="btn btn-outline" onclick="EXT.print()">🖨️ Print</button>
       </div></div>
       <div id="ex-clashes"></div>
@@ -663,7 +665,11 @@ const EXT={
       '<small style="color:var(--gray-500)">Format HH:MM-HH:MM per line. 2 lines = 2 papers/day, 5 lines = 5 papers/day.</small></div>'+
       '<div class="form-group"><label><b>Paper divisions per subject</b> (optional — comma-separated; each division becomes its own sitting on a DIFFERENT day)</label>'+
       '<input class="form-input" id="exa-papers" placeholder="e.g. Paper 1 (Objective), Paper 2 (Theory), CBT — blank = one paper per subject">'+
-      '<small style="color:var(--gray-500)">Type your own labels: Objective/Theory/CBT/Practical/Oral — anything the school uses.</small></div>'+
+      '<small style="color:var(--gray-500)">Type your own labels: Objective/Theory/CBT/Practical/Oral — anything the school uses. V9.5: divisions are INTERMIXED through the timetable (every day carries a blend — never "all Paper first, all CBT last").</small></div>'+
+      '<div class="form-group"><label><b>📌 Reserve subjects for specific days</b> (optional — one per line: <code>Subject = Day 3</code> or <code>Subject = 2026-03-12</code>)</label>'+
+      '<textarea class="form-input" id="exa-pins" rows="2" placeholder="Mathematics = Day 1&#10;English Language = 2026-03-12"></textarea>'+
+      '<small style="color:var(--gray-500)">Pinned subjects sit ONLY on their reserved day (all their divisions that day); everything else flows around them.</small></div>'+
+      '<div class="form-group"><label><input type="checkbox" id="exa-sat"> Include Saturdays (some schools examine on Saturday)</label></div>'+
       '<div class="grid grid-2">'+
       '<div class="form-group"><label>Venue pool (comma-separated — randomised fairly)</label><input class="form-input" id="exa-venues" placeholder="e.g. Main Hall, Block B Hall, ICT Lab"></div>'+
       '<div class="form-group"><label>Invigilator pool (comma-separated — randomised fairly)</label><input class="form-input" id="exa-invs" placeholder="e.g. Mr Ade, Mrs Bello, Mr Chukwu — blank = fill later"></div>'+
@@ -684,6 +690,15 @@ const EXT={
     const venues=shuffle(String((document.getElementById('exa-venues')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean));
     const invs=shuffle(String((document.getElementById('exa-invs')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean));
     let vi=0,ii=0;const nextVenue=()=>venues.length?venues[(vi++)%venues.length]:'';const nextInv=()=>invs.length?invs[(ii++)%invs.length]:'';
+    const satOK=!!(document.getElementById('exa-sat')||{}).checked;
+    /* 📌 day pins: 'Subject = Day 3' or 'Subject = YYYY-MM-DD' */
+    const pins={};let pinErr=null;
+    String((document.getElementById('exa-pins')||{}).value||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(ln=>{
+      const m=ln.match(/^(.+?)\s*=\s*(.+)$/);if(!m){pinErr='Bad pin line: "'+ln+'" — use Subject = Day 3 or Subject = 2026-03-12';return;}
+      const subj=m[1].trim().toLowerCase(),v=m[2].trim();
+      const dm=v.match(/^day\s*(\d+)$/i),dt=v.match(/^\d{4}-\d{2}-\d{2}$/);
+      if(dm)pins[subj]={day:parseInt(dm[1],10)};else if(dt)pins[subj]={date:v};else pinErr='Bad pin value in "'+ln+'"';});
+    if(pinErr){toast(pinErr,'warning',8000);return;}
     const classes=clsPick==='__ALL__'?[...document.getElementById('ex-class').options].map(o=>o.value).filter(Boolean):[clsPick];
     /* subject sources (V9.2 chain): demand → published timetable → level match → all */
     const subj=await sb.from('subjects').select('name,level').order('name');
@@ -700,23 +715,66 @@ const EXT={
         if(!subjects.length)subjects=[...new Set((subj.data||[]).map(s=>s.name))];}
       if(!subjects.length)continue;
       await sb.from('exam_timetable').delete().eq('class',cls).eq('term',c.term).eq('session',c.session);
-      /* Build the sitting list: subjects × paper divisions. Round-robin over
-         subjects so different papers of the SAME subject fall on DIFFERENT
-         days (students never sit two papers of one subject back-to-back). */
-      const sittings=[];
-      if(papers.length){for(const pk of papers)for(const s of subjects)sittings.push({subject:s,paper:pk});}
-      else for(const s of subjects)sittings.push({subject:s,paper:''});
+      /* ===== V9.5 SCHEDULING CORE =====
+         (2) INTERMIXED divisions: one shuffled subject-queue PER division,
+             offset from each other; we take one sitting from each division's
+             queue in turn — so every day carries a blend of divisions, never
+             "all Paper 1 first, all CBT last".
+         (—) Same-subject protection: a subject never sits twice on one day —
+             a candidate whose subject already sat today is swapped with the
+             next eligible sitting.
+         (3) 📌 DAY PINS: 'Subject = Day 3' / 'Subject = 2026-03-12' reserves
+             that subject (ALL its divisions) for that day only.
+         (4) Saturday option honoured in date mode. */
+      const isSkippedDay=(dt)=>dt.getDay()===0||(!satOK&&dt.getDay()===6);
+      /* interleaved sitting list */
+      let sittings=[];
+      if(papers.length){
+        const queues=papers.map((pk,qi)=>{const q=shuffle(subjects).map(s=>({subject:s,paper:pk}));
+          /* offset each division's queue so subject k's divisions are far apart */
+          for(let r=0;r<qi*Math.ceil(subjects.length/papers.length);r++)q.push(q.shift());
+          return q;});
+        let remaining=subjects.length*papers.length;
+        while(remaining>0){for(const q of queues){if(q.length){sittings.push(q.shift());remaining--;}}}
+      } else sittings=shuffle(subjects).map(s=>({subject:s,paper:''}));
+      /* split out pinned subjects */
+      const pinned=sittings.filter(x=>pins[x.subject.toLowerCase()]!=null);
+      sittings=sittings.filter(x=>pins[x.subject.toLowerCase()]==null);
       /* day/slot cursor */
       let dayNo=1,si=0;let d0=mode==='date'?new Date(start+'T12:00:00'):null;
-      if(d0)while(d0.getDay()===0||d0.getDay()===6)d0.setDate(d0.getDate()+1);
-      const advance=()=>{si++;if(si>=slots.length){si=0;dayNo++;if(d0){d0.setDate(d0.getDate()+1);while(d0.getDay()===0||d0.getDay()===6)d0.setDate(d0.getDate()+1);}}};
-      const rows=[];
-      sittings.forEach(x=>{
-        const row={class:cls,subject:x.subject,start_time:slots[si][0],end_time:slots[si][1],
+      if(d0)while(isSkippedDay(d0))d0.setDate(d0.getDate()+1);
+      const advance=()=>{si++;if(si>=slots.length){si=0;dayNo++;if(d0){d0.setDate(d0.getDate()+1);while(isSkippedDay(d0))d0.setDate(d0.getDate()+1);}}};
+      const rows=[];const todaySubjects=()=>new Set(rows.filter(r=>d0?(r.exam_date===d0.toISOString().slice(0,10)):(r.day_no===dayNo)).map(r=>r.subject));
+      const push=(x)=>{rows.push({class:cls,subject:x.subject,start_time:slots[si][0],end_time:slots[si][1],
           venue:nextVenue(),invigilator:nextInv(),paper:x.paper,paper_kind:x.paper,term:c.term,session:c.session,notes:'',
           exam_date:d0?d0.toISOString().slice(0,10):new Date(Date.now()+dayNo*86400000).toISOString().slice(0,10),
-          day_no:d0?null:dayNo};
-        rows.push(row);advance();});
+          day_no:d0?null:dayNo});advance();};
+      while(sittings.length){
+        const seen=todaySubjects();
+        let idx=sittings.findIndex(x=>!seen.has(x.subject));
+        if(idx<0)idx=0;                       // day too small to avoid a repeat — accept
+        push(sittings.splice(idx,1)[0]);
+      }
+      /* place pinned subjects on their reserved day (their own slot sequence) */
+      const pinCursor={};
+      pinned.forEach(x=>{
+        const pin=pins[x.subject.toLowerCase()];
+        const key=x.subject.toLowerCase();
+        pinCursor[key]=(pinCursor[key]||0);
+        const slot=slots[pinCursor[key]%slots.length];pinCursor[key]++;
+        const row={class:cls,subject:x.subject,start_time:slot[0],end_time:slot[1],
+          venue:nextVenue(),invigilator:nextInv(),paper:x.paper,paper_kind:x.paper,term:c.term,session:c.session,
+          notes:'📌 reserved day',exam_date:null,day_no:null};
+        if(pin.date){row.exam_date=pin.date;row.day_no=mode==='day'?null:null;}
+        else{row.day_no=mode==='day'?pin.day:null;
+          if(mode==='date'&&d0){/* Day N pin in date mode → count N scheduling days from start */
+            const dd=new Date(start+'T12:00:00');let n=1;while(isSkippedDay(dd))dd.setDate(dd.getDate()+1);
+            while(n<pin.day){dd.setDate(dd.getDate()+1);while(isSkippedDay(dd))dd.setDate(dd.getDate()+1);n++;}
+            row.exam_date=dd.toISOString().slice(0,10);}
+          else if(mode==='day')row.exam_date=new Date(Date.now()+pin.day*86400000).toISOString().slice(0,10);
+        }
+        if(!row.exam_date)row.exam_date=new Date(Date.now()+(pin.day||1)*86400000).toISOString().slice(0,10);
+        rows.push(row);});
       /* insert with graceful fallback for pre-v9.4 databases (no day_no/paper_kind) */
       let r=await sb.from('exam_timetable').insert(rows);
       if(r.error&&/day_no|paper_kind/.test(r.error.message||'')){
@@ -728,6 +786,41 @@ const EXT={
       made+=rows.length;}
     closeModal();toast('⚡ '+made+' sitting(s) scheduled across '+classes.length+' class(es)'+(papers.length?' · '+papers.length+' paper division(s) per subject':'')+(venues.length?' · venues randomised':'')+(invs.length?' · invigilators randomised':'')+'. Review the grid and adjust as needed.','success',9000);
     if(window.App&&App.logActivity)App.logActivity('generate','exam_timetable',classes.join(','));this.load();},
+  /* V9.5 (#4): SHIFT DAYS — strikes/holidays happen; move every paper from a
+     cut-off date onwards by N days in one click (weekends skipped). */
+  shiftModal(){
+    if(!this.canEdit){toast('Only the admin or an authorized timetable editor can shift the schedule.','warning');return;}
+    openModal('↔️ Shift exam days',
+      '<p style="font-size:.85rem;color:var(--gray-600)">School closed unexpectedly? Every paper ON or AFTER the cut-off moves forward by the chosen number of days (Sundays'+((this._satOK)?'':' and Saturdays')+' skipped). Day-number rows shift their Day N instead.</p>'+
+      '<div class="grid grid-2"><div class="form-group"><label>From date (papers on/after this move)</label><input class="form-input" id="exs-from" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+      '<div class="form-group"><label>Shift by (days)</label><input class="form-input" id="exs-by" type="number" value="1" min="1" max="30"></div></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.shiftRun()">↔️ Shift now</button>');},
+  async shiftRun(){
+    const from=document.getElementById('exs-from').value,by=Math.max(1,Number(document.getElementById('exs-by').value)||1);
+    if(!from){toast('Pick the cut-off date.','warning');return;}
+    const c=this.ctx();let q=sb.from('exam_timetable').select('*').gte('exam_date',from);
+    if(c.term)q=q.eq('term',c.term);if(c.session)q=q.eq('session',c.session);if(c.cls)q=q.eq('class',c.cls);
+    const r=await q.limit(2000);if(r.error){toast(r.error.message,'danger');return;}
+    const rows=r.data||[];if(!rows.length){toast('No papers on/after '+from+' in this scope.','info');return;}
+    if(!confirm('Shift '+rows.length+' paper(s) forward by '+by+' day(s)?'))return;
+    let moved=0;
+    for(const row of rows){
+      if(row.day_no!=null&&row.day_no!==''){ /* day-number rows shift Day N */
+        const u=await sb.from('exam_timetable').update({day_no:Number(row.day_no)+by}).eq('id',row.id);
+        if(!u.error)moved++;continue;}
+      const dt=new Date(row.exam_date+'T12:00:00');let n=0;
+      while(n<by){dt.setDate(dt.getDate()+1);if(dt.getDay()!==0&&dt.getDay()!==6)n++;}
+      const u=await sb.from('exam_timetable').update({exam_date:dt.toISOString().slice(0,10)}).eq('id',row.id);
+      if(!u.error)moved++;}
+    toast('↔️ '+moved+' paper(s) shifted by '+by+' day(s).','success',8000);
+    if(window.App&&App.logActivity)App.logActivity('shift','exam_timetable',from+'+'+by);this.load();},
+  /* V9.5 (#4): CSV export of the current filter */
+  exportCSV(){
+    const rows=this.rows||[];if(!rows.length){toast('Nothing to export — load a schedule first.','info');return;}
+    const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const csv=['Class,Subject,Paper,Day,Date,Start,End,Venue,Invigilator,Term,Session,Notes']
+      .concat(rows.map(r=>[r.class,r.subject,r.paper||'',r.day_no!=null?('Day '+r.day_no):'',r.exam_date||'',r.start_time,r.end_time,r.venue||'',r.invigilator||'',r.term||'',r.session||'',r.notes||''].map(esc2).join(','))).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='exam-timetable.csv';a.click();},
   print(){const el=document.getElementById('ex-print-area');if(!el){toast('Nothing to print yet.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Exam Timetable</title><style>@page{size:A4;margin:10mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #111;padding:6px;text-align:left;font-size:12px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();}
 };
 document.addEventListener('DOMContentLoaded',()=>EXT.init());EXT.init();
