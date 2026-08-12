@@ -1758,7 +1758,7 @@ begin
  end loop;
  insert into public.timetable_runs(class,session,term,generated_at,conflicts,notes)
  values(p_class,p_session,p_term,now(),unplaced,'Placed '||placed||' of '||required_total||' requested periods');
- return jsonb_build_object('ok',true,'placed',placed,'unplaced',unplaced,'requested',required_total,
+ return jsonb_build_object('ok',true,'engine','9.5','placed',placed,'unplaced',unplaced,'requested',required_total,
    'capacity',capacity,'periods_per_day',ppd,'day_periods',coalesce(p_day_periods,'{}'::jsonb),
    'unplaced_items',unplaced_items,
    'message',case when unplaced=0 then 'Conflict-free timetable generated.'
