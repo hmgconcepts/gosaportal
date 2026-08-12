@@ -764,7 +764,17 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   async contextChanged(){this.fillMulticlass();this.refreshPpdInfo();const first=this.tickedClasses()[0]||'';const sel=document.getElementById('tt-class');if(sel)sel.value=first;if(first)await Promise.all([this.loadReqs(first),this.listBlocks()]);else{this.reqs=[];document.getElementById('tt-reqs').innerHTML='';}this.updateChecklist();},
   /* V8.1 #5/#6: Step-3 class list = the Step-2 ticked classes, ALL PRE-TICKED
      and fully editable (untick the classes that don't take this subject). */
-  fillMulticlass(){const host=document.getElementById('tt-multiclass');if(!host)return;const ticked=this.tickedClasses();host.innerHTML=ticked.length?ticked.map(n=>'<label><input type="checkbox" class="tt-mc" value="'+esc(n)+'" checked> '+esc(n)+'</label>').join(''):'<span style="color:var(--gray-500);font-size:.85rem">Tick classes in Step 2 first.</span>';},
+  fillMulticlass(){const host=document.getElementById('tt-multiclass');if(!host)return;const ticked=this.tickedClasses();
+    /* V9.4 (#6) ROOT CAUSE of "subjects I never added appear in the summary":
+       this tick-list was PRE-TICKED with every Step-2 class, so each
+       "Add subject demand" silently copied the subject into EVERY class.
+       Now: a loud live banner shows exactly which classes will receive the
+       subject, updated on every tick, and saving to >1 class asks first. */
+    host.innerHTML=(ticked.length?ticked.map(n=>'<label><input type="checkbox" class="tt-mc" value="'+esc(n)+'" checked onchange="TTG.mcBanner()"> '+esc(n)+'</label>').join(''):'<span style="color:var(--gray-500);font-size:.85rem">Tick classes in Step 2 first.</span>')
+      +'<div id="tt-mc-banner" style="flex-basis:100%;margin-top:6px"></div>';
+    this.mcBanner();},
+  mcBanner(){const el=document.getElementById('tt-mc-banner');if(!el)return;const t=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
+    el.innerHTML=t.length?'<div style="background:'+(t.length>1?'#fef3c7':'#dcfce7')+';border:1px solid '+(t.length>1?'#fcd34d':'#86efac')+';border-radius:8px;padding:6px 10px;font-size:.83rem"><b>'+(t.length>1?'⚠️ This subject will be saved to '+t.length+' classes:':'✅ Saving to ONE class:')+'</b> '+t.map(esc).join(', ')+(t.length>1?' — <b>untick</b> the classes that do NOT take it.':'')+'</div>':'<div style="color:#b91c1c;font-size:.83rem">No class ticked — nothing will be saved.</div>';},
   dayToggled(cb){const host=document.getElementById('tt-day-periods');if(!host)return;const id='ttdp-'+cb.value;if(cb.checked){if(!document.getElementById(id)){const w=document.createElement('div');w.id=id;w.style.cssText='margin:4px 0';w.innerHTML='<label style="display:inline-flex;gap:8px;align-items:center">'+cb.value+' periods: <input class="form-input tt-dp" data-day="'+cb.value+'" placeholder="e.g. 1,2,3 (blank = any)" style="width:220px"></label>';host.appendChild(w);}}else{const w=document.getElementById(id);if(w)w.remove();}},
   collectDayPeriods(){const out={};let any=false;[...document.querySelectorAll('.tt-dp')].forEach(inp=>{const day=inp.dataset.day,v=String(inp.value||'').trim();if(!v)return;const arr=v.split(/[\s,;]+/).map(x=>parseInt(x,10)).filter(x=>x>=1&&x<=12);if(arr.length){out[day]=arr;any=true;}});return any?out:null;},
   async addBlock(){const cls=this.val('tb-class')||'ALL',day=this.val('tb-day'),per=Number(this.val('tb-period'))||0,label=this.val('tb-label')||'Free period';if(!day||per<1){toast('Pick a day and period number.','warning');return;}const r=await sb.from('timetable_blocks').upsert({class:cls,day:day,period:per,label:label},{onConflict:'class,day,period'});if(r.error){toast(/timetable_blocks/.test(r.error.message)?'Run the latest complete-schema.sql (or database/v7.9-timetable-flex-and-class-scope.sql) first to enable reserved slots.':r.error.message,'danger',9000);return;}toast('⛔ Reserved: '+cls+' · '+day+' · period '+per+' — '+label,'success');this.listBlocks();},
@@ -787,6 +797,8 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     const step3=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
     const targets=[...new Set(step3.length?step3:(ticked.length?ticked:[c.class]))].filter(Boolean);
     if(!targets.length){toast('Tick at least one class for this subject.','warning');return;}
+    /* V9.4 (#6): saving to MANY classes is now a conscious decision. */
+    if(targets.length>1&&!confirm('Save "'+subject+'" ('+ppw+'×/week) to '+targets.length+' classes?\n\n• '+targets.join('\n• ')+'\n\nUntick classes in the list above if some do not take this subject.'))return;
     /* V9.1 (4a/4c): double periods + early-period cap flow into the engine. */
     const dbl=Math.max(0,Number(this.val('tt-dbl'))||0);
     const maxpRaw=this.val('tt-maxp');const maxp=maxpRaw?Math.max(1,Math.min(12,Number(maxpRaw)||0)):null;
