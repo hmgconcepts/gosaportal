@@ -116,7 +116,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div id="modal-footer" class="modal-footer"></div>
   </div>
 </div>
-<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent">
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
         <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
@@ -487,6 +487,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
     </header>
     <div class="app-content">
+      <div id="fam-fees" style="display:none;margin-bottom:16px"></div>
       <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:14px"><b>👀 See samples first:</b> <a href="samples/sample-report-card.html" target="_blank">Report Card</a> · <a href="samples/sample-class-broadsheet.html" target="_blank">Class Broadsheet</a> · <a href="samples/sample-subject-broadsheet.html" target="_blank">Subject Broadsheet</a> · <a href="samples/sample-e-receipt.html" target="_blank">Fee E-Receipt</a></div>
       
       <div class="card" style="margin-bottom:16px;border:2px solid #86efac" data-admin-only><h2 style="margin-top:0">💰 Daily Fee Collection Dashboard</h2><p>Know exactly what entered the school each day. Select a date to see total payments, transaction count, average receipt, payment methods, classes, collectors and an auditable transaction list.</p><div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><div class="form-group" style="margin:0"><label>Collection date</label><input class="form-input" id="fd-date" type="date"></div><button class="btn btn-primary" onclick="FeeDaily.load()">View daily collection</button><button class="btn btn-outline" onclick="FeeDaily.exportDay()">Export this day CSV</button></div><div id="fd-out" style="margin-top:12px"><span class="pulse">Loading today’s fees…</span></div></div>
@@ -552,4 +553,73 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 const FeeDaily={rows:[],esc:s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'),today(){return new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});},money(n){return((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},async fetchDate(date){const all=[];for(let from=0;;from+=1000){const r=await sb.from('fee_payments').select('*').eq('payment_date',date).order('created_at',{ascending:false}).range(from,from+999);if(r.error)throw r.error;all.push(...(r.data||[]));if(!r.data||r.data.length<1000)break;}return all;},async sumRange(from,to){let total=0,count=0;for(let start=0;;start+=1000){const r=await sb.from('fee_payments').select('amount_paid').gte('payment_date',from).lte('payment_date',to).range(start,start+999);if(r.error)throw r.error;(r.data||[]).forEach(x=>{total+=Number(x.amount_paid||0);count++;});if(!r.data||r.data.length<1000)break;}return{total,count};},async load(){if(!window.sb)return;const input=document.getElementById('fd-date'),date=input.value||this.today();input.value=date;try{const rows=await this.fetchDate(date);this.rows=rows;const ids=[...new Set(rows.map(x=>x.student_id).filter(Boolean))],students={};if(ids.length){const r=await sb.from('students').select('id,full_name,admission_no,class').in('id',ids);(r.data||[]).forEach(x=>students[x.id]=x);}const d=new Date(date+'T12:00:00'),yd=new Date(d);yd.setDate(d.getDate()-1);const yesterday=yd.toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'}),monthStart=date.slice(0,7)+'-01',[prev,month]=await Promise.all([this.sumRange(yesterday,yesterday),this.sumRange(monthStart,date)]),total=rows.reduce((a,x)=>a+Number(x.amount_paid||0),0),methods={},classes={},collectors={};rows.forEach(x=>{methods[x.method||'unspecified']=(methods[x.method||'unspecified']||0)+Number(x.amount_paid||0);const st=students[x.student_id]||{},cl=st.class||'Unassigned';classes[cl]=(classes[cl]||0)+Number(x.amount_paid||0);const by=x.received_by_name||'Not recorded';collectors[by]=(collectors[by]||0)+Number(x.amount_paid||0);});const breakdown=(title,obj)=>'<div><h4>'+title+'</h4><div class="table-wrap"><table><tbody>'+Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+this.esc(k)+'</td><td><b>'+this.money(v)+'</b></td></tr>').join('')+'</tbody></table></div></div>';document.getElementById('fd-out').innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+this.money(total)+'</div><div class="stat-label">Selected day total</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Transactions</div></div><div class="stat-card"><div class="stat-value">'+this.money(rows.length?total/rows.length:0)+'</div><div class="stat-label">Average receipt</div></div><div class="stat-card"><div class="stat-value">'+this.money(prev.total)+'</div><div class="stat-label">Previous day</div></div><div class="stat-card"><div class="stat-value">'+this.money(month.total)+'</div><div class="stat-label">Month-to-date</div></div></div><div class="grid grid-3">'+breakdown('By payment method',methods)+breakdown('By class',classes)+breakdown('By collector',collectors)+'</div><h4>Transactions for '+this.esc(date)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th><th>Student</th><th>Class</th><th>Amount</th><th>Method</th><th>Reference</th><th>Collector</th></tr></thead><tbody>'+(rows.length?rows.map(x=>{const st=students[x.student_id]||{};return'<tr><td>'+this.esc(String(x.created_at||'').slice(11,16))+'</td><td>'+this.esc(st.full_name||x.student_name||'')+'<br><small>'+this.esc(st.admission_no||'')+'</small></td><td>'+this.esc(st.class||'')+'</td><td><b>'+this.money(x.amount_paid)+'</b></td><td>'+this.esc(x.method||'')+'</td><td>'+this.esc(x.reference||'')+'</td><td>'+this.esc(x.received_by_name||'')+'</td></tr>';}).join(''):'<tr><td colspan="7">No fees recorded on this date.</td></tr>')+'</tbody></table></div>';}catch(e){document.getElementById('fd-out').innerHTML='<div class="notice notice-error">'+this.esc(e.message||e)+'. Run the latest complete-schema.sql if payment_date is missing.</div>'; }},exportDay(){if(!this.rows.length){toast('No daily rows to export.','warning');return;}const keys=['payment_date','created_at','student_id','student_name','amount_paid','method','reference','term','session','received_by_name'],csv=[keys.join(',')].concat(this.rows.map(r=>keys.map(k=>'"'+String(r[k]??'').replace(/"/g,'""')+'"').join(','))).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='daily-fees-'+document.getElementById('fd-date').value+'.csv';a.click();}};
 document.addEventListener('DOMContentLoaded',()=>FeeDaily.load());
 </script>
-</body></html>
+<script>
+/* ===== FAM — V9.4 (#1): Family fee panel for parents & students =====
+   Bold current-term totals per child (sc_student_fee_state), the child's FULL
+   payment history, and one-click printable e-receipts. Staff/admin never see
+   this panel (they have the full ledgers above). */
+const FAM={
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  money(cur,n){return (cur||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},
+  async init(){
+    try{
+      for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+      const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if(!['parent','student'].includes(role))return;
+      /* hide the admin ledgers for family users */
+      document.querySelectorAll('.app-content [data-admin-only],.app-content [data-staff-only]').forEach(el=>el.style.display='none');
+      const host=document.getElementById('fam-fees');if(!host)return;host.style.display='';
+      host.innerHTML='<div class="card"><span class="pulse">Loading your fee records…</span></div>';
+      let studs=[];
+      if(role==='student'){const r=await sb.from('students').select('id,full_name,class,admission_no').eq('user_id',SC_PROFILE.id);studs=r.data||[];}
+      else{const l=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);const ids=(l.data||[]).map(x=>x.student_id);
+        if(ids.length){const st=await sb.from('students').select('id,full_name,class,admission_no').in('id',ids);studs=st.data||[];}}
+      if(!studs.length){host.innerHTML='<div class="card">No linked student record yet — ask the admin to link your account.</div>';return;}
+      let h='';
+      for(const s of studs){
+        let f={};try{const fr=await sb.rpc('sc_student_fee_state',{p_student:s.id});f=(fr.data&&fr.data.ok!==false)?fr.data:{};}catch(_){}
+        const cur=f.currency||'₦';
+        const pr=await sb.from('fee_payments').select('*').eq('student_id',s.id).order('payment_date',{ascending:false}).order('created_at',{ascending:false}).limit(200);
+        const pays=pr.data||[];this._pays=this._pays||{};this._pays[s.id]=pays;
+        h+='<div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">💰 '+this.esc(s.full_name)+' · '+this.esc(s.class||'')+' <small style="color:var(--gray-500)">'+this.esc(s.admission_no||'')+'</small></h3>';
+        if(f.ok){
+          const owing=Number(f.total_due||0);
+          h+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px">'
+            +'<div><div style="font-size:1.6rem;font-weight:900">'+this.money(cur,f.bill)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Total fees · '+this.esc(f.term||'')+'</div></div>'
+            +'<div><div style="font-size:1.6rem;font-weight:900;color:#15803d">'+this.money(cur,f.paid)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Paid this term</div></div>'
+            +(Number(f.arrears||0)>0?'<div><div style="font-size:1.6rem;font-weight:900;color:#b91c1c">'+this.money(cur,f.arrears)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Previous terms owing</div></div>':'')
+            +'<div><div style="font-size:1.6rem;font-weight:900;color:'+(owing>0?'#b91c1c':'#15803d')+'">'+this.money(cur,owing)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:'+(owing>0?'#b91c1c':'#15803d')+'">'+(owing>0?'Total outstanding':'✅ Fully paid')+'</div></div></div>';
+        } else h+='<p style="font-size:.85rem;color:var(--gray-500)">Live fee totals appear after the school installs the v9.4 database update. Your payment history is below.</p>';
+        h+='<h4 style="margin:8px 0 4px">🧾 Payment history</h4>';
+        h+=pays.length?'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Term</th><th>Reference</th><th>E-receipt</th></tr></thead><tbody>'
+          +pays.map((p,i)=>'<tr><td>'+this.esc(p.payment_date||String(p.created_at||'').slice(0,10))+'</td><td><b>'+this.money(cur,p.amount_paid)+'</b></td><td>'+this.esc(p.method||'')+'</td><td>'+this.esc((p.term||'')+(p.session?' · '+p.session:''))+'</td><td>'+this.esc(p.reference||'—')+'</td><td><button class="btn btn-sm btn-outline" onclick="FAM.receipt(\''+s.id+'\','+i+')">🖨️ Print</button></td></tr>').join('')
+          +'</tbody></table></div>':'<p style="color:var(--gray-500);font-size:.85rem">No payments recorded yet.</p>';
+        h+='</div>';
+      }
+      host.innerHTML=h;
+    }catch(e){console.warn('[FAM]',e);}
+  },
+  receipt(studentId,idx){
+    const p=(this._pays&&this._pays[studentId]||[])[idx];if(!p)return;
+    const sc=window.SCHOOL||{};const cur=(sc.currency)||'₦';
+    const w=window.open('','_blank');if(!w){toast('Allow popups to print the receipt.','warning');return;}
+    const money=n=>cur+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+    w.document.write('<!DOCTYPE html><html><head><title>E-Receipt — '+this.esc(p.student_name||'')+'</title><style>@page{size:A5 landscape;margin:8mm}body{font-family:Georgia,serif;color:#111;padding:18px;max-width:640px;margin:auto}h1{font-size:20px;margin:0;text-align:center}p.m{margin:2px 0;text-align:center;color:#555;font-size:11px}table{width:100%;border-collapse:collapse;margin-top:14px}td{padding:7px 10px;border-bottom:1px solid #ddd;font-size:13px}td:first-child{color:#555;width:45%}.tot{font-size:16px;font-weight:bold}.foot{margin-top:22px;text-align:center;font-size:10.5px;color:#777}.badge{display:inline-block;border:2px solid #16a34a;color:#16a34a;border-radius:8px;padding:3px 14px;font-weight:bold;margin-top:8px}</style></head><body>'
+      +'<h1>'+this.esc(sc.name||'School')+'</h1><p class="m">'+this.esc(sc.address||'')+'</p><p class="m">'+this.esc(sc.phone||'')+' · '+this.esc(sc.email||'')+'</p>'
+      +'<p class="m" style="margin-top:10px;font-size:14px;font-weight:bold;letter-spacing:1px">OFFICIAL FEE E-RECEIPT</p><div style="text-align:center"><span class="badge">PAYMENT RECEIVED</span></div>'
+      +'<table><tr><td>Receipt for</td><td><b>'+this.esc(p.student_name||'')+'</b></td></tr>'
+      +'<tr><td>Date</td><td>'+this.esc(p.payment_date||String(p.created_at||'').slice(0,10))+'</td></tr>'
+      +'<tr><td>Amount paid</td><td class="tot">'+money(p.amount_paid)+'</td></tr>'
+      +(p.fee_total?'<tr><td>Total fee for the term</td><td>'+money(p.fee_total)+'</td></tr>':'')
+      +(p.balance!=null&&p.balance!==''?'<tr><td>Remaining balance</td><td><b>'+money(p.balance)+'</b></td></tr>':'')
+      +'<tr><td>Method</td><td>'+this.esc(p.method||'—')+'</td></tr>'
+      +'<tr><td>Term / Session</td><td>'+this.esc((p.term||'—')+(p.session?' · '+p.session:''))+'</td></tr>'
+      +'<tr><td>Reference</td><td>'+this.esc(p.reference||'—')+'</td></tr>'
+      +(p.received_by_name?'<tr><td>Received by</td><td>'+this.esc(p.received_by_name)+'</td></tr>':'')
+      +'</table><p class="foot">Generated by School Connect · '+new Date().toLocaleString()+' · Verify with the school bursar quoting the reference above.</p>'
+      +'<script>window.onload=()=>window.print()<\/script></body></html>');
+    w.document.close();
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>FAM.init());FAM.init();
+</script></body></html>

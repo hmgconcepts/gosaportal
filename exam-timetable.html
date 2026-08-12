@@ -496,6 +496,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <button class="btn btn-outline" onclick="EXT.load()">Refresh</button>
         <button class="btn btn-primary" data-staff-only onclick="EXT.addModal()">+ Add paper</button>
         <button class="btn btn-outline" data-staff-only onclick="EXT.autoModal()">⚡ Auto-spread subjects</button>
+        <button class="btn btn-outline" onclick="EXT.toggleCompact()" id="ex-compact-btn" title="One-row-per-sitting compact card per class — ideal for photocopying">🗜️ Compact view</button>
         <button class="btn btn-outline" onclick="EXT.print()">🖨️ Print</button>
       </div></div>
       <div id="ex-clashes"></div>
@@ -574,22 +575,48 @@ const EXT={
       if(a.class===b.class&&a.exam_date===b.exam_date&&(a.start_time<b.end_time&&b.start_time<a.end_time))clashes.push(a.class+' · '+a.exam_date+': '+a.subject+' ('+a.start_time+'–'+a.end_time+') overlaps '+b.subject+' ('+b.start_time+'–'+b.end_time+')');}
     document.getElementById('ex-clashes').innerHTML=clashes.length?'<div class="card" style="border-color:#fca5a5;background:#fef2f2;margin-bottom:16px"><b style="color:#b91c1c">⛔ '+clashes.length+' clash(es) found</b><ul style="margin:6px 0 0;padding-left:18px;font-size:.85rem">'+clashes.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'';
     if(!rows.length){box.innerHTML='<div class="card">No exam papers scheduled yet'+(c.cls?' for '+esc(c.cls):'')+'. Staff can add papers or use ⚡ Auto-spread.</div>';return;}
-    /* group by date */
-    const dates=[...new Set(rows.map(r=>r.exam_date))].sort();
+    /* V9.4 (#4/#5): two view modes and day-number awareness.
+       • Standard: grouped by DATE, or by "Day N" when rows carry day_no.
+       • 🗜️ Compact: ONE CARD PER CLASS — a dense sitting list (Day/Date ·
+         time · subject · paper · venue) that fits a term's whole schedule on
+         one A4 sheet per class; perfect for photocopying to students. */
     const isStaff=this.canEdit; /* V9.2: row edit buttons only for authorized editors */
+    const dayMode=rows.some(r=>r.day_no!=null&&r.day_no!=='');
+    const keyOf=r=>dayMode?('Day '+(r.day_no!=null&&r.day_no!==''?r.day_no:'?')):r.exam_date;
+    const keys=[...new Set(rows.map(keyOf))].sort((a,b)=>{if(dayMode)return (parseInt(a.replace(/\D/g,''))||0)-(parseInt(b.replace(/\D/g,''))||0);return a<b?-1:1;});
+    const labelOf=k=>{if(dayMode)return '🔢 '+k+' <small style="color:var(--gray-500)">(attach the real date later — Edit any paper)</small>';const day=new Date(k+'T12:00:00');return '📅 '+day.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});};
     let h='<div class="card" id="ex-print-area"><h2 style="text-align:center">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center">EXAMINATION TIMETABLE'+(c.cls?' · '+esc(c.cls):'')+(c.term?' · '+esc(c.term):'')+(c.session?' · '+esc(c.session):'')+'</h3>';
-    dates.forEach(dt=>{const day=new Date(dt+'T12:00:00');const dn=day.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-      h+='<h4 style="margin:14px 0 6px;border-bottom:2px solid var(--gray-200);padding-bottom:4px">📅 '+esc(dn)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th>'+(c.cls?'':'<th>Class</th>')+'<th>Subject</th><th>Paper</th><th>Venue</th><th>Invigilator</th>'+(isStaff?'<th></th>':'')+'</tr></thead><tbody>';
-      rows.filter(r=>r.exam_date===dt).sort((a,b)=>(a.start_time+a.class).localeCompare(b.start_time+b.class)).forEach(r=>{
-        h+='<tr><td><b>'+esc(r.start_time)+'–'+esc(r.end_time)+'</b></td>'+(c.cls?'':'<td>'+esc(r.class)+'</td>')+'<td><b>'+esc(r.subject)+'</b>'+(r.notes?'<br><small style="color:var(--gray-500)">'+esc(r.notes)+'</small>':'')+'</td><td>'+esc(r.paper||'—')+'</td><td>'+esc(r.venue||'—')+'</td><td>'+esc(r.invigilator||'—')+'</td>'+(isStaff?'<td><button class="btn btn-sm btn-outline" onclick="EXT.edit(\''+r.id+'\')">✏️</button> <button class="btn btn-sm btn-outline" onclick="EXT.del(\''+r.id+'\')">🗑</button></td>':'')+'</tr>';});
-      h+='</tbody></table></div>';});
-    h+='<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+'</p></div>';
+    if(this.compact){
+      /* ---- COMPACT: one dense card per class ---- */
+      const classes=[...new Set(rows.map(r=>r.class))].sort();
+      classes.forEach(cls=>{
+        const mine=rows.filter(r=>r.class===cls).sort((a,b)=>{const ka=dayMode?(a.day_no||0):a.exam_date,kb=dayMode?(b.day_no||0):b.exam_date;return ka<kb?-1:ka>kb?1:(a.start_time<b.start_time?-1:1);});
+        h+='<div style="border:1.5px solid var(--gray-300);border-radius:12px;padding:10px 12px;margin:10px 0;page-break-inside:avoid"><h4 style="margin:0 0 6px">'+esc(cls)+' <small style="color:var(--gray-500)">('+mine.length+' sitting'+(mine.length===1?'':'s')+')</small></h4>'
+          +'<table style="width:100%;border-collapse:collapse;font-size:.85rem">'
+          +mine.map(r=>'<tr style="border-bottom:1px solid var(--gray-200)">'
+            +'<td style="padding:3px 6px;white-space:nowrap"><b>'+(dayMode?('Day '+(r.day_no??'?')):esc(String(r.exam_date||'').slice(5)))+'</b></td>'
+            +'<td style="padding:3px 6px;white-space:nowrap">'+esc(r.start_time)+'–'+esc(r.end_time)+'</td>'
+            +'<td style="padding:3px 6px"><b>'+esc(r.subject)+'</b>'+(r.paper?' <span style="color:#7c3aed">· '+esc(r.paper)+'</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;color:var(--gray-600)">'+esc(r.venue||'')+'</td>'
+            +'<td style="padding:3px 6px;color:var(--gray-600)">'+esc(r.invigilator||'')+'</td></tr>').join('')
+          +'</table></div>';});
+    } else {
+      keys.forEach(k=>{
+        h+='<h4 style="margin:14px 0 6px;border-bottom:2px solid var(--gray-200);padding-bottom:4px">'+labelOf(k)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th>'+(c.cls?'':'<th>Class</th>')+'<th>Subject</th><th>Paper</th><th>Venue</th><th>Invigilator</th>'+(isStaff?'<th></th>':'')+'</tr></thead><tbody>';
+        rows.filter(r=>keyOf(r)===k).sort((a,b)=>(a.start_time+a.class).localeCompare(b.start_time+b.class)).forEach(r=>{
+          h+='<tr><td><b>'+esc(r.start_time)+'–'+esc(r.end_time)+'</b></td>'+(c.cls?'':'<td>'+esc(r.class)+'</td>')+'<td><b>'+esc(r.subject)+'</b>'+(r.notes?'<br><small style="color:var(--gray-500)">'+esc(r.notes)+'</small>':'')+'</td><td>'+esc(r.paper||'—')+'</td><td>'+esc(r.venue||'—')+'</td><td>'+esc(r.invigilator||'—')+'</td>'+(isStaff?'<td><button class="btn btn-sm btn-outline" onclick="EXT.edit(\''+r.id+'\')">✏️</button> <button class="btn btn-sm btn-outline" onclick="EXT.del(\''+r.id+'\')">🗑</button></td>':'')+'</tr>';});
+        h+='</tbody></table></div>';});
+    }
+    h+='<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+(dayMode?' · Day-number schedule (dates to be announced)':'')+'</p></div>';
     box.innerHTML=h;},
+  /* V9.4 (#4): compact one-card-per-class toggle */
+  toggleCompact(){this.compact=!this.compact;const b=document.getElementById('ex-compact-btn');if(b)b.textContent=this.compact?'📋 Standard view':'🗜️ Compact view';this.load();},
   formHtml(r){r=r||{};const c=this.ctx();
     return '<div class="grid grid-2">'+
     '<div class="form-group"><label>Class</label><select class="form-select" id="exf-class">'+[...document.getElementById('ex-class').options].filter(o=>o.value).map(o=>'<option'+((r.class||c.cls)===o.value?' selected':'')+'>'+esc(o.value)+'</option>').join('')+'</select></div>'+
     '<div class="form-group"><label>Subject</label><input class="form-input" id="exf-subject" value="'+esc(r.subject||'')+'" list="exf-subjects"><datalist id="exf-subjects"></datalist></div>'+
     '<div class="form-group"><label>Date</label><input class="form-input" id="exf-date" type="date" value="'+esc(r.exam_date||'')+'"></div>'+
+    '<div class="form-group"><label>Day number (Day 1/2/3 mode — blank when using real dates)</label><input class="form-input" id="exf-dayno" type="number" min="1" value="'+esc(r.day_no!=null?r.day_no:'')+'"></div>'+
     '<div class="form-group"><label>Start</label><input class="form-input" id="exf-start" type="time" value="'+esc(r.start_time||'09:00')+'"></div>'+
     '<div class="form-group"><label>End</label><input class="form-input" id="exf-end" type="time" value="'+esc(r.end_time||'11:00')+'"></div>'+
     '<div class="form-group"><label>Paper (optional)</label><input class="form-input" id="exf-paper" value="'+esc(r.paper||'')+'" placeholder="e.g. Paper 1 · Objective"></div>'+
@@ -601,36 +628,64 @@ const EXT={
   async edit(id){const r=(this.rows||[]).find(x=>x.id===id);if(!r)return;this._editing=id;openModal('Edit exam paper',this.formHtml(r),'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.save(\''+id+'\')">💾 Save changes</button>');this.fillSubjects();},
   async save(id){const c=this.ctx();
     if(!this.canEdit){toast('Only the admin or an authorized timetable editor can modify the exam timetable.','warning',7000);return;}
-    const row={class:document.getElementById('exf-class').value,subject:(document.getElementById('exf-subject').value||'').trim(),exam_date:document.getElementById('exf-date').value,start_time:document.getElementById('exf-start').value,end_time:document.getElementById('exf-end').value,paper:(document.getElementById('exf-paper').value||'').trim(),venue:(document.getElementById('exf-venue').value||'').trim(),invigilator:(document.getElementById('exf-inv').value||'').trim(),notes:(document.getElementById('exf-notes').value||'').trim(),term:c.term,session:c.session};
+    const dayNoRaw=(document.getElementById('exf-dayno')||{}).value;
+    const row={class:document.getElementById('exf-class').value,subject:(document.getElementById('exf-subject').value||'').trim(),exam_date:document.getElementById('exf-date').value,start_time:document.getElementById('exf-start').value,end_time:document.getElementById('exf-end').value,paper:(document.getElementById('exf-paper').value||'').trim(),venue:(document.getElementById('exf-venue').value||'').trim(),invigilator:(document.getElementById('exf-inv').value||'').trim(),notes:(document.getElementById('exf-notes').value||'').trim(),term:c.term,session:c.session,day_no:dayNoRaw?parseInt(dayNoRaw,10):null};
     if(!row.class||!row.subject||!row.exam_date){toast('Class, subject and date are required.','warning');return;}
     if(row.end_time<=row.start_time){toast('End time must be after start time.','warning');return;}
-    const r=id?await sb.from('exam_timetable').update(row).eq('id',id):await sb.from('exam_timetable').insert(row);
+    let r=id?await sb.from('exam_timetable').update(row).eq('id',id):await sb.from('exam_timetable').insert(row);
+    if(r.error&&/day_no/.test(r.error.message||'')){delete row.day_no;r=id?await sb.from('exam_timetable').update(row).eq('id',id):await sb.from('exam_timetable').insert(row);}
     if(r.error){toast(r.error.message,'danger',8000);return;}
     closeModal();toast('💾 Exam paper saved.','success');this.load();},
   async del(id){if(!this.canEdit){toast('Only the admin or an authorized timetable editor can modify the exam timetable.','warning',7000);return;}
     if(!confirm('Remove this exam paper?'))return;const r=await sb.from('exam_timetable').delete().eq('id',id);if(r.error){toast(r.error.message,'danger');return;}toast('Removed.','success');this.load();},
+  /* ===== V9.4 (#3/#5): FLEXIBLE AUTO-SPREAD =====
+     • UNLIMITED daily slots — the school creates as many as it needs (3, 4, 5+
+       papers a day), each with its own time window.
+     • Paper divisions — each subject can sit MULTIPLE papers (e.g. Paper 1
+       (Objective) / Paper 2 (Theory) / CBT / Practical); the school types its
+       own division labels, one set applied to every subject, and divisions of
+       the same subject are automatically spread to DIFFERENT days.
+     • Venue + invigilator pools — comma-separated lists; the system RANDOMISES
+       fairly across them (round-robin from a shuffled pool, so no venue or
+       teacher is overloaded).
+     • DAY-NUMBER MODE (#5) — schools unsure of exact dates schedule as Day 1,
+       Day 2, Day 3…; printable immediately, dates can be attached later. */
   autoModal(){const c=this.ctx();
     openModal('⚡ Auto-spread subjects into an exam timetable',
-      '<p style="font-size:.85rem;color:var(--gray-600)">One paper per subject for the selected class(es), spread across the date range. Weekends are skipped; each day gets a morning slot and (optionally) an afternoon slot. Review and adjust afterwards — existing papers for the class/term/session are replaced.</p>'+
+      '<p style="font-size:.85rem;color:var(--gray-600)">Papers are spread across days (weekends skipped in date mode). Existing papers for the class/term/session are replaced. Everything is editable afterwards.</p>'+
       '<div class="grid grid-2">'+
       '<div class="form-group"><label>Class (one, or ALL)</label><select class="form-select" id="exa-class"><option value="__ALL__">ALL classes</option>'+[...document.getElementById('ex-class').options].filter(o=>o.value).map(o=>'<option'+(c.cls===o.value?' selected':'')+'>'+esc(o.value)+'</option>').join('')+'</select></div>'+
-      '<div class="form-group"><label>First exam day</label><input class="form-input" id="exa-start" type="date"></div>'+
-      '<div class="form-group"><label>Morning slot</label><input class="form-input" id="exa-m" value="09:00-11:00" placeholder="09:00-11:00"></div>'+
-      '<div class="form-group"><label>Afternoon slot (blank = mornings only)</label><input class="form-input" id="exa-a" value="12:00-14:00" placeholder="12:00-14:00"></div>'+
-      '<div class="form-group"><label>Default venue</label><input class="form-input" id="exa-venue" placeholder="e.g. Main Hall"></div></div>',
+      '<div class="form-group"><label>Scheduling mode</label><select class="form-select" id="exa-mode" onchange="document.getElementById(\'exa-datewrap\').style.display=this.value===\'date\'?\'\':\'none\'"><option value="date">📅 Exact dates (weekends skipped)</option><option value="day">🔢 Day 1, Day 2, Day 3… (attach dates later)</option></select></div>'+
+      '</div>'+
+      '<div id="exa-datewrap" class="form-group"><label>First exam day</label><input class="form-input" id="exa-start" type="date"></div>'+
+      '<div class="form-group"><label><b>Daily time slots</b> — one per line, as many as your school runs in a day (e.g. 4+ papers/day)</label>'+
+      '<textarea class="form-input" id="exa-slots" rows="4" placeholder="08:30-10:00&#10;10:30-12:00&#10;12:30-14:00&#10;14:30-16:00">09:00-11:00\n12:00-14:00</textarea>'+
+      '<small style="color:var(--gray-500)">Format HH:MM-HH:MM per line. 2 lines = 2 papers/day, 5 lines = 5 papers/day.</small></div>'+
+      '<div class="form-group"><label><b>Paper divisions per subject</b> (optional — comma-separated; each division becomes its own sitting on a DIFFERENT day)</label>'+
+      '<input class="form-input" id="exa-papers" placeholder="e.g. Paper 1 (Objective), Paper 2 (Theory), CBT — blank = one paper per subject">'+
+      '<small style="color:var(--gray-500)">Type your own labels: Objective/Theory/CBT/Practical/Oral — anything the school uses.</small></div>'+
+      '<div class="grid grid-2">'+
+      '<div class="form-group"><label>Venue pool (comma-separated — randomised fairly)</label><input class="form-input" id="exa-venues" placeholder="e.g. Main Hall, Block B Hall, ICT Lab"></div>'+
+      '<div class="form-group"><label>Invigilator pool (comma-separated — randomised fairly)</label><input class="form-input" id="exa-invs" placeholder="e.g. Mr Ade, Mrs Bello, Mr Chukwu — blank = fill later"></div>'+
+      '</div>',
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.autoRun()">⚡ Build timetable</button>');},
   async autoRun(){const c=this.ctx();
     if(!this.canEdit){toast('Only the admin or an authorized timetable editor can build the exam timetable.','warning',7000);return;}
-    const clsPick=document.getElementById('exa-class').value,start=document.getElementById('exa-start').value,venue=(document.getElementById('exa-venue').value||'').trim();
-    const mm=(document.getElementById('exa-m').value||'').match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-    const aa=(document.getElementById('exa-a').value||'').match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
-    if(!start||!mm){toast('Pick the first exam day and a valid morning slot like 09:00-11:00.','warning');return;}
+    const clsPick=document.getElementById('exa-class').value;
+    const mode=document.getElementById('exa-mode').value;
+    const start=(document.getElementById('exa-start')||{}).value;
+    /* parse the unlimited slot list */
+    const slotLines=String((document.getElementById('exa-slots')||{}).value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    const slots=[];for(const ln of slotLines){const m=ln.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);if(!m){toast('Bad slot "'+ln+'" — use HH:MM-HH:MM, one per line.','warning',7000);return;}if(m[2]<=m[1]){toast('Slot "'+ln+'": end must be after start.','warning');return;}slots.push([m[1],m[2]]);}
+    if(!slots.length){toast('Add at least one daily time slot.','warning');return;}
+    if(mode==='date'&&!start){toast('Pick the first exam day (or switch to Day 1/Day 2 mode).','warning');return;}
+    const papers=String((document.getElementById('exa-papers')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+    const venues=shuffle(String((document.getElementById('exa-venues')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean));
+    const invs=shuffle(String((document.getElementById('exa-invs')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean));
+    let vi=0,ii=0;const nextVenue=()=>venues.length?venues[(vi++)%venues.length]:'';const nextInv=()=>invs.length?invs[(ii++)%invs.length]:'';
     const classes=clsPick==='__ALL__'?[...document.getElementById('ex-class').options].map(o=>o.value).filter(Boolean):[clsPick];
-    /* V9.2 FIX: subjects has NO class column (it has level/department) — the old
-       query 'select name,class' failed with "column subjects.class does not exist".
-       Better source of truth: the class's own subject demand (timetable_requirements)
-       — exactly the subjects the class actually takes, option groups split into
-       their member subjects. Fallback: published timetable rows, then ALL subjects. */
+    /* subject sources (V9.2 chain): demand → published timetable → level match → all */
     const subj=await sb.from('subjects').select('name,level').order('name');
     if(subj.error){toast(subj.error.message,'danger');return;}
     const reqAll=await sb.from('timetable_requirements').select('class,subject');
@@ -638,25 +693,40 @@ const EXT={
     let made=0;
     for(const cls of classes){
       let subjects=[];
-      /* 1st choice: the class's registered subject demand */
       (reqAll.data||[]).filter(r=>r.class===cls).forEach(r=>{String(r.subject||'').split('/').map(x=>x.trim()).filter(Boolean).forEach(s=>{if(!subjects.includes(s))subjects.push(s);});});
-      /* 2nd choice: subjects already on the class's published timetable */
       if(!subjects.length)(ttAll.data||[]).filter(r=>r.class===cls&&r.subject&&!/^⛔/.test(r.subject)).forEach(r=>{const s=String(r.subject).replace(/\s*\(double\)$/,'').trim();if(s&&!subjects.includes(s))subjects.push(s);});
-      /* 3rd choice: level-matched subjects (e.g. JSS-level for a JSS class), else all */
       if(!subjects.length){const lvl=(cls.match(/^[A-Za-z]+/)||[''])[0].toUpperCase();
         subjects=[...new Set((subj.data||[]).filter(s=>!s.level||String(s.level).toUpperCase().indexOf(lvl)>-1).map(s=>s.name))];
         if(!subjects.length)subjects=[...new Set((subj.data||[]).map(s=>s.name))];}
       if(!subjects.length)continue;
       await sb.from('exam_timetable').delete().eq('class',cls).eq('term',c.term).eq('session',c.session);
-      const slots=[[mm[1],mm[2]]];if(aa)slots.push([aa[1],aa[2]]);
-      let d=new Date(start+'T12:00:00'),si=0;const rows=[];
-      const next=()=>{si++;if(si>=slots.length){si=0;d.setDate(d.getDate()+1);while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);}};
-      while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);
-      subjects.forEach(s=>{rows.push({class:cls,subject:s,exam_date:d.toISOString().slice(0,10),start_time:slots[si][0],end_time:slots[si][1],venue:venue,term:c.term,session:c.session,paper:'',invigilator:'',notes:''});next();});
-      const r=await sb.from('exam_timetable').insert(rows);
+      /* Build the sitting list: subjects × paper divisions. Round-robin over
+         subjects so different papers of the SAME subject fall on DIFFERENT
+         days (students never sit two papers of one subject back-to-back). */
+      const sittings=[];
+      if(papers.length){for(const pk of papers)for(const s of subjects)sittings.push({subject:s,paper:pk});}
+      else for(const s of subjects)sittings.push({subject:s,paper:''});
+      /* day/slot cursor */
+      let dayNo=1,si=0;let d0=mode==='date'?new Date(start+'T12:00:00'):null;
+      if(d0)while(d0.getDay()===0||d0.getDay()===6)d0.setDate(d0.getDate()+1);
+      const advance=()=>{si++;if(si>=slots.length){si=0;dayNo++;if(d0){d0.setDate(d0.getDate()+1);while(d0.getDay()===0||d0.getDay()===6)d0.setDate(d0.getDate()+1);}}};
+      const rows=[];
+      sittings.forEach(x=>{
+        const row={class:cls,subject:x.subject,start_time:slots[si][0],end_time:slots[si][1],
+          venue:nextVenue(),invigilator:nextInv(),paper:x.paper,paper_kind:x.paper,term:c.term,session:c.session,notes:'',
+          exam_date:d0?d0.toISOString().slice(0,10):new Date(Date.now()+dayNo*86400000).toISOString().slice(0,10),
+          day_no:d0?null:dayNo};
+        rows.push(row);advance();});
+      /* insert with graceful fallback for pre-v9.4 databases (no day_no/paper_kind) */
+      let r=await sb.from('exam_timetable').insert(rows);
+      if(r.error&&/day_no|paper_kind/.test(r.error.message||'')){
+        rows.forEach(x=>{delete x.day_no;delete x.paper_kind;});
+        r=await sb.from('exam_timetable').insert(rows);
+        if(!r.error&&mode==='day')toast('Day-number mode needs the v9.4 database update — scheduled with placeholder dates for now.','warning',9000);
+      }
       if(r.error){toast(cls+': '+r.error.message,'danger',8000);continue;}
       made+=rows.length;}
-    closeModal();toast('⚡ '+made+' paper(s) scheduled across '+classes.length+' class(es). Review the grid and adjust as needed.','success',8000);
+    closeModal();toast('⚡ '+made+' sitting(s) scheduled across '+classes.length+' class(es)'+(papers.length?' · '+papers.length+' paper division(s) per subject':'')+(venues.length?' · venues randomised':'')+(invs.length?' · invigilators randomised':'')+'. Review the grid and adjust as needed.','success',9000);
     if(window.App&&App.logActivity)App.logActivity('generate','exam_timetable',classes.join(','));this.load();},
   print(){const el=document.getElementById('ex-print-area');if(!el){toast('Nothing to print yet.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Exam Timetable</title><style>@page{size:A4;margin:10mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #111;padding:6px;text-align:left;font-size:12px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();}
 };
