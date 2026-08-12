@@ -1233,6 +1233,39 @@ const App = {
     if (App['load_' + path]) App['load_' + path]();
   },
 
+  /* V9.2: upcoming exam papers for MY classes (student = own class, parent =
+     children's classes, staff/admin = whole school preview). Renders into any
+     #dash-exam-tt container on the page; silently skips when absent. */
+  async loadDashExamTT() {
+    const box = document.getElementById('dash-exam-tt');
+    if (!box || !window.sb) return;
+    try {
+      for (let i = 0; i < 25 && !(window.SC_PROFILE && SC_PROFILE.role); i++) await new Promise(r => setTimeout(r, 200));
+      const role = String((window.SC_PROFILE || {}).role || '').toLowerCase();
+      let classes = [];
+      if (role === 'student') {
+        const r = await sb.from('students').select('class').eq('user_id', SC_PROFILE.id);
+        classes = [...new Set((r.data || []).map(x => x.class).filter(Boolean))];
+      } else if (role === 'parent') {
+        const l = await sb.from('parent_child').select('student_id').eq('parent_id', SC_PROFILE.id);
+        const ids = (l.data || []).map(x => x.student_id);
+        if (ids.length) { const st = await sb.from('students').select('class').in('id', ids); classes = [...new Set((st.data || []).map(x => x.class).filter(Boolean))]; }
+      }
+      let q = sb.from('exam_timetable').select('*').gte('exam_date', new Date().toISOString().slice(0, 10)).order('exam_date').order('start_time').limit(60);
+      if (classes.length) q = q.in('class', classes);
+      const r = await q;
+      if (r.error) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">Exam timetable appears here once the database update (v9.1+) is installed.</p>'; return; }
+      const rows = r.data || [];
+      if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">No upcoming exam papers scheduled' + (classes.length ? ' for ' + classes.join(', ') : '') + ' yet. The full schedule lives on the <a href="exam-timetable.html">Exam Timetable</a> page.</p>'; return; }
+      let h = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th>' + (classes.length === 1 ? '' : '<th>Class</th>') + '<th>Subject</th><th>Venue</th></tr></thead><tbody>';
+      rows.slice(0, 10).forEach(x => {
+        const dt = new Date(x.exam_date + 'T12:00:00');
+        h += '<tr><td><b>' + dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + '</b></td><td>' + esc(x.start_time) + '–' + esc(x.end_time) + '</td>' + (classes.length === 1 ? '' : '<td>' + esc(x.class) + '</td>') + '<td><b>' + esc(x.subject) + '</b>' + (x.paper ? '<br><small>' + esc(x.paper) + '</small>' : '') + '</td><td>' + esc(x.venue || '—') + '</td></tr>';
+      });
+      h += '</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">' + rows.length + ' upcoming paper(s) · <a href="exam-timetable.html">full exam timetable →</a></p>';
+      box.innerHTML = h;
+    } catch (e) { box.innerHTML = ''; }
+  },
   async loadDashboard() {
     const supabase = window.sb || this.sb || null;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -1355,6 +1388,10 @@ const App = {
               }
             }
           } catch (e) { console.warn('[dashboard] my-week timetable failed:', e); }
+          /* V9.2 (issue 7): upcoming EXAM TIMETABLE on parent/student dashboards.
+             Fills #dash-exam-tt with the linked child(ren)'s / own class's next
+             papers; the container only exists in the parent/student sections. */
+          try { App.loadDashExamTT(); } catch (e) {}
           /* V7.8 #3 EDUCATOR DIGEST: "Action needed today" strip — pending
              account approvals, unresolved complaints, pending leave requests,
              open helpdesk tickets, today's birthdays and unapplied promotion

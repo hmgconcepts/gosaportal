@@ -219,6 +219,7 @@ ${T.modal()}
       student_profile: 'student-profile.html',
       verify_certificate: 'verify-certificate.html',
       feature_guide: 'feature-guide.html', profile:'profile.html', change_password:'change-password.html', cbt_multi:'cbt-multi.html',
+      exam_timetable: 'exam-timetable.html', 'exam-timetable': 'exam-timetable.html',
       ecosystem_products: 'ecosystem.html', ecosystem:'ecosystem.html', hmg_digital_products:'hmg-digital-products.html', school_fees:'school-fees.html', school_products:'school-products.html', status_manager:'status-manager.html'
     };
     return map[id] || (id + '.html');
@@ -560,11 +561,15 @@ ${T.setupRequiredBanner()}
       <section id="dash-sec-parent" data-dash-role="parent" style="display:none">
         <div class="card" data-admin-only style="margin-bottom:16px;background:#fef3c7;border-color:#f59e0b"><h3 style="margin:0">👁️ Admin Oversight Mode (Parent Portal)</h3><p style="margin:4px 0 10px;color:#92400e">You are inspecting the Parent portal as an Admin.</p><button class="btn btn-primary btn-sm" onclick="['dash-sec-admin','dash-sec-staff','dash-sec-parent','dash-sec-student'].forEach(id=>{var e=document.getElementById(id);if(e)e.style.display='none';});document.getElementById('dash-sec-admin').style.display='block';">← Return to Admin Command Centre</button></div>
         <div class="grid grid-2"><div class="card"><h3>👨‍👩‍👧 Parent Portal</h3><p>Parents focus on linked children only: fees, attendance, results, assignments, messages and complaints. Admin and teacher controls are excluded.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${buttons(parentLinks)}</div></div><div class="card"><h3>📢 Parent Notices</h3><div id="dash-announcements"><span class="pulse">Loading…</span></div></div></div>
+      
+        <div class="card" style="margin-top:16px"><h3>🗓️ Upcoming Exams</h3><div id="dash-exam-tt"><span class="pulse">Loading exam timetable…</span></div></div>
       </section>
 
       <section id="dash-sec-student" data-dash-role="student" style="display:none">
         <div class="card" data-admin-only style="margin-bottom:16px;background:#fef3c7;border-color:#f59e0b"><h3 style="margin:0">👁️ Admin Oversight Mode (Student Portal)</h3><p style="margin:4px 0 10px;color:#92400e">You are inspecting the Student portal as an Admin.</p><button class="btn btn-primary btn-sm" onclick="['dash-sec-admin','dash-sec-staff','dash-sec-parent','dash-sec-student'].forEach(id=>{var e=document.getElementById(id);if(e)e.style.display='none';});document.getElementById('dash-sec-admin').style.display='block';">← Return to Admin Command Centre</button></div>
         <div class="grid grid-2"><div class="card"><h3>🎓 Student Portal</h3><p>Students see learning and personal academic tools only. Finance administration, staff management, payroll, backups and approvals are excluded.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${buttons(studentLinks)}</div></div><div class="card"><h3>📢 Student Notices</h3><div id="dash-announcements"><span class="pulse">Loading…</span></div></div></div>
+      
+        <div class="card" style="margin-top:16px"><h3>🗓️ Upcoming Exams</h3><div id="dash-exam-tt"><span class="pulse">Loading exam timetable…</span></div></div>
       </section>`);
   },
 

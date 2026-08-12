@@ -18,7 +18,7 @@ const CRUD = {
     classes:[], subjects:[], attendance:['staff','teacher'],
     results:['staff','teacher'], academic_records:['staff','teacher'], report_cards:['staff','teacher'],
     cbt:['staff','teacher'], cbt_prompts:['staff','teacher'], assignments:['staff','teacher'],
-    timetable:[], timetable_generator:[], exam_timetable:['staff','teacher'], sow:['staff','teacher'],
+    timetable:[], timetable_generator:[], exam_timetable:[], sow:['staff','teacher'],
     lesson_plans:['staff','teacher'], announcements:[], events:[],
     gallery:[], library:[], digital_library:['staff','teacher'],
     eresources:['staff','teacher'], directory:[], broadcast:[],
