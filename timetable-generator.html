@@ -578,8 +578,15 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <!-- V9.2 (issue 3): departmental groups can also be double-period or morning-only -->
           <label style="margin-left:12px">Double periods <input class="form-input" id="tt-group-dbl" type="number" value="0" min="0" max="5" style="width:70px;display:inline-block" title="Pairs of adjacent slots (e.g. practicals). 0 = none."></label>
           <label style="margin-left:12px">Latest allowed period <input class="form-input" id="tt-group-maxp" type="number" min="1" max="12" placeholder="any" style="width:70px;display:inline-block" title="e.g. 4 keeps this option group in the first four periods of any day."></label>
-          <label style="margin-left:12px"><input type="checkbox" id="tt-group-pt" onchange="document.getElementById('tt-group-days').style.display=this.checked?'block':'none'"> One of these teachers is part-time / restricted-days</label>
-          <button type="button" class="btn btn-sm btn-primary" onclick="TTG.addGroup()">＋ Add option group</button></div>
+          <label style="margin-left:12px"><input type="checkbox" id="tt-group-pt" onchange="document.getElementById('tt-group-days').style.display=this.checked?'block':'none'"> One of these teachers is part-time / restricted-days</label></div>
+          <!-- V9.5 (#5): the option group has its OWN class tick-list — previously it
+               silently reused the Step-3 list, so departmental subjects could not be
+               excluded from classes that don't take them. -->
+          <div style="margin-top:8px"><b>Classes taking this option group</b> <small style="color:var(--gray-500)">(untick the ones that don't — e.g. JSS classes don't take an SSS department block)</small>
+            <div id="tt-group-classes" style="display:flex;gap:10px 14px;flex-wrap:wrap;margin-top:6px"></div>
+            <div id="tt-gc-banner" style="margin-top:6px"></div>
+          </div>
+          <div style="margin-top:8px"><button type="button" class="btn btn-sm btn-primary" onclick="TTG.addGroup()">＋ Add option group</button></div>
           <!-- V8.5 #1: a slashed group inherits the STRICTEST member's availability —
                the whole group can only sit where EVERY department teacher is present. -->
           <div id="tt-group-days" style="display:none;margin-top:8px;padding:8px;border:1px dashed var(--gray-300);border-radius:8px">
@@ -734,9 +741,12 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     if(dupT.length){toast('One teacher ('+dupT[0]+') takes two subjects in this group — they cannot teach both at once. Adjust the group.','danger',9000);return;}
     const c=this.context();const ticked=this.tickedClasses();
     if(!ticked.length||!c.term||!c.session){toast('Step 2 first: tick the classes and choose term/session.','warning');return;}
-    const step3=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
-    const targets=[...new Set(step3.length?step3:ticked)];
+    /* V9.5 (#5): the GROUP's own tick-list decides the target classes. */
+    const gcs=[...document.querySelectorAll('.tt-gc:checked')].map(x=>x.value);
+    const targets=[...new Set(gcs.length?gcs:ticked)];
+    if(!targets.length){toast('Tick at least one class for this option group.','warning');return;}
     const subject=subs.join(' / '), teacher=teachers.join(' / ');
+    if(!confirm('Save the option group?\n\nSubjects (one shared slot): '+subject+'\nTeachers: '+teacher+'\nPeriods/week per class: '+ppw+(_gd?'\nDouble periods: '+_gd:'')+'\n\nClasses receiving it ('+targets.length+'):\n• '+targets.join('\n• ')+'\n\nUntick classes above if any do not take this department block.'))return;
     /* V8.5 #1: part-time member? The whole group inherits the restriction. */
     const gpt=!!(document.getElementById('tt-group-pt')||{}).checked;
     const gdays=gpt?[...document.querySelectorAll('.tt-gday:checked')].map(x=>x.value):null;
@@ -748,17 +758,26 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
       const gmaxRaw=(document.getElementById('tt-group-maxp')||{}).value;const gmax=gmaxRaw?Math.max(1,Math.min(12,Number(gmaxRaw)||0)):null;
       let r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:gdays,is_part_time:gpt,available_periods:gPeriods,double_periods:gdbl,max_period:gmax},{onConflict:'class,subject'});
       if(r.error&&/double_periods|max_period/.test(r.error.message||'')){r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:gdays,is_part_time:gpt,available_periods:gPeriods},{onConflict:'class,subject'});if(!r.error&&(gdbl||gmax))toast('Group double periods / early-period rules need the latest SQL update (v9.1+) — saved without them for now.','warning',9000);}
-      if(r.error)err=err||r.error;else ok++;
+      if(r.error)err=err||r.error;else{ok++;
+        try{const nr=await sb.from('timetable_requirements').select('id').eq('class',cls).eq('subject',subject).maybeSingle();if(nr.data){(this._addedIds=this._addedIds||new Set()).add(nr.data.id);}}catch(_){}}
     }
     if(err&&!ok){toast(err.message||err,'danger');return;}
-    toast('🎓 Option group saved for '+ok+' class(es): '+subject+' — one shared slot, '+ppw+'×/week'+(gpt?' · restricted to '+gdays.map(d=>d.slice(0,3)).join('/')+(gPeriods?' (specific periods set)':''):'')+'.','success',9000);
+    /* V9.5 (#5): a clear receipt of exactly what was written where. */
+    openModal('🎓 Option group saved',
+      '<p><b>'+esc(subject)+'</b> now occupies ONE shared weekly slot ('+ppw+'×/week'+(_gd?' incl. '+_gd+' double':'')+') in each of these classes:</p>'+
+      '<ul style="margin:6px 0;padding-left:20px">'+targets.map(t=>'<li><b>'+esc(t)+'</b></li>').join('')+'</ul>'+
+      '<p style="font-size:.85rem;color:var(--gray-600)">Teachers teaching simultaneously: '+esc(teacher)+(gpt?'<br>Restricted to: '+gdays.map(x=>x.slice(0,3)).join('/')+(gPeriods?' (specific periods)':''):'')+'</p>'+
+      '<p style="font-size:.82rem;color:var(--gray-500)">Each class\'s Step-3 summary now lists this group. Remove it per class with its Remove button if needed.</p>',
+      '<button class="btn btn-primary" onclick="closeModal()">OK</button>');
     [...document.querySelectorAll('.tt-gs:checked')].forEach(x=>x.checked=false);
     await this.loadReqs(targets[0]);},
   subjectPicked(){const s=this.val('tt-subject'),auto=document.getElementById('tt-teacher-auto'),wrap=document.getElementById('tt-teacher-wrap');const t=(this.subjectTeachers||{})[s]||'';
     if(!s){if(auto)auto.innerHTML='';if(wrap)wrap.style.display='none';return;}
     if(t){if(auto)auto.innerHTML='👩‍🏫 Mapped teacher: <b>'+esc(t)+'</b> <small style="color:var(--gray-500)">(from the Subjects module — change it there if wrong)</small>';if(wrap)wrap.style.display='none';const th=document.getElementById('tt-teacher');if(th)th.value='';}
     else{if(auto)auto.innerHTML='<span style="color:#b45309">⚠ No teacher mapped to this subject yet — pick one below (and map it in the Subjects module for next time).</span>';if(wrap)wrap.style.display='block';}},
-  updateChecklist(){const c=this.context(),teaching=PC.rows.filter(x=>!x.is_break).length||c.ppd,req=this.reqs.length,total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),capacity=5*(teaching||6),host=document.getElementById('tt-checklist');if(host)host.innerHTML='<b>Setup status:</b> '+(PC.rows.length?'✅ Day schedule':'❌ Day schedule')+' · '+(c.class&&c.term&&c.session?'✅ Context selected':'❌ Pick class/term/session')+' · '+(req?'✅ '+req+' subject demand(s)':'❌ Add subjects')+' · Requested '+total+' / capacity '+capacity;const sum=document.getElementById('tt-summary');if(sum)sum.innerHTML='<b>'+esc(c.class||'No class selected')+'</b> · '+esc(c.term||'No term')+' · '+esc(c.session||'No session')+' · '+req+' subjects · '+total+' requested periods · '+capacity+' weekly slots'+(total>capacity?' <b style="color:#dc2626">OVER CAPACITY</b>':'');},
+  updateChecklist(){const c=this.context(),teaching=PC.rows.filter(x=>!x.is_break).length||c.ppd,req=this.reqs.length,total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),host=document.getElementById('tt-checklist');
+    /* V9.5 (BUG C): capacity respects per-day counts (short Fridays etc.). */
+    const dc=this.collectDayCounts()||{};let capacity=0;['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(day=>{capacity+=Math.min(12,Math.max(0,Number(dc[day]!=null?dc[day]:(teaching||6))||0));});if(host)host.innerHTML='<b>Setup status:</b> '+(PC.rows.length?'✅ Day schedule':'❌ Day schedule')+' · '+(c.class&&c.term&&c.session?'✅ Context selected':'❌ Pick class/term/session')+' · '+(req?'✅ '+req+' subject demand(s)':'❌ Add subjects')+' · Requested '+total+' / capacity '+capacity;const sum=document.getElementById('tt-summary');if(sum)sum.innerHTML='<b>'+esc(c.class||'No class selected')+'</b> · '+esc(c.term||'No term')+' · '+esc(c.session||'No session')+' · '+req+' subjects · '+total+' requested periods · '+capacity+' weekly slots'+(total>capacity?' <b style="color:#dc2626">OVER CAPACITY</b>':'');},
   /* V8.1 #6: changing context/classes ONLY refreshes lists — timetables are
      built exclusively by the Step-4 Generate button, never as a side effect. */
   async contextChanged(){this.fillMulticlass();this.refreshPpdInfo();const first=this.tickedClasses()[0]||'';const sel=document.getElementById('tt-class');if(sel)sel.value=first;if(first)await Promise.all([this.loadReqs(first),this.listBlocks()]);else{this.reqs=[];document.getElementById('tt-reqs').innerHTML='';}this.updateChecklist();},
@@ -772,7 +791,11 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
        subject, updated on every tick, and saving to >1 class asks first. */
     host.innerHTML=(ticked.length?ticked.map(n=>'<label><input type="checkbox" class="tt-mc" value="'+esc(n)+'" checked onchange="TTG.mcBanner()"> '+esc(n)+'</label>').join(''):'<span style="color:var(--gray-500);font-size:.85rem">Tick classes in Step 2 first.</span>')
       +'<div id="tt-mc-banner" style="flex-basis:100%;margin-top:6px"></div>';
-    this.mcBanner();},
+    this.mcBanner();
+    /* V9.5 (#5): mirror the classes into the option-group's OWN tick-list */
+    try{const gh=document.getElementById('tt-group-classes');if(gh){gh.innerHTML=ticked.length?ticked.map(n=>'<label><input type="checkbox" class="tt-gc" value="'+esc(n)+'" checked onchange="TTG.gcBanner()"> '+esc(n)+'</label>').join(''):'<span style="color:var(--gray-500);font-size:.85rem">Tick classes in Step 2 first.</span>';this.gcBanner();}}catch(_){}},
+  gcBanner(){const el=document.getElementById('tt-gc-banner');if(!el)return;const t=[...document.querySelectorAll('.tt-gc:checked')].map(x=>x.value);
+    el.innerHTML=t.length?'<div style="background:'+(t.length>1?'#fef3c7':'#dcfce7')+';border:1px solid '+(t.length>1?'#fcd34d':'#86efac')+';border-radius:8px;padding:5px 10px;font-size:.82rem"><b>'+(t.length>1?'⚠️ Group will be saved to '+t.length+' classes:':'✅ Group saved to ONE class:')+'</b> '+t.map(esc).join(', ')+'</div>':'<div style="color:#b91c1c;font-size:.82rem">No class ticked — the group will not be saved anywhere.</div>';},
   mcBanner(){const el=document.getElementById('tt-mc-banner');if(!el)return;const t=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
     el.innerHTML=t.length?'<div style="background:'+(t.length>1?'#fef3c7':'#dcfce7')+';border:1px solid '+(t.length>1?'#fcd34d':'#86efac')+';border-radius:8px;padding:6px 10px;font-size:.83rem"><b>'+(t.length>1?'⚠️ This subject will be saved to '+t.length+' classes:':'✅ Saving to ONE class:')+'</b> '+t.map(esc).join(', ')+(t.length>1?' — <b>untick</b> the classes that do NOT take it.':'')+'</div>':'<div style="color:#b91c1c;font-size:.83rem">No class ticked — nothing will be saved.</div>';},
   dayToggled(cb){const host=document.getElementById('tt-day-periods');if(!host)return;const id='ttdp-'+cb.value;if(cb.checked){if(!document.getElementById(id)){const w=document.createElement('div');w.id=id;w.style.cssText='margin:4px 0';w.innerHTML='<label style="display:inline-flex;gap:8px;align-items:center">'+cb.value+' periods: <input class="form-input tt-dp" data-day="'+cb.value+'" placeholder="e.g. 1,2,3 (blank = any)" style="width:220px"></label>';host.appendChild(w);}}else{const w=document.getElementById(id);if(w)w.remove();}},
@@ -808,38 +831,100 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
       let r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:days,is_part_time:!!pt,available_periods:dayPeriods,double_periods:dbl,max_period:maxp},{onConflict:'class,subject'});
       if(r.error&&/double_periods|max_period/.test(r.error.message||'')){r=await sb.from('timetable_requirements').upsert({class:cls,subject:subject,teacher:teacher,periods_per_week:ppw,available_days:days,is_part_time:!!pt,available_periods:dayPeriods},{onConflict:'class,subject'});if(!r.error&&(dbl||maxp))toast('Double periods / early-period rules need the latest SQL update (v9.1) — saved without them for now.','warning',9000);}
       if(r.error&&/available_periods/.test(r.error.message||'')){r=await Enterprise.timetable.addRequirement(cls,subject,teacher,ppw,days,pt);}
-      if(r&&r.error){firstErr=firstErr||r.error;}else okCount++;
+      if(r&&r.error){firstErr=firstErr||r.error;}else{okCount++;
+        try{const nr=await sb.from('timetable_requirements').select('id').eq('class',cls).eq('subject',subject).maybeSingle();if(nr.data){(this._addedIds=this._addedIds||new Set()).add(nr.data.id);}}catch(_){}}
     }
     if(firstErr&&!okCount){toast(firstErr.message||firstErr,'danger');return;}
     toast('Demand saved for '+okCount+' class'+(okCount>1?'es':'')+': '+subject+' · '+ppw+'/week · '+teacher+(dayPeriods?' · limited periods set':''),'success',8000);
     if(firstErr)toast('Some classes failed: '+(firstErr.message||firstErr),'warning',8000);
     await this.loadReqs(c.class);},
-  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><p class="help" style="margin:2px 0 8px">Only what YOU add appears here. Seeing subjects you never added? They came from older sample/demo data — remove them individually or use <b>🧹 Clear ALL demand for this class</b> and rebuild the list cleanly. <small>(Sample data no longer re-seeds once this table has rows — v9.2.)</small></p><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Doubles</th><th>Latest period</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td><b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+(Number(x.double_periods||0)?('<b style="color:#7c3aed">'+Number(x.double_periods)+' × double</b>'):'—')+'</td><td>'+(x.max_period?('≤ P'+x.max_period+' 🌅'):'any')+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([d,a])=>d.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="7">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div><div style="margin-top:8px">'+(this.reqs.length?'<button class="btn btn-sm btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="TTG.clearReqs(\''+esc(cls)+'\')">🧹 Clear ALL demand for this class</button>':'')+'</div></div>';this.updateChecklist();},
+  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];
+    /* V9.5 (BUG B): every row now shows its PROVENANCE — 🆕 added in THIS
+       sitting vs 📦 already in the database (with its save date). Old rows
+       from earlier sessions/copies are instantly recognisable instead of
+       looking like mysterious auto-fills. */
+    this._addedIds=this._addedIds||new Set();const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><p class="help" style="margin:2px 0 8px">Only what YOU add appears here. Seeing subjects you never added? They came from older sample/demo data — remove them individually or use <b>🧹 Clear ALL demand for this class</b> and rebuild the list cleanly. <small>(Sample data no longer re-seeds once this table has rows — v9.2.)</small></p><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Doubles</th><th>Latest period</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td>'+(TTG._addedIds&&TTG._addedIds.has(x.id)?'<span title="Added in this sitting" style="background:#dcfce7;color:#166534;border-radius:6px;padding:1px 6px;font-size:.72rem;font-weight:700">🆕 new</span> ':'<span title="Saved earlier — '+esc(String(x.created_at||'').slice(0,10))+'" style="background:var(--gray-100);color:var(--gray-500);border-radius:6px;padding:1px 6px;font-size:.72rem">📦 '+esc(String(x.created_at||'').slice(0,10))+'</span> ')+'<b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+(Number(x.double_periods||0)?('<b style="color:#7c3aed">'+Number(x.double_periods)+' × double</b>'):'—')+'</td><td>'+(x.max_period?('≤ P'+x.max_period+' 🌅'):'any')+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([d,a])=>d.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="7">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div><div style="margin-top:8px">'+(this.reqs.length?'<button class="btn btn-sm btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="TTG.clearReqs(\''+esc(cls)+'\')">🧹 Clear ALL demand for this class</button>':'')+'</div></div>';this.updateChecklist();},
   /* V9.2 (issue 2): one-click removal of stale/seeded demand rows. */
   async clearReqs(cls){if(!confirm('Remove ALL '+this.reqs.length+' subject demand row(s) for '+cls+'?\n\nUse this to wipe old sample data, then add only the subjects you actually teach. Generated timetables are not touched.'))return;
     const r=await sb.from('timetable_requirements').delete().eq('class',cls);
     if(r.error){toast(r.error.message,'danger');return;}
     toast('🧹 All demand rows for '+cls+' removed. Add your real subjects now.','success');await this.loadReqs(cls);},
   async removeReq(id){if(!confirm('Remove this subject demand?'))return;const r=await Enterprise.timetable.removeRequirement(id);if(r.error){toast(r.error.message||r.error,'danger');return;}await this.loadReqs(this.context().class);},
-  validate(){const c=this.context(),total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),capacity=5*c.ppd,missing=this.reqs.filter(x=>!x.teacher);if((!c.class&&!this.tickedClasses().length)||!c.term||!c.session){toast('Tick the classes and choose term/session.','warning');return false;}if(!this.reqs.length){toast('Add at least one subject demand.','warning');return false;}if(total>capacity){toast('Requested '+total+' periods but only '+capacity+' slots exist. Reduce demand or increase periods/day.','danger',9000);return false;}if(missing.length){toast('Every subject must have a teacher.','danger');return false;}toast('✅ Demand is valid: '+total+' of '+capacity+' weekly slots requested.','success');return true;},
+  validate(){const c=this.context(),total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),missing=this.reqs.filter(x=>!x.teacher);
+    /* V9.5 (BUG C): capacity now respects per-day period COUNTS (short
+       Fridays etc.) instead of assuming 5 uniform days. */
+    const dayCounts=this.collectDayCounts()||{};let capacity=0;
+    ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(day=>{capacity+=Math.min(12,Math.max(0,Number(dayCounts[day]!=null?dayCounts[day]:c.ppd)||0));});if((!c.class&&!this.tickedClasses().length)||!c.term||!c.session){toast('Tick the classes and choose term/session.','warning');return false;}if(!this.reqs.length){toast('Add at least one subject demand.','warning');return false;}if(total>capacity){toast('Requested '+total+' periods but only '+capacity+' slots exist. Reduce demand or increase periods/day.','danger',9000);return false;}if(missing.length){toast('Every subject must have a teacher.','danger');return false;}toast('✅ Demand is valid: '+total+' of '+capacity+' weekly slots requested.','success');return true;},
   async generate(){const c=this.context();const classes=this.tickedClasses().length?this.tickedClasses():(c.class?[c.class]:[]);
     if(!classes.length||!c.term||!c.session){toast('Tick at least one class and choose term/session.','warning');return;}
     if(!confirm('Generate/regenerate '+classes.length+' class timetable(s) for '+c.term+' '+c.session+'? Each click produces a FRESH random arrangement; existing generated rows for these classes are replaced.'))return;
-    const dayCounts=this.collectDayCounts();let totPlaced=0,totUnplaced=0,problems=[];
+    const dayCounts=this.collectDayCounts();let totPlaced=0,totUnplaced=0,problems=[];let engineStale=false;
     for(const cls of classes){
       let {data,error}=await sb.rpc('generate_timetable',{p_class:cls,p_session:c.session||'',p_term:c.term||'',p_periods_per_day:Number(c.ppd)||6,p_day_periods:dayCounts});
       if(error&&/p_day_periods|generate_timetable/.test(error.message||'')){({data,error}=await Enterprise.timetable.generate(cls,c.session,c.term,c.ppd));if(dayCounts)toast('Per-day period counts need the latest SQL update — generated with the uniform day length for now.','warning',9000);}
       if(error){problems.push(cls+': '+error.message);continue;}
       if(!data||data.ok===false){problems.push(cls+': '+((data&&data.error)||'failed'));continue;}
+      /* V9.5 (BUG A — the real reason "doubles keep missing"): the database can
+         run an OLDER engine than this page. The v9.4+ engine returns
+         engine:'9.5'; anything else means the school never ran the latest SQL
+         and doubles/ghost-guards silently didn't apply. Detect and SAY it. */
+      if(data.engine!=='9.5')engineStale=true;
       totPlaced+=Number(data.placed||0);totUnplaced+=Number(data.unplaced||0);
       (data.unplaced_items||[]).forEach(x=>problems.push(cls+': '+x.subject+' — '+(x.teacher||'')+' ('+x.reason+')'));
     }
+    if(engineStale)openModal('⚠️ Database engine is OUTDATED',
+      '<p>The timetable was generated by an <b>older database engine</b> — that is exactly why double periods can be missing and why stale subjects can slip in.</p>'+
+      '<p><b>Fix (one time, 2 minutes):</b> run <code>database/v9.4-fees-and-exams.sql</code> (or the full <code>complete-schema.sql</code>) in the Supabase SQL Editor, then click Generate again.</p>'+
+      '<p style="font-size:.85rem;color:var(--gray-600)">The modern engine places ALL double periods first (two-phase), enforces part-time teacher periods, and only ever places subjects you added for each class.</p>',
+      '<button class="btn btn-primary" onclick="closeModal()">OK — I will run the SQL</button>');
+    /* V9.5 (BUG D): post-generation RECONCILIATION — verify the grid matches
+       the demand for every class; surface ghosts + missing doubles with fixes. */
+    try{await this.reconcile(classes,c);}catch(_){}
     toast('⚙️ '+classes.length+' class(es) generated · '+totPlaced+' periods placed'+(totUnplaced?' · '+totUnplaced+' unplaced':'')+'. Click again any time for a different random arrangement.',totUnplaced||problems.length?'warning':'success',10000);
     if(window.App&&App.logActivity)App.logActivity('generate','timetable',classes.join(',')+'|'+c.term+'|'+c.session);
     await this.grid(this.val('tt-class')||classes[0]);
     await this.masterGrid(classes);
     await this.teacherGrids(classes);
     if(problems.length)openModal('Timetable needs attention','<ul>'+problems.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>');},
+  /* ===== V9.5 (BUG D): POST-GENERATION AUDIT =====
+     For every generated class: compare what the grid CONTAINS with what the
+     demand table ORDERED. Reports (a) 👻 ghost subjects (in the grid but never
+     demanded — stale manual rows or leftovers) with one-click removal, and
+     (b) missing double periods (demanded doubles that found no adjacent pair).
+     Runs automatically after Generate; renders into #tt-audit. */
+  async reconcile(classes,c){
+    let host=document.getElementById('tt-audit');
+    if(!host){host=document.createElement('div');host.id='tt-audit';const g=document.getElementById('tt-grid');if(g&&g.parentNode)g.parentNode.insertBefore(host,g);else return;}
+    const req=await sb.from('timetable_requirements').select('class,subject,double_periods,periods_per_week').in('class',classes);
+    const tt=await sb.from('timetable').select('class,subject').in('class',classes).eq('session',c.session||'').eq('term',c.term||'');
+    if(req.error||tt.error){host.innerHTML='';return;}
+    const issues=[];this._ghosts={};
+    for(const cls of classes){
+      const demanded=new Set();(req.data||[]).filter(r=>r.class===cls).forEach(r=>{demanded.add(r.subject);String(r.subject).split('/').map(x=>x.trim()).forEach(s=>demanded.add(s));});
+      const placed=(tt.data||[]).filter(t=>t.class===cls&&t.subject&&!/^⛔/.test(t.subject));
+      /* 👻 ghosts */
+      const ghosts=[...new Set(placed.map(t=>String(t.subject).replace(/\s*\(double\)$/,'').trim()).filter(s=>s&&!demanded.has(s)))];
+      if(ghosts.length){this._ghosts[cls]=ghosts;issues.push('<li><b>'+esc(cls)+'</b>: 👻 in the grid but NOT in this class\'s demand: <b>'+ghosts.map(esc).join(', ')+'</b> — leftover manual/stale rows. <button class="btn btn-sm btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="TTG.removeGhosts(\''+esc(cls)+'\')">🧹 Remove these rows</button></li>');}
+      /* missing doubles */
+      (req.data||[]).filter(r=>r.class===cls&&Number(r.double_periods||0)>0).forEach(r=>{
+        const got=placed.filter(t=>t.subject===r.subject+' (double)').length;
+        const want=Number(r.double_periods)*2;
+        if(got<want)issues.push('<li><b>'+esc(cls)+'</b>: <b>'+esc(r.subject)+'</b> asked for '+r.double_periods+' double(s) but only '+Math.floor(got/2)+' fitted — free up adjacent slots (reduce other demand, raise periods/day, or relax its "latest period" cap) and regenerate.</li>');});
+    }
+    host.innerHTML=issues.length?'<div class="card" style="border-color:#fca5a5;background:#fef2f2;margin-bottom:12px"><h3 style="margin-top:0">🔎 Post-generation audit — '+issues.length+' finding(s)</h3><ul style="margin:0;padding-left:18px;font-size:.87rem;line-height:1.8">'+issues.join('')+'</ul></div>'
+      :'<div class="card" style="border-color:#86efac;background:#f0fdf4;margin-bottom:12px"><b>✅ Post-generation audit passed:</b> every class\'s grid contains exactly the subjects you demanded, and all requested double periods were placed.</div>';
+  },
+  async removeGhosts(cls){
+    const ghosts=(this._ghosts||{})[cls]||[];if(!ghosts.length)return;
+    if(!confirm('Remove ALL grid rows for these non-demanded subjects in '+cls+'?\n\n• '+ghosts.join('\n• ')))return;
+    const c=this.context();let removed=0;
+    for(const g of ghosts){
+      const r=await sb.from('timetable').delete().eq('class',cls).eq('session',c.session||'').eq('term',c.term||'').in('subject',[g,g+' (double)']);
+      if(!r.error)removed++;
+    }
+    toast('🧹 Ghost rows removed for '+removed+' subject(s) in '+cls+'.','success');
+    await this.grid(cls);await this.reconcile(this.tickedClasses().length?this.tickedClasses():[cls],c);
+  },
   /* V8.0 #5: COMBINED master timetable — every ticked class side by side,
      days as rows and periods as columns (#8), breaks shown from Step 1. */
   async masterGrid(classes){const host=document.getElementById('tt-master');if(!host)return;const c=this.context();
