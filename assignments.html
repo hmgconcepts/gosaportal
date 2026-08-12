@@ -520,17 +520,32 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div id="ap-my-points" style="margin-top:8px"><span class="pulse">Loading your points…</span></div>
       </div>
       <div class="card" style="margin-top:16px" data-staff-only>
-        <h3>🏅 Assignment points → Report card</h3>
-        <p class="help">Score any assignment per student (✍️ Score class). Every scored assignment for the same class + subject + term ACCUMULATES; the running totals below can be pushed into any report-card column in one click (scaled to the column's maximum mark).</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
-          <div class="form-group"><label>Class</label><select class="form-select" id="ap-class"><option value="">— class —</option></select></div>
-          <div class="form-group"><label>Subject</label><select class="form-select" id="ap-subject"><option value="">— subject —</option></select></div>
-          <button class="btn btn-outline" onclick="AP.totals()">Σ Show accumulated totals</button>
-          <button class="btn btn-outline" onclick="AP.matrix()" data-staff-only title="Every assignment as a column, every student as a row — the full term's collation sheet">📋 Term score sheet</button>
-          <button class="btn btn-outline" onclick="AP.quickAssignment()" data-staff-only title="Record a physical/paper assignment and score it immediately">➕ Quick physical assignment</button>
-          <button class="btn btn-primary" onclick="AP.pushModal()" data-staff-only>🚀 Push totals → Report card</button>
-          <button class="btn btn-outline" onclick="AP.pullCBT()" data-staff-only title="Import CBT-assignment results into the accumulated totals">🖥️ Pull CBT assignment scores</button>
+        <h3>🏅 Assignment Points Workbench — from scores to report card</h3>
+        <!-- V9.2 (issue 4): a numbered workflow so ANY teacher/admin can follow it
+             without training. Physical + CBT scores meet in ONE score sheet. -->
+        <div style="background:var(--gray-100);border-radius:12px;padding:10px 14px;margin:4px 0 12px;font-size:.85rem;line-height:1.8">
+          <b>How it works (4 steps):</b><br>
+          <b>1️⃣ Pick class + subject</b> below — everything on this workbench applies to that pair for the CURRENT term.<br>
+          <b>2️⃣ Get scores in</b> — three ways, mix freely:
+          <span style="display:inline-block;margin-left:8px">📄 <b>Physical/paper work</b> → <i>➕ Quick physical assignment</i> (records it and opens the class scoring sheet immediately) · ✍️ <i>Score class</i> on any existing assignment row above · 🖥️ <b>CBT assignments</b> → <i>Pull CBT scores</i> (imports auto-marked results; put the word “Assignment” in the CBT title).</span><br>
+          <b>3️⃣ Review</b> — <i>📋 Term score sheet</i> shows EVERY assignment (physical AND CBT side by side) per student with totals & %; print it or export CSV. <i>Σ Totals</i> is the condensed per-student view.<br>
+          <b>4️⃣ Push</b> — <i>🚀 Push totals → Report card</i> writes each student's percentage into any report-card column, scaled to that column's max mark. Done.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;padding:8px;border:2px solid var(--gray-200);border-radius:12px;background:#fff">
+          <span style="font-weight:800;color:var(--primary);align-self:center">1️⃣</span>
+          <div class="form-group" style="margin:0"><label>Class</label><select class="form-select" id="ap-class" onchange="if(this.value&&document.getElementById('ap-subject').value)AP.matrix()"><option value="">— class —</option></select></div>
+          <div class="form-group" style="margin:0"><label>Subject</label><select class="form-select" id="ap-subject" onchange="if(this.value&&document.getElementById('ap-class').value)AP.matrix()"><option value="">— subject —</option></select></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px">
+          <span style="font-weight:800;color:var(--primary)">2️⃣</span>
+          <button class="btn btn-primary" onclick="AP.quickAssignment()" data-staff-only title="Record a physical/paper assignment and score it immediately">➕ Quick physical assignment</button>
+          <button class="btn btn-outline" onclick="AP.pullCBT()" data-staff-only title="Import CBT-assignment results into the same score sheet">🖥️ Pull CBT scores</button>
           <a class="btn btn-outline" href="cbt.html" data-staff-only title="Create an automated CBT assignment — its scores can be pulled here">＋ Create CBT assignment</a>
+          <span style="font-weight:800;color:var(--primary);margin-left:10px">3️⃣</span>
+          <button class="btn btn-primary" onclick="AP.matrix()" data-staff-only title="Every assignment (physical + CBT) as a column, every student as a row">📋 Term score sheet</button>
+          <button class="btn btn-outline" onclick="AP.totals()">Σ Totals only</button>
+          <span style="font-weight:800;color:var(--primary);margin-left:10px">4️⃣</span>
+          <button class="btn btn-primary" onclick="AP.pushModal()" data-staff-only>🚀 Push totals → Report card</button>
         </div>
         <div id="ap-totals" style="margin-top:10px"></div>
       </div>
@@ -641,7 +656,8 @@ const AP={
       const {error}=await sb.from('assignment_scores').insert(row);
       if(!error)saved++;
     }
-    toast('🖥️ Pulled '+saved+' CBT assignment result(s) into the accumulated totals. Click Σ to refresh.',saved?'success':'warning',9000);
+    toast('🖥️ Pulled '+saved+' CBT assignment result(s) — they now sit beside the physical assignments in the score sheet.',saved?'success':'warning',9000);
+    if(saved)this.matrix(); /* V9.2 (issue 4): physical + CBT together, no extra click */
   },
   async scoreModal(assignmentId){
     if(!window.sb){toast('Database not configured','warning');return;}
@@ -680,6 +696,7 @@ const AP={
     const r=await sb.from('assignment_scores').upsert(rows,{onConflict:'assignment_id,student_id'});
     if(r.error){toast(/assignment_scores/.test(r.error.message)?'Run database/v8.4-assignment-dl-points.sql (or the latest complete-schema.sql) first.':r.error.message,'danger',9000);return;}
     closeModal();toast('💾 Saved '+rows.length+' score(s). They now count in the accumulated totals.','success',7000);
+    try{if(this._matrix)this.matrix();}catch(_){ } /* live-refresh the open score sheet */
   },
   async totals(){
     const cls=(document.getElementById('ap-class')||{}).value,sub=(document.getElementById('ap-subject')||{}).value;
@@ -712,14 +729,14 @@ const AP={
     let titles={};
     if(aids.length){const ar=await sb.from('assignments').select('id,title,due_date').in('id',aids);(ar.data||[]).forEach(a=>titles[a.id]=a.title||'Assignment');}
     const colKeys=[...new Set(scores.map(x=>x.assignment_id||'cbt-pull'))];
-    const colLabel=k=>k==='cbt-pull'?'CBT pulls':(titles[k]||'Assignment');
+    const colLabel=k=>k==='cbt-pull'?'🖥️ CBT assignments':(titles[k]?'📄 '+titles[k]:'📄 Assignment');
     /* rows: full class register so unscored students are visible too */
     const studs=(await sb.from('students').select('id,full_name,admission_no').eq('class',cls).order('full_name')).data||[];
     const byStud={};scores.forEach(x=>{const k=String(x.student_id);(byStud[k]=byStud[k]||{}); const ck=x.assignment_id||'cbt-pull'; (byStud[k][ck]=byStud[k][ck]||{got:0,max:0}); byStud[k][ck].got+=Number(x.score)||0; byStud[k][ck].max+=Number(x.max_score)||0;});
     let h='<div class="table-wrap" id="ap-matrix-print"><h4 style="margin:6px 0">📋 Term score sheet · '+AP.esc(cls)+' · '+AP.esc(sub)+(cp.term?' · '+AP.esc(cp.term):'')+(cp.session?' · '+AP.esc(cp.session):'')+'</h4><table><thead><tr><th>Student</th>'+colKeys.map(k=>'<th style="font-size:.75rem">'+AP.esc(colLabel(k)).slice(0,24)+'</th>').join('')+'<th>Total</th><th>%</th></tr></thead><tbody>';
     studs.forEach(s0=>{const row=byStud[String(s0.id)]||{};let got=0,max=0;
       h+='<tr><td><b>'+AP.esc(s0.full_name)+'</b><br><small>'+AP.esc(s0.admission_no||'')+'</small></td>'+colKeys.map(k=>{const c=row[k];if(c){got+=c.got;max+=c.max;return '<td>'+c.got+'/'+c.max+'</td>';}return '<td style="color:var(--gray-400)">—</td>';}).join('')+'<td><b>'+got+' / '+max+'</b></td><td><b>'+(max?Math.round(got/max*1000)/10:0)+'%</b></td></tr>';});
-    h+='</tbody></table></div><div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="AP.printMatrix()">🖨️ Print score sheet</button><button class="btn btn-outline btn-sm" onclick="AP.exportMatrixCSV()">⬇ CSV</button></div>';
+    h+='</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">📄 = physical/manual assignment · 🖥️ = auto-marked CBT assignment (via Pull CBT). Both accumulate into the same Total and %.</p><div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="AP.printMatrix()">🖨️ Print score sheet</button><button class="btn btn-outline btn-sm" onclick="AP.exportMatrixCSV()">⬇ CSV</button><button class="btn btn-primary btn-sm" onclick="AP.pushModal()">🚀 Push totals → Report card</button></div>';
     this._matrix={studs:studs,byStud:byStud,colKeys:colKeys,colLabel:colLabel,cls:cls,sub:sub,cp:cp};
     box.innerHTML=h;
   },
@@ -754,7 +771,13 @@ const AP={
     if(window.CRUD)CRUD.renderList('assignments');
   },
   async pushModal(){
-    if(!this._totals||!this._totals.list.length){toast('Click Σ Show accumulated totals first (pick class + subject).','warning');return;}
+    /* V9.2: the score sheet counts too — no need to click Σ first. */
+    if((!this._totals||!this._totals.list.length)&&this._matrix){
+      const m=this._matrix;const list=[];
+      m.studs.forEach(s0=>{const row=m.byStud[String(s0.id)]||{};let got=0,max=0;Object.values(row).forEach(c=>{got+=c.got;max+=c.max;});if(max>0)list.push({name:s0.full_name,ref:s0.admission_no||'',sid:s0.id,got:got,max:max,n:Object.keys(row).length});});
+      if(list.length)this._totals={list:list,cls:m.cls,sub:m.sub,cp:m.cp};
+    }
+    if(!this._totals||!this._totals.list.length){toast('Open 📋 Term score sheet or Σ Totals first (pick class + subject).','warning');return;}
     let cols=[];
     try{if(window.ReportEngine&&ReportEngine.reportPickerOptions){const p=await ReportEngine.reportPickerOptions();cols=p.columns||[];}}catch(_){ }
     if(!cols.length&&window.sb){try{const cr=await sb.from('assessment_columns').select('id,name,max_mark').order('position').limit(500);const seen=new Set();(cr.data||[]).forEach(c=>{const k=String(c.name||'').toLowerCase();if(!k||seen.has(k))return;seen.add(k);cols.push(c);});}catch(_){ }}

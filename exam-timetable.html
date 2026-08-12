@@ -489,7 +489,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div class="app-content">
       
       <div class="card" style="margin-bottom:16px;background:#fef3c7;border-color:#fcd34d"><h3 style="margin-top:0">🗓️ Examination Timetable</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">The official exam schedule for the selected term. Staff/admin build it below (manually or with the ⚡ auto-spread helper); students and parents see their class's papers with dates, times, venues and invigilators. Clashes (same class, same date+time) are detected automatically.</p></div>
-      <div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+      <div class="card" style="margin-bottom:16px"><div id="ex-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
         <div class="form-group"><label>Class</label><select class="form-select" id="ex-class" onchange="EXT.load()"><option value="">All classes</option></select></div>
         <div class="form-group"><label>Term</label><select class="form-select" id="ex-term"><option>First Term</option><option>Second Term</option><option>Third Term</option></select></div>
         <div class="form-group"><label>Session</label><input class="form-input" id="ex-session" placeholder="e.g. 2026/2027" style="width:130px"></div>
@@ -536,7 +536,22 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
    auto-spread (one paper per subject over a date range, morning/afternoon
    slots, weekends skipped) · per-class landing for students/parents · print. */
 const EXT={
+  canEdit:false,
+  /* V9.2 (issue 6): editing = admin tier OR explicitly authorized editor
+     (sc_module_editors, granted on the Timetable Wizard). Others read-only. */
+  async resolveEdit(){try{
+    for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+    const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+    const isAdmin=!!(window.App&&App.isAdminRole&&App.isAdminRole(role));
+    if(isAdmin){this.canEdit=true;}
+    else{
+      try{const r=await sb.rpc('sc_can_edit',{p_module:'timetable'});this.canEdit=!!(r&&r.data===true);}
+      catch(_){this.canEdit=false;}
+    }
+    if(!this.canEdit)document.querySelectorAll('#ex-actions [data-staff-only]').forEach(el=>el.style.display='none');
+  }catch(_){}},
   async init(){
+    this.resolveEdit();
     try{const {data}=await sb.from('classes').select('name').order('name');const sel=document.getElementById('ex-class');(function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();}catch(e){}
     try{const cp=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();if(cp.data){if(cp.data.term)document.getElementById('ex-term').value=cp.data.term;if(cp.data.session)document.getElementById('ex-session').value=cp.data.session;}}catch(e){}
     /* students/parents land on their own class */
@@ -561,7 +576,7 @@ const EXT={
     if(!rows.length){box.innerHTML='<div class="card">No exam papers scheduled yet'+(c.cls?' for '+esc(c.cls):'')+'. Staff can add papers or use ⚡ Auto-spread.</div>';return;}
     /* group by date */
     const dates=[...new Set(rows.map(r=>r.exam_date))].sort();
-    const isStaff=window.App&&App.isStaffRole&&App.isStaffRole(App.currentRole);
+    const isStaff=this.canEdit; /* V9.2: row edit buttons only for authorized editors */
     let h='<div class="card" id="ex-print-area"><h2 style="text-align:center">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center">EXAMINATION TIMETABLE'+(c.cls?' · '+esc(c.cls):'')+(c.term?' · '+esc(c.term):'')+(c.session?' · '+esc(c.session):'')+'</h3>';
     dates.forEach(dt=>{const day=new Date(dt+'T12:00:00');const dn=day.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
       h+='<h4 style="margin:14px 0 6px;border-bottom:2px solid var(--gray-200);padding-bottom:4px">📅 '+esc(dn)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th>'+(c.cls?'':'<th>Class</th>')+'<th>Subject</th><th>Paper</th><th>Venue</th><th>Invigilator</th>'+(isStaff?'<th></th>':'')+'</tr></thead><tbody>';
@@ -585,13 +600,15 @@ const EXT={
   addModal(){openModal('Add exam paper',this.formHtml(null),'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.save()">💾 Save paper</button>');this.fillSubjects();},
   async edit(id){const r=(this.rows||[]).find(x=>x.id===id);if(!r)return;this._editing=id;openModal('Edit exam paper',this.formHtml(r),'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.save(\''+id+'\')">💾 Save changes</button>');this.fillSubjects();},
   async save(id){const c=this.ctx();
+    if(!this.canEdit){toast('Only the admin or an authorized timetable editor can modify the exam timetable.','warning',7000);return;}
     const row={class:document.getElementById('exf-class').value,subject:(document.getElementById('exf-subject').value||'').trim(),exam_date:document.getElementById('exf-date').value,start_time:document.getElementById('exf-start').value,end_time:document.getElementById('exf-end').value,paper:(document.getElementById('exf-paper').value||'').trim(),venue:(document.getElementById('exf-venue').value||'').trim(),invigilator:(document.getElementById('exf-inv').value||'').trim(),notes:(document.getElementById('exf-notes').value||'').trim(),term:c.term,session:c.session};
     if(!row.class||!row.subject||!row.exam_date){toast('Class, subject and date are required.','warning');return;}
     if(row.end_time<=row.start_time){toast('End time must be after start time.','warning');return;}
     const r=id?await sb.from('exam_timetable').update(row).eq('id',id):await sb.from('exam_timetable').insert(row);
     if(r.error){toast(r.error.message,'danger',8000);return;}
     closeModal();toast('💾 Exam paper saved.','success');this.load();},
-  async del(id){if(!confirm('Remove this exam paper?'))return;const r=await sb.from('exam_timetable').delete().eq('id',id);if(r.error){toast(r.error.message,'danger');return;}toast('Removed.','success');this.load();},
+  async del(id){if(!this.canEdit){toast('Only the admin or an authorized timetable editor can modify the exam timetable.','warning',7000);return;}
+    if(!confirm('Remove this exam paper?'))return;const r=await sb.from('exam_timetable').delete().eq('id',id);if(r.error){toast(r.error.message,'danger');return;}toast('Removed.','success');this.load();},
   autoModal(){const c=this.ctx();
     openModal('⚡ Auto-spread subjects into an exam timetable',
       '<p style="font-size:.85rem;color:var(--gray-600)">One paper per subject for the selected class(es), spread across the date range. Weekends are skipped; each day gets a morning slot and (optionally) an afternoon slot. Review and adjust afterwards — existing papers for the class/term/session are replaced.</p>'+
@@ -603,17 +620,32 @@ const EXT={
       '<div class="form-group"><label>Default venue</label><input class="form-input" id="exa-venue" placeholder="e.g. Main Hall"></div></div>',
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.autoRun()">⚡ Build timetable</button>');},
   async autoRun(){const c=this.ctx();
+    if(!this.canEdit){toast('Only the admin or an authorized timetable editor can build the exam timetable.','warning',7000);return;}
     const clsPick=document.getElementById('exa-class').value,start=document.getElementById('exa-start').value,venue=(document.getElementById('exa-venue').value||'').trim();
     const mm=(document.getElementById('exa-m').value||'').match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
     const aa=(document.getElementById('exa-a').value||'').match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);
     if(!start||!mm){toast('Pick the first exam day and a valid morning slot like 09:00-11:00.','warning');return;}
     const classes=clsPick==='__ALL__'?[...document.getElementById('ex-class').options].map(o=>o.value).filter(Boolean):[clsPick];
-    const subj=await sb.from('subjects').select('name,class').order('name');
+    /* V9.2 FIX: subjects has NO class column (it has level/department) — the old
+       query 'select name,class' failed with "column subjects.class does not exist".
+       Better source of truth: the class's own subject demand (timetable_requirements)
+       — exactly the subjects the class actually takes, option groups split into
+       their member subjects. Fallback: published timetable rows, then ALL subjects. */
+    const subj=await sb.from('subjects').select('name,level').order('name');
     if(subj.error){toast(subj.error.message,'danger');return;}
+    const reqAll=await sb.from('timetable_requirements').select('class,subject');
+    const ttAll=await sb.from('timetable').select('class,subject').limit(4000);
     let made=0;
     for(const cls of classes){
-      let subjects=[...new Set((subj.data||[]).filter(s=>!s.class||s.class===cls).map(s=>s.name))];
-      if(!subjects.length)subjects=[...new Set((subj.data||[]).map(s=>s.name))];
+      let subjects=[];
+      /* 1st choice: the class's registered subject demand */
+      (reqAll.data||[]).filter(r=>r.class===cls).forEach(r=>{String(r.subject||'').split('/').map(x=>x.trim()).filter(Boolean).forEach(s=>{if(!subjects.includes(s))subjects.push(s);});});
+      /* 2nd choice: subjects already on the class's published timetable */
+      if(!subjects.length)(ttAll.data||[]).filter(r=>r.class===cls&&r.subject&&!/^⛔/.test(r.subject)).forEach(r=>{const s=String(r.subject).replace(/\s*\(double\)$/,'').trim();if(s&&!subjects.includes(s))subjects.push(s);});
+      /* 3rd choice: level-matched subjects (e.g. JSS-level for a JSS class), else all */
+      if(!subjects.length){const lvl=(cls.match(/^[A-Za-z]+/)||[''])[0].toUpperCase();
+        subjects=[...new Set((subj.data||[]).filter(s=>!s.level||String(s.level).toUpperCase().indexOf(lvl)>-1).map(s=>s.name))];
+        if(!subjects.length)subjects=[...new Set((subj.data||[]).map(s=>s.name))];}
       if(!subjects.length)continue;
       await sb.from('exam_timetable').delete().eq('class',cls).eq('term',c.term).eq('session',c.session);
       const slots=[[mm[1],mm[2]]];if(aa)slots.push([aa[1],aa[2]]);
