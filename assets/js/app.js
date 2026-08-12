@@ -1233,6 +1233,56 @@ const App = {
     if (App['load_' + path]) App['load_' + path]();
   },
 
+  /* V9.4 (#1/#8): CURRENT-TERM SCHOOL FEES — bold on parent/student dashboards.
+     Uses the sc_student_fee_state RPC (bill from the class fee structure,
+     paid this term, arrears from previous terms with the full breakdown).
+     Renders into #dash-fees; parents get one panel per linked child with a
+     🧾 receipt-history + print link. */
+  async loadDashFees() {
+    const box = document.getElementById('dash-fees');
+    if (!box || !window.sb) return;
+    try {
+      for (let i = 0; i < 25 && !(window.SC_PROFILE && SC_PROFILE.role); i++) await new Promise(r => setTimeout(r, 200));
+      const role = String((window.SC_PROFILE || {}).role || '').toLowerCase();
+      let studs = [];
+      if (role === 'student') {
+        const r = await sb.from('students').select('id,full_name').eq('user_id', SC_PROFILE.id);
+        studs = r.data || [];
+      } else if (role === 'parent') {
+        const l = await sb.from('parent_child').select('student_id').eq('parent_id', SC_PROFILE.id);
+        const ids = (l.data || []).map(x => x.student_id);
+        if (ids.length) { const st = await sb.from('students').select('id,full_name').in('id', ids); studs = st.data || []; }
+      } else return;
+      if (!studs.length) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">No linked student record yet — fees appear here once the admin links the account.</p>'; return; }
+      const money = (cur, n) => cur + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+      let h = '';
+      for (const s of studs) {
+        const r = await sb.rpc('sc_student_fee_state', { p_student: s.id });
+        if (r.error) { h += '<p style="color:var(--gray-500);font-size:.85rem">Fee summary needs the v9.4 database update.</p>'; break; }
+        const f = r.data || {};
+        if (f.ok === false) continue;
+        const cur = f.currency || '₦';
+        const owingNow = Number(f.balance || 0), arrears = Number(f.arrears || 0), totalDue = Number(f.total_due || 0);
+        h += '<div style="border:2px solid ' + (totalDue > 0 ? '#fca5a5' : '#86efac') + ';border-radius:14px;padding:14px;margin-bottom:12px;background:' + (totalDue > 0 ? '#fef2f2' : '#f0fdf4') + '">' +
+          '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline">' +
+          '<b style="font-size:1.02rem">' + esc(s.full_name) + (f.class ? ' · ' + esc(f.class) : '') + '</b>' +
+          '<span style="font-size:.8rem;color:var(--gray-500)">' + esc(f.term || '') + (f.session ? ' · ' + esc(f.session) : '') + '</span></div>' +
+          '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px">' +
+          '<div><div style="font-size:1.5rem;font-weight:900;color:#0f172a">' + money(cur, f.bill) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Total fees this term</div></div>' +
+          '<div><div style="font-size:1.5rem;font-weight:900;color:#15803d">' + money(cur, f.paid) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Paid</div></div>' +
+          '<div><div style="font-size:1.5rem;font-weight:900;color:' + (owingNow > 0 ? '#b91c1c' : '#15803d') + '">' + money(cur, owingNow) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Balance this term</div></div>' +
+          (arrears > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, arrears) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Previous terms owing</div></div>' : '') +
+          (totalDue > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, totalDue) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#b91c1c">TOTAL OUTSTANDING</div></div>' : '<div style="align-self:center;font-weight:800;color:#15803d">✅ Fully paid</div>') +
+          '</div>';
+        const br = f.breakdown || [];
+        if (br.length) h += '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">📋 Fee breakdown</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + br.map(b => '<tr><td style="padding:2px 6px">' + esc(b.item) + '</td><td style="padding:2px 6px;text-align:right"><b>' + money(cur, b.amount) + '</b></td></tr>').join('') + '<tr><td style="padding:4px 6px;border-top:1px solid var(--gray-300)"><b>Total</b></td><td style="padding:4px 6px;text-align:right;border-top:1px solid var(--gray-300)"><b>' + money(cur, f.bill) + '</b></td></tr></table></details>';
+        const ar = f.arrears_rows || [];
+        if (ar.length) h += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:#b91c1c">🧮 Previous terms owing — breakdown</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + ar.map(a => '<tr><td style="padding:2px 6px">' + esc(a.term) + ' ' + esc(a.session) + '</td><td style="padding:2px 6px;text-align:right">billed <b>' + money(cur, a.bill) + '</b> · paid ' + money(cur, a.paid) + ' · owing <b style="color:#b91c1c">' + money(cur, a.owing) + '</b></td></tr>').join('') + '</table></details>';
+        h += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm btn-outline" href="fees.html">🧾 Payment history & e-receipts</a>' + (role === 'parent' ? '<a class="btn btn-sm btn-outline" href="payments_online.html">💳 Pay online</a>' : '') + '</div></div>';
+      }
+      box.innerHTML = h || '<p style="color:var(--gray-500);font-size:.85rem">No fee structure has been published for the class yet.</p>';
+    } catch (e) { box.innerHTML = ''; }
+  },
   /* V9.2: upcoming exam papers for MY classes (student = own class, parent =
      children's classes, staff/admin = whole school preview). Renders into any
      #dash-exam-tt container on the page; silently skips when absent. */
@@ -1260,7 +1310,8 @@ const App = {
       let h = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th>' + (classes.length === 1 ? '' : '<th>Class</th>') + '<th>Subject</th><th>Venue</th></tr></thead><tbody>';
       rows.slice(0, 10).forEach(x => {
         const dt = new Date(x.exam_date + 'T12:00:00');
-        h += '<tr><td><b>' + dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) + '</b></td><td>' + esc(x.start_time) + '–' + esc(x.end_time) + '</td>' + (classes.length === 1 ? '' : '<td>' + esc(x.class) + '</td>') + '<td><b>' + esc(x.subject) + '</b>' + (x.paper ? '<br><small>' + esc(x.paper) + '</small>' : '') + '</td><td>' + esc(x.venue || '—') + '</td></tr>';
+        const dLabel = (x.day_no != null && x.day_no !== '') ? ('Day ' + x.day_no) : dt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        h += '<tr><td><b>' + dLabel + '</b></td><td>' + esc(x.start_time) + '–' + esc(x.end_time) + '</td>' + (classes.length === 1 ? '' : '<td>' + esc(x.class) + '</td>') + '<td><b>' + esc(x.subject) + '</b>' + (x.paper ? '<br><small>' + esc(x.paper) + '</small>' : '') + '</td><td>' + esc(x.venue || '—') + '</td></tr>';
       });
       h += '</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">' + rows.length + ' upcoming paper(s) · <a href="exam-timetable.html">full exam timetable →</a></p>';
       box.innerHTML = h;
@@ -1392,6 +1443,7 @@ const App = {
              Fills #dash-exam-tt with the linked child(ren)'s / own class's next
              papers; the container only exists in the parent/student sections. */
           try { App.loadDashExamTT(); } catch (e) {}
+          try { App.loadDashFees(); } catch (e) {}
           /* V7.8 #3 EDUCATOR DIGEST: "Action needed today" strip — pending
              account approvals, unresolved complaints, pending leave requests,
              open helpdesk tickets, today's birthdays and unapplied promotion

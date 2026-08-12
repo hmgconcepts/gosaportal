@@ -197,28 +197,75 @@ const DriveSync = {
     const last = this.cfg.lastBackup ? Date.parse(this.cfg.lastBackup) : 0;
     return (Date.now() - last) >= this.cfg.days * 86400000;
   },
-  async autoSyncCheck() {
+  /* V9.4 (#11) TRULY AUTOMATIC SYNC. Why manual backups were still needed:
+       (a) one failed attempt froze retries for 6 HOURS — a single popup-blocked
+           silent token on the day's first visit killed the whole day's backup;
+       (b) a silent-grant failure quit for good instead of asking ONCE;
+       (c) overdue-ness didn't change behaviour — day 1 late and day 20 late
+           were treated the same. All three fixed:
+       • retry interval now scales with urgency: 30 min when overdue (was 6 h);
+       • if the silent grant fails but the backup is DUE and the tab is
+         focused, ONE interactive consent prompt is allowed per day — the
+         admin clicks "Allow" a single time and Drive backups flow again;
+       • a persistent red banner appears when backups are ≥2 cycles overdue
+         so the failure mode is loudly visible instead of a silent gap;
+       • re-checks on tab refocus (not just first load). */
+  async autoSyncCheck(fromFocus) {
     try {
       if (!this.sb() || !window.DataPortability) return;
       if (window.SCHOOL && window.SCHOOL.demo && window.SCHOOL.demo.enabled) return;   // never auto-sync the public demo
       if (!this.isPrivileged()) return;
       await this.loadCfg();
-      if (!this.cfg.clientId || !this.due()) return;
+      if (!this.cfg.clientId || !this.due()) { this.overdueBanner(false); return; }
       const st = this.state();
-      if (st.lastAttempt && Date.now() - st.lastAttempt < 6 * 3600000) return;         // one attempt per 6h per device
+      const last = this.cfg.lastBackup ? Date.parse(this.cfg.lastBackup) : 0;
+      const overdueFactor = last ? (Date.now() - last) / (this.cfg.days * 86400000) : 2;
+      const retryMs = overdueFactor >= 1 ? 30 * 60000 : 6 * 3600000;                   // urgent → every 30 min
+      if (st.lastAttempt && Date.now() - st.lastAttempt < retryMs) return;
       this.setState({ lastAttempt: Date.now() });
-      if (!st.granted) {                                                               // this browser never authorised Google
-        if (typeof toast === 'function') toast('☁️ A scheduled Google Drive backup is due. Open Admin Data → Google Drive Backup and click “Back up now”.', 'info', 9000);
+      try {
+        const r = await this.backupNow({ interactive: false });                        // silent token first
+        this.setState({ granted: true, lastAutoOk: Date.now(), interactiveAskDay: '' });
+        this.overdueBanner(false);
+        if (typeof toast === 'function') toast('☁️ Automatic Google Drive backup completed — ' + r.rows + ' rows saved to your Drive.', 'success', 8000);
+        const el = document.getElementById('gd-status'); if (el && window.GD) GD.refreshStatus();
         return;
+      } catch (silentErr) {
+        // Silent path failed. If DUE and the tab is visible, ask interactively —
+        // at most once per day — so automation heals itself with one click.
+        const today = new Date().toISOString().slice(0, 10);
+        if (!document.hidden && st.interactiveAskDay !== today) {
+          this.setState({ interactiveAskDay: today });
+          if (typeof toast === 'function') toast('☁️ Scheduled Drive backup is due — approving Google access now (one click)…', 'info', 6000);
+          const r2 = await this.backupNow({ interactive: true });
+          this.setState({ granted: true, lastAutoOk: Date.now() });
+          this.overdueBanner(false);
+          if (typeof toast === 'function') toast('☁️ Google Drive backup completed — ' + r2.rows + ' rows saved. Future backups run silently.', 'success', 9000);
+          return;
+        }
+        throw silentErr;
       }
-      const r = await this.backupNow({ interactive: false });                          // silent token, no popup
-      if (typeof toast === 'function') toast('☁️ Automatic Google Drive backup completed — ' + r.rows + ' rows saved to your Drive.', 'success', 8000);
-      const el = document.getElementById('gd-status'); if (el && window.GD) GD.refreshStatus();
     } catch (e) {
-      console.warn('[DriveSync] auto-sync skipped:', e.message || e);
-      if (typeof toast === 'function' && this.state().granted)
-        toast('☁️ Scheduled Drive backup could not run silently. Open Admin Data → Google Drive Backup and click “Back up now”.', 'warning', 9000);
+      console.warn('[DriveSync] auto-sync attempt failed:', e.message || e);
+      // loud, persistent overdue banner at ≥2 missed cycles
+      try {
+        const last = this.cfg.lastBackup ? Date.parse(this.cfg.lastBackup) : 0;
+        if (this.cfg.enabled && this.cfg.clientId && (!last || Date.now() - last >= 2 * this.cfg.days * 86400000)) this.overdueBanner(true);
+      } catch (_) {}
     }
+  },
+  /* Persistent overdue strip (admins only) — impossible to miss. */
+  overdueBanner(show) {
+    try {
+      let el = document.getElementById('sc-drive-overdue');
+      if (!show) { if (el) el.remove(); return; }
+      if (el || !this.isPrivileged()) return;
+      el = document.createElement('div');
+      el.id = 'sc-drive-overdue';
+      el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:2147482000;background:#b91c1c;color:#fff;font:600 13px/1.5 system-ui;padding:8px 14px;text-align:center';
+      el.innerHTML = '☁️⚠️ Google Drive backups are OVERDUE (2+ cycles missed). <a href="admin-data.html" style="color:#fff;text-decoration:underline">Open Admin Data → Google Drive Backup</a> and click “Back up now” — or simply stay on any page and approve the Google prompt when it appears. <span style="cursor:pointer;padding:0 8px" onclick="this.parentNode.remove()">✕</span>';
+      document.body.appendChild(el);
+    } catch (_) {}
   },
   _progress(opts, msg) {
     if (opts && typeof opts.onProgress === 'function') { try { opts.onProgress(msg); } catch (_) {} }
@@ -238,4 +285,8 @@ window.DriveSync = DriveSync;
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(tick, 3000));
   else setTimeout(tick, 3000);
+  /* V9.4 (#11): re-check when the admin returns to the tab, and every 30 min
+     while a portal tab stays open — a due backup no longer needs a reload. */
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(() => DriveSync.autoSyncCheck(true), 2000); });
+  setInterval(() => { if (!document.hidden) DriveSync.autoSyncCheck(); }, 30 * 60000);
 })();

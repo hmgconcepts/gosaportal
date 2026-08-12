@@ -197,12 +197,12 @@ const CRUD = {
       {key:'max_score',label:'Max score (counts to grade)',type:'number',help:'e.g. 10 — added to results as CA'},
       {key:'due_date',label:'Due date',type:'date'}
     ]},
-    fees: { table:'fee_payments', title:'Fee payment', cols:[
+    fees: { table:'fee_payments', title:'Fee payment', help:'V9.4: pick the student and the SYSTEM fills the total due (class fee structure + any previous-term arrears) and computes the balance live as you type the amount paid — no manual maths, no typing errors.', cols:[
       {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,required:true,autofill:{student_name:'full_name'}},
       {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
-      {key:'fee_total',label:'Total fee for the term (optional)',type:'number',help:'If entered, balance auto-computes when left blank.'},
-      {key:'amount_paid',label:'Amount paid',type:'number',required:true},
-      {key:'balance',label:'Remaining balance',type:'number',help:'ENTERPRISE V11 (issue 13): shows on the e-receipt. Leave blank to auto-compute (total − paid).'},
+      {key:'fee_total',label:'Total due (auto — class fee structure + arrears)',type:'number',readonly:true,help:'Pulled automatically when the student is picked: current-term bill from the Class Fee Structure MINUS what is already paid this term PLUS previous-term arrears. Admin can still adjust after unlock (double-click).'},
+      {key:'amount_paid',label:'Amount paid now',type:'number',required:true},
+      {key:'balance',label:'Remaining balance (computed)',type:'number',readonly:true,help:'Always total due − amount paid. Computed live — never typed.'},
       {key:'method',label:'Method',type:'select',options:['cash','transfer','pos','online']},
       {key:'reference',label:'Reference',type:'text'},{key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'}
     ]},
@@ -583,7 +583,7 @@ const CRUD = {
       {key:'boarding',label:'Boarding / hostel fee',type:'number'},
       {key:'other_fee',label:'Other compulsory fee',type:'number'},
       {key:'discount',label:'Discount amount',type:'number'},
-      {key:'total',label:'Total bill (auto-fill or override)',type:'number',help:'If left 0, report cards calculate the total from the fee components.'},
+      {key:'total',label:'Total bill (COMPUTED automatically)',type:'number',readonly:true,help:'V9.4: the system sums tuition + exam + development + transport + boarding + other − discount, live as you type AND again in the database — manual maths errors are impossible. Schools that bill one lump sum: leave components at 0 and double-click to type the grand total.'},
       {key:'due_date',label:'Due date',type:'date'},
       {key:'next_term_begins',label:'Next term begins',type:'date'},
       {key:'note',label:'Payment note / bank instruction',type:'textarea'}
@@ -1347,6 +1347,20 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
        V7.5 #4 extends this: today's date, current month/year and the signed-in
        staff member's own name are also pre-filled on NEW records. */
     if (!id) setTimeout(() => { try { this.autofillPeriod(); this.autofillToday(); } catch(_) {} }, 250);
+    /* V9.4 (#8): class fee structure — live total as components are typed. */
+    if (this.canonicalId(moduleId) === 'school_fees') setTimeout(() => { try {
+      const parts = ['tuition','exam_fee','development','transport','boarding','other_fee','discount'];
+      const totEl = document.getElementById('cf-' + CRUD.fid('total'));
+      if (!totEl) return;
+      const recompute = () => {
+        let sum = 0;
+        parts.forEach(k => { const el = document.getElementById('cf-' + CRUD.fid(k)); if (el) sum += (k === 'discount' ? -1 : 1) * (Number(el.value) || 0); });
+        if (sum !== 0) totEl.value = Math.max(0, sum).toFixed(2);
+      };
+      parts.forEach(k => { const el = document.getElementById('cf-' + CRUD.fid(k)); if (el) el.addEventListener('input', recompute); });
+      totEl.ondblclick = () => { totEl.readOnly = false; totEl.focus(); if (typeof toast === 'function') toast('Total unlocked — for lump-sum schools that do not itemise components.', 'info', 5000); };
+      recompute();
+    } catch(_) {} }, 300);
     /* V8.5 #3: LIVE net-pay preview on the payroll form — earnings minus ALL
        deductions recompute as the bursar types, so the figure is verifiably
        right before saving (the DB trigger remains the authority on save). */
@@ -1468,6 +1482,44 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
          row: To-class = next rung on the class ladder (or graduation on the
          final class), Action, Status 'approved' and the current term/session.
          The admin just reviews and saves. Every value stays editable. */
+      /* V9.4 (#9): FEE SMART-FILL — picking the student pulls the authoritative
+         total due from sc_student_fee_state (class-fee-structure bill − paid
+         this term + previous-term arrears), fills term/session with the current
+         period, and wires a live balance computation on the amount field. The
+         readonly total unlocks on double-click for edge-case overrides. */
+      if (this.canonicalId(moduleId) === 'fees' && key === 'student_id') {
+        (async () => {
+          try {
+            const totEl = document.getElementById('cf-' + CRUD.fid('fee_total'));
+            const paidEl = document.getElementById('cf-' + CRUD.fid('amount_paid'));
+            const balEl = document.getElementById('cf-' + CRUD.fid('balance'));
+            const stuId = sel.value;
+            if (!stuId || !totEl) return;
+            totEl.placeholder = 'Loading fee record…';
+            const fr = await this.sb.rpc('sc_student_fee_state', { p_student: stuId });
+            const f = (fr && fr.data) || {};
+            const recompute = () => { if (balEl) balEl.value = Math.max(0, (Number(totEl.value) || 0) - (Number(paidEl && paidEl.value) || 0)).toFixed(2); };
+            if (fr.error || f.ok === false) {
+              totEl.readOnly = false;
+              if (typeof toast === 'function') toast(fr.error ? 'Auto fee lookup needs the v9.4 database update — enter the total manually for now.' : (f.error || 'Fee lookup failed.'), 'warning', 8000);
+            } else {
+              const due = Number(f.total_due || 0);
+              totEl.value = due.toFixed(2);
+              const bits = ['bill ' + (f.currency||'₦') + Number(f.bill||0).toLocaleString()];
+              if (Number(f.paid||0) > 0) bits.push('already paid ' + (f.currency||'₦') + Number(f.paid).toLocaleString());
+              if (Number(f.arrears||0) > 0) bits.push('previous terms owing ' + (f.currency||'₦') + Number(f.arrears).toLocaleString());
+              if (typeof toast === 'function') toast('💰 Total due auto-filled: ' + (f.currency||'₦') + due.toLocaleString() + ' (' + bits.join(' · ') + '). Double-click the field to override.', 'info', 9000);
+              const tEl = document.getElementById('cf-' + CRUD.fid('term')), sEl = document.getElementById('cf-' + CRUD.fid('session'));
+              if (tEl && !tEl.value && f.term) tEl.value = f.term;
+              if (sEl && !sEl.value && f.session) sEl.value = f.session;
+            }
+            totEl.ondblclick = () => { totEl.readOnly = false; totEl.focus(); if (typeof toast === 'function') toast('Total due unlocked for manual override (admin discretion).', 'info', 4000); };
+            totEl.oninput = recompute;
+            if (paidEl) paidEl.oninput = recompute;
+            recompute();
+          } catch (_) {}
+        })();
+      }
       if (this.canonicalId(moduleId) === 'promotion' && key === 'student_id') {
         (async () => {
           try {
