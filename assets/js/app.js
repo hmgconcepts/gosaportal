@@ -1239,7 +1239,14 @@ const App = {
      Renders into #dash-fees; parents get one panel per linked child with a
      🧾 receipt-history + print link. */
   async loadDashFees() {
-    const box = document.getElementById('dash-fees');
+    /* V9.5 ROOT-CAUSE FIX: the fee card exists in BOTH the parent and student
+       dashboard sections → duplicate id="dash-fees". getElementById returned
+       the FIRST (the parent's, display:none for a student), so the loader
+       filled an invisible div while the student stared at "Loading fee
+       summary…" forever. Now every container is filled. */
+    const boxes = [...document.querySelectorAll('[id="dash-fees"]')];
+    const box = boxes[0];
+    const paint = (html) => boxes.forEach(b => { b.innerHTML = html; });
     if (!box || !window.sb) return;
     try {
       for (let i = 0; i < 25 && !(window.SC_PROFILE && SC_PROFILE.role); i++) await new Promise(r => setTimeout(r, 200));
@@ -1253,12 +1260,12 @@ const App = {
         const ids = (l.data || []).map(x => x.student_id);
         if (ids.length) { const st = await sb.from('students').select('id,full_name').in('id', ids); studs = st.data || []; }
       } else return;
-      if (!studs.length) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">No linked student record yet — fees appear here once the admin links the account.</p>'; return; }
+      if (!studs.length) { paint('<p style="color:var(--gray-500);font-size:.85rem">No linked student record yet — fees appear here once the admin links the account.</p>'); return; }
       const money = (cur, n) => cur + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
       let h = '';
       for (const s of studs) {
         const r = await sb.rpc('sc_student_fee_state', { p_student: s.id });
-        if (r.error) { h += '<p style="color:var(--gray-500);font-size:.85rem">Fee summary needs the v9.4 database update.</p>'; break; }
+        if (r.error) { h += '<p style="color:var(--gray-500);font-size:.85rem">💤 Fee totals need a one-time database update (admin: run database/v9.4-fees-and-exams.sql). Payment history is on the <a href="fees.html">Fees page</a>.</p>'; break; }
         const f = r.data || {};
         if (f.ok === false) continue;
         const cur = f.currency || '₦';
@@ -1280,14 +1287,17 @@ const App = {
         if (ar.length) h += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:#b91c1c">🧮 Previous terms owing — breakdown</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + ar.map(a => '<tr><td style="padding:2px 6px">' + esc(a.term) + ' ' + esc(a.session) + '</td><td style="padding:2px 6px;text-align:right">billed <b>' + money(cur, a.bill) + '</b> · paid ' + money(cur, a.paid) + ' · owing <b style="color:#b91c1c">' + money(cur, a.owing) + '</b></td></tr>').join('') + '</table></details>';
         h += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm btn-outline" href="fees.html">🧾 Payment history & e-receipts</a>' + (role === 'parent' ? '<a class="btn btn-sm btn-outline" href="payments_online.html">💳 Pay online</a>' : '') + '</div></div>';
       }
-      box.innerHTML = h || '<p style="color:var(--gray-500);font-size:.85rem">No fee structure has been published for the class yet.</p>';
-    } catch (e) { box.innerHTML = ''; }
+      paint(h || '<div style="color:var(--gray-500);font-size:.85rem"><p>💤 No fee structure has been published for the class yet.</p><p>Once the school saves the Class Fee Structure (admin: 💰 School Fee Structure page) and runs the v9.4 database update, the full bill, payments and balance appear here automatically.</p><button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div>');
+    } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Fee summary could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Retry</button></p>'); }
   },
   /* V9.2: upcoming exam papers for MY classes (student = own class, parent =
      children's classes, staff/admin = whole school preview). Renders into any
      #dash-exam-tt container on the page; silently skips when absent. */
   async loadDashExamTT() {
-    const box = document.getElementById('dash-exam-tt');
+    /* V9.5: same duplicate-id fix as loadDashFees (parent + student sections). */
+    const boxes = [...document.querySelectorAll('[id="dash-exam-tt"]')];
+    const box = boxes[0];
+    const paint = (html) => boxes.forEach(b => { b.innerHTML = html; });
     if (!box || !window.sb) return;
     try {
       for (let i = 0; i < 25 && !(window.SC_PROFILE && SC_PROFILE.role); i++) await new Promise(r => setTimeout(r, 200));
@@ -1304,9 +1314,9 @@ const App = {
       let q = sb.from('exam_timetable').select('*').gte('exam_date', new Date().toISOString().slice(0, 10)).order('exam_date').order('start_time').limit(60);
       if (classes.length) q = q.in('class', classes);
       const r = await q;
-      if (r.error) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">Exam timetable appears here once the database update (v9.1+) is installed.</p>'; return; }
+      if (r.error) { paint('<p style="color:var(--gray-500);font-size:.85rem">💤 The exam timetable appears here after a one-time database update (admin: run database/v9.4-fees-and-exams.sql or complete-schema.sql).</p>'); return; }
       const rows = r.data || [];
-      if (!rows.length) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">No upcoming exam papers scheduled' + (classes.length ? ' for ' + classes.join(', ') : '') + ' yet. The full schedule lives on the <a href="exam-timetable.html">Exam Timetable</a> page.</p>'; return; }
+      if (!rows.length) { paint('<p style="color:var(--gray-500);font-size:.85rem">📭 No upcoming exam papers scheduled' + (classes.length ? ' for ' + classes.join(', ') : '') + ' yet — new papers appear here the moment the school publishes them. <a href="exam-timetable.html">Open the Exam Timetable →</a></p>'); return; }
       let h = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th>' + (classes.length === 1 ? '' : '<th>Class</th>') + '<th>Subject</th><th>Venue</th></tr></thead><tbody>';
       rows.slice(0, 10).forEach(x => {
         const dt = new Date(x.exam_date + 'T12:00:00');
@@ -1314,8 +1324,8 @@ const App = {
         h += '<tr><td><b>' + dLabel + '</b></td><td>' + esc(x.start_time) + '–' + esc(x.end_time) + '</td>' + (classes.length === 1 ? '' : '<td>' + esc(x.class) + '</td>') + '<td><b>' + esc(x.subject) + '</b>' + (x.paper ? '<br><small>' + esc(x.paper) + '</small>' : '') + '</td><td>' + esc(x.venue || '—') + '</td></tr>';
       });
       h += '</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">' + rows.length + ' upcoming paper(s) · <a href="exam-timetable.html">full exam timetable →</a></p>';
-      box.innerHTML = h;
-    } catch (e) { box.innerHTML = ''; }
+      paint(h);
+    } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashExamTT()">🔄 Retry</button></p>'); }
   },
   async loadDashboard() {
     const supabase = window.sb || this.sb || null;
