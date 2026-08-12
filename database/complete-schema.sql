@@ -1597,6 +1597,7 @@ alter table public.timetable_config alter column period_no type numeric using pe
 alter table public.timetable_requirements add column if not exists double_periods int not null default 0;
 alter table public.timetable_requirements add column if not exists max_period int;
 drop function if exists public.generate_timetable(text,text,text,integer);
+-- V9.2: engine refuses unauthorized callers (sc_can_edit gate; fn defined in the v9.2 embed below runs at call time).
 create or replace function public.generate_timetable(
   p_class text, p_session text default '', p_term text default '',
   p_periods_per_day integer default 6, p_day_periods jsonb default null)
@@ -1608,7 +1609,7 @@ declare req record; blk record; occ int; placed int:=0; unplaced int:=0;
         unplaced_items jsonb:='[]'::jsonb; required_total int:=0; capacity int:=0;
         d text; dp int; pairs int; singles int;
 begin
- if not public.is_staff(auth.uid()) then return jsonb_build_object('ok',false,'error','Staff/admin role required.'); end if;
+ if not public.sc_can_edit('timetable') then return jsonb_build_object('ok',false,'error','Only the admin or an authorized timetable editor can generate timetables. Ask the admin for access (Timetable Wizard → Authorized editors).'); end if;
  if coalesce(trim(p_class),'')='' then return jsonb_build_object('ok',false,'error','Select a class.'); end if;
  select coalesce(sum(greatest(periods_per_week,0)),0) into required_total from public.timetable_requirements where class=p_class;
  if required_total=0 then return jsonb_build_object('ok',false,'error','No subject demand exists for '||p_class||'. Add each subject, teacher and periods/week first.'); end if;
@@ -1634,7 +1635,6 @@ begin
 
  for req in select * from public.timetable_requirements where class=p_class
              order by (coalesce(max_period,99)) asc, periods_per_week desc, subject loop
-  -- V9.1: requirement-level AND teacher-level constraints BOTH apply.
   r_days := req.available_days; r_p := req.available_periods;
   t_days := null; t_p := null;
   if coalesce(req.teacher,'')<>'' then
@@ -1647,7 +1647,6 @@ begin
   pairs   := least(greatest(coalesce(req.double_periods,0),0), greatest(coalesce(req.periods_per_week,0),0)/2);
   singles := greatest(coalesce(req.periods_per_week,0),0) - pairs*2;
 
-  -- -------- double periods: two ADJACENT slots on the same day --------
   for occ in 1..pairs loop
    chosen_day:=null; chosen_period:=null;
    select dd.day, p.per into chosen_day, chosen_period
@@ -1682,7 +1681,7 @@ begin
             random()
    limit 1;
    if chosen_day is null then
-     singles := singles + 2;   -- no adjacent pair available: place as singles instead
+     singles := singles + 2;
    else
      insert into public.timetable(class,day,period,subject,teacher,session,term)
      values(p_class,chosen_day,chosen_period::text,req.subject||' (double)',nullif(req.teacher,''),coalesce(p_session,''),coalesce(p_term,'')),
@@ -1691,7 +1690,6 @@ begin
    end if;
   end loop;
 
-  -- -------- single periods --------
   for occ in 1..singles loop
    chosen_day:=null; chosen_period:=null;
    select dd.day, p.per into chosen_day, chosen_period
@@ -1699,18 +1697,14 @@ begin
    cross join generate_series(1,12) p(per)
    where p.per <= least(greatest(coalesce((p_day_periods->>dd.day)::int, ppd),0),12)
      and (cap is null or p.per <= cap)
-     -- day allowed by the SUBJECT row
      and ( (r_p is not null and r_p ? dd.day)
         or (r_p is null and (r_days is null or array_length(r_days,1) is null
              or exists(select 1 from unnest(r_days) a(x) where left(lower(a.x),3)=left(lower(dd.day),3)))) )
-     -- day allowed by the TEACHER (V9.1: always enforced when present)
      and ( (t_p is not null and t_p ? dd.day)
         or (t_p is null and (t_days is null or array_length(t_days,1) is null
              or exists(select 1 from unnest(t_days) a(x) where left(lower(a.x),3)=left(lower(dd.day),3)))) )
-     -- period allowed by the SUBJECT row's map
      and ( r_p is null or not (r_p ? dd.day)
         or exists(select 1 from jsonb_array_elements_text(r_p->dd.day) e(v) where e.v::int = p.per) )
-     -- period allowed by the TEACHER's map (V9.1)
      and ( t_p is null or not (t_p ? dd.day)
         or exists(select 1 from jsonb_array_elements_text(t_p->dd.day) e(v) where e.v::int = p.per) )
      and not exists(select 1 from public.timetable t
@@ -5316,6 +5310,135 @@ create policy "ai_write" on public.sc_ai_settings for all
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V9.1 enterprise pack installed — timetable V9.1, exam timetable, license hardening, AI settings' as status;
+
+
+
+
+-- ============================================================================
+-- EMBEDDED: database/v9.2-access-and-fixes.sql (last wins)
+-- ============================================================================
+-- ============================================================================
+-- School Connect V9.2 — Timetable access control + integrity fixes
+--   1. AUTHORIZED-EDITORS model: only the admin tier PLUS explicitly
+--      authorized staff can write to the published timetable, the
+--      auto-timetable engine tables and the exam timetable. Random
+--      teachers can no longer tamper with published schedules.
+--        • table  public.sc_module_editors  (module, user_id)
+--        • fn     public.sc_can_edit(module) → is_admin OR granted
+--        • write policies on timetable / timetable_blocks / exam_timetable /
+--          timetable_requirements / teacher_availability / timetable_config
+--        • generate_timetable() itself now refuses unauthorized callers.
+--   2. Attendance privacy re-assertion: ONE canonical read policy —
+--      students see their own rows, parents see their children's rows,
+--      staff see all (older overlapping policies are dropped).
+-- Idempotent — safe to run repeatedly.
+select 'RUNNING: School Connect access-control pack V9.2' as running_version;
+
+-- ---------------------------------------------------------------------------
+-- 1a. Authorized editors registry
+-- ---------------------------------------------------------------------------
+create table if not exists public.sc_module_editors (
+  id uuid primary key default gen_random_uuid(),
+  module text not null,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  granted_by uuid references public.profiles(id) on delete set null,
+  granted_at timestamptz default now(),
+  unique(module, user_id)
+);
+alter table public.sc_module_editors enable row level security;
+drop policy if exists "sme_read" on public.sc_module_editors;
+create policy "sme_read"  on public.sc_module_editors for select using (public.is_staff(auth.uid()));
+drop policy if exists "sme_write" on public.sc_module_editors;
+create policy "sme_write" on public.sc_module_editors for all
+  using (public.is_admin(auth.uid())) with check (public.is_admin(auth.uid()));
+
+create or replace function public.sc_can_edit(p_module text)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select public.is_admin(auth.uid())
+      or exists (select 1 from public.sc_module_editors e
+                  where e.module = p_module and e.user_id = auth.uid());
+$$;
+grant execute on function public.sc_can_edit(text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 1b. Lock the timetable family down to admin + authorized editors.
+--     (READ stays open to every authenticated user — everyone can VIEW.)
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  -- published class timetable (was generic staff-write)
+  drop policy if exists "write_timetable" on public.timetable;
+  create policy "write_timetable" on public.timetable for all
+    using (public.sc_can_edit('timetable')) with check (public.sc_can_edit('timetable'));
+
+  -- reserved/blocked slots
+  drop policy if exists tb_staff_write on public.timetable_blocks;
+  drop policy if exists tb_editor_write on public.timetable_blocks;
+  create policy tb_editor_write on public.timetable_blocks for all
+    using (public.sc_can_edit('timetable')) with check (public.sc_can_edit('timetable'));
+
+  -- exam timetable (was staff-write)
+  drop policy if exists "examtt_write" on public.exam_timetable;
+  create policy "examtt_write" on public.exam_timetable for all
+    using (public.sc_can_edit('timetable')) with check (public.sc_can_edit('timetable'));
+
+  -- subject demand + teacher availability (was admin-only; now admin + authorized)
+  drop policy if exists "admin_manage_timetable_requirements" on public.timetable_requirements;
+  drop policy if exists "v7_enterprise_write" on public.timetable_requirements;
+  drop policy if exists "tt_req_editor_write" on public.timetable_requirements;
+  create policy "tt_req_editor_write" on public.timetable_requirements for all
+    using (public.sc_can_edit('timetable')) with check (public.sc_can_edit('timetable'));
+
+  drop policy if exists "admin_manage_teacher_availability" on public.teacher_availability;
+  drop policy if exists "tt_av_editor_write" on public.teacher_availability;
+  create policy "tt_av_editor_write" on public.teacher_availability for all
+    using (public.sc_can_edit('timetable')) with check (public.sc_can_edit('timetable'));
+
+  -- period/break schedule
+  drop policy if exists "tc_admin_write" on public.timetable_config;
+  drop policy if exists "tc_editor_write" on public.timetable_config;
+  create policy "tc_editor_write" on public.timetable_config for all
+    using (public.sc_can_edit('timetable')) with check (public.sc_can_edit('timetable'));
+exception when undefined_table then
+  raise notice 'A timetable table is missing on this database — run complete-schema.sql.';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 2. Attendance privacy: ONE canonical scoped read policy.
+--    (Older permissive policies stacked up over versions; because PostgreSQL
+--    ORs all permissive policies, we drop the legacy ones and keep a single
+--    authoritative rule so the scope is provable at a glance.)
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  drop policy if exists "att_read" on public.attendance;
+  drop policy if exists "attendance_parent_read_v16" on public.attendance;
+  drop policy if exists "attendance_scope_select" on public.attendance;  -- subset of the canonical rule (permissive policies OR together, so folding it in loses nothing)
+  drop policy if exists "v7_attendance_read_family" on public.attendance;
+  create policy "v7_attendance_read_family" on public.attendance for select using (
+    public.is_staff(auth.uid())
+    or exists(select 1 from public.students s
+               where s.id = attendance.student_id
+                 and (s.user_id = auth.uid()
+                      or public.is_parent_of(auth.uid(), s.id)
+                      -- legacy guardian-email linkage kept (feature-preserving)
+                      or s.guardian_email = auth.jwt()->>'email'))
+  );
+exception when undefined_table then null;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 3. generate_timetable(): unauthorized callers are refused at the engine.
+--    (Full V9.2 definition — V9.1 body with the sc_can_edit gate.)
+-- ---------------------------------------------------------------------------
+-- (generate_timetable V9.2 is defined ONCE in Section 5 above; the standalone
+--  v9.2 file carries it for existing databases.)
+
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V9.2 access control installed — timetable family locked to admin + authorized editors; attendance scope canonical' as status;
 
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;

@@ -626,14 +626,20 @@ end $$;
 -- 22) Timetable requirements + school shop products + ID cards -------------------
 do $$
 begin
-  insert into public.timetable_requirements (class, subject, teacher, periods_per_week, available_days, is_part_time) values
-    ('SS 2','Mathematics','Funke Alabi',5,array['Mon','Tue','Wed','Thu','Fri']::text[],false),
-    ('SS 2','English Language','Chukwuemeka Nwachukwu',4,array['Mon','Tue','Wed','Thu','Fri']::text[],false),
-    ('SS 2','Physics','Hauwa Suleiman',4,array['Mon','Tue','Thu']::text[],false),
-    ('SS 2','Chemistry','Hauwa Suleiman',3,array['Tue','Wed','Fri']::text[],false),
-    ('SS 2','Biology','Olumide Ajayi',4,array['Mon','Wed','Fri']::text[],false),
-    ('JSS 1','Mathematics','Funke Alabi',5,array['Mon','Tue','Wed','Thu','Fri']::text[],false)
-  on conflict (class, subject) do nothing;
+  -- V9.2 FIX: seed ONLY when the table is empty. The old unconditional insert
+  -- ('on conflict do nothing') re-added sample subject demand that the admin
+  -- had deliberately deleted — the mystery "subjects I never added" in the
+  -- Step-3 summary of the Timetable Wizard.
+  if (select count(*) from public.timetable_requirements) = 0 then
+    insert into public.timetable_requirements (class, subject, teacher, periods_per_week, available_days, is_part_time) values
+      ('SS 2','Mathematics','Funke Alabi',5,array['Mon','Tue','Wed','Thu','Fri']::text[],false),
+      ('SS 2','English Language','Chukwuemeka Nwachukwu',4,array['Mon','Tue','Wed','Thu','Fri']::text[],false),
+      ('SS 2','Physics','Hauwa Suleiman',4,array['Mon','Tue','Thu']::text[],false),
+      ('SS 2','Chemistry','Hauwa Suleiman',3,array['Tue','Wed','Fri']::text[],false),
+      ('SS 2','Biology','Olumide Ajayi',4,array['Mon','Wed','Fri']::text[],false),
+      ('JSS 1','Mathematics','Funke Alabi',5,array['Mon','Tue','Wed','Thu','Fri']::text[],false)
+    on conflict (class, subject) do nothing;
+  end if;
   if (select count(*) from public.school_products) = 0 then
     insert into public.school_products (name, description, price, active) values
       ('Exercise Book (80 leaves)','Custom-branded school exercise book','500', true),
