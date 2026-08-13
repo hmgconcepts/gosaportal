@@ -1772,4 +1772,19 @@ else App.init();
   }catch(_){/* never break the page for a heartbeat */}
 })();
 
+/* ====================================================================
+   V9.8 ROOT-CAUSE FIX (leadership read-only + missing admin Score buttons
+   + dozens of silently-dead integrations):
+   `const App = {...}` at the top level of a CLASSIC script creates a
+   script-scope binding — it does NOT create window.App. Every guard of the
+   form `window.App && App.something(...)` therefore evaluated FALSE forever:
+   • crud.js's leadership write branch returned false → principal/
+     head_teacher/bursar were read-only everywhere (user's issue 2);
+   • assignments' Score-button injector's admin clause never fired
+     (user's issue 3);
+   • App.logActivity audit calls, oversight fallbacks and other
+     `window.App`-guarded paths silently skipped platform-wide.
+   One line makes every guard truthful: */
+window.App = App;
+
 console.log('%c[School Connect v15] app.js loaded — RBAC, family-safe nav, fixed notifications.', 'color:#10b981;font-weight:bold');
