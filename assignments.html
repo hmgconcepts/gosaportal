@@ -593,19 +593,33 @@ const AP={
     this.myPoints();
     try{const {data}=await sb.from('classes').select('name').order('name');const el=document.getElementById('ap-class');(data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;el.appendChild(o);});}catch(_){ }
     try{const {data}=await sb.from('subjects').select('name').order('name');const el=document.getElementById('ap-subject');(data||[]).forEach(s0=>{const o=document.createElement('option');o.value=s0.name;o.textContent=s0.name;el.appendChild(o);});}catch(_){ }
-    /* add a ✍️ Score button on every assignment row (staff only) */
-    setInterval(()=>{try{
+    /* V9.6 (#3): ✍️ Score button GUARANTEED on EVERY assignment row.
+       The old injector only added the button when the row's last cell already
+       contained an Edit/🔒 control — rows owned by other teachers (or rendered
+       before the role resolved) never got one, so scoring looked missing.
+       Now: a dedicated Score control is appended to every data row for any
+       staff member (ownership is still enforced inside scoreModal — a teacher
+       scoring another teacher's assignment gets a clear refusal). Injection
+       runs on a MutationObserver (instant after each re-render) with a
+       1.2 s interval as the safety net. */
+    const injectScoreButtons=()=>{try{
       const role=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
       const isStaff=(window.App&&App.isAdminRole&&App.isAdminRole(role))||['staff','teacher'].includes(role);
       if(!isStaff)return;
       document.querySelectorAll('#assignments-table tbody tr[data-id]').forEach(tr=>{
         if(tr.querySelector('.ap-score-btn'))return;
-        const td=tr.querySelector('td:last-child'); if(!td||!/Edit|🔒/.test(td.textContent))return;
-        const b=document.createElement('button'); b.className='btn btn-sm btn-primary ap-score-btn'; b.textContent='✍️ Score class';
+        const td=tr.querySelector('td:last-child'); if(!td)return;
+        const b=document.createElement('button'); b.className='btn btn-sm btn-primary ap-score-btn';
+        b.textContent='✍️ Score class'; b.title='Open the class register and enter each student\'s mark for THIS assignment';
+        b.style.marginRight='4px';
         b.onclick=(e)=>{e.stopPropagation();AP.scoreModal(tr.getAttribute('data-id'));};
         td.insertBefore(b, td.firstChild);
       });
-    }catch(_){}} ,1200);
+    }catch(_){}};
+    try{const tbl=document.getElementById('assignments-table');
+      if(tbl)new MutationObserver(()=>injectScoreButtons()).observe(tbl,{childList:true,subtree:true});}catch(_){}
+    injectScoreButtons();
+    setInterval(injectScoreButtons,1200);
   },
   async myPoints(){
     const box=document.getElementById('ap-my-points'); if(!box)return;
