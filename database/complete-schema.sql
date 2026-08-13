@@ -3461,7 +3461,7 @@ alter table public.school_settings add column if not exists examination_officer_
 alter table public.school_settings add column if not exists examination_officer_signature_url text default '';
 alter table public.school_settings add column if not exists examination_officer_signature_bg_removed boolean not null default true;
 create or replace function public.is_owner(p_uid uuid)returns boolean language sql security definer stable set search_path=public as $$select exists(select 1 from profiles where id=p_uid and role in('super_admin','admin','proprietor')and status in('approved','active'))$$;
-create or replace function public.is_school_leader(p_uid uuid)returns boolean language sql security definer stable set search_path=public as $$select exists(select 1 from profiles where id=p_uid and role in('super_admin','admin','proprietor','principal','head_teacher')and status in('approved','active'))$$;
+create or replace function public.is_school_leader(p_uid uuid)returns boolean language sql security definer stable set search_path=public as $$select exists(select 1 from profiles where id=p_uid and role in('super_admin','admin','proprietor','principal','head_teacher','bursar')and status in('approved','active'))$$; -- V9.7: bursar added — leadership tier is admin-wide
 revoke execute on function public.is_owner(uuid)from public,anon;grant execute on function public.is_owner(uuid)to authenticated;
 revoke execute on function public.is_school_leader(uuid)from public,anon;grant execute on function public.is_school_leader(uuid)to authenticated;
 create table if not exists public.exam_registration_links(id uuid primary key default gen_random_uuid(),token text not null unique default upper(substr(replace(gen_random_uuid()::text,'-',''),1,12)),title text not null,intro text default '',exam_types text[]not null default '{}',session text default '',term text default '',registration_deadline timestamptz,exam_date date,venue text default '',fee_note text default '',requirements text default '',instructions text default '',contact_name text default '',contact_phone text default '',contact_email text default '',consent_text text default '',success_message text default '',hidden_fields text[]not null default '{}',active boolean not null default true,created_by uuid references profiles(id)on delete set null,created_at timestamptz default now(),updated_at timestamptz default now());
@@ -5600,6 +5600,26 @@ grant execute on function public.sc_student_fee_state(uuid) to authenticated;
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V9.4 fees & exams pack installed — auto totals, fee state RPC, exam day-mode + paper divisions' as status;
+
+
+
+
+-- ============================================================================
+-- EMBEDDED: database/v9.7-leadership-access.sql (last wins)
+-- ============================================================================
+-- ============================================================================
+-- School Connect V9.7 — Leadership access completion
+-- The bursar was missing from is_school_leader(), so RLS blocked bursars from
+-- school_settings and other leader-managed tables even after the UI opened up.
+-- Principal / head teacher / bursar are ADMIN-TIER: full access everywhere
+-- except the owner cockpit. Idempotent.
+-- ============================================================================
+select 'RUNNING: School Connect leadership access pack V9.7' as running_version;
+-- (is_school_leader is defined ONCE in the section above with bursar included;
+--  the standalone v9.7 file carries it for existing databases.)
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V9.7 leadership access installed — bursar joins the leader tier' as status;
 
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
