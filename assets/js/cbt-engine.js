@@ -286,13 +286,26 @@ const CBT = {
 
   parseCSV(csv) {
     if (!csv || !csv.trim()) return [];
-    const rows = this.parseCSVRows(csv);
-    if (rows.length < 2) return [];
+    const rows = this.parseCSVRows(csv).filter(r => r.some(v => String(v == null ? '' : v).trim()));
+    if (!rows.length) return [];
     const canon = h => String(h==null?'':h).replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-    const head = rows[0].map(canon);
+    /* V9.6 (#2) ROOT CAUSE of "Add at least one question CSV" on PASTED text:
+       the parser demanded ≥2 rows and blindly consumed row 1 as a header.
+       Raw CSV pasted WITHOUT a header row (the common case when copying
+       straight from Excel/Notepad) lost its first question — and a single
+       pasted question produced ZERO. Now we DETECT whether row 1 is really
+       a header (contains recognisable column names); when it is not, every
+       row is data and the standard positional layout applies
+       (question,a,b,c,d,answer,explanation,type,mark). */
+    const probe = rows[0].map(canon);
+    const headerWords = ['question','prompt','text','answer','correct','correctanswer','optiona','a','b','c','d','type','mark','marks'];
+    const looksHeader = probe.filter(x => headerWords.includes(x)).length >= 2;
+    const head = looksHeader ? probe : [];
     const idx = name => head.indexOf(canon(name));
+    const dataRows = looksHeader ? rows.slice(1) : rows;
+    if (!dataRows.length) return [];
     const questions = [];
-    rows.slice(1).forEach((vals, i) => {
+    dataRows.forEach((vals, i) => {
       if (!vals.some(v => String(v||'').trim())) return;
       const get = (...names) => { for (const n of names) { const k=idx(n); if(k>=0) return vals[k] || ''; } return ''; };
       const q = {

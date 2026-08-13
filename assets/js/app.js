@@ -516,8 +516,19 @@ const App = {
     student: ['student']
   },
   BURSAR_WHITELIST:new Set(['dashboard','profile','change_password','notifications','students','parents','classes','fees','school_fees','school_products','payment_history','payments_online','finance','payroll','financial_aid','donations','reports','analytics','inbox','messages','directory','feature_guide','about','contact']),
-  PRINCIPAL_DENY:new Set(['site_license','license','status_manager','admin_data','developer','storage','activity_log']),
-  HEADTEACHER_DENY:new Set(['site_license','license','status_manager','admin_data','developer','storage','activity_log','finance','payroll','hr','staff_loans','staff_bonus','donations','payments_online','school_products','inventory','approvals','settings']),
+  /* V9.6 (#1): principal, head teacher and bursar are ADMIN-TIER — school
+     leadership needs the whole platform. The old deny-lists/whitelist locked
+     them out of most pages (bursar saw ~20 pages; principal/head teacher were
+     blocked from settings, approvals, finance and more). Policy now:
+     • Full READ+WRITE everywhere for all three roles (same as admin).
+     • The ONLY exception: the owner-tier super-admin cockpit modules
+       (site license, developer, admin-data restore, status manager) stay
+       owner-only — they can break the whole site. Everything operational is
+       open. The old lists are kept as named constants for the Access-Manager
+       UI but are NO LONGER enforced by default. */
+  PRINCIPAL_DENY:new Set([]),
+  HEADTEACHER_DENY:new Set([]),
+  LEADERSHIP_OWNER_ONLY:new Set(['site_license','license','developer','status_manager']),
 
   /* Modules that parents/students should NEVER see. The whitelist
      (PARENT_WHITELIST / STUDENT_WHITELIST) handles everything else.
@@ -632,11 +643,16 @@ const App = {
       if (App.STUDENT_WHITELIST.has(id)) return true;
       return false;
     }
-    if(r==='bursar')return App.BURSAR_WHITELIST.has(id);if(r==='principal'&&App.PRINCIPAL_DENY.has(id))return false;if(['head_teacher','headteacher'].includes(r)&&App.HEADTEACHER_DENY.has(id))return false;if(['staff','teacher'].includes(r))return true;return true;
+    /* V9.6 (#1): leadership tier = admin-wide access; only the owner cockpit
+       stays owner-only. */
+    if(['bursar','principal','head_teacher','headteacher'].includes(r))return !App.LEADERSHIP_OWNER_ONLY.has(id);
+    if(['staff','teacher'].includes(r))return true;return true;
   },
 
   /* Can the role WRITE (add/edit/delete) on this module? */
-  canWriteModule(moduleId,role){const id=App.normalizeModuleId(moduleId),r=String(role||'').toLowerCase();if(App.isOwnerRole(r))return true;if(r==='bursar')return App.BURSAR_WHITELIST.has(id);if(r==='principal')return !App.PRINCIPAL_DENY.has(id);if(['head_teacher','headteacher'].includes(r))return !App.HEADTEACHER_DENY.has(id);
+  canWriteModule(moduleId,role){const id=App.normalizeModuleId(moduleId),r=String(role||'').toLowerCase();if(App.isOwnerRole(r))return true;
+    /* V9.6 (#1): leadership tier writes everywhere except the owner cockpit. */
+    if(['bursar','principal','head_teacher','headteacher'].includes(r))return !App.LEADERSHIP_OWNER_ONLY.has(id);
     if (r === 'parent' || r === 'student') return false; // family-safe
     if (['staff','teacher'].includes(r)) {
       // Staff can write the academic modules they own. CRUD.remove checks
