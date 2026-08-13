@@ -674,7 +674,11 @@ const App = {
   roleAccessMap: null,
   roleWriteMap: null,
 
-  canAccessPage(pageFileName,role){if(App.isOwnerRole(role))return true;const id=this.normalizeModuleId(pageFileName);if(!App.moduleAllowedForRole(id,role))return false;
+  canAccessPage(pageFileName,role){if(App.isOwnerRole(role))return true;const id=this.normalizeModuleId(pageFileName);
+    /* V9.7: leadership tier (principal/head_teacher/bursar) is admin-wide —
+       the staff/parent/student access maps below must never restrict them. */
+    if(App.isAdminRole(role))return !App.LEADERSHIP_OWNER_ONLY.has(id);
+    if(!App.moduleAllowedForRole(id,role))return false;
     const map = this.roleAccessMap || {};
     if (map[id] && Array.isArray(map[id])) {
       return map[id].includes(role) || (role === 'teacher' && map[id].includes('staff')) || (role === 'staff' && map[id].includes('teacher'));
@@ -714,7 +718,9 @@ const App = {
     const id = this.normalizeModuleId(rawId);
     const map = this.roleAccessMap || {};
     if (map[id] && Array.isArray(map[id])) {
-      return ['super_admin','admin','proprietor'].concat(map[id]).join(' ');
+      /* V9.7: a saved access map must never strip the admin tier — principal,
+         head teacher and bursar are always included. */
+      return ['super_admin','admin','proprietor','principal','head_teacher','bursar'].concat(map[id]).join(' ');
     }
     return (el && el.getAttribute('data-role-allow')) || '';
   },
@@ -906,6 +912,15 @@ const App = {
     App.injectNavSearch();
     const links = [...document.querySelectorAll('[data-role-allow]')];
     const isAdmin=App.isOwnerRole(role);
+    /* V9.7 ROOT CAUSE (leadership nav shrank to ONE page): principal/
+       head_teacher/bursar fell into the generic branch below, where the
+       Page Access Manager maps (sc-nav-show-map / role_access) apply — and
+       those maps only carry staff/parent/student columns. Every page the
+       admin ever saved in the manager got HIDDEN for leadership roles;
+       exam-timetable only survived because it was added AFTER the map was
+       last saved (no entry → default visible). Leadership is admin-tier:
+       the maps must never apply to them. */
+    const isLeader=!isAdmin&&['principal','head_teacher','headteacher','bursar'].includes(String(role||'').toLowerCase());
     /* v5: per-role nav-visibility map (admin can override per-page per-role) */
     let navShowMap = {};
     try { navShowMap = JSON.parse(localStorage.getItem('sc-nav-show-map') || '{}'); } catch(_){}
@@ -933,6 +948,13 @@ const App = {
         el.style.display = '';
         el.dataset.navRoleHidden = '0';
         el.classList.remove('nav-locked');
+      } else if (isLeader) {
+        /* V9.7: full nav for the leadership tier — only the owner cockpit hides. */
+        const show=!App.LEADERSHIP_OWNER_ONLY.has(App.normalizeModuleId(moduleId));
+        el.style.display = show ? '' : 'none';
+        el.dataset.navRoleHidden = show ? '0' : '1';
+        el.classList.remove('nav-locked');
+        ok = show;
       } else {
         // ENTERPRISE V9 (issue 3 — policy update by client): admin-only pages
         // must NOT appear on student/parent/staff navigation at all. Restricted
