@@ -601,6 +601,8 @@ QUALITY RULES:
 - Vary the position of the correct option (do not favour A or C).
 - Use Nigerian/local context in word problems where natural (names, currency ₦, places).
 
+DELIVERABLE: a single .csv FILE (attachment/download), UTF-8, comma-separated — never a chat table, never inline text. If your interface can attach files, attach the .csv; otherwise output pure CSV text that saves cleanly as a .csv file.
+
 SELF-CHECK BEFORE OUTPUT (do this silently):
 1. Count the rows — exactly [NUMBER] questions plus the single header row.
 2. Every row has ALL 17 columns, every field wrapped in double quotes, inner quotes doubled.
@@ -608,7 +610,7 @@ SELF-CHECK BEFORE OUTPUT (do this silently):
 4. No commentary, no markdown fences, no blank lines inside the CSV.
 If any check fails, silently fix it before responding.
 
-Now output/generate the downloadable CSV only.</textarea>
+Now output/generate the downloadable CSV file only.</textarea>
       </div>
 
       <div class="card" style="background:#f0fdfa;border-color:#99f6e4">
@@ -656,13 +658,15 @@ OUTPUT RULES — obey strictly:
 13. Keep all subjects to EXACTLY the requested question count — equal weighting matters for UTME/Common Entrance scoring.
 14. Use Nigerian curriculum context and ₦ currency in applied questions where natural.
 
+DELIVERABLE: a single .csv FILE (attachment/download), UTF-8, comma-separated — never a chat table, never inline text. If your interface can attach files, attach the .csv; otherwise output pure CSV text that saves cleanly as a .csv file.
+
 SELF-CHECK BEFORE OUTPUT (do this silently):
 - Row count = subjects × questions-per-subject, plus one header row.
 - The "section" value on every row exactly matches one of the listed subjects (same spelling).
 - All fields quoted, inner quotes doubled, no blank lines, no text outside the CSV.
 If any check fails, silently fix it before responding.
 
-Now output/generate the downloadable CSV only.</textarea>
+Now output/generate the downloadable CSV file only.</textarea>
 </div>
 
 <div class="card" style="margin-top:18px;border-left:6px solid #2563eb"><h2>MCQ-ONLY STRICT CSV PROMPT</h2><p style="color:var(--gray-700)">Use this when you want only multiple-choice questions. The output must be saved as a downloadable CSV file and uploaded directly into CBT.</p><textarea class="form-input" rows="14" style="font-family:monospace;font-size:.82rem" onclick="this.select()">Generate [NUMBER] multiple-choice questions for [SUBJECT], [CLASS], topic [TOPIC].
@@ -684,13 +688,15 @@ Rules:
 - Cover the topic broadly — consecutive questions must not test the same fact.
 - Age-appropriate wording for [CLASS]; use Nigerian context (names, ₦, places) where natural.
 
+DELIVERABLE: a single .csv FILE (attachment/download), UTF-8, comma-separated — never a chat table, never inline text. If your interface can attach files, attach the .csv; otherwise output pure CSV text that saves cleanly as a .csv file.
+
 SELF-CHECK BEFORE OUTPUT (do this silently):
 - Exactly [NUMBER] data rows plus the single header row.
 - Every row has all 13 columns and parses as valid CSV.
 - No commentary, markdown, code fences or blank lines anywhere.
 If any check fails, silently fix it before responding.
 
-Now output/generate the downloadable CSV only.</textarea></div>
+Now output/generate the downloadable CSV file only.</textarea></div>
 </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

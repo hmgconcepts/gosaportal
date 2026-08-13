@@ -609,7 +609,9 @@ const AP={
          appear on first paint, not only after the async profile load. */
       let role=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
       if(!role||role==='guest'){try{const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(c&&c.role)role=String(c.role).toLowerCase();}catch(_){}}
-      const isStaff=(window.App&&App.isAdminRole&&App.isAdminRole(role))||['staff','teacher','principal','head_teacher','headteacher','bursar'].includes(role.replace(/\s+/g,'_'));
+      /* V9.8: belt-and-braces — admin roles listed literally too, so the
+         buttons survive even if a guard object is ever missing again. */
+      const isStaff=(window.App&&App.isAdminRole&&App.isAdminRole(role))||['super_admin','superadmin','admin','administrator','owner','director','proprietor','staff','teacher','principal','head_teacher','headteacher','bursar'].includes(role.replace(/\s+/g,'_'));
       if(!isStaff)return;
       document.querySelectorAll('#assignments-table tbody tr[data-id]').forEach(tr=>{
         if(tr.querySelector('.ap-score-btn'))return;
