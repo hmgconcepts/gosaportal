@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AI Question Prompts (for CBT CSV) • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — AI Question Prompts (for CBT CSV). Free school management platform by HMG Concepts.">
-<meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -48,7 +48,7 @@
 </style>
 
     <meta name="description" content="God of Seed Academy — AI Question Prompts (for CBT CSV). Free school management platform by HMG Concepts.">
-    <meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./cbt-prompts.html">
@@ -113,10 +113,10 @@
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -499,7 +499,7 @@
           <textarea id="p-simple" class="form-input" rows="10" style="font-family:monospace;font-size:.8rem">You are a Nigerian school exam question writer. Generate exactly [NUMBER] questions on the topic &quot;[TOPIC]&quot; for [CLASS/LEVEL].
 Use ONLY these simple question types: mcq (multiple choice with 4 options) and truefalse (yes/no).
 Output ONLY a downloadable CSV file content with this EXACT header row and one question per line (no extra text, no markdown, no explanation outside the CSV). Wrap every field in double quotes:
-Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
 Rules:
 - For mcq: fill A,B,C,D and put the correct letter (A/B/C/D) in CorrectAnswer. Type = mcq.
 - For truefalse: leave A,B,C,D blank, put A (for True) or B (for False) in CorrectAnswer. Type = truefalse.
@@ -514,7 +514,7 @@ Rules:
           <p style="color:var(--gray-600);margin:6px 0">For mid-level assessments — adds numeric, short-answer and multiple-response questions.</p>
           <textarea id="p-inter" class="form-input" rows="10" style="font-family:monospace;font-size:.8rem">You are a Nigerian school exam question writer. Generate exactly [NUMBER] questions on &quot;[TOPIC]&quot; for [CLASS/LEVEL], mixing these intermediate types: mcq, truefalse, numeric, short, mrq (multiple-response).
 Output ONLY a downloadable CSV file content with this EXACT header and one question per line (no extra text, no markdown, no explanation outside the CSV). Wrap every field in double quotes:
-Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
 Rules:
 - mcq: A,B,C,D filled; CorrectAnswer = A/B/C/D. Type=mcq.
 - truefalse: CorrectAnswer = A (True) or B (False). Type=truefalse.
@@ -530,7 +530,7 @@ Rules:
           <p style="color:var(--gray-600);margin:6px 0">Exam-grade (WAEC/NECO/UTME) — adds matching, ordering and essay questions.</p>
           <textarea id="p-adv" class="form-input" rows="10" style="font-family:monospace;font-size:.8rem">You are a senior Nigerian examiner. Generate exactly [NUMBER] rigorous questions on &quot;[TOPIC]&quot; for [CLASS/LEVEL] (WAEC/NECO/UTME standard), using a rich mix of types: mcq, mrq, numeric, short, truefalse, matching (Pairs), ordering (Items), and essay (open).
 Output ONLY a downloadable CSV file content with this EXACT header and one question per line (no commentary, no code fences, no explanation outside the CSV). Wrap every field in double quotes:
-Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
 Type-specific rules:
 - matching: list pairs in Pairs as &quot;left=right;left2=right2&quot;. Type=matching. Leave A-D blank.
 - ordering: list the correct order in Items as &quot;step1;step2;step3&quot;. Type=ordering.
@@ -562,7 +562,7 @@ Learning level: [LOWER BASIC / UPPER BASIC / JSS / SSS]
 IMPORTANT OUTPUT RULES:
 - Output CSV only. No markdown table. No commentary.
 - First line must be exactly:
-Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
 - Wrap every CSV field in double quotes.
 - Escape inner JSON double quotes as two double quotes.
 - Use UTF-8 science/math symbols correctly.
@@ -591,14 +591,24 @@ hot_text: CorrectAnswer contains the exact phrase(s) to select.
 code: Question contains code; CorrectAnswer/Accept contains expected output or keywords.
 
 QUALITY RULES:
-- Mix easy, medium and challenging items.
-- Distractors must reflect common misconceptions.
-- Explanations must teach the concept.
-- Avoid ambiguous answers.
-- Numeric questions must include tolerance where needed.
+- Mix easy, medium and challenging items (roughly 30% easy, 50% medium, 20% hard).
+- Distractors must reflect the most common student misconceptions — never random filler.
+- Explanations must TEACH the concept in 1–2 sentences, not merely restate the answer.
+- Avoid ambiguous stems, double negatives, "all/none of the above", and trick wording.
+- Numeric questions must include tolerance where rounding is possible.
 - Essay scoring must be deterministic by keywords/min words; teacher review recommended.
+- Spread questions across every listed subtopic — do not cluster on one.
+- Vary the position of the correct option (do not favour A or C).
+- Use Nigerian/local context in word problems where natural (names, currency ₦, places).
 
-Now output the CSV only.</textarea>
+SELF-CHECK BEFORE OUTPUT (do this silently):
+1. Count the rows — exactly [NUMBER] questions plus the single header row.
+2. Every row has ALL 17 columns, every field wrapped in double quotes, inner quotes doubled.
+3. Every answer is verifiably correct and every JSON field parses.
+4. No commentary, no markdown fences, no blank lines inside the CSV.
+If any check fails, silently fix it before responding.
+
+Now output/generate the downloadable CSV only.</textarea>
       </div>
 
       <div class="card" style="background:#f0fdfa;border-color:#99f6e4">
@@ -641,8 +651,18 @@ OUTPUT RULES — obey strictly:
 8. For multi_select, separate correct answers with semicolons.
 9. Every question must have an explanation that helps a teacher review the answer.
 10. Questions must be original, age-appropriate, unambiguous and curriculum-aligned.
+11. Balance difficulty inside EVERY subject (30% recall, 50% applied, 20% reasoning) and spread topics across each subject's syllabus — no clustering.
+12. Vary the correct-option position evenly across A–D; never favour one letter.
+13. Keep all subjects to EXACTLY the requested question count — equal weighting matters for UTME/Common Entrance scoring.
+14. Use Nigerian curriculum context and ₦ currency in applied questions where natural.
 
-Now generate the CSV only.</textarea>
+SELF-CHECK BEFORE OUTPUT (do this silently):
+- Row count = subjects × questions-per-subject, plus one header row.
+- The "section" value on every row exactly matches one of the listed subjects (same spelling).
+- All fields quoted, inner quotes doubled, no blank lines, no text outside the CSV.
+If any check fails, silently fix it before responding.
+
+Now output/generate the downloadable CSV only.</textarea>
 </div>
 
 <div class="card" style="margin-top:18px;border-left:6px solid #2563eb"><h2>MCQ-ONLY STRICT CSV PROMPT</h2><p style="color:var(--gray-700)">Use this when you want only multiple-choice questions. The output must be saved as a downloadable CSV file and uploaded directly into CBT.</p><textarea class="form-input" rows="14" style="font-family:monospace;font-size:.82rem" onclick="this.select()">Generate [NUMBER] multiple-choice questions for [SUBJECT], [CLASS], topic [TOPIC].
@@ -654,13 +674,23 @@ Use this exact header row:
 
 Rules:
 - Every row must have type "mcq".
-- Options a, b, c and d must be plausible.
-- The answer field must contain the correct option text or letter.
-- The explanation field must explain why the answer is correct.
-- Wrap every field in double quotes.
+- Options a, b, c and d must all be plausible — distractors must reflect real student misconceptions, never obvious filler.
+- Exactly ONE option is correct; the answer field contains that option's text or letter.
+- The explanation field must teach WHY the answer is correct in 1–2 sentences.
+- Wrap every field in double quotes; escape inner quotes by doubling them.
 - Put the subject name in section.
+- Difficulty mix: about 30% easy recall, 50% applied, 20% challenging reasoning.
+- Vary the position of the correct option evenly across a–d; never favour one letter.
+- Cover the topic broadly — consecutive questions must not test the same fact.
+- Age-appropriate wording for [CLASS]; use Nigerian context (names, ₦, places) where natural.
 
-Now output the CSV only.</textarea></div>
+SELF-CHECK BEFORE OUTPUT (do this silently):
+- Exactly [NUMBER] data rows plus the single header row.
+- Every row has all 13 columns and parses as valid CSV.
+- No commentary, markdown, code fences or blank lines anywhere.
+If any check fails, silently fix it before responding.
+
+Now output/generate the downloadable CSV only.</textarea></div>
 </main>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

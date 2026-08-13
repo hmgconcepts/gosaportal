@@ -603,8 +603,13 @@ const AP={
        runs on a MutationObserver (instant after each re-render) with a
        1.2 s interval as the safety net. */
     const injectScoreButtons=()=>{try{
-      const role=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
-      const isStaff=(window.App&&App.isAdminRole&&App.isAdminRole(role))||['staff','teacher'].includes(role);
+      /* V9.7 (#5): ADMIN CONTROL IS NEVER LOST TO A RACE (V8.3 pattern).
+         Before auth resolves, currentRole is 'guest' — the cached profile
+         from the last session breaks the tie so the admin's Score buttons
+         appear on first paint, not only after the async profile load. */
+      let role=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+      if(!role||role==='guest'){try{const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(c&&c.role)role=String(c.role).toLowerCase();}catch(_){}}
+      const isStaff=(window.App&&App.isAdminRole&&App.isAdminRole(role))||['staff','teacher','principal','head_teacher','headteacher','bursar'].includes(role.replace(/\s+/g,'_'));
       if(!isStaff)return;
       document.querySelectorAll('#assignments-table tbody tr[data-id]').forEach(tr=>{
         if(tr.querySelector('.ap-score-btn'))return;
