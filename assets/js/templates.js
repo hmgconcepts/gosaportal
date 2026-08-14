@@ -220,6 +220,7 @@ ${T.modal()}
       verify_certificate: 'verify-certificate.html',
       feature_guide: 'feature-guide.html', profile:'profile.html', change_password:'change-password.html', cbt_multi:'cbt-multi.html',
       exam_timetable: 'exam-timetable.html', 'exam-timetable': 'exam-timetable.html',
+      hr: 'payroll.html',
       ecosystem_products: 'ecosystem.html', ecosystem:'ecosystem.html', hmg_digital_products:'hmg-digital-products.html', school_fees:'school-fees.html', school_products:'school-products.html', status_manager:'status-manager.html'
     };
     return map[id] || (id + '.html');
@@ -556,6 +557,7 @@ ${T.setupRequiredBanner()}
         <div class="stats-grid"><div class="stat-card"><div class="stat-value" id="stat-my-classes">—</div><div class="stat-label">My Classes</div></div><div class="stat-card"><div class="stat-value" id="stat-open-cbt">—</div><div class="stat-label">Open CBT</div></div><div class="stat-card"><div class="stat-value" id="stat-attendance-today">—</div><div class="stat-label">Attendance Today</div></div></div>
         <div class="grid grid-2"><div class="card"><h3>👨‍🏫 Staff / Teacher Workspace</h3><p>Academic and classroom operations only — no proprietor finance, HR payroll, storage, compliance or system-backup tools.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${buttons(staffLinks)}</div></div><div class="card"><h3>📢 Staff Notices</h3><div id="dash-announcements"><span class="pulse">Loading…</span></div></div></div>
         <div class="card" style="margin-top:16px"><h3>🗓️ My Week — personal teaching timetable</h3><div id="dash-my-timetable"><span class="pulse">Loading your timetable…</span></div></div>
+        <div class="card" style="margin-top:16px"><h3>💼 My Pay &amp; Benefits</h3><div id="dash-my-pay"><span class="pulse">Loading your pay records…</span></div></div>
       </section>
 
       <section id="dash-sec-parent" data-dash-role="parent" style="display:none">

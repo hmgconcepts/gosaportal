@@ -651,8 +651,15 @@ const App = {
 
   /* Can the role WRITE (add/edit/delete) on this module? */
   canWriteModule(moduleId,role){const id=App.normalizeModuleId(moduleId),r=String(role||'').toLowerCase();if(App.isOwnerRole(r))return true;
-    /* V9.6 (#1): leadership tier writes everywhere except the owner cockpit. */
-    if(['bursar','principal','head_teacher','headteacher'].includes(r))return !App.LEADERSHIP_OWNER_ONLY.has(id);
+    /* V9.6 (#1): leadership tier writes everywhere except the owner cockpit.
+       V9.9 (#7): unless the owner flipped this module to READ-ONLY for
+       leadership in Settings → Module Access Control (sc_module_access,
+       cached below; per-user grants in sc_module_editors override). */
+    if(['bursar','principal','head_teacher','headteacher'].includes(r)){
+      if(App.LEADERSHIP_OWNER_ONLY.has(id))return false;
+      try{const m=App._moduleAccess||{};if(m[id]==='readonly'){const g=App._myModuleGrants||new Set();return g.has(id);}}catch(_){}
+      return true;
+    }
     if (r === 'parent' || r === 'student') return false; // family-safe
     if (['staff','teacher'].includes(r)) {
       // Staff can write the academic modules they own. CRUD.remove checks
@@ -690,7 +697,19 @@ const App = {
     return true;
   },
 
+  /* V9.9 (#7): cache the per-module leadership switch + my personal grants. */
+  async loadModuleAccess() {
+    try {
+      const supabase = window.sb || this.sb; if (!supabase) return;
+      const r = await supabase.from('sc_module_access').select('module,leadership');
+      if (!r.error && r.data) { const m={}; r.data.forEach(x=>m[x.module]=x.leadership); App._moduleAccess=m; }
+      const me = (window.SC_PROFILE && SC_PROFILE.id) || null;
+      if (me) { const g = await supabase.from('sc_module_editors').select('module').eq('user_id', me);
+        if (!g.error && g.data) App._myModuleGrants = new Set(g.data.map(x=>x.module)); }
+    } catch(_){}
+  },
   loadRoleAccessMap() {
+    try { App.loadModuleAccess(); } catch(_){}
     try {
       const saved = localStorage.getItem('sc-role-access-map');
       this.roleAccessMap = saved ? JSON.parse(saved) : null;
@@ -1316,6 +1335,7 @@ const App = {
           '<div><div style="font-size:1.5rem;font-weight:900;color:#0f172a">' + money(cur, f.bill) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Total fees this term</div></div>' +
           '<div><div style="font-size:1.5rem;font-weight:900;color:#15803d">' + money(cur, f.paid) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Paid</div></div>' +
           '<div><div style="font-size:1.5rem;font-weight:900;color:' + (owingNow > 0 ? '#b91c1c' : '#15803d') + '">' + money(cur, owingNow) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Balance this term</div></div>' +
+          (Number(f.aid || 0) > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#7c3aed">−' + money(cur, f.aid) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#7c3aed">🎓 Scholarship / aid</div></div>' : '') +
           (arrears > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, arrears) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Previous terms owing</div></div>' : '') +
           (totalDue > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, totalDue) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#b91c1c">TOTAL OUTSTANDING</div></div>' : '<div style="align-self:center;font-weight:800;color:#15803d">✅ Fully paid</div>') +
           '</div>';
@@ -1327,6 +1347,37 @@ const App = {
       }
       paint(h || '<div style="color:var(--gray-500);font-size:.85rem"><p>💤 No fee structure has been published for the class yet.</p><p>Once the school saves the Class Fee Structure (admin: 💰 School Fee Structure page) and runs the v9.4 database update, the full bill, payments and balance appear here automatically.</p><button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div>');
     } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Fee summary could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Retry</button></p>'); }
+  },
+  /* V10 (#3): MY PAY & BENEFITS — every staff member sees their own payslips,
+     loans/advances (with balance) and bonuses on the dashboard, newest first.
+     Reads rely on the narrow self-read RLS policies (v7.5 + v10) — staff can
+     only ever see their OWN rows; admins see the note instead. */
+  async loadDashMyPay() {
+    const box = document.getElementById('dash-my-pay');
+    if (!box || !window.sb) return;
+    try {
+      for (let i = 0; i < 25 && !(window.SC_PROFILE && SC_PROFILE.role); i++) await new Promise(r => setTimeout(r, 200));
+      const role = String((window.SC_PROFILE || {}).role || '').toLowerCase();
+      if (!['staff','teacher','principal','head_teacher','bursar'].includes(role) && !App.isAdminRole(role)) { box.innerHTML=''; return; }
+      const me = await sb.from('staff').select('id,full_name').eq('user_id', SC_PROFILE.id).maybeSingle();
+      if (!me.data) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">' + (App.isAdminRole(role) ? 'Admins: each staff member sees their own payslips, loans and bonuses here (manage them on the Payroll Register / Staff Loans / Staff Bonuses pages).' : 'Your account is not linked to a staff record yet — ask the admin to link it (Staff page → your record → user link).') + '</p>'; return; }
+      const myName = String(me.data.full_name||'').trim();
+      const money = n => ((window.SCHOOL && SCHOOL.currency) || '₦') + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+      const [pay, loans, bonus] = await Promise.all([
+        sb.from('payroll').select('*').or('staff_id.eq.' + me.data.id + ',staff_name.ilike.' + myName.replace(/[%,()]/g,'')).order('created_at', { ascending: false }).limit(6).then(r=>r.data||[], ()=>[]),
+        sb.from('staff_loans').select('*').ilike('staff_name', myName.replace(/[%,()]/g,'')).order('created_at', { ascending: false }).limit(6).then(r=>r.data||[], ()=>[]),
+        sb.from('staff_bonus').select('*').ilike('staff_name', myName.replace(/[%,()]/g,'')).order('created_at', { ascending: false }).limit(6).then(r=>r.data||[], ()=>[])
+      ]);
+      const net = r => { const nv = k => Number(r[k]) || 0; return Math.max(0,(nv('basic')+nv('allowances')+nv('bonus')+nv('overtime'))-(nv('tax')+nv('pension')+nv('loan_deduction')+nv('other_deductions')+nv('deductions'))); };
+      let h = '';
+      if (pay.length) h += '<h4 style="margin:4px 0 4px">🧾 Recent payslips</h4><div class="table-wrap"><table><thead><tr><th>Period</th><th>Net pay</th></tr></thead><tbody>' +
+        pay.map(p => '<tr><td>' + esc(p.month || p.period || String(p.created_at||'').slice(0,10)) + '</td><td><b>' + money(net(p)) + '</b></td></tr>').join('') + '</tbody></table></div>';
+      if (loans.length) h += '<h4 style="margin:10px 0 4px">🏦 Loans & advances</h4><div class="table-wrap"><table><thead><tr><th>Type</th><th>Principal</th><th>Monthly</th><th>Status</th></tr></thead><tbody>' +
+        loans.map(l => '<tr><td>' + esc(l.loan_type||'loan') + '</td><td>' + money(l.principal) + '</td><td>' + money(l.monthly_repayment) + '</td><td>' + esc(l.status||'active') + '</td></tr>').join('') + '</tbody></table></div>';
+      if (bonus.length) h += '<h4 style="margin:10px 0 4px">🎁 Bonuses & awards</h4><div class="table-wrap"><table><thead><tr><th>Award</th><th>Amount</th><th>When</th></tr></thead><tbody>' +
+        bonus.map(b => '<tr><td>' + esc(b.reason || b.title || b.bonus_type || 'Bonus') + '</td><td><b>' + money(b.amount) + '</b></td><td>' + esc(String(b.award_date||b.created_at||'').slice(0,10)) + '</td></tr>').join('') + '</tbody></table></div>';
+      box.innerHTML = h || '<p style="color:var(--gray-500);font-size:.85rem">No payslips, loans or bonuses recorded for you yet — entries appear here the moment the bursar saves them. 💡 If you expect to see records, ask the admin to run <code>database/v10.0-fee-match-and-staffpay.sql</code> and confirm your staff record\'s name matches the payroll entries.</p>';
+    } catch (e) { box.innerHTML = ''; }
   },
   /* V9.2: upcoming exam papers for MY classes (student = own class, parent =
      children's classes, staff/admin = whole school preview). Renders into any
@@ -1492,6 +1543,7 @@ const App = {
              papers; the container only exists in the parent/student sections. */
           try { App.loadDashExamTT(); } catch (e) {}
           try { App.loadDashFees(); } catch (e) {}
+          try { App.loadDashMyPay(); } catch (e) {}
           /* V7.8 #3 EDUCATOR DIGEST: "Action needed today" strip — pending
              account approvals, unresolved complaints, pending leave requests,
              open helpdesk tickets, today's birthdays and unapplied promotion

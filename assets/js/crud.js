@@ -100,7 +100,10 @@ const CRUD = {
       {key:'code',label:'Code',type:'text'},
       {key:'department',label:'Department',type:'ref',refTable:'departments',refValue:'name'},
       {key:'level',label:'Level',type:'select',options:['Nursery','Primary','JSS','SSS','All']},
-      {key:'teacher',label:'Subject teacher (pick from staff)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',refFilter:{staff_type:'teaching'},help:'Maps this subject to a teacher'}
+      {key:'teacher',label:'Subject teacher (pick from staff)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',refFilter:{staff_type:'teaching'},help:'Maps this subject to a teacher'},
+      /* V9.9 (#4): map the subject to the CLASSES taking it — powers the
+         Auto-Timetable wizard's wrong-class alerts and the exam auto-spread. */
+      {key:'classes',label:'Classes taking this subject',type:'multiref',refTable:'classes',refValue:'name',help:'Tick every class that takes this subject. The Auto-Timetable wizard warns when a class outside this list is ticked.'}
     ]},
     attendance: { table:'attendance', title:'Attendance', cols:[
       {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,autofill:{student_name:'full_name',class:'class'}},
@@ -574,7 +577,7 @@ const CRUD = {
       {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name',required:true},
       {key:'arm',label:'Arm / Stream (select from dropdown — no typing)',type:'lookup',lookupKind:'arm',help:'Pick from existing arms (A/B/C/D) — created in Academic Setup > Lookups. No manual typing — prevents typos.'},
       {key:'department',label:'Department / Section',type:'ref',refTable:'departments',refValue:'name',refStore:'value',help:'Optional: Nursery, Primary, Junior Secondary, Science, Arts, Boarding, etc.'},
-      {key:'term',label:'Term scope',type:'select',options:['Current Term','Next Term'],required:true},
+      {key:'term',label:'Term scope',type:'select',options:['Current Term','Next Term'],default:'Current Term',required:true,help:'V10: "Current Term" = the bill students owe NOW (drives Total-due auto-fill on Fees & Payments and the dashboards). "Next Term" = the advance bill printed on report cards. New schools: just enter Current Term — Next Term is optional and can come later.'},
       {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
       {key:'tuition',label:'Tuition fee',type:'number'},
       {key:'exam_fee',label:'Exam / assessment fee',type:'number'},
@@ -973,6 +976,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         v = Math.max(0, (nv('basic')+nv('allowances')+nv('bonus')+nv('overtime')) - (nv('tax')+nv('pension')+nv('loan_deduction')+nv('other_deductions')+nv('deductions')));
       }
       if (c.type === 'checkbox') v = v ? '✓' : '';
+      if (c.type === 'multiref' && Array.isArray(v)) v = v.join(', ');
       if (v && (c.type === 'date' || c.type === 'datetime' || /(^|_)(date|dob|created_at|issued_on|due_date|ref_date)$/i.test(c.key))) v = CRUD.formatDate(v);
       // Issue 11: render link columns as image/video thumbnails when possible.
       if (v && isLinkCol(c.key) && window.Super && Super.media) {
@@ -1302,6 +1306,12 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       let field;
       if (c.type === 'textarea') {
         field = '<textarea class="form-input" id="cf-' + CRUD.fid(c.key) + '" rows="2"' + req + '>' + esc(val) + '</textarea>';
+      } else if (c.type === 'multiref') {
+        /* V9.9: checkbox list from a ref table, stored as text[] */
+        const opts = await this.loadOptions({ type:'ref', refTable:c.refTable, refValue:c.refValue, refStore:'value' });
+        const cur = Array.isArray(val) ? val.map(String) : (typeof val==='string'&&val? val.replace(/[{}"]/g,'').split(',').map(s=>s.trim()).filter(Boolean) : []);
+        field = '<div id="cf-' + CRUD.fid(c.key) + '" data-multiref="1" style="display:flex;gap:8px 14px;flex-wrap:wrap;border:1px solid var(--gray-200);border-radius:10px;padding:8px 10px">' +
+          (opts.length ? opts.map(o => '<label style="font-weight:500"><input type="checkbox" class="cf-mr" value="' + esc(o.value) + '"' + (cur.includes(String(o.value)) ? ' checked' : '') + '> ' + esc(o.label) + '</label>').join('') : '<span style="color:var(--gray-500);font-size:.85rem">No records in ' + esc(c.refTable) + ' yet.</span>') + '</div>';
       } else if (c.type === 'ref' || c.type === 'lookup' || c.type === 'select') {
         const opts = this.dedupeOptions((c.type === 'select') ? (c.options || []).map(o => ({ value: o, label: o })) : await this.loadOptions(c));
         const onchg = (c.type === 'ref' && c.autofill) ? ' onchange="CRUD.onRefChange(\'' + moduleId + '\',\'' + c.key + '\',this)"' : '';
@@ -1502,6 +1512,12 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
             if (fr.error || f.ok === false) {
               totEl.readOnly = false;
               if (typeof toast === 'function') toast(fr.error ? 'Auto fee lookup needs the v9.4 database update — enter the total manually for now.' : (f.error || 'Fee lookup failed.'), 'warning', 8000);
+            } else if (f.matched === false || (Number(f.bill||0) === 0 && Number(f.total_due||0) === 0 && Number(f.paid||0) === 0)) {
+              /* V10 (#1): the RPC found NO fee structure for this student's
+                 class/term — say so loudly instead of quietly writing 0. */
+              totEl.readOnly = false; totEl.value = '';
+              totEl.placeholder = 'No fee structure found — enter manually';
+              if (typeof toast === 'function') toast('⚠️ No Class Fee Structure matched ' + (f.class||'this student\'s class') + ' for ' + (f.term||'the current term') + '. Check: (a) a CURRENT-term bill exists for the class on the 💳 Class Fee Structure page, (b) the class name spelling matches the student record, (c) the row is active. You can type the total manually for now.', 'warning', 12000);
             } else {
               const due = Number(f.total_due || 0);
               totEl.value = due.toFixed(2);
@@ -1580,6 +1596,12 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     let missing = '';
     d.cols.forEach(c => {
       const el = document.getElementById('cf-' + CRUD.fid(c.key)); if (!el) return;
+      /* V9.9: multiref reads its checkbox list into a text[] */
+      if (c.type === 'multiref') {
+        const arr = [...el.querySelectorAll('.cf-mr:checked')].map(x => x.value);
+        if (c.key.indexOf('data.') === 0) dataObj[c.key.slice(5)] = arr; else payload[c.key] = arr.length ? arr : null;
+        return;
+      }
       let v = c.type === 'checkbox' ? el.checked : el.value;
       if (c.type === 'number') v = v === '' ? null : Number(v);
       if (c.type !== 'checkbox' && v === '') v = null;
