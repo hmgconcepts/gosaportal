@@ -566,6 +566,8 @@ ${T.setupRequiredBanner()}
       
         <div class="card" style="margin-top:16px;border:2px solid var(--primary)"><h3>💰 School Fees — Current Term</h3><div id="dash-fees"><span class="pulse">Loading fee summary…</span></div></div>
         <div class="card" style="margin-top:16px"><h3>🗓️ Upcoming Exams</h3><div id="dash-exam-tt"><span class="pulse">Loading exam timetable…</span></div></div>
+      
+        <div class="card" style="margin-top:16px"><h3>🛍️ School Shop — Products &amp; Purchases</h3><div id="dash-products"><span class="pulse">Loading products…</span></div></div>
       </section>
 
       <section id="dash-sec-student" data-dash-role="student" style="display:none">
@@ -574,6 +576,8 @@ ${T.setupRequiredBanner()}
       
         <div class="card" style="margin-top:16px;border:2px solid var(--primary)"><h3>💰 School Fees — Current Term</h3><div id="dash-fees"><span class="pulse">Loading fee summary…</span></div></div>
         <div class="card" style="margin-top:16px"><h3>🗓️ Upcoming Exams</h3><div id="dash-exam-tt"><span class="pulse">Loading exam timetable…</span></div></div>
+      
+        <div class="card" style="margin-top:16px"><h3>🛍️ School Shop — Products &amp; Purchases</h3><div id="dash-products"><span class="pulse">Loading products…</span></div></div>
       </section>`);
   },
 

@@ -144,13 +144,14 @@ const CRUD = {
       {key:'room',label:'Room',type:'text'},
       {key:'session',label:'Session',type:'lookup',lookupKind:'session'},{key:'term',label:'Term',type:'lookup',lookupKind:'term'}
     ]},
-    sow: { table:'scheme_of_work', title:'Scheme of Work', cols:[
+    sow: { table:'scheme_of_work', title:'Scheme of Work', help:'V10.1: two-step verification — the TEACHER confirms a topic was taught, then the ADMIN affirms it (✔✔). Unaffirmed confirmations stay visibly pending.', cols:[
       {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
       {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
       {key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'},
       {key:'week',label:'Week',type:'number'},{key:'topic',label:'Topic',type:'text',required:true},
       {key:'status',label:'Status',type:'select',options:['pending','covered','uncovered']},
-      {key:'confirmed',label:'Taught this week (confirm)',type:'checkbox'},
+      {key:'confirmed',label:'Taught this week (teacher confirms)',type:'checkbox'},
+      {key:'admin_affirmed',label:'Admin affirmation (✔✔ verified taught)',type:'checkbox',adminOnly:true,help:'Only the admin tier sees/ticks this — affirms the teacher\'s confirmation after checking (diary, students, spot check).'},
       {key:'teacher',label:'Teacher',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value'}
     ]},
     assignments: { table:'assignments', title:'Assignment', cols:[
@@ -363,8 +364,8 @@ const CRUD = {
       {key:'principal_comment',label:'Principal\'s Comment',type:'textarea'},
       {key:'next_term_begins',label:'Next Term Begins',type:'date'}
     ]},
-    hr: { table:'payroll', title:'Salary / Payslip', alias:'payroll', cols:[
-      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true},
+    hr: { table:'payroll', title:'Salary / Payslip', alias:'payroll', help:'V10.1: bonuses + loan repayments auto-pull on staff pick.', cols:[
+      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true,autofill:{}},
       {key:'month',label:'Month',type:'select',options:['January','February','March','April','May','June','July','August','September','October','November','December'],required:true},
       {key:'year',label:'Year',type:'number',default:new Date().getFullYear()},
       {key:'basic',label:'Basic salary',type:'number',required:true},
@@ -394,13 +395,15 @@ const CRUD = {
       {key:'condition',label:'Condition',type:'select',options:['new','excellent','good','fair','needs repair','retired']},
       {key:'last_audit',label:'Last audit',type:'date'},{key:'next_audit',label:'Next audit',type:'date'}
     ]},
-    lesson_plans: { table:'lesson_plans', title:'Lesson plan', cols:[
+    lesson_plans: { table:'lesson_plans', title:'Lesson plan', help:'V10.1 VETTING WORKFLOW: teacher drafts → submits → admin reviews with written feedback → ✅ approved or ✏️ needs-changes (teacher revises and resubmits). Feedback and reviewer stamp travel with the plan.', cols:[
       {key:'teacher',label:'Teacher',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',searchable:true},{key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
       {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},{key:'week',label:'Week',type:'number'},
       {key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'},
       {key:'objectives',label:'Objectives',type:'textarea'},{key:'content',label:'Content',type:'textarea'},
       {key:'resources',label:'Resources',type:'textarea'},
-      {key:'status',label:'Status',type:'select',options:['draft','submitted','approved']}
+      {key:'status',label:'Status',type:'select',options:['draft','submitted','approved','needs-changes']},
+      {key:'review_feedback',label:'Admin review feedback (vetting)',type:'textarea',adminOnly:true,help:'Written vetting notes for the teacher — required when returning as needs-changes.'},
+      {key:'reviewed_by',label:'Reviewed by (auto)',type:'text',readonly:true,adminOnly:true}
     ]},
     behaviour: { table:'behaviour_points', title:'Behaviour point', cols:[
       {key:'student_name',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class'],refStore:'value',groupBy:'class',searchable:true},
@@ -525,8 +528,8 @@ const CRUD = {
     ]},
 
     /* ===== Issue 5: Staff HR / Payroll suite (salary, bonus, loans, appraisal) ===== */
-    payroll: { table:'payroll', title:'Salary / Payslip', cols:[
-      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true},
+    payroll: { table:'payroll', title:'Salary / Payslip', help:'V10.1: picking the staff member AUTO-PULLS their approved bonuses and active-loan monthly repayment; net pay is computed by the database. Review and save.', cols:[
+      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true,autofill:{}},
       {key:'month',label:'Month',type:'select',options:['January','February','March','April','May','June','July','August','September','October','November','December'],required:true},
       {key:'year',label:'Year',type:'number',default:new Date().getFullYear()},
       {key:'basic',label:'Basic salary',type:'number',required:true},
@@ -1497,6 +1500,33 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
          this term + previous-term arrears), fills term/session with the current
          period, and wires a live balance computation on the amount field. The
          readonly total unlocks on double-click for edge-case overrides. */
+      /* V10.1 (#1): PAYROLL SMART-FILL — picking the staff member pulls their
+         APPROVED bonuses (sum → Bonus field) and ACTIVE loans' monthly
+         repayment (→ Loan repayment field) automatically; net pay is computed
+         by the database trigger. The admin just reviews and saves. */
+      if (['payroll','hr'].includes(this.canonicalId(moduleId)) && key === 'staff_name') {
+        (async () => {
+          try {
+            const name = sel.value; if (!name) return;
+            const [bon, loans] = await Promise.all([
+              this.sb.from('staff_bonus').select('amount,status,reason').ilike('staff_name', name).eq('status','approved').limit(50),
+              this.sb.from('staff_loans').select('monthly_repayment,principal,amount_repaid,repaid_from_payroll,status').ilike('staff_name', name).eq('status','active').limit(20)
+            ]);
+            const bonusEl = document.getElementById('cf-' + CRUD.fid('bonus'));
+            const loanEl = document.getElementById('cf-' + CRUD.fid('loan_deduction'));
+            const bonTotal = (bon.data||[]).reduce((a,b)=>a+(Number(b.amount)||0),0);
+            let monthly = 0, balance = 0;
+            (loans.data||[]).forEach(l => { monthly += Number(l.monthly_repayment)||0;
+              balance += Math.max(0,(Number(l.principal)||0)-(Number(l.amount_repaid)||0)-(Number(l.repaid_from_payroll)||0)); });
+            const bits = [];
+            if (bonusEl && bonTotal > 0 && !Number(bonusEl.value)) { bonusEl.value = bonTotal.toFixed(2); bits.push('🎁 approved bonuses ' + bonTotal.toLocaleString() + ' → Bonus'); }
+            if (loanEl && monthly > 0 && !Number(loanEl.value)) { const ded = Math.min(monthly, balance); loanEl.value = ded.toFixed(2); bits.push('🏦 monthly loan repayment ' + ded.toLocaleString() + ' → Loan deduction (balance ' + balance.toLocaleString() + ')'); }
+            if (bits.length && typeof toast === 'function') toast('💼 Auto-pulled for ' + name + ': ' + bits.join(' · ') + '. Net pay computes automatically — review and save.', 'info', 10000);
+            /* live net preview refresh if the page has one */
+            try { if (loanEl) loanEl.dispatchEvent(new Event('input')); if (bonusEl) bonusEl.dispatchEvent(new Event('input')); } catch(_) {}
+          } catch (_) {}
+        })();
+      }
       if (this.canonicalId(moduleId) === 'fees' && key === 'student_id') {
         (async () => {
           try {
@@ -1645,6 +1675,10 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         (pv('basic') + pv('allowances') + pv('bonus') + pv('overtime')) -
         (pv('tax') + pv('pension') + pv('loan_deduction') + pv('other_deductions') + pv('deductions')));
     }
+    /* V10.1 (#5/#6): audit stamps for SOW affirmation + lesson-plan vetting */
+    if(d.table==='scheme_of_work'&&payload.admin_affirmed&&window.SC_PROFILE){payload.affirmed_by=SC_PROFILE.full_name||SC_PROFILE.email||'';payload.affirmed_at=new Date().toISOString();}
+    if(d.table==='lesson_plans'&&window.SC_PROFILE&&window.App&&App.isAdminRole&&App.isAdminRole(App.currentRole)){
+      if(payload.review_feedback||['approved','needs-changes'].includes(String(payload.status||''))){payload.reviewed_by=SC_PROFILE.full_name||SC_PROFILE.email||'';payload.reviewed_at=new Date().toISOString();}}
     if(d.table==='fee_payments'&&window.SC_PROFILE){if(!id&&!payload.received_by)payload.received_by=SC_PROFILE.id||null;if(!payload.received_by_name)payload.received_by_name=SC_PROFILE.full_name||SC_PROFILE.email||'';if(!payload.payment_date)payload.payment_date=new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});}
     // ENTERPRISE V11 (issue 13): auto-compute fee balance when blank
     if (d.table === 'fee_payments' && payload.balance == null && payload.fee_total != null) {

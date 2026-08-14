@@ -645,7 +645,12 @@ const App = {
     }
     /* V9.6 (#1): leadership tier = admin-wide access; only the owner cockpit
        stays owner-only. */
-    if(['bursar','principal','head_teacher','headteacher'].includes(r))return !App.LEADERSHIP_OWNER_ONLY.has(id);
+    if(['bursar','principal','head_teacher','headteacher'].includes(r)){
+      if(App.LEADERSHIP_OWNER_ONLY.has(id))return false;
+      /* V10.1 (#8): 'none' hides the module from leadership entirely */
+      try{if((App._moduleAccess||{})[id]==='none'){const g=App._myModuleGrants||new Set();return g.has(id);}}catch(_){}
+      return true;
+    }
     if(['staff','teacher'].includes(r))return true;return true;
   },
 
@@ -657,7 +662,7 @@ const App = {
        cached below; per-user grants in sc_module_editors override). */
     if(['bursar','principal','head_teacher','headteacher'].includes(r)){
       if(App.LEADERSHIP_OWNER_ONLY.has(id))return false;
-      try{const m=App._moduleAccess||{};if(m[id]==='readonly'){const g=App._myModuleGrants||new Set();return g.has(id);}}catch(_){}
+      try{const m=App._moduleAccess||{};if(m[id]==='readonly'||m[id]==='none'){const g=App._myModuleGrants||new Set();return g.has(id);}}catch(_){}
       return true;
     }
     if (r === 'parent' || r === 'student') return false; // family-safe
@@ -684,7 +689,11 @@ const App = {
   canAccessPage(pageFileName,role){if(App.isOwnerRole(role))return true;const id=this.normalizeModuleId(pageFileName);
     /* V9.7: leadership tier (principal/head_teacher/bursar) is admin-wide —
        the staff/parent/student access maps below must never restrict them. */
-    if(App.isAdminRole(role))return !App.LEADERSHIP_OWNER_ONLY.has(id);
+    if(App.isAdminRole(role)){
+      if(App.LEADERSHIP_OWNER_ONLY.has(id))return false;
+      if(!App.isOwnerRole(role)){try{if((App._moduleAccess||{})[id]==='none'){const g=App._myModuleGrants||new Set();return g.has(id);}}catch(_){}}
+      return true;
+    }
     if(!App.moduleAllowedForRole(id,role))return false;
     const map = this.roleAccessMap || {};
     if (map[id] && Array.isArray(map[id])) {
@@ -968,8 +977,11 @@ const App = {
         el.dataset.navRoleHidden = '0';
         el.classList.remove('nav-locked');
       } else if (isLeader) {
-        /* V9.7: full nav for the leadership tier — only the owner cockpit hides. */
-        const show=!App.LEADERSHIP_OWNER_ONLY.has(App.normalizeModuleId(moduleId));
+        /* V9.7: full nav for the leadership tier — only the owner cockpit hides.
+           V10.1 (#8): modules set to 'none' hide too (per-user grants override). */
+        const mid=App.normalizeModuleId(moduleId);
+        let show=!App.LEADERSHIP_OWNER_ONLY.has(mid);
+        try{if(show&&(App._moduleAccess||{})[mid]==='none'){const g=App._myModuleGrants||new Set();show=g.has(mid);}}catch(_){}
         el.style.display = show ? '' : 'none';
         el.dataset.navRoleHidden = show ? '0' : '1';
         el.classList.remove('nav-locked');
@@ -1359,24 +1371,55 @@ const App = {
       for (let i = 0; i < 25 && !(window.SC_PROFILE && SC_PROFILE.role); i++) await new Promise(r => setTimeout(r, 200));
       const role = String((window.SC_PROFILE || {}).role || '').toLowerCase();
       if (!['staff','teacher','principal','head_teacher','bursar'].includes(role) && !App.isAdminRole(role)) { box.innerHTML=''; return; }
-      const me = await sb.from('staff').select('id,full_name').eq('user_id', SC_PROFILE.id).maybeSingle();
-      if (!me.data) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">' + (App.isAdminRole(role) ? 'Admins: each staff member sees their own payslips, loans and bonuses here (manage them on the Payroll Register / Staff Loans / Staff Bonuses pages).' : 'Your account is not linked to a staff record yet — ask the admin to link it (Staff page → your record → user link).') + '</p>'; return; }
-      const myName = String(me.data.full_name||'').trim();
-      const money = n => ((window.SCHOOL && SCHOOL.currency) || '₦') + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
-      const [pay, loans, bonus] = await Promise.all([
-        sb.from('payroll').select('*').or('staff_id.eq.' + me.data.id + ',staff_name.ilike.' + myName.replace(/[%,()]/g,'')).order('created_at', { ascending: false }).limit(6).then(r=>r.data||[], ()=>[]),
-        sb.from('staff_loans').select('*').ilike('staff_name', myName.replace(/[%,()]/g,'')).order('created_at', { ascending: false }).limit(6).then(r=>r.data||[], ()=>[]),
-        sb.from('staff_bonus').select('*').ilike('staff_name', myName.replace(/[%,()]/g,'')).order('created_at', { ascending: false }).limit(6).then(r=>r.data||[], ()=>[])
-      ]);
-      const net = r => { const nv = k => Number(r[k]) || 0; return Math.max(0,(nv('basic')+nv('allowances')+nv('bonus')+nv('overtime'))-(nv('tax')+nv('pension')+nv('loan_deduction')+nv('other_deductions')+nv('deductions'))); };
-      let h = '';
-      if (pay.length) h += '<h4 style="margin:4px 0 4px">🧾 Recent payslips</h4><div class="table-wrap"><table><thead><tr><th>Period</th><th>Net pay</th></tr></thead><tbody>' +
-        pay.map(p => '<tr><td>' + esc(p.month || p.period || String(p.created_at||'').slice(0,10)) + '</td><td><b>' + money(net(p)) + '</b></td></tr>').join('') + '</tbody></table></div>';
-      if (loans.length) h += '<h4 style="margin:10px 0 4px">🏦 Loans & advances</h4><div class="table-wrap"><table><thead><tr><th>Type</th><th>Principal</th><th>Monthly</th><th>Status</th></tr></thead><tbody>' +
-        loans.map(l => '<tr><td>' + esc(l.loan_type||'loan') + '</td><td>' + money(l.principal) + '</td><td>' + money(l.monthly_repayment) + '</td><td>' + esc(l.status||'active') + '</td></tr>').join('') + '</tbody></table></div>';
-      if (bonus.length) h += '<h4 style="margin:10px 0 4px">🎁 Bonuses & awards</h4><div class="table-wrap"><table><thead><tr><th>Award</th><th>Amount</th><th>When</th></tr></thead><tbody>' +
-        bonus.map(b => '<tr><td>' + esc(b.reason || b.title || b.bonus_type || 'Bonus') + '</td><td><b>' + money(b.amount) + '</b></td><td>' + esc(String(b.award_date||b.created_at||'').slice(0,10)) + '</td></tr>').join('') + '</tbody></table></div>';
-      box.innerHTML = h || '<p style="color:var(--gray-500);font-size:.85rem">No payslips, loans or bonuses recorded for you yet — entries appear here the moment the bursar saves them. 💡 If you expect to see records, ask the admin to run <code>database/v10.0-fee-match-and-staffpay.sql</code> and confirm your staff record\'s name matches the payroll entries.</p>';
+      /* V10.1 (#1/#2): one RPC returns everything — payslip breakdown, loans
+         with AUTO-COMPUTED balances (manual + payroll repayments summed by
+         the database), approved bonuses — displayed BOLD like the student
+         fee card. */
+      const r = await sb.rpc('sc_staff_pay_state');
+      if (r.error) {
+        if (/could not find|does not exist|schema cache/i.test(r.error.message||'')) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">💤 Pay summary needs a one-time database update — admin: run <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>'; return; }
+        box.innerHTML=''; return;
+      }
+      const f = r.data || {};
+      if (f.ok === false) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">' + (App.isAdminRole(role) && /No staff record/i.test(f.error||'') ? 'Admins: each staff member sees their own payslips, loans and bonuses here.' : esc(f.error || 'Not available.')) + '</p>'; return; }
+      const cur = f.currency || '₦';
+      const money = n => cur + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+      const latest = (f.payslips || [])[0];
+      let h = '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:8px">';
+      if (latest) h += '<div><div style="font-size:1.5rem;font-weight:900;color:#0f172a">' + money(latest.net) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Latest net pay · ' + esc((latest.month||'') + ' ' + (latest.year||'')) + '</div></div>';
+      if (Number(f.loan_balance||0) > 0) h += '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(f.loan_balance) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#b91c1c">Loan balance outstanding</div></div>';
+      if (Number(f.approved_bonus_due||0) > 0) h += '<div><div style="font-size:1.5rem;font-weight:900;color:#15803d">' + money(f.approved_bonus_due) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#15803d">🎁 Approved bonus awaiting payroll</div></div>';
+      if (Number(f.monthly_loan_due||0) > 0) h += '<div><div style="font-size:1.5rem;font-weight:900;color:#b45309">' + money(f.monthly_loan_due) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#b45309">Monthly loan repayment</div></div>';
+      h += '</div>';
+      /* salary breakdown — like the fee breakdown */
+      if (latest) {
+        const items = [['Basic', latest.basic], ['Allowances', latest.allowances], ['Bonus', latest.bonus], ['Overtime', latest.overtime], ['Tax (PAYE)', -latest.tax], ['Pension', -latest.pension], ['Loan repayment', -latest.loan_deduction], ['Other deductions', -latest.other_deductions]].filter(x => Number(x[1]) !== 0);
+        if (items.length) h += '<details style="margin:2px 0 8px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">📋 Salary breakdown (' + esc((latest.month||'')+' '+(latest.year||'')) + ' · ' + esc(latest.status||'') + ')</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + items.map(x => '<tr><td style="padding:2px 6px">' + esc(x[0]) + '</td><td style="padding:2px 6px;text-align:right"><b style="color:' + (x[1] < 0 ? '#b91c1c' : '#0f172a') + '">' + (x[1] < 0 ? '−' + money(-x[1]) : money(x[1])) + '</b></td></tr>').join('') + '<tr><td style="padding:4px 6px;border-top:1px solid var(--gray-300)"><b>Net pay</b></td><td style="padding:4px 6px;text-align:right;border-top:1px solid var(--gray-300)"><b>' + money(latest.net) + '</b></td></tr></table></details>';
+      }
+      const loans = f.loans || [];
+      if (loans.length) h += '<details style="margin:2px 0 8px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">🏦 Loans & advances — auto-computed balances</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + loans.map(l => '<tr><td style="padding:2px 6px">' + esc(l.type||'loan') + ' <small style="color:var(--gray-500)">' + esc(l.status||'') + '</small></td><td style="padding:2px 6px;text-align:right">borrowed <b>' + money(l.principal) + '</b> · repaid ' + money(l.repaid) + ' · balance <b style="color:' + (Number(l.balance)>0?'#b91c1c':'#15803d') + '">' + money(l.balance) + '</b></td></tr>').join('') + '</table></details>';
+      const bons = f.bonuses || [];
+      if (bons.length) h += '<details style="margin:2px 0 8px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">🎁 Bonuses & awards</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + bons.map(b => '<tr><td style="padding:2px 6px">' + esc(b.reason||b.type||'Bonus') + '</td><td style="padding:2px 6px;text-align:right"><b>' + money(b.amount) + '</b> · ' + esc(b.status||'') + '</td></tr>').join('') + '</table></details>';
+      if ((f.payslips||[]).length > 1) h += '<details><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">🧾 Previous payslips</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + f.payslips.slice(1).map(p => '<tr><td style="padding:2px 6px">' + esc((p.month||'')+' '+(p.year||'')) + '</td><td style="padding:2px 6px;text-align:right"><b>' + money(p.net) + '</b> · ' + esc(p.status||'') + '</td></tr>').join('') + '</table></details>';
+      box.innerHTML = h || '<p style="color:var(--gray-500);font-size:.85rem">No payslips, loans or bonuses recorded yet — entries appear here the moment the bursar saves them.</p>';
+    } catch (e) { box.innerHTML = ''; }
+  },
+  /* V10.1 (#3): SCHOOL SHOP — active school products on parent/student
+     dashboards so families can see and purchase (uniforms, books…). */
+  async loadDashProducts() {
+    const box = document.getElementById('dash-products');
+    if (!box || !window.sb) return;
+    try {
+      const r = await sb.from('school_products').select('*').eq('active', true).order('created_at', { ascending: false }).limit(8);
+      if (r.error || !(r.data||[]).length) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">No products on sale right now — new items appear here when the school lists them.</p>'; return; }
+      const cur = (window.SCHOOL && SCHOOL.currency) || '₦';
+      box.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">' +
+        r.data.map(p => '<div style="border:1px solid var(--gray-200);border-radius:12px;padding:10px;text-align:center">' +
+          (p.image_url ? '<img src="' + esc(p.image_url) + '" style="width:100%;height:70px;object-fit:cover;border-radius:8px" onerror="this.style.display=\'none\'">' : '<div style="font-size:1.6rem">🛍️</div>') +
+          '<div style="font-weight:800;font-size:.85rem;margin-top:4px">' + esc(p.name||'') + '</div>' +
+          (p.category ? '<div style="font-size:.72rem;color:var(--gray-500)">' + esc(p.category) + '</div>' : '') +
+          '<div style="font-weight:900;color:var(--primary);margin-top:2px">' + cur + Number(p.price||0).toLocaleString() + '</div></div>').join('') +
+        '</div><p style="font-size:.78rem;color:var(--gray-500);margin:8px 0 0">💳 To purchase: contact the school office/bursar' + ((window.SCHOOL&&SCHOOL.phone)?' (📞 '+esc(SCHOOL.phone)+')':'') + ' or pay via <a href="payments_online.html">Online Payments</a> quoting the product name.</p>';
     } catch (e) { box.innerHTML = ''; }
   },
   /* V9.2: upcoming exam papers for MY classes (student = own class, parent =
@@ -1544,6 +1587,7 @@ const App = {
           try { App.loadDashExamTT(); } catch (e) {}
           try { App.loadDashFees(); } catch (e) {}
           try { App.loadDashMyPay(); } catch (e) {}
+          try { App.loadDashProducts(); } catch (e) {}
           /* V7.8 #3 EDUCATOR DIGEST: "Action needed today" strip — pending
              account approvals, unresolved complaints, pending leave requests,
              open helpdesk tickets, today's birthdays and unapplied promotion
