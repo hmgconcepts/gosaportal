@@ -680,15 +680,15 @@ var ACL={
         var lv=map[m[0]]||'full';
         var list=(edsByMod[m[0]]||[]).map(function(e){return '<span style="background:var(--gray-100);border-radius:8px;padding:2px 8px;font-size:.78rem;margin:1px;display:inline-block">'+esc(names[e.user_id]||e.user_id)+' <a href="#" onclick="ACL.revoke(\''+e.id+'\');return false" style="color:#b91c1c;text-decoration:none" title="Revoke">✕</a></span>';}).join(' ')||'<span style="color:var(--gray-400);font-size:.78rem">none</span>';
         return '<tr><td><b>'+m[1]+'</b><br><small style="color:var(--gray-500)">'+m[0]+'</small></td>'+
-          '<td><select class="form-select" style="min-width:170px" onchange="ACL.setLevel(\''+m[0]+'\',this.value)"><option value="full"'+(lv==='full'?' selected':'')+'>✅ Full read/write</option><option value="readonly"'+(lv==='readonly'?' selected':'')+'>👁 Read-only</option></select></td>'+
+          '<td><select class="form-select" style="min-width:170px" onchange="ACL.setLevel(\''+m[0]+'\',this.value)"><option value="full"'+(lv==='full'?' selected':'')+'>✅ Full read/write</option><option value="readonly"'+(lv==='readonly'?' selected':'')+'>👁 Read-only</option><option value="none"'+(lv==='none'?' selected':'')+'>🚫 No access (hidden)</option></select></td>'+
           '<td>'+list+' <button class="btn btn-sm btn-outline" onclick="ACL.grantModal(\''+m[0]+'\',\''+m[1].replace(/'/g,'')+'\')">➕ Grant</button></td></tr>';
-      }).join('')+'</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">Changes apply within seconds (pages re-check on load). Read-only leadership still SEES every page — they just cannot add/edit/delete on it.</p>';
+      }).join('')+'</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">Changes apply within seconds (pages re-check on load). Read-only leadership still SEES the page but cannot add/edit/delete. 🚫 No access removes the page from their navigation entirely and blocks direct opens. Owner tier is never affected.</p>';
     }catch(e){box.innerHTML='<p style="color:#b91c1c">'+esc(e.message||e)+'</p>';}
   },
   async setLevel(mod,lv){
     var r=await sb.from('sc_module_access').upsert({module:mod,leadership:lv,set_by:(window.SC_PROFILE&&SC_PROFILE.id)||null,set_at:new Date().toISOString()},{onConflict:'module'});
     if(r.error){toast(r.error.message,'danger',7000);return;}
-    toast((lv==='full'?'✅ Principal/Head Teacher/Bursar now have FULL read/write on ':'👁 Principal/Head Teacher/Bursar are now READ-ONLY on ')+mod+'.','success',6000);
+    toast((lv==='full'?'✅ Principal/Head Teacher/Bursar now have FULL read/write on ':lv==='readonly'?'👁 Principal/Head Teacher/Bursar are now READ-ONLY on ':'🚫 Principal/Head Teacher/Bursar can no longer SEE ')+mod+'.','success',6000);
   },
   grantModal(mod,label){
     var opts=(ACL._staff||[]).map(function(p){return '<option value="'+p.id+'">'+esc((p.full_name||p.email)+' ('+p.role+')')+'</option>';}).join('');
