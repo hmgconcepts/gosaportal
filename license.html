@@ -44,6 +44,14 @@
   <div class="card" id="key-card" style="margin-top:16px">
     <h3 style="margin-top:0">🎟️ Activation key</h3>
     <p style="color:var(--gray-600);font-size:.85rem">When this site is <b>key-locked</b>, the subscription can only be changed with a signed HMG activation key (<code>SC1.…</code>). Paste the key you received and apply — the server verifies its signature, applies the new expiry/status, and each key works exactly once.</p>
+    <div style="background:var(--gray-100);border-radius:10px;padding:8px 12px;font-size:.8rem;color:var(--gray-600);margin-bottom:8px">
+      <b>Key recipes (HMG side · V9.9):</b><br>
+      · Renew a term: <code>node tools/make-license-key.mjs --salt "…" --expires 2027-01-31</code><br>
+      · Suspend: <code>… --expires 2026-01-01 --status suspended</code><br>
+      · <b>Convert to ONE-TIME/lifetime ownership:</b> <code>… --model lifetime</code> — one key, the lock never shows again, no database access needed.<br>
+      · Back to subscription later: issue a normal key with a new expiry.
+    </div>
+    <div id="lic-monitor" style="margin-bottom:10px"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
       <div class="form-group" style="flex:1;min-width:260px"><label>Activation key</label><input id="lic-key" class="form-input" placeholder="SC1.eyJleHBpcmVzX29uIjoi….3fb2…"></div>
       <button class="btn btn-primary" onclick="applyActivationKey()">✅ Apply key</button>
@@ -174,6 +182,19 @@ async function loadKeyState(){
   try{
     var locked=false;
     try{var s=await sb.rpc('sc_license_locked');locked=!!(s&&s.data===true);}catch(e){}
+    /* V9.9 (#8): live server-verdict monitor — one glance answers "what does
+       the DATABASE think right now?" (state, days, server date, lock). */
+    try{var mv=await sb.rpc('sc_license_status');var mb=document.getElementById('lic-monitor');
+      if(mb&&mv&&mv.data){var md=mv.data;
+        var col={active:'#16a34a',warning:'#b45309',grace:'#b91c1c',expired:'#b91c1c',suspended:'#b91c1c',lifetime:'#4f46e5'}[md.state]||'#334155';
+        mb.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;border:1.5px solid '+col+';border-radius:12px;padding:10px 14px;background:#fff">'
+          +'<div><div style="font-weight:900;font-size:1.05rem;color:'+col+'">'+esc(String(md.state||'').toUpperCase())+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Server verdict</div></div>'
+          +(md.days!=null?'<div><div style="font-weight:900;font-size:1.05rem">'+esc(md.days)+' day(s)</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">'+(md.state==='expired'?'past grace':md.state==='grace'?'grace left':'until expiry')+'</div></div>':'')
+          +(md.expires_on?'<div><div style="font-weight:900;font-size:1.05rem">'+esc(md.expires_on)+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Expires</div></div>':'')
+          +'<div><div style="font-weight:900;font-size:1.05rem">'+(md.locked?'🔐 Locked':'🔓 Open')+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Key-lock</div></div>'
+          +(md.server_date?'<div><div style="font-weight:900;font-size:1.05rem">'+esc(md.server_date)+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Server date (authoritative)</div></div>':'')
+          +'</div>';
+      }}catch(e){}
     var lt=document.getElementById('lock-tools');
     if(lt)lt.style.display=(__isAdmin&&!locked)?'':'none';
     var mc=document.getElementById('manage-card');

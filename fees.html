@@ -294,9 +294,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">💝</span>
           <span>Donations</span>
-        </a><a href="hr.html" data-module-id="hr" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
-          <span class="app-nav-icon">💼</span>
-          <span>HR &amp; Payroll</span>
         </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">🧾</span>
           <span>Payroll Register</span>
@@ -587,6 +584,7 @@ const FAM={
           h+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px">'
             +'<div><div style="font-size:1.6rem;font-weight:900">'+this.money(cur,f.bill)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Total fees · '+this.esc(f.term||'')+'</div></div>'
             +'<div><div style="font-size:1.6rem;font-weight:900;color:#15803d">'+this.money(cur,f.paid)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Paid this term</div></div>'
+            +(Number(f.aid||0)>0?'<div><div style="font-size:1.6rem;font-weight:900;color:#7c3aed">−'+this.money(cur,f.aid)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:#7c3aed">🎓 Scholarship / aid</div></div>':'')
             +(Number(f.arrears||0)>0?'<div><div style="font-size:1.6rem;font-weight:900;color:#b91c1c">'+this.money(cur,f.arrears)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Previous terms owing</div></div>':'')
             +'<div><div style="font-size:1.6rem;font-weight:900;color:'+(owing>0?'#b91c1c':'#15803d')+'">'+this.money(cur,owing)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:'+(owing>0?'#b91c1c':'#15803d')+'">'+(owing>0?'Total outstanding':'✅ Fully paid')+'</div></div></div>';
         } else h+='<p style="font-size:.85rem;color:var(--gray-500)">Live fee totals appear after the school installs the v9.4 database update. Your payment history is below.</p>';

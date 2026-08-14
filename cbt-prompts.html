@@ -288,9 +288,6 @@
         </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">💝</span>
           <span>Donations</span>
-        </a><a href="hr.html" data-module-id="hr" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
-          <span class="app-nav-icon">💼</span>
-          <span>HR &amp; Payroll</span>
         </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">🧾</span>
           <span>Payroll Register</span>
@@ -630,9 +627,12 @@ Now output/generate the downloadable CSV file only.</textarea>
     </footer>
   
 <div class="card" style="margin-top:18px;border-left:6px solid var(--primary)">
-  <h2>ENTERPRISE STRICT CSV PROMPT — UTME / Common Entrance / Multi-Subject</h2>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <h2 style="margin:0">ENTERPRISE STRICT CSV PROMPT — UTME / Common Entrance / Multi-Subject</h2>
+    <button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-utme')">📋 Copy prompt</button>
+  </div>
   <p style="color:var(--gray-700);line-height:1.7">Use this when the exam contains multiple subjects at once. It forces the output to be a downloadable CSV file content and tags every question with its subject/section so the CBT page can show subject tabs simultaneously.</p>
-  <textarea class="form-input" rows="18" style="font-family:monospace;font-size:.82rem" onclick="this.select()">You are a senior Nigerian school examination setter and CSV data validator.
+  <textarea id="p-utme" class="form-input" rows="18" style="font-family:monospace;font-size:.82rem" onclick="this.select()">You are a senior Nigerian school examination setter and CSV data validator.
 
 TASK: Generate a complete downloadable CSV question bank for School Connect CBT.
 EXAM TYPE: [Common Entrance / UTME Practice / Term Exam / Continuous Assessment]
@@ -669,7 +669,7 @@ If any check fails, silently fix it before responding.
 Now output/generate the downloadable CSV file only.</textarea>
 </div>
 
-<div class="card" style="margin-top:18px;border-left:6px solid #2563eb"><h2>MCQ-ONLY STRICT CSV PROMPT</h2><p style="color:var(--gray-700)">Use this when you want only multiple-choice questions. The output must be saved as a downloadable CSV file and uploaded directly into CBT.</p><textarea class="form-input" rows="14" style="font-family:monospace;font-size:.82rem" onclick="this.select()">Generate [NUMBER] multiple-choice questions for [SUBJECT], [CLASS], topic [TOPIC].
+<div class="card" style="margin-top:18px;border-left:6px solid #2563eb"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">MCQ-ONLY STRICT CSV PROMPT</h2><button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-mcqonly')">📋 Copy prompt</button></div><p style="color:var(--gray-700)">Use this when you want only multiple-choice questions. The output must be saved as a downloadable CSV file and uploaded directly into CBT.</p><textarea id="p-mcqonly" class="form-input" rows="14" style="font-family:monospace;font-size:.82rem" onclick="this.select()">Generate [NUMBER] multiple-choice questions for [SUBJECT], [CLASS], topic [TOPIC].
 
 Output ONLY downloadable CSV file content. Do not output markdown, code fence, notes, numbering outside CSV, or explanation outside CSV.
 
