@@ -119,7 +119,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
           <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
@@ -484,7 +484,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
     </header>
     <div class="app-content">
-      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date" onchange="AT.load()" title="Pick ANY date — past registers load as saved for review or correction"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button><button class="btn btn-outline" data-staff-only onclick="AT.printRegister()">🖨️ Print register</button></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
+      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed. <b>V10.1:</b> QR/ID check-ins now mark the day's register PRESENT automatically (a teacher's explicit mark always wins), and 🚀 Push to report sheets writes each student's present/total counts onto their report card.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date" onchange="AT.load()" title="Pick ANY date — past registers load as saved for review or correction"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button><button class="btn btn-outline" data-staff-only onclick="AT.printRegister()">🖨️ Print register</button><button class="btn btn-primary" data-admin-only onclick="AT.pushToReports()" title="Fill every student's attendance count on their report sheet for this class + term">🚀 Push to report sheets</button></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -527,6 +527,31 @@ const AT_printRegister=function(){
 };
 const AT={
   printRegister(){return AT_printRegister();},
+  /* V10.1 (#4): push per-student attendance counts into report_cards */
+  async pushToReports(){
+    const cls=document.getElementById('at-class').value;
+    if(!cls){toast('Choose a class first.','warning');return;}
+    let cp={};try{const r=await sb.from('academic_periods').select('term,session,starts_on,ends_on').eq('is_current',true).maybeSingle();cp=r.data||{};}catch(_){}
+    openModal('🚀 Push attendance → report sheets · '+cls,
+      '<p style="font-size:.85rem;color:var(--gray-600)">Counts each student\'s PRESENT/LATE days between the two dates and writes <b>present / total school days</b> onto their report sheet for the chosen term. Re-pushing updates the same rows — never duplicates.</p>'+
+      '<div class="grid grid-2">'+
+      '<div class="form-group"><label>Term</label><input class="form-input" id="atp-term" value="'+(cp.term||'')+'" readonly style="background:var(--gray-100)"></div>'+
+      '<div class="form-group"><label>Session</label><input class="form-input" id="atp-session" value="'+(cp.session||'')+'" readonly style="background:var(--gray-100)"></div>'+
+      '<div class="form-group"><label>Term start date</label><input class="form-input" id="atp-start" type="date" value="'+(cp.starts_on||'')+'"></div>'+
+      '<div class="form-group"><label>Term end date (or today)</label><input class="form-input" id="atp-end" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="AT.pushRun(\''+cls.replace(/'/g,"\\'")+'\')">🚀 Push now</button>');
+  },
+  async pushRun(cls){
+    const term=document.getElementById('atp-term').value,session=document.getElementById('atp-session').value;
+    const start=document.getElementById('atp-start').value,end=document.getElementById('atp-end').value;
+    if(!start||!end){toast('Enter the term start and end dates.','warning');return;}
+    const r=await sb.rpc('sc_push_attendance_to_reports',{p_class:cls,p_term:term,p_session:session,p_start:start,p_end:end});
+    if(r.error){toast(/could not find|does not exist|schema cache/i.test(r.error.message||'')?'Run database/v10.1-staffpay-attendance-vetting.sql once, then push again.':r.error.message,'danger',9000);return;}
+    const d=r.data||{};
+    if(d.ok===false){toast(d.error||'Push failed.','danger',8000);return;}
+    closeModal();toast('🚀 Attendance pushed for '+(d.students||0)+' student(s) · '+(d.school_days||0)+' school day(s) counted. Report sheets now show present/total automatically.','success',9000);
+    if(window.App&&App.logActivity)App.logActivity('push-attendance','report_cards',cls);
+  },
   students:[], 
   async init(){
     document.getElementById('at-date').value=new Date().toISOString().slice(0,10);
@@ -650,12 +675,12 @@ const AT={
       })();
     }catch(e){}
   }, 
-  async load(){
-    const cls=document.getElementById('at-class').value, box=document.getElementById('at-register');
-    if(!cls){box.innerHTML='<p>Choose a class.</p>';return;}
-    const {data,error}=await sb.from('students').select('id,full_name,admission_no,class').eq('class',cls).order('full_name').limit(300);
-    if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;}
-    this.students=data||[];
+  async load(){ 
+    const cls=document.getElementById('at-class').value, box=document.getElementById('at-register'); 
+    if(!cls){box.innerHTML='<p>Choose a class.</p>';return;} 
+    const {data,error}=await sb.from('students').select('id,full_name,admission_no,class').eq('class',cls).order('full_name').limit(300); 
+    if(error){box.innerHTML='<div class="card">'+esc(error.message)+'</div>';return;} 
+    this.students=data||[]; 
     /* V7.6 #1: HISTORY-AWARE REGISTER — the register now loads the marks
        ALREADY SAVED for the chosen date (any past date), so staff can review,
        correct or reprint any previous day instead of always starting blank. */

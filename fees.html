@@ -487,6 +487,16 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div id="fam-fees" style="display:none;margin-bottom:16px"></div>
       <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:14px"><b>👀 See samples first:</b> <a href="samples/sample-report-card.html" target="_blank">Report Card</a> · <a href="samples/sample-class-broadsheet.html" target="_blank">Class Broadsheet</a> · <a href="samples/sample-subject-broadsheet.html" target="_blank">Subject Broadsheet</a> · <a href="samples/sample-e-receipt.html" target="_blank">Fee E-Receipt</a></div>
       
+      <div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe" data-admin-only><h2 style="margin-top:0">📑 Master Financial Records — export by class (V10.1)</h2>
+        <p style="color:var(--gray-600);font-size:.9rem">One row per student: current-term bill, scholarship/aid, paid so far, balance, previous-term arrears and TOTAL outstanding — computed live by the same engine that powers the dashboards. Print/save as PDF or download CSV. Needs <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+          <div class="form-group" style="margin:0"><label>Class</label><select class="form-select" id="fm-class"><option value="">ALL classes</option></select></div>
+          <button class="btn btn-primary" onclick="FM.load()">📊 Build master sheet</button>
+          <button class="btn btn-outline" onclick="FM.printPDF()">🖨️ Print / Save PDF</button>
+          <button class="btn btn-outline" onclick="FM.exportCSV()">⬇ CSV</button>
+        </div>
+        <div id="fm-out" style="margin-top:12px"></div>
+      </div>
       <div class="card" style="margin-bottom:16px;border:2px solid #86efac" data-admin-only><h2 style="margin-top:0">💰 Daily Fee Collection Dashboard</h2><p>Know exactly what entered the school each day. Select a date to see total payments, transaction count, average receipt, payment methods, classes, collectors and an auditable transaction list.</p><div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><div class="form-group" style="margin:0"><label>Collection date</label><input class="form-input" id="fd-date" type="date"></div><button class="btn btn-primary" onclick="FeeDaily.load()">View daily collection</button><button class="btn btn-outline" onclick="FeeDaily.exportDay()">Export this day CSV</button></div><div id="fd-out" style="margin-top:12px"><span class="pulse">Loading today’s fees…</span></div></div>
       <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer" onclick="var b=document.getElementById('pg-more');b.style.display=b.style.display==='none'?'block':'none'">
@@ -620,4 +630,33 @@ const FAM={
   }
 };
 document.addEventListener('DOMContentLoaded',()=>FAM.init());FAM.init();
+/* ===== FM — V10.1 (#7): Master financial records export ===== */
+const FM={rows:[],ctx:{},
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  money(n){return((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},
+  async init(){try{const {data}=await sb.from('classes').select('name').order('name');const el=document.getElementById('fm-class');if(el)(data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;el.appendChild(o);});}catch(_){}},
+  async load(){
+    const cls=(document.getElementById('fm-class')||{}).value||'';
+    const box=document.getElementById('fm-out');box.innerHTML='<span class="pulse">Computing every student\'s financial state…</span>';
+    const r=await sb.rpc('sc_class_fee_master',{p_class:cls});
+    if(r.error){box.innerHTML='<div class="notice notice-error">'+this.esc(/could not find|does not exist|schema cache/i.test(r.error.message||'')?'Run database/v10.1-staffpay-attendance-vetting.sql once, then rebuild.':r.error.message)+'</div>';return;}
+    const d=r.data||{};if(d.ok===false){box.innerHTML='<div class="notice notice-error">'+this.esc(d.error||'Failed')+'</div>';return;}
+    this.rows=d.rows||[];this.ctx={cls:cls,term:d.term,session:d.session};
+    if(!this.rows.length){box.innerHTML='<p style="color:var(--gray-500)">No students found'+(cls?' in '+this.esc(cls):'')+'.</p>';return;}
+    let tb=0,tp=0,to=0;this.rows.forEach(x=>{tb+=Number(x.bill)||0;tp+=Number(x.paid)||0;to+=Number(x.total_due)||0;});
+    box.innerHTML='<div id="fm-print-area"><h3 style="text-align:center;margin:4px 0">'+this.esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h3>'
+      +'<p style="text-align:center;margin:0 0 8px;color:var(--gray-600)">MASTER FINANCIAL RECORDS · '+this.esc(cls||'ALL CLASSES')+' · '+this.esc(d.term||'')+' '+this.esc(d.session||'')+' · generated '+new Date().toLocaleString()+'</p>'
+      +'<div class="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Adm. No</th><th>Class</th><th>Dept</th><th>Term bill</th><th>Aid</th><th>Paid</th><th>Balance</th><th>Prev. terms owing</th><th>TOTAL DUE</th></tr></thead><tbody>'
+      +this.rows.map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+this.esc(x.student)+'</b></td><td>'+this.esc(x.admission_no||'')+'</td><td>'+this.esc(x.class||'')+'</td><td>'+this.esc(x.department||'')+'</td><td>'+this.money(x.bill)+'</td><td>'+(Number(x.aid)>0?'−'+this.money(x.aid):'—')+'</td><td>'+this.money(x.paid)+'</td><td>'+this.money(x.balance)+'</td><td>'+(Number(x.arrears)>0?'<b style="color:#b91c1c">'+this.money(x.arrears)+'</b>':'—')+'</td><td><b style="color:'+(Number(x.total_due)>0?'#b91c1c':'#15803d')+'">'+this.money(x.total_due)+'</b></td></tr>').join('')
+      +'<tr style="background:var(--gray-100);font-weight:800"><td colspan="5">TOTALS · '+this.rows.length+' student(s)</td><td>'+this.money(tb)+'</td><td></td><td>'+this.money(tp)+'</td><td></td><td></td><td>'+this.money(to)+'</td></tr></tbody></table></div></div>';},
+  printPDF(){const el=document.getElementById('fm-print-area');if(!el){toast('Build the master sheet first.','warning');return;}
+    const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}
+    w.document.write('<html><head><title>Master Financial Records</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px;color:#111}table{width:100%;border-collapse:collapse}th,td{border:1px solid #334155;padding:4px 6px;font-size:10.5px;text-align:left}th{background:#e2e8f0}h3{margin:0;text-align:center}</style></head><body>'+el.innerHTML+'<p style="text-align:center;font-size:9px;color:#64748b;margin-top:10px">Generated by School Connect · HMG Concepts · Bursar signature: ______________________</p><script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
+  exportCSV(){if(!this.rows.length){toast('Build the master sheet first.','warning');return;}
+    const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const csv=['Student,Admission No,Class,Department,Term Bill,Aid,Paid,Balance,Previous Terms Owing,Total Due']
+      .concat(this.rows.map(x=>[x.student,x.admission_no,x.class,x.department,x.bill,x.aid,x.paid,x.balance,x.arrears,x.total_due].map(esc2).join(','))).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='master-financial-records'+(this.ctx.cls?'-'+this.ctx.cls.replace(/\s+/g,'_'):'')+'.csv';a.click();}
+};
+document.addEventListener('DOMContentLoaded',()=>FM.init());FM.init();
 </script></body></html>
