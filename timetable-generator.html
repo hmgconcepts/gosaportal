@@ -294,9 +294,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">💝</span>
           <span>Donations</span>
-        </a><a href="hr.html" data-module-id="hr" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
-          <span class="app-nav-icon">💼</span>
-          <span>HR &amp; Payroll</span>
         </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">🧾</span>
           <span>Payroll Register</span>
@@ -706,9 +703,9 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     el.innerHTML=teaching?('<b>'+teaching+' teaching periods/day</b>'+(breaks.length?' · breaks: '+breaks.map(esc).join(', '):'')+(Object.keys(counts).length?' · fewer periods: '+Object.entries(counts).map(([d,n])=>d.slice(0,3)+'='+n).join(', '):'')+(Object.keys(lens).length?' · shorter periods: '+Object.entries(lens).map(([d,n])=>d.slice(0,3)+'='+n+'min').join(', '):'')):'Save Step 1 first — the day structure will show here.';
     const hid=document.getElementById('tt-ppd');if(hid&&teaching)hid.value=teaching;},
   fill(id,items,label,key='name'){const el=document.getElementById(id);if(!el)return;const keep=el.value,vals=[...new Set((items||[]).map(x=>typeof x==='string'?x:x[key]).filter(Boolean))].sort();el.innerHTML='<option value="">— '+label+' —</option>'+vals.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(vals.includes(keep))el.value=keep;},
-  async init(){if(!sb)return;const [cl,su,st,lo,ap,cfg]=await Promise.all([sb.from('classes').select('name').order('name'),sb.from('subjects').select('name,teacher,teacher_id').order('name'),sb.from('staff').select('full_name,staff_type,status').eq('status','active').order('full_name'),sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'),sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false}),sb.from('timetable_config').select('*').eq('class','ALL').order('position')]);
+  async init(){if(!sb)return;const [cl,su,st,lo,ap,cfg]=await Promise.all([sb.from('classes').select('name').order('name'),sb.from('subjects').select('name,teacher,teacher_id,classes').order('name'),sb.from('staff').select('full_name,staff_type,status').eq('status','active').order('full_name'),sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'),sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false}),sb.from('timetable_config').select('*').eq('class','ALL').order('position')]);
     /* V8.0 #2: subject → mapped teacher lookup (from the Subjects module). */
-    this.subjectTeachers={};(su.data||[]).forEach(s=>{if(s.name)this.subjectTeachers[s.name]=s.teacher||'';});
+    this.subjectTeachers={};this.subjectClasses={};(su.data||[]).forEach(s=>{if(s.name){this.subjectTeachers[s.name]=s.teacher||'';if(Array.isArray(s.classes)&&s.classes.length)this.subjectClasses[s.name]=s.classes;}});
     this.lookups.classes=cl.data||[];this.lookups.subjects=su.data||[];this.lookups.teachers=st.data||[];this.lookups.terms=[...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value),...(ap.data||[]).map(x=>x.term)];this.lookups.sessions=[...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value),...(ap.data||[]).map(x=>x.session)];this.fill('tt-class',this.lookups.classes,'choose class');try{const tb=document.getElementById('tb-class');if(tb){(this.lookups.classes||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name||c;o.textContent=c.name||c;tb.appendChild(o);});}this.fillMulticlass();this.listBlocks();this.fillGroupSubjects();}catch(_){}this.fill('tt-subject',this.lookups.subjects,'choose subject');this.fill('tt-teacher',this.lookups.teachers,'choose teacher','full_name');this.fill('tt-term',this.lookups.terms,'choose term','');this.fill('tt-session',this.lookups.sessions,'choose session','');const current=(ap.data||[]).find(x=>x.is_current);if(current){document.getElementById('tt-term').value=current.term||'';document.getElementById('tt-session').value=current.session||'';}const rowsCfg=(cfg.data||[]).filter(x=>x.label!=='__daycounts__'&&Number(x.period_no)!==0);
     if(rowsCfg.length){PC.rows=rowsCfg.map(x=>({period_no:Number(x.period_no),label:x.label,start_time:x.start_time,end_time:x.end_time,is_break:x.is_break}));document.getElementById('pc-count').value=PC.rows.filter(x=>!x.is_break).length;PC.preview();toast('📥 Saved school-day schedule loaded — continue where you stopped.','info',4500);}else PC.build();
     /* V8.0 #3: restore per-day period counts from the carrier row. */
@@ -772,6 +769,15 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     [...document.querySelectorAll('.tt-gs:checked')].forEach(x=>x.checked=false);
     await this.loadReqs(targets[0]);},
   subjectPicked(){const s=this.val('tt-subject'),auto=document.getElementById('tt-teacher-auto'),wrap=document.getElementById('tt-teacher-wrap');const t=(this.subjectTeachers||{})[s]||'';
+    /* V9.9 (#5/#6): the subject's class map (Subjects page) drives Step 3 —
+       mapped classes are auto-ticked, unmapped ones are unticked, and the
+       banner turns red if the admin re-ticks a class outside the map. */
+    try{const map=(this.subjectClasses||{})[s];
+      if(map&&map.length){const norm=map.map(x=>String(x).trim().toLowerCase());
+        [...document.querySelectorAll('.tt-mc')].forEach(cb=>{cb.checked=norm.includes(String(cb.value).trim().toLowerCase());});
+        this.mcBanner();
+        toast('🗺️ '+s+' is mapped to: '+map.join(', ')+' — classes auto-ticked from the Subjects page. Adjust only if the mapping is stale.','info',7000);
+      }}catch(_){}
     if(!s){if(auto)auto.innerHTML='';if(wrap)wrap.style.display='none';return;}
     if(t){if(auto)auto.innerHTML='👩‍🏫 Mapped teacher: <b>'+esc(t)+'</b> <small style="color:var(--gray-500)">(from the Subjects module — change it there if wrong)</small>';if(wrap)wrap.style.display='none';const th=document.getElementById('tt-teacher');if(th)th.value='';}
     else{if(auto)auto.innerHTML='<span style="color:#b45309">⚠ No teacher mapped to this subject yet — pick one below (and map it in the Subjects module for next time).</span>';if(wrap)wrap.style.display='block';}},
@@ -797,7 +803,11 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   gcBanner(){const el=document.getElementById('tt-gc-banner');if(!el)return;const t=[...document.querySelectorAll('.tt-gc:checked')].map(x=>x.value);
     el.innerHTML=t.length?'<div style="background:'+(t.length>1?'#fef3c7':'#dcfce7')+';border:1px solid '+(t.length>1?'#fcd34d':'#86efac')+';border-radius:8px;padding:5px 10px;font-size:.82rem"><b>'+(t.length>1?'⚠️ Group will be saved to '+t.length+' classes:':'✅ Group saved to ONE class:')+'</b> '+t.map(esc).join(', ')+'</div>':'<div style="color:#b91c1c;font-size:.82rem">No class ticked — the group will not be saved anywhere.</div>';},
   mcBanner(){const el=document.getElementById('tt-mc-banner');if(!el)return;const t=[...document.querySelectorAll('.tt-mc:checked')].map(x=>x.value);
-    el.innerHTML=t.length?'<div style="background:'+(t.length>1?'#fef3c7':'#dcfce7')+';border:1px solid '+(t.length>1?'#fcd34d':'#86efac')+';border-radius:8px;padding:6px 10px;font-size:.83rem"><b>'+(t.length>1?'⚠️ This subject will be saved to '+t.length+' classes:':'✅ Saving to ONE class:')+'</b> '+t.map(esc).join(', ')+(t.length>1?' — <b>untick</b> the classes that do NOT take it.':'')+'</div>':'<div style="color:#b91c1c;font-size:.83rem">No class ticked — nothing will be saved.</div>';},
+    /* V9.9 (#5): cross-check against the subject's class map */
+    let mismatch=[];try{const s=this.val('tt-subject');const map=(this.subjectClasses||{})[s];
+      if(map&&map.length){const norm=map.map(x=>String(x).trim().toLowerCase());mismatch=t.filter(c=>!norm.includes(String(c).trim().toLowerCase()));}}catch(_){}
+    el.innerHTML=(t.length?'<div style="background:'+(t.length>1?'#fef3c7':'#dcfce7')+';border:1px solid '+(t.length>1?'#fcd34d':'#86efac')+';border-radius:8px;padding:6px 10px;font-size:.83rem"><b>'+(t.length>1?'⚠️ This subject will be saved to '+t.length+' classes:':'✅ Saving to ONE class:')+'</b> '+t.map(esc).join(', ')+(t.length>1?' — <b>untick</b> the classes that do NOT take it.':'')+'</div>':'<div style="color:#b91c1c;font-size:.83rem">No class ticked — nothing will be saved.</div>')
+      +(mismatch.length?'<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:6px 10px;font-size:.83rem;margin-top:4px"><b style="color:#b91c1c">⛔ Not mapped to this subject:</b> '+mismatch.map(esc).join(', ')+' — the Subjects page says these classes do NOT take it. Untick them, or update the subject\'s class list on the Subjects page if the mapping is outdated.</div>':'');},
   dayToggled(cb){const host=document.getElementById('tt-day-periods');if(!host)return;const id='ttdp-'+cb.value;if(cb.checked){if(!document.getElementById(id)){const w=document.createElement('div');w.id=id;w.style.cssText='margin:4px 0';w.innerHTML='<label style="display:inline-flex;gap:8px;align-items:center">'+cb.value+' periods: <input class="form-input tt-dp" data-day="'+cb.value+'" placeholder="e.g. 1,2,3 (blank = any)" style="width:220px"></label>';host.appendChild(w);}}else{const w=document.getElementById(id);if(w)w.remove();}},
   collectDayPeriods(){const out={};let any=false;[...document.querySelectorAll('.tt-dp')].forEach(inp=>{const day=inp.dataset.day,v=String(inp.value||'').trim();if(!v)return;const arr=v.split(/[\s,;]+/).map(x=>parseInt(x,10)).filter(x=>x>=1&&x<=12);if(arr.length){out[day]=arr;any=true;}});return any?out:null;},
   async addBlock(){const cls=this.val('tb-class')||'ALL',day=this.val('tb-day'),per=Number(this.val('tb-period'))||0,label=this.val('tb-label')||'Free period';if(!day||per<1){toast('Pick a day and period number.','warning');return;}const r=await sb.from('timetable_blocks').upsert({class:cls,day:day,period:per,label:label},{onConflict:'class,day,period'});if(r.error){toast(/timetable_blocks/.test(r.error.message)?'Run the latest complete-schema.sql (or database/v7.9-timetable-flex-and-class-scope.sql) first to enable reserved slots.':r.error.message,'danger',9000);return;}toast('⛔ Reserved: '+cls+' · '+day+' · period '+per+' — '+label,'success');this.listBlocks();},
@@ -822,6 +832,12 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     if(!targets.length){toast('Tick at least one class for this subject.','warning');return;}
     /* V9.4 (#6): saving to MANY classes is now a conscious decision. */
     if(targets.length>1&&!confirm('Save "'+subject+'" ('+ppw+'×/week) to '+targets.length+' classes?\n\n• '+targets.join('\n• ')+'\n\nUntick classes in the list above if some do not take this subject.'))return;
+    /* V9.9 (#5): ALERT on classes outside the subject's map (Subjects page). */
+    try{const map=(this.subjectClasses||{})[subject];
+      if(map&&map.length){const norm=map.map(x=>String(x).trim().toLowerCase());
+        const bad=targets.filter(c=>!norm.includes(String(c).trim().toLowerCase()));
+        if(bad.length&&!confirm('⛔ MAPPING ALERT\n\nThe Subjects page says "'+subject+'" is taken by:\n• '+map.join('\n• ')+'\n\nBut you are about to save it to these UNMAPPED class(es):\n• '+bad.join('\n• ')+'\n\nOK = save anyway (I know better than the map)\nCancel = go back and untick them.'))return;}
+    }catch(_){}
     /* V9.1 (4a/4c): double periods + early-period cap flow into the engine. */
     const dbl=Math.max(0,Number(this.val('tt-dbl'))||0);
     const maxpRaw=this.val('tt-maxp');const maxp=maxpRaw?Math.max(1,Math.min(12,Number(maxpRaw)||0)):null;

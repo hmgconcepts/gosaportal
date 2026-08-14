@@ -294,9 +294,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">💝</span>
           <span>Donations</span>
-        </a><a href="hr.html" data-module-id="hr" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
-          <span class="app-nav-icon">💼</span>
-          <span>HR &amp; Payroll</span>
         </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">🧾</span>
           <span>Payroll Register</span>
@@ -637,6 +634,12 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <a class="btn btn-primary btn-sm" href="license.html">Open Site License &amp; Subscription →</a>
         </div>
       </div>
+      <!-- V9.9 (#7): per-module leadership access + authorized editors -->
+      <div class="card" style="margin-top:16px" id="acl-card" data-owner-only>
+        <h3 style="margin-top:0">🔐 Module Access Control — leadership & authorized editors</h3>
+        <p style="color:var(--gray-600);font-size:.87rem;line-height:1.6">For each protected module below, the owner tier (Super Admin / Admin / Proprietor) decides whether <b>Principal, Head Teacher and Bursar</b> get <b>Full read/write</b> (default) or <b>Read-only</b>. Individual staff can additionally be granted edit rights per module (same mechanism as the timetable's Authorized Editors). Enforced in the DATABASE (RLS + sc_can_edit) and mirrored in the UI. Needs <code>database/v9.9-aid-editors-subjects.sql</code>.</p>
+        <div id="acl-grid"><span class="pulse">Loading module access…</span></div>
+      </div>
       <!-- V9.1: OPTIONAL AI assistant — bring-your-own-key, OFF by default -->
       <div class="card" style="margin-top:16px" id="ai-card" data-admin-only>
         <h3 style="margin-top:0">🤖 AI Assistant (optional — bring your own key)</h3>
@@ -655,6 +658,60 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <p style="font-size:.78rem;color:var(--gray-500);margin:10px 0 0">Where it appears once enabled: ✨ buttons for staff on Lesson Plans, Scheme of Work, Announcements and Messages, plus <code>AI.openBox()</code> for ad-hoc drafting. AI output is always a suggestion for a human to review — never an automatic decision.</p>
       </div>
     </div>
+<script>
+/* ===== ACL — V9.9 (#7): per-module leadership switch + authorized editors ===== */
+var ACL={
+  MODULES:[['school_fees','💳 Class Fee Structure'],['settings','⚙️ Settings'],['admin_data','🗄️ Admin Data'],['storage','🧰 Storage Manager'],['directory','🔍 Directory'],['staff_bonus','🎁 Staff Bonuses'],['payroll','🧾 Payroll Register'],['financial_aid','🎗️ Financial Aid'],['fees','💰 Fees & Payments'],['staff_loans','🏦 Staff Loans & Advances'],['timetable','🗓️ Timetables (published + wizard + exam)']],
+  async load(){
+    var box=document.getElementById('acl-grid');if(!box||!window.sb)return;
+    try{
+      for(var i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+      var role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if(!(window.App&&App.isOwnerRole&&App.isOwnerRole(role))){var c=document.getElementById('acl-card');if(c)c.style.display='none';return;}
+      var acc=await sb.from('sc_module_access').select('*');
+      if(acc.error){box.innerHTML='<p style="color:#b45309;font-size:.85rem">Run <code>database/v9.9-aid-editors-subjects.sql</code> once in the Supabase SQL Editor to activate this panel.</p>';return;}
+      var map={};(acc.data||[]).forEach(function(x){map[x.module]=x.leadership;});
+      var eds=await sb.from('sc_module_editors').select('*');
+      var edsByMod={};(eds.data||[]).forEach(function(x){(edsByMod[x.module]=edsByMod[x.module]||[]).push(x);});
+      var st=await sb.from('profiles').select('id,full_name,email,role').in('role',['staff','teacher','principal','head_teacher','bursar']).eq('status','approved').order('full_name');
+      ACL._staff=st.data||[];ACL._eds=edsByMod;
+      var names={};ACL._staff.forEach(function(p){names[p.id]=p.full_name||p.email;});
+      box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Module</th><th>Principal / Head Teacher / Bursar</th><th>Extra authorized editors</th></tr></thead><tbody>'+ACL.MODULES.map(function(m){
+        var lv=map[m[0]]||'full';
+        var list=(edsByMod[m[0]]||[]).map(function(e){return '<span style="background:var(--gray-100);border-radius:8px;padding:2px 8px;font-size:.78rem;margin:1px;display:inline-block">'+esc(names[e.user_id]||e.user_id)+' <a href="#" onclick="ACL.revoke(\''+e.id+'\');return false" style="color:#b91c1c;text-decoration:none" title="Revoke">✕</a></span>';}).join(' ')||'<span style="color:var(--gray-400);font-size:.78rem">none</span>';
+        return '<tr><td><b>'+m[1]+'</b><br><small style="color:var(--gray-500)">'+m[0]+'</small></td>'+
+          '<td><select class="form-select" style="min-width:170px" onchange="ACL.setLevel(\''+m[0]+'\',this.value)"><option value="full"'+(lv==='full'?' selected':'')+'>✅ Full read/write</option><option value="readonly"'+(lv==='readonly'?' selected':'')+'>👁 Read-only</option></select></td>'+
+          '<td>'+list+' <button class="btn btn-sm btn-outline" onclick="ACL.grantModal(\''+m[0]+'\',\''+m[1].replace(/'/g,'')+'\')">➕ Grant</button></td></tr>';
+      }).join('')+'</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">Changes apply within seconds (pages re-check on load). Read-only leadership still SEES every page — they just cannot add/edit/delete on it.</p>';
+    }catch(e){box.innerHTML='<p style="color:#b91c1c">'+esc(e.message||e)+'</p>';}
+  },
+  async setLevel(mod,lv){
+    var r=await sb.from('sc_module_access').upsert({module:mod,leadership:lv,set_by:(window.SC_PROFILE&&SC_PROFILE.id)||null,set_at:new Date().toISOString()},{onConflict:'module'});
+    if(r.error){toast(r.error.message,'danger',7000);return;}
+    toast((lv==='full'?'✅ Principal/Head Teacher/Bursar now have FULL read/write on ':'👁 Principal/Head Teacher/Bursar are now READ-ONLY on ')+mod+'.','success',6000);
+  },
+  grantModal(mod,label){
+    var opts=(ACL._staff||[]).map(function(p){return '<option value="'+p.id+'">'+esc((p.full_name||p.email)+' ('+p.role+')')+'</option>';}).join('');
+    openModal('➕ Grant edit access · '+esc(label),
+      '<p style="font-size:.85rem;color:var(--gray-600)">The chosen person can add/edit/delete on this module even when leadership is read-only (per-user grants override the switch).</p>'+
+      '<div class="form-group"><label>Staff member</label><select class="form-select" id="acl-user"><option value="">— choose —</option>'+opts+'</select></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="ACL.grant(\''+mod+'\')">➕ Grant</button>');
+  },
+  async grant(mod){
+    var uid=document.getElementById('acl-user').value;if(!uid){toast('Choose a staff member.','warning');return;}
+    var r=await sb.from('sc_module_editors').upsert({module:mod,user_id:uid,granted_by:(window.SC_PROFILE&&SC_PROFILE.id)||null},{onConflict:'module,user_id'});
+    if(r.error){toast(r.error.message,'danger',7000);return;}
+    closeModal();toast('✅ Edit access granted on '+mod+'.','success');ACL.load();
+  },
+  async revoke(id){
+    if(!confirm('Revoke this editor\'s access?'))return;
+    var r=await sb.from('sc_module_editors').delete().eq('id',id);
+    if(r.error){toast(r.error.message,'danger');return;}
+    toast('Access revoked.','success');ACL.load();
+  }
+};
+document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){ACL.load();},800);});
+</script>
 <script>
 /* V9.1 AI settings loader/saver (admin-only card) */
 var AISET={
