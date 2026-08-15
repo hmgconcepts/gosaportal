@@ -528,7 +528,10 @@ const App = {
        UI but are NO LONGER enforced by default. */
   PRINCIPAL_DENY:new Set([]),
   HEADTEACHER_DENY:new Set([]),
-  LEADERSHIP_OWNER_ONLY:new Set(['site_license','license','developer','status_manager']),
+  /* V10.2 (#8): status_manager moved OUT of the hard owner-only set — it is
+     now governed by Module Access Control (default 'none' seeded by v10.2
+     SQL, so behaviour is unchanged until the owner flips it). */
+  LEADERSHIP_OWNER_ONLY:new Set(['site_license','license','developer']),
 
   /* Modules that parents/students should NEVER see. The whitelist
      (PARENT_WHITELIST / STUDENT_WHITELIST) handles everything else.
@@ -1407,20 +1410,26 @@ const App = {
   /* V10.1 (#3): SCHOOL SHOP — active school products on parent/student
      dashboards so families can see and purchase (uniforms, books…). */
   async loadDashProducts() {
-    const box = document.getElementById('dash-products');
+    /* V10.2 (#1): the card exists in BOTH the parent and student sections →
+       duplicate id. getElementById filled only the FIRST (hidden) one — the
+       V9.5 lesson applied again: paint EVERY container. */
+    const boxes = [...document.querySelectorAll('[id="dash-products"]')];
+    const box = boxes[0];
+    const paint = (html) => boxes.forEach(b => { b.innerHTML = html; });
     if (!box || !window.sb) return;
     try {
       const r = await sb.from('school_products').select('*').eq('active', true).order('created_at', { ascending: false }).limit(8);
-      if (r.error || !(r.data||[]).length) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">No products on sale right now — new items appear here when the school lists them.</p>'; return; }
+      if (r.error) { paint('<p style="color:var(--gray-500);font-size:.85rem">Could not load products. <button class="btn btn-sm btn-outline" onclick="App.loadDashProducts()">🔄 Retry</button></p>'); return; }
+      if (!(r.data||[]).length) { paint('<p style="color:var(--gray-500);font-size:.85rem">No products on sale right now — new items appear here when the school lists them on the School Products page.</p>'); return; }
       const cur = (window.SCHOOL && SCHOOL.currency) || '₦';
-      box.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">' +
+      paint('<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">' +
         r.data.map(p => '<div style="border:1px solid var(--gray-200);border-radius:12px;padding:10px;text-align:center">' +
           (p.image_url ? '<img src="' + esc(p.image_url) + '" style="width:100%;height:70px;object-fit:cover;border-radius:8px" onerror="this.style.display=\'none\'">' : '<div style="font-size:1.6rem">🛍️</div>') +
           '<div style="font-weight:800;font-size:.85rem;margin-top:4px">' + esc(p.name||'') + '</div>' +
           (p.category ? '<div style="font-size:.72rem;color:var(--gray-500)">' + esc(p.category) + '</div>' : '') +
           '<div style="font-weight:900;color:var(--primary);margin-top:2px">' + cur + Number(p.price||0).toLocaleString() + '</div></div>').join('') +
-        '</div><p style="font-size:.78rem;color:var(--gray-500);margin:8px 0 0">💳 To purchase: contact the school office/bursar' + ((window.SCHOOL&&SCHOOL.phone)?' (📞 '+esc(SCHOOL.phone)+')':'') + ' or pay via <a href="payments_online.html">Online Payments</a> quoting the product name.</p>';
-    } catch (e) { box.innerHTML = ''; }
+        '</div><p style="font-size:.78rem;color:var(--gray-500);margin:8px 0 0">💳 To purchase: contact the school office/bursar' + ((window.SCHOOL&&SCHOOL.phone)?' (📞 '+esc(SCHOOL.phone)+')':'') + ' or pay via <a href="payments_online.html">Online Payments</a> quoting the product name.</p>');
+    } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Could not load products. <button class="btn btn-sm btn-outline" onclick="App.loadDashProducts()">🔄 Retry</button></p>'); }
   },
   /* V9.2: upcoming exam papers for MY classes (student = own class, parent =
      children's classes, staff/admin = whole school preview). Renders into any
@@ -1882,5 +1891,33 @@ else App.init();
      `window.App`-guarded paths silently skipped platform-wide.
    One line makes every guard truthful: */
 window.App = App;
+
+/* ====================================================================
+   V10.2 (#2): PASSWORD VISIBILITY TOGGLE — every password field on every
+   page (login, signup, change-password, settings keys…) gets a 👁 button
+   to show/hide what was typed. Injected automatically, works for fields
+   added later too (MutationObserver).
+   ==================================================================== */
+(function(){
+  function enhance(inp){
+    try{
+      if(inp.dataset.scEye)return; inp.dataset.scEye='1';
+      const wrap=document.createElement('div');
+      wrap.style.cssText='position:relative;display:block';
+      inp.parentNode.insertBefore(wrap,inp); wrap.appendChild(inp);
+      const btn=document.createElement('button');
+      btn.type='button'; btn.tabIndex=-1; btn.setAttribute('aria-label','Show/hide password');
+      btn.textContent='👁';
+      btn.style.cssText='position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1rem;opacity:.55;padding:2px 4px;line-height:1';
+      btn.onmouseenter=()=>btn.style.opacity='1'; btn.onmouseleave=()=>btn.style.opacity='.55';
+      btn.onclick=()=>{const show=inp.type==='password'; inp.type=show?'text':'password'; btn.textContent=show?'🙈':'👁'; inp.focus();};
+      inp.style.paddingRight='34px';
+      wrap.appendChild(btn);
+    }catch(_){}
+  }
+  function scan(){document.querySelectorAll('input[type="password"]').forEach(enhance);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan);else scan();
+  try{new MutationObserver(()=>scan()).observe(document.documentElement,{childList:true,subtree:true});}catch(_){}
+})();
 
 console.log('%c[School Connect v15] app.js loaded — RBAC, family-safe nav, fixed notifications.', 'color:#10b981;font-weight:bold');
