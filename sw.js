@@ -1,6 +1,6 @@
 // School Connect Service Worker — V5 cumulative release (offline + push + timeout)
 // Literal cache version intentionally changes with every runtime deployment.
-const CACHE = 'sc-client-v10.1-20260814-60';
+const CACHE = 'sc-client-v10.2-20260815-61';
 const CORE = ['./','./index.html','./login.html','./dashboard.html','./offline.html','./assets/css/style.css','./assets/js/config.js','./assets/js/app.js','./assets/js/crud.js','./assets/js/drive-sync.js','./assets/js/security-guard.js','./assets/js/cbt-engine.js','./assets/js/report-engine.js','./assets/js/notifications.js','./assets/js/voting.js','./assets/js/pwa-install.js','./assets/js/super.js','./assets/js/site-help.js','./assets/js/enterprise.js','./assets/js/analytics.js','./assets/img/logo.png','./manifest.json'];
 
 self.addEventListener('install', e => {

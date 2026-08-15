@@ -718,7 +718,22 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
   classesTicked(){this.contextChanged();},
   tickedClasses(){return [...document.querySelectorAll('.tt-cls:checked')].map(x=>x.value);},
   /* V8.0 #2: picking a subject reveals its MAPPED teacher automatically. */
-  fillGroupSubjects(){try{const host=document.getElementById('tt-group-subjects');if(!host)return;host.innerHTML=(this.lookups.subjects||[]).map(s=>{const n=s.name||s;return '<label><input type="checkbox" class="tt-gs" value="'+esc(n)+'"> '+esc(n)+'</label>';}).join('');}catch(_){}},
+  fillGroupSubjects(){try{const host=document.getElementById('tt-group-subjects');if(!host)return;host.innerHTML=(this.lookups.subjects||[]).map(s=>{const n=s.name||s;return '<label><input type="checkbox" class="tt-gs" value="'+esc(n)+'" onchange="TTG.groupSubjectsChanged()"> '+esc(n)+'</label>';}).join('');}catch(_){}},
+  /* V10.2 (#3): ticking group subjects AUTO-TICKS the classes that take them —
+     the INTERSECTION of every ticked member's class map (a department block
+     can only run in classes taking ALL its member subjects). */
+  groupSubjectsChanged(){try{
+    const subs=[...document.querySelectorAll('.tt-gs:checked')].map(x=>x.value);
+    if(!subs.length){this.gcBanner();return;}
+    const maps=subs.map(s=>(this.subjectClasses||{})[s]).filter(Boolean);
+    if(maps.length<subs.length){this.gcBanner();return;} /* some member unmapped → leave manual */
+    const norm=a=>a.map(x=>String(x).trim().toLowerCase());
+    let inter=norm(maps[0]);
+    maps.slice(1).forEach(m=>{const nm=norm(m);inter=inter.filter(c=>nm.includes(c));});
+    [...document.querySelectorAll('.tt-gc')].forEach(cb=>{cb.checked=inter.includes(String(cb.value).trim().toLowerCase());});
+    this.gcBanner();
+    if(subs.length>=2)toast('🗺️ Classes auto-ticked: only those taking ALL of '+subs.join(' + ')+' (from the Subjects page maps).','info',6000);
+  }catch(_){}},
   /* V8.3 #4: department option group — 'Commerce / CRS / Chemistry' saved as ONE
      demand whose subject and teacher are slash-joined lists; the SQL engine's
      list-aware conflict check protects every listed teacher individually. */
@@ -742,6 +757,18 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     const gcs=[...document.querySelectorAll('.tt-gc:checked')].map(x=>x.value);
     const targets=[...new Set(gcs.length?gcs:ticked)];
     if(!targets.length){toast('Tick at least one class for this option group.','warning');return;}
+    /* V10.2 (#5): HARD BLOCK — a class outside ANY member subject's map cannot
+       receive the group. No override: fix the tick or fix the map first. */
+    {let blocked=[];
+     for(const s of subs){const map=(this.subjectClasses||{})[s];
+       if(map&&map.length){const nm=map.map(x=>String(x).trim().toLowerCase());
+         targets.forEach(c=>{if(!nm.includes(String(c).trim().toLowerCase())&&!blocked.some(b=>b.cls===c&&b.sub===s))blocked.push({cls:c,sub:s});});}}
+     if(blocked.length){
+       openModal('⛔ Class–subject mismatch — group NOT saved',
+         '<p>The Subjects page says these classes do <b>NOT</b> take these group members:</p><ul style="margin:6px 0;padding-left:20px">'+blocked.map(b=>'<li><b>'+esc(b.cls)+'</b> does not take <b>'+esc(b.sub)+'</b></li>').join('')+'</ul>'+
+         '<p style="font-size:.85rem;color:var(--gray-600)">Fix one of the two:</p><ol style="font-size:.85rem;padding-left:20px"><li><b>Untick</b> those classes above, or</li><li>If the mapping is outdated, update the subject\'s "Classes taking this subject" list on the <a href="subjects.html">Subjects page</a>, reload, and try again.</li></ol>',
+         '<button class="btn btn-primary" onclick="closeModal()">OK — I will fix it</button>');
+       return;}}
     const subject=subs.join(' / '), teacher=teachers.join(' / ');
     if(!confirm('Save the option group?\n\nSubjects (one shared slot): '+subject+'\nTeachers: '+teacher+'\nPeriods/week per class: '+ppw+(_gd?'\nDouble periods: '+_gd:'')+'\n\nClasses receiving it ('+targets.length+'):\n• '+targets.join('\n• ')+'\n\nUntick classes above if any do not take this department block.'))return;
     /* V8.5 #1: part-time member? The whole group inherits the restriction. */
@@ -759,6 +786,13 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
         try{const nr=await sb.from('timetable_requirements').select('id').eq('class',cls).eq('subject',subject).maybeSingle();if(nr.data){(this._addedIds=this._addedIds||new Set()).add(nr.data.id);}}catch(_){}}
     }
     if(err&&!ok){toast(err.message||err,'danger');return;}
+    /* V10.2 (#4): SELF-HEAL — remove this exact group from any class NOT in
+       today's target list (cleans up earlier wrong-class saves so the next
+       Generate can never place it there again). */
+    try{const stale=await sb.from('timetable_requirements').select('id,class').eq('subject',subject);
+      const wrong=(stale.data||[]).filter(x=>!targets.includes(x.class));
+      if(wrong.length){await sb.from('timetable_requirements').delete().in('id',wrong.map(x=>x.id));
+        toast('🧹 Also removed this group from '+wrong.length+' class(es) that no longer take it: '+wrong.map(x=>x.class).join(', ')+'. Regenerate those classes to update their grids.','info',9000);}}catch(_){}
     /* V9.5 (#5): a clear receipt of exactly what was written where. */
     openModal('🎓 Option group saved',
       '<p><b>'+esc(subject)+'</b> now occupies ONE shared weekly slot ('+ppw+'×/week'+(_gd?' incl. '+_gd+' double':'')+') in each of these classes:</p>'+
@@ -854,12 +888,34 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     toast('Demand saved for '+okCount+' class'+(okCount>1?'es':'')+': '+subject+' · '+ppw+'/week · '+teacher+(dayPeriods?' · limited periods set':''),'success',8000);
     if(firstErr)toast('Some classes failed: '+(firstErr.message||firstErr),'warning',8000);
     await this.loadReqs(c.class);},
-  async loadReqs(cls){const r=await Enterprise.timetable.listRequirements(cls);this.reqs=r.data||[];
-    /* V9.5 (BUG B): every row now shows its PROVENANCE — 🆕 added in THIS
-       sitting vs 📦 already in the database (with its save date). Old rows
-       from earlier sessions/copies are instantly recognisable instead of
-       looking like mysterious auto-fills. */
-    this._addedIds=this._addedIds||new Set();const box=document.getElementById('tt-reqs');box.innerHTML='<div class="card"><h3>Step 3 summary · Subject demand for '+esc(cls)+'</h3><p class="help" style="margin:2px 0 8px">Only what YOU add appears here. Seeing subjects you never added? They came from older sample/demo data — remove them individually or use <b>🧹 Clear ALL demand for this class</b> and rebuild the list cleanly. <small>(Sample data no longer re-seeds once this table has rows — v9.2.)</small></p><div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Doubles</th><th>Latest period</th><th>Available days</th><th></th></tr></thead><tbody>'+(this.reqs.length?this.reqs.map(x=>'<tr><td>'+(TTG._addedIds&&TTG._addedIds.has(x.id)?'<span title="Added in this sitting" style="background:#dcfce7;color:#166534;border-radius:6px;padding:1px 6px;font-size:.72rem;font-weight:700">🆕 new</span> ':'<span title="Saved earlier — '+esc(String(x.created_at||'').slice(0,10))+'" style="background:var(--gray-100);color:var(--gray-500);border-radius:6px;padding:1px 6px;font-size:.72rem">📦 '+esc(String(x.created_at||'').slice(0,10))+'</span> ')+'<b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+(Number(x.double_periods||0)?('<b style="color:#7c3aed">'+Number(x.double_periods)+' × double</b>'):'—')+'</td><td>'+(x.max_period?('≤ P'+x.max_period+' 🌅'):'any')+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([d,a])=>d.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>').join(''):'<tr><td colspan="7">No subject demand yet. Add every subject taught in this class.</td></tr>')+'</tbody></table></div><div style="margin-top:8px">'+(this.reqs.length?'<button class="btn btn-sm btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="TTG.clearReqs(\''+esc(cls)+'\')">🧹 Clear ALL demand for this class</button>':'')+'</div></div>';this.updateChecklist();},
+  async loadReqs(cls){
+    /* V10.2 (#6/#7) ROOT CAUSE of "my department group vanished from the
+       summary": this panel showed ONE class at a time, and each save reloaded
+       it for the FIRST target class — which often wasn't the class you were
+       watching, so rows seemed to disappear (they were safe in the DB).
+       Now it is a MULTI-CLASS summary: every Step-2 ticked class gets its own
+       section, single subjects and 🎓 option groups TOGETHER, loaded fresh
+       from the database — so what you see is always exactly what is stored
+       (#7: nothing more, nothing less). */
+    this._addedIds=this._addedIds||new Set();
+    const ticked=this.tickedClasses();
+    const classes=[...new Set([cls].concat(ticked))].filter(Boolean);
+    let all=[];
+    if(classes.length){const r=await sb.from('timetable_requirements').select('*').in('class',classes).order('class').order('periods_per_week',{ascending:false});all=r.data||[];}
+    this.reqs=all.filter(x=>x.class===cls);
+    this.reqsAll=all;
+    const box=document.getElementById('tt-reqs');
+    const rowHtml=x=>'<tr><td>'+(TTG._addedIds&&TTG._addedIds.has(x.id)?'<span title="Added in this sitting" style="background:#dcfce7;color:#166534;border-radius:6px;padding:1px 6px;font-size:.72rem;font-weight:700">🆕 new</span> ':'<span title="Saved earlier — '+esc(String(x.created_at||'').slice(0,10))+'" style="background:var(--gray-100);color:var(--gray-500);border-radius:6px;padding:1px 6px;font-size:.72rem">📦 '+esc(String(x.created_at||'').slice(0,10))+'</span> ')+(String(x.subject||'').includes(' / ')?'<span title="Department option group — one shared slot" style="background:#ede9fe;color:#5b21b6;border-radius:6px;padding:1px 6px;font-size:.72rem;font-weight:700">🎓 group</span> ':'')+'<b>'+esc(x.subject)+'</b></td><td>'+esc(x.teacher||'—')+'</td><td>'+Number(x.periods_per_week||0)+'</td><td>'+(Number(x.double_periods||0)?('<b style="color:#7c3aed">'+Number(x.double_periods)+' × double</b>'):'—')+'</td><td>'+(x.max_period?('≤ P'+x.max_period+' 🌅'):'any')+'</td><td>'+esc((x.available_days&&x.available_days.length?x.available_days.join(', '):'Monday–Friday'))+(x.available_periods?'<br><small style="color:#7c3aed">periods: '+esc(Object.entries(x.available_periods).map(([dd,a])=>dd.slice(0,3)+' '+a.join(',')).join(' · '))+'</small>':'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeReq(\''+x.id+'\')">Remove</button></td></tr>';
+    let h='<div class="card"><h3>Step 3 summary · Subject demand — all ticked classes</h3><p class="help" style="margin:2px 0 8px">Single subjects and 🎓 option groups appear TOGETHER per class, loaded live from the database — exactly what is stored, nothing else. Rows show 🆕 (this sitting) or 📦 (saved earlier).</p>';
+    if(!classes.length)h+='<p style="color:var(--gray-500)">Tick classes in Step 2 first.</p>';
+    classes.forEach(c2=>{
+      const rows=all.filter(x=>x.class===c2);
+      const tot=rows.reduce((a,x)=>a+Number(x.periods_per_week||0),0);
+      h+='<h4 style="margin:12px 0 4px">'+esc(c2)+' <small style="color:var(--gray-500)">('+rows.length+' subject'+(rows.length===1?'':'s')+' · '+tot+' periods/week)</small></h4>';
+      h+=rows.length?'<div class="table-wrap"><table><thead><tr><th>Subject</th><th>Teacher</th><th>Periods/week</th><th>Doubles</th><th>Latest period</th><th>Available days</th><th></th></tr></thead><tbody>'+rows.map(rowHtml).join('')+'</tbody></table></div><div style="margin:4px 0 0"><button class="btn btn-sm btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="TTG.clearReqs(\''+esc(c2)+'\')">🧹 Clear ALL demand for '+esc(c2)+'</button></div>':'<p style="color:var(--gray-500);font-size:.85rem">No subject demand yet for this class.</p>';
+    });
+    h+='</div>';
+    box.innerHTML=h;this.updateChecklist();},
   /* V9.2 (issue 2): one-click removal of stale/seeded demand rows. */
   async clearReqs(cls){if(!confirm('Remove ALL '+this.reqs.length+' subject demand row(s) for '+cls+'?\n\nUse this to wipe old sample data, then add only the subjects you actually teach. Generated timetables are not touched.'))return;
     const r=await sb.from('timetable_requirements').delete().eq('class',cls);
