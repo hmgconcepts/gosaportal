@@ -288,7 +288,45 @@ const CBT = {
   // slim list is a few KB. Full rows are still fetched per-exam whenever the
   // teacher edits, previews, exports or appends questions.
   async listExams() { if (!this._sb) return {data:null,error:{message:'Database not configured'}}; const all=[];for(let from=0;from<5000;from+=500){const r=await this._sb.from('cbt_exams').select('id,code,title,subject,class,term,session,assessment_type,report_column,max_score,duration,duration_min,attempt_limit,select_count,randomise,negative_mark,exam_mode,is_open,is_archived,is_entrance,pass_mark,release_results,anti_cheat_config,certificate_enabled,start_at,close_at,teacher_id,created_at,updated_at').order('created_at',{ascending:false}).range(from,from+499);if(r.error)return r;all.push(...(r.data||[]));if(!r.data||r.data.length<500)break;}return{data:all,error:null}; },
-  async createExam(exam) { if (!this._sb) return {data:null,error:{message:'Database not configured'}}; exam = exam || {}; exam.code = (exam.code || this._generateCode(6)).toUpperCase(); exam.created_at = new Date().toISOString(); if (!exam.teacher_id && window.SC_PROFILE && SC_PROFILE.id) exam.teacher_id = SC_PROFILE.id; exam.anti_cheat_config = Object.assign({tab_switch:true,window_blur:true,copy_paste:true,right_click:true,fullscreen:true,watermark:true,devtools:true,max_violations:5}, exam.anti_cheat_config || {}); const bank=(Array.isArray(exam.csv_data)&&exam.csv_data.length)?exam.csv_data:((Array.isArray(exam.questions)&&exam.questions.length)?exam.questions:[]); if(bank.length){exam.csv_data=bank;exam.questions=bank;} return await this._sb.from('cbt_exams').insert(exam).select().single(); },
+  async createExam(exam) {
+    if (!this._sb) return {data:null,error:{message:'Database not configured'}};
+    exam = exam || {};
+    exam.code = (exam.code || this._generateCode(6)).toUpperCase();
+    exam.created_at = new Date().toISOString();
+    /* V10.4 ROOT-CAUSE FIX (reported: "new row violates row-level security
+       policy for table cbt_exams"): teacher_id was stamped from SC_PROFILE,
+       which loads ASYNCHRONOUSLY after sign-in. A fast click sent
+       teacher_id = NULL, and the RLS insert policy (teacher_id = auth.uid())
+       failed even for the right teacher. Now the authenticated user id is
+       fetched directly from the session as a guaranteed fallback. */
+    if (!exam.teacher_id && window.SC_PROFILE && SC_PROFILE.id) exam.teacher_id = SC_PROFILE.id;
+    if (!exam.teacher_id) {
+      try { const u = await this._sb.auth.getUser(); if (u && u.data && u.data.user) exam.teacher_id = u.data.user.id; } catch(_) {}
+    }
+    exam.anti_cheat_config = Object.assign({tab_switch:true,window_blur:true,copy_paste:true,right_click:true,fullscreen:true,watermark:true,devtools:true,max_violations:5}, exam.anti_cheat_config || {});
+    const bank=(Array.isArray(exam.csv_data)&&exam.csv_data.length)?exam.csv_data:((Array.isArray(exam.questions)&&exam.questions.length)?exam.questions:[]);
+    if(bank.length){exam.csv_data=bank;exam.questions=bank;}
+    /* V10.4: random 6-char codes can collide with an existing exam (unique
+       constraint) — regenerate and retry instead of surfacing a cryptic
+       duplicate-key error to the teacher. */
+    let res = await this._sb.from('cbt_exams').insert(exam).select().single();
+    for (let attempt = 0; attempt < 3 && res.error && /duplicate key|cbt_exams_code_key|unique/i.test(String(res.error.message||'')); attempt++) {
+      exam.code = this._generateCode(6).toUpperCase();
+      res = await this._sb.from('cbt_exams').insert(exam).select().single();
+    }
+    /* V10.4: translate the raw RLS rejection into the actual causes and the
+       fixes, instead of leaving the teacher staring at "row-level security". */
+    if (res.error && /row-level security|42501/i.test(String(res.error.message||'') + String(res.error.code||''))) {
+      const who = (window.SC_PROFILE && (SC_PROFILE.full_name || SC_PROFILE.email)) || 'your account';
+      res.error = { ...res.error, message:
+        'The database refused this exam for ' + who + ' (row-level security). Likely causes, in order:\n' +
+        '1) Your school database has not run database/v10.4-cbt-multisubject-rls.sql — required for MULTI-SUBJECT packages created by teachers (admin: run it once in Supabase).\n' +
+        '2) The subject "' + (exam.subject||'') + '" is not assigned to you on the Subjects page (admin can assign it, or an admin account can create the exam).\n' +
+        '3) Your profile had not finished loading — wait two seconds after sign-in and try again.\n' +
+        'Admins are never blocked; ask an admin to create it if urgent.' };
+    }
+    return res;
+  },
   _generateCode(len) { const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<len;i++) r+=chars.charAt(Math.floor(Math.random()*chars.length)); return r; },
 
   advancedPromptTemplate(subject, klass, topic, count) {
