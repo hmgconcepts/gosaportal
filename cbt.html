@@ -714,6 +714,7 @@ window.CBTUI = {
       report_column: document.getElementById('ex-col').value,
       max_score: parseFloat(document.getElementById('ex-max').value)||0,
       duration: parseInt(document.getElementById('ex-dur').value)||45,
+      duration_min: parseInt(document.getElementById('ex-dur').value)||45, /* V10.4: the student getter prefers duration_min — keep both coherent */
       negative_mark: parseFloat(document.getElementById('ex-neg').value)||0,
       select_count: parseInt(document.getElementById('ex-sel').value)||0,
       instructions: document.getElementById('ex-instr').value,

@@ -762,13 +762,16 @@ const DL={ qs:[],
     var cp={}; try{ var r0=await sb.from('academic_periods').select('term,session').eq('is_current',true).limit(1); cp=(r0.data&&r0.data[0])||{}; }catch(_){}
     var exam={ code:code, title:'📚 Reading CBT — '+(b.title||'Digital Library'),
       subject:b.subject||'General', class:b.class||'', term:cp.term||null, session:cp.session||null,
-      assessment_type:'quiz', exam_mode:'registered', duration:Math.max(10,Math.min(60,qs.length*2)),
+      assessment_type:'quiz', exam_mode:'registered', duration:Math.max(10,Math.min(60,qs.length*2)), duration_min:Math.max(10,Math.min(60,qs.length*2)),
       attempt_limit:Number(b.attempts_allowed||1)||1, max_score:Number(b.max_score||0)||qs.length,
       report_column:'CA1', is_open:false, release_results:true, randomise:false, select_count:0, negative_mark:0,
       instructions:'This CBT is based on the reading "'+(b.title||'')+'". Material link: '+(b.read_link||'')+(b.instructions?('\n'+b.instructions):'')+'\nAnswer from the material you read.',
       anti_cheat_config:{tab_switch:true,window_blur:true,copy_paste:true,right_click:true,fullscreen:true,watermark:true,max_violations:5},
       csv_data:bank, questions:bank, created_at:new Date().toISOString() };
     if(window.SC_PROFILE&&SC_PROFILE.id)exam.teacher_id=SC_PROFILE.id;
+    /* V10.4: same SC_PROFILE race as CBT.createExam — the RLS insert policy
+       requires teacher_id = auth.uid(), so fall back to the live session. */
+    if(!exam.teacher_id){ try{ var u=await sb.auth.getUser(); if(u&&u.data&&u.data.user)exam.teacher_id=u.data.user.id; }catch(_){} }
     var res=await sb.from('cbt_exams').insert(exam).select('id,code').single();
     if(res.error&&/attempt_limit|randomise|select_count|negative_mark|release_results/.test(res.error.message||'')){
       ['attempt_limit','randomise','select_count','negative_mark','release_results'].forEach(function(k){delete exam[k];});

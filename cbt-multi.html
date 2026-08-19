@@ -55,7 +55,24 @@
     <label style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="checkbox" id="mm-rel" checked> Release results instantly</label>
 
     <h3 style="margin-top:22px">Step 2 — Subjects &amp; their question banks</h3>
-    <p style="color:var(--gray-600);font-size:.9rem">Add one block per subject. Paste that subject's CSV (headers: <code>question,type,a,b,c,d,answer,explanation,mark</code>) or upload the CSV file. Need CSV help? Open <a href="cbt-prompts.html">CSV Prompt Templates</a>.</p>
+
+    <!-- V10.4: ONE-FILE IMPORT. The Prompt Studio's multi-subject pack (and
+         most AI chats) emit a SINGLE CSV where every row carries its subject
+         in the Section column. Teachers were left splitting that file by hand
+         into per-subject blocks. Now: paste/upload the combined file once and
+         the builder splits it into subject blocks automatically. -->
+    <div class="card" style="background:#f0fdf4;border-color:#86efac;margin-bottom:14px">
+      <h4 style="margin-top:0">⚡ Fast lane — one combined CSV (recommended)</h4>
+      <p style="color:var(--gray-600);font-size:.88rem;margin:4px 0 8px">Got ONE file with a <code>Section</code> column naming each row's subject (what the <a href="cbt-prompts.html">Prompt Studio</a> multi-subject pack produces)? Paste or upload it here — the subject blocks below fill themselves.</p>
+      <textarea class="form-input" id="mm-combined" rows="4" style="font-family:monospace;font-size:.78rem" placeholder="Question,A,B,C,D,CorrectAnswer,Explanation,Type,...,Section  (one file, all subjects)"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        <input type="file" accept=".csv,text/csv" class="form-input" style="max-width:280px" onchange="MM.readCombinedFile(this)">
+        <button class="btn btn-primary btn-sm" onclick="MM.importCombined()">🪄 Split into subjects</button>
+        <span id="mm-combined-note" style="font-size:.82rem;color:var(--gray-500)"></span>
+      </div>
+    </div>
+
+    <p style="color:var(--gray-600);font-size:.9rem">…or add one block per subject manually. Paste that subject's CSV (headers: <code>question,type,a,b,c,d,answer,explanation,mark</code>) or upload the CSV file. Need CSV help? Open <a href="cbt-prompts.html">CSV Prompt Templates</a>.</p>
     <div id="mm-subjects"></div>
     <button class="btn btn-outline" onclick="MM.addSubject()">＋ Add subject</button>
 
@@ -86,6 +103,47 @@ const MM = {
       '<div class="ms-count" style="font-size:.82rem;color:var(--gray-500)"></div>';
     box.appendChild(div);
     div.querySelector('.ms-csv').addEventListener('input', () => MM.count(div));
+  },
+  /* V10.4: one-file import — split a combined CSV by its Section column into
+     per-subject blocks, LOSSLESSLY (raw rows are regrouped under the original
+     header, so structured columns like Pairs/Items survive untouched). */
+  readCombinedFile(input){
+    const f = input.files && input.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { document.getElementById('mm-combined').value = String(r.result); MM.importCombined(); };
+    r.readAsText(f);
+  },
+  importCombined(){
+    const raw = document.getElementById('mm-combined').value.trim();
+    const note = document.getElementById('mm-combined-note');
+    if (!raw) { alert('Paste or upload the combined CSV first.'); return; }
+    const rows = CBT.parseCSVRows(raw).filter(r => r.some(v => String(v == null ? '' : v).trim()));
+    if (rows.length < 2) { alert('That CSV has no data rows.'); return; }
+    const canon = h => String(h == null ? '' : h).replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const head = rows[0].map(canon);
+    let secIdx = -1;
+    ['section','subject','subjectsection','examsubject'].some(k => { const i = head.indexOf(k); if (i >= 0) { secIdx = i; return true; } return false; });
+    if (secIdx < 0) { alert('No "Section" (or Subject) column found in the header — the multi-subject prompt always includes one. Check the file, or paste each subject\'s CSV manually below.'); return; }
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const headerLine = rows[0].map(q).join(',');
+    const groups = new Map();
+    rows.slice(1).forEach(r => {
+      const sec = String(r[secIdx] || '').trim() || 'General';
+      const key = sec.toLowerCase();
+      if (!groups.has(key)) groups.set(key, { name: sec, lines: [] });
+      groups.get(key).lines.push(r.map(q).join(','));
+    });
+    if (groups.size < 2) { alert('Only ONE subject ("' + [...groups.values()][0].name + '") was found in the Section column. A multi-subject package needs at least two — check the Section values, or use the single-exam CBT Manager instead.'); return; }
+    document.getElementById('mm-subjects').innerHTML = ''; this.n = 0;
+    let total = 0;
+    groups.forEach(g => {
+      this.addSubject(g.name);
+      const div = document.querySelector('.ms-sub:last-child');
+      div.querySelector('.ms-csv').value = headerLine + '\n' + g.lines.join('\n');
+      this.count(div);
+      total += g.lines.length;
+    });
+    if (note) note.textContent = '✅ Split ' + total + ' questions into ' + groups.size + ' subjects: ' + [...groups.values()].map(g => g.name + ' (' + g.lines.length + ')').join(', ') + '. Review each block, then Create.';
   },
   readFile(input){
     const f = input.files[0]; if (!f) return;
@@ -139,7 +197,7 @@ const MM = {
     const exam = {
       title, subject: 'MULTI-SUBJECT: ' + subjects.join(', '), class: v('mm-class'), term: v('mm-term'), session: v('mm-session'),
       assessment_type: 'exam', topic: subjects.join(', '), report_column: v('mm-col'),
-      duration: parseInt(v('mm-dur')) || 120, negative_mark: parseFloat(v('mm-neg')) || 0,
+      duration: parseInt(v('mm-dur')) || 120, duration_min: parseInt(v('mm-dur')) || 120, /* V10.4: getter prefers duration_min */ negative_mark: parseFloat(v('mm-neg')) || 0,
       select_count: parseInt(v('mm-sel')) || 0, instructions: v('mm-instr'),
       randomise: document.getElementById('mm-rand').checked,
       release_results: document.getElementById('mm-rel').checked,
