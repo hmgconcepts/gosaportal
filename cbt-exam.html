@@ -114,6 +114,7 @@ textarea.form-input{min-height:80px;resize:vertical}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/cbt-engine.js"></script>
+<script src="assets/js/cbt-types.js"></script>
 <script src="assets/js/proctor.js"></script>
 <script>
 /* ===================================================================
@@ -244,16 +245,40 @@ textarea.form-input{min-height:80px;resize:vertical}
     return out;
   };
 
+  /* V10.3: array/structured answers (matching, ordering, grids…) must count
+     as "answered" — String([]).trim() !== '' was true for ['',''] and false
+     for a real [] pick list, so meters miscounted. One shared checker now. */
+  Exam.hasAnswer=function(v){
+    if (window.CBTTypes && CBTTypes.isBlank) return !CBTTypes.isBlank(v);
+    return v != null && String(v).trim() !== '';
+  };
+
   Exam.sectionStats=function(sec){
     let t = 0, a = 0;
     this.qs().forEach((q, i) => {
       if (this.subjectOf(q) === sec) {
         t++;
-        const v = this.answers[i];
-        if (v != null && String(v).trim() !== '') a++;
+        if (this.hasAnswer(this.answers[i])) a++;
       }
     });
     return { t, a };
+  };
+
+  /* V10.3: refresh tab counters + palette states WITHOUT re-rendering the
+     whole card. A full render would rebuild the drag list / chips under the
+     candidate's finger on every keystroke. */
+  Exam.refreshMeters=function(){
+    const current = this.currentSubject();
+    this.root().querySelectorAll('.cbt-subject-tabs button').forEach(btn => {
+      const sec = decodeURIComponent(btn.dataset.sec || '');
+      const st = this.sectionStats(sec);
+      const span = btn.querySelector('span');
+      if (span) span.textContent = '(' + st.a + '/' + st.t + ')';
+    });
+    this.root().querySelectorAll('.q-palette button').forEach(btn => {
+      const i = Number(btn.dataset.i);
+      btn.className = i === this.idx ? 'current' : (this.hasAnswer(this.answers[i]) ? 'answered' : (this.flags[i] ? 'flagged' : ''));
+    });
   };
 
   Exam.goSubject=function(sec){
@@ -289,7 +314,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     return '<div class="q-palette"><div class="label">' + esc(current) + ' — question map</div>' + this.qs().map((qq, i) => {
       if (this.subjectOf(qq) !==current) return '';
       localNo++;
-      const cls = i === this.idx ? 'current' : (this.answers[i] != null && String(this.answers[i]).trim() !== '' ? 'answered' : (this.flags[i] ? 'flagged' : ''));
+      const cls = i === this.idx ? 'current' : (this.hasAnswer(this.answers[i]) ? 'answered' : (this.flags[i] ? 'flagged' : ''));
       return '<button type="button" class="' + cls + '" data-i="' + i + '" title="' + esc(current) + ' question ' + localNo + '">' + localNo + '</button>';
     }).join('') + '</div>';
   };
@@ -303,7 +328,16 @@ textarea.form-input{min-height:80px;resize:vertical}
     const localPos = subjectIndexes.indexOf(this.idx);
     const localNo = localPos + 1;
     const qType = String(q.type || 'mcq').toLowerCase();
-    const hasOptions = (q.options || []).length > 0 && !FREE_TYPES_NO_OPTIONS.includes(qType);
+    /* V10.3 (Tutoring Connect parity): structured question types — matching,
+       ordering, sort-into-groups, grid, hot-text, multi-part numeric,
+       multi-blank cloze, plus purpose-built numeric / short-answer / essay /
+       code controls — render through the advanced engine in cbt-types.js.
+       Everything else keeps the original letter-card / textarea path, so no
+       existing paper changes behaviour. */
+    const advanced = !!(window.CBTTypes && CBTTypes.handles && CBTTypes.handles(q));
+    const advName = 'scq-' + this.idx;
+    const advHTML = advanced ? CBTTypes.render(q, advName) : '';
+    const hasOptions = !advanced && (q.options || []).length > 0 && !FREE_TYPES_NO_OPTIONS.includes(qType);
     const isMultiSelect = qType === 'multi_select';
     const selectedValues = Array.isArray(this.answers[this.idx]) ? this.answers[this.idx] : (this.answers[this.idx] == null ? [] : [String(this.answers[this.idx])]);
 
@@ -314,7 +348,10 @@ textarea.form-input{min-height:80px;resize:vertical}
     }).join('') : '';
 
     const existingText = Array.isArray(this.answers[this.idx]) ? this.answers[this.idx].join(', ') : (this.answers[this.idx] || '');
-    const free = !hasOptions ? '<textarea class="form-input" rows="3" placeholder="Type your answer here">' + esc(existingText) + '</textarea>' : '';
+    const free = (!hasOptions && !advanced) ? '<textarea class="form-input" rows="3" placeholder="Type your answer here">' + esc(existingText) + '</textarea>' : '';
+    /* Assertion/Reason stems (kept on the classic option-card path) show the
+       assertion + reason briefing block above the options. */
+    const arBlock = (!advanced && window.CBTTypes && ['assertion_reason','ar'].includes(qType.replace(/[\s\/\\-]+/g,'_'))) ? CBTTypes.arBlock(q) : '';
     const passage = q.passage ? '<div class="notice" style="background:#f8fafc;border-color:#cbd5e1;color:#334155"><strong>Passage / Case:</strong><br>' + esc(q.passage) + '</div>' : '';
     const media = q.media_url ? (/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(q.media_url) ? '<audio controls style="width:100%;margin:8px 0" src="'+esc(q.media_url)+'"></audio>' : (/\.(mp4|webm|mov)(\?|$)/i.test(q.media_url) ? '<video controls style="max-width:100%;max-height:360px;margin:8px auto;display:block" src="'+esc(q.media_url)+'"></video>' : '<img src="'+esc(q.media_url)+'" alt="Question media" style="max-width:100%;max-height:360px;object-fit:contain;margin:8px auto;display:block" referrerpolicy="no-referrer">')) : '';
     const m = Math.floor(this.remaining / 60), ss = this.remaining % 60;
@@ -332,13 +369,16 @@ textarea.form-input{min-height:80px;resize:vertical}
         '<strong>' + esc(current) + ' · Q ' + localNo + ' / ' + subjectIndexes.length + ' <span style="color:#64748b;font-weight:600">(overall ' + (this.idx + 1) + ' / ' + this.qs().length + ')</span></strong>' +
         '<div><span class="clock' + (urgent ? ' urgent' : '') + '" id="clock">' + m + ':' + String(ss).padStart(2, '0') + '</span> <span id="viol" class="viol"></span></div>' +
       '</div>' +
-      passage + media +
-      '<p style="font-size:1.05rem;margin:0 0 12px;line-height:1.5">' + esc(q.question || '(no question text)') + (q.mark ? ' <span style="color:#64748b;font-size:.85rem">[' + q.mark + ' mark' + (q.mark > 1 ? 's' : '') + ']</span>' : '') + '</p>' +
-      (isMultiSelect ? '<p style="font-size:.78rem;color:#475569;margin:-4px 0 8px">Select every correct option.</p>' : '') +
-      opts + free +
+      passage + media + arBlock +
+      ((advanced && window.CBTTypes && CBTTypes.canonical(q.type) === 'cloze')
+        ? '<p style="font-size:.85rem;color:#64748b;margin:0 0 8px">Fill the gaps below' + (q.mark ? ' <span style="color:#64748b;font-size:.85rem">[' + q.mark + ' mark' + (q.mark > 1 ? 's' : '') + ']</span>' : '') + '</p>'
+        : '<p style="font-size:1.05rem;margin:0 0 12px;line-height:1.5">' + esc(q.question || '(no question text)') + (q.mark ? ' <span style="color:#64748b;font-size:.85rem">[' + q.mark + ' mark' + (q.mark > 1 ? 's' : '') + ']</span>' : '') + '</p>') +
+      (isMultiSelect && !advanced ? '<p style="font-size:.78rem;color:#475569;margin:-4px 0 8px">Select every correct option.</p>' : '') +
+      (advanced ? '<div id="scq-holder">' + advHTML + '</div>' : opts + free) +
       '<div class="actions">' +
         '<button type="button" class="btn btn-outline" data-act="prev-in" ' + (localPos <= 0 ? 'disabled' : '') + '>← Prev in ' + esc(current) + '</button>' +
         '<button type="button" class="btn btn-outline" data-act="flag">' + (this.flags[this.idx] ? '🚩 Unflag' : '🚩 Flag') + '</button>' +
+        (window.CBTTypes ? '<button type="button" class="btn btn-outline" data-act="legend" title="How each question style works — does not use exam time">❓ How to answer</button>' : '') +
         (localPos < subjectIndexes.length - 1
           ? '<button type="button" class="btn btn-primary" data-act="next-in">Next in ' + esc(current) + ' →</button>'
           : '<button type="button" class="btn btn-outline" disabled>End of ' + esc(current) + '</button>') +
@@ -348,6 +388,24 @@ textarea.form-input{min-height:80px;resize:vertical}
     '</div>';
 
     this.root().innerHTML = html;
+
+    /* V10.3: wire the advanced control — restore any saved answer, activate
+       drag/chips/word-count behaviour, and stream every change into the
+       standard answer store so drafts, palettes and submission all keep
+       working identically. */
+    if (advanced && window.CBTTypes) {
+      try { CBTTypes.injectStyles(); } catch(_) {}
+      const holder = this.root().querySelector('#scq-holder');
+      if (holder) {
+        CBTTypes.restore(q, advName, holder, this.answers[this.idx]);
+        CBTTypes.activate(holder, () => {
+          const v = CBTTypes.collect(q, advName, holder);
+          this.answers[this.idx] = CBTTypes.isBlank(v) ? null : v;
+          this.saveDraft();
+          this.refreshMeters();
+        });
+      }
+    }
 
     // Wire up the buttons
     if (this.root().querySelectorAll) this.root().querySelectorAll('.option-label').forEach((label) => {
@@ -376,6 +434,7 @@ textarea.form-input{min-height:80px;resize:vertical}
           if (a === 'prev-in') this.prevInSubject();
           else if (a === 'next-in') this.nextInSubject();
           else if (a === 'flag') { this.flags[this.idx] = !this.flags[this.idx]; this.render(); }
+          else if (a === 'legend') this.showLegend();
           else if (a === 'submit') this.confirmSubmit();
         });
       });
@@ -389,6 +448,27 @@ textarea.form-input{min-height:80px;resize:vertical}
     this.saveDraft();
   };
 
+  /* V10.3: the "❓ How to answer" legend — every question style explained in
+     student language, openable at any time without costing exam time. */
+  Exam.showLegend = function(){
+    if (!window.CBTTypes) return;
+    try { CBTTypes.injectStyles(); } catch(_) {}
+    let overlay = document.getElementById('scq-legend-overlay');
+    if (overlay) { overlay.remove(); return; }
+    overlay = document.createElement('div');
+    overlay.id = 'scq-legend-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:16px;max-width:760px;width:100%;max-height:88vh;overflow:auto;padding:20px 22px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">' +
+      '<h2 style="margin:0;font-size:1.1rem">❓ How each question style works</h2>' +
+      '<button type="button" class="btn btn-sm btn-outline" id="scq-legend-close">× Close</button></div>' +
+      CBTTypes.legendHTML() + '</div>';
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    const c = document.getElementById('scq-legend-close');
+    if (c) c.addEventListener('click', () => overlay.remove());
+  };
+
   Exam.saveDraft = function(){
     try {
       const keyed = this.qs().map((q,i) => ({ index:(q._orig_index != null ? q._orig_index : i), answer:this.answers[i] }));
@@ -398,7 +478,7 @@ textarea.form-input{min-height:80px;resize:vertical}
   };
 
   Exam.confirmSubmit = function(){
-    const unanswered = this.answers.filter(a => a == null || String(a).trim() === '').length;
+    const unanswered = this.qs().map((q,i)=>this.answers[i]).filter(a => !this.hasAnswer(a)).length;
     if (unanswered > 0 && !confirm(unanswered + ' question(s) unanswered. Submit anyway?')) return;
     this.submit();
   };

@@ -496,6 +496,18 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <li>Ask the 💬 assistant, or open <a href="feature-guide.html">Feature Guide</a>, for a fuller explanation.</li>
         </ol>
       </div>
+      <!-- V10.3 (#3): AI-assisted assignment authoring — a full brief + rubric
+           prompt pack (link-based resources), structured like Tutoring
+           Connect. No paid AI: copy into any free chat, paste the brief into
+           the Description and the resource link into Drive link. -->
+      <div class="card" style="margin-bottom:16px;border-left:6px solid #059669" data-staff-only>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">🤖 Draft a complete assignment brief with AI (free chat, no API)</h3>
+          <span class="badge" style="background:#059669;color:#fff">NEW · V10.3</span>
+        </div>
+        <p style="color:var(--gray-600);margin:6px 0 10px">The Prompt Studio writes a professional prompt that makes any free AI chat produce a <b>ready-to-post assignment brief</b> — task steps, your <b>resource link</b> (Drive/web, links only), submission expectations and a <b>marks rubric a parent can read</b> — plus an optional self-check quiz you can import on the CBT page.</p>
+        <a class="btn btn-sm btn-primary" href="cbt-prompts.html?pack=assignment">📝 Open the Assignment prompt pack</a>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary" onclick="CRUD.openForm('assignments')" data-staff-only>+ Add new</button>
         <button class="btn btn-outline" onclick="CRUD.renderList('assignments')">↻ Refresh</button>

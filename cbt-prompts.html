@@ -487,6 +487,87 @@
         <a href="cbt.html">CBT page</a>. Pick the level that matches your need:</p>
       </div>
 
+      <!-- ===================================================================
+           V10.3 PROMPT STUDIO — Tutoring Connect parity, School Connect flavour.
+           An interactive builder: pick a pack, type the topic/count/class once,
+           and a COMPLETE, tailored prompt is assembled — no [BLANKS] to hunt
+           for. Each pack is a genuinely different prompt (its own role,
+           mission, type distribution, briefing sections, quality bar and
+           final checklist), sharing only the CSV output contract that keeps
+           files importable. The classic copy-paste prompt cards below are
+           untouched — this is purely additive.
+           =================================================================== -->
+      <div class="card" style="margin-bottom:16px;border-left:6px solid #059669">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">🎛 Prompt Studio — build a tailored prompt in seconds</h3>
+          <span class="badge" style="background:#059669;color:#fff">NEW · V10.3</span>
+        </div>
+        <p style="color:var(--gray-600);margin:6px 0 12px">Fill the boxes once — the studio writes the whole prompt for you, correctly formatted for the pack you choose. Includes the <b>advanced 17+ question types</b>, <b>multi-subject papers with per-subject topics</b>, <b>📚 Digital Library reading packs (link-based)</b> and <b>📝 Assignment briefs (link-based)</b>.</p>
+        <div class="grid grid-2">
+          <div class="form-group"><label>Pack</label>
+            <select class="form-select" id="ps-pack">
+              <optgroup label="Question banks">
+                <option value="simple">Simple recall (MCQ + True/False)</option>
+                <option value="intermediate">Intermediate (adds numeric, short, MRQ)</option>
+                <option value="advanced">Advanced (matching, ordering, essay)</option>
+                <option value="enterprise" selected>Enterprise — full 17+ type paper</option>
+                <option value="mcq_only">MCQ-only strict paper</option>
+                <option value="multi_subject">Multi-subject paper (UTME / Common Entrance)</option>
+              </optgroup>
+              <optgroup label="Examiner specials">
+                <option value="exam_board">Exam-board style (WAEC / NECO / UTME / IGCSE…)</option>
+                <option value="past_paper">From a past paper link</option>
+                <option value="marking_scheme">Paper + full marking scheme</option>
+                <option value="differentiated">Differentiated — Support / Core / Stretch</option>
+                <option value="misconception">Diagnostic misconception hunter</option>
+              </optgroup>
+              <optgroup label="School Connect specials">
+                <option value="dl_article">📚 Digital Library — article / material link</option>
+                <option value="dl_video">📚 Digital Library — video link</option>
+                <option value="assignment">📝 Assignment brief + rubric (link-based)</option>
+              </optgroup>
+            </select></div>
+          <div class="form-group" data-ps-hide="subjects"><label>Topic</label><input class="form-input" id="ps-topic" value="" placeholder="e.g. Quadratic equations"></div>
+          <div class="form-group"><label>Number of questions</label><input class="form-input" id="ps-n" type="number" value="20" min="1"></div>
+          <div class="form-group"><label>Class / level</label><input class="form-input" id="ps-lv" value="" placeholder="e.g. JSS 3 / SS 2" list="ps-classes"><datalist id="ps-classes"></datalist></div>
+          <div class="form-group" data-ps-hide="subjects"><label>Subject</label><input class="form-input" id="ps-subject" value="" placeholder="e.g. Mathematics" list="ps-subjects"><datalist id="ps-subjects"></datalist></div>
+          <div class="form-group"><label>Exam type / board</label>
+            <select class="form-select" id="ps-board">
+              <option>General classwork</option><option>WAEC</option><option>NECO</option>
+              <option>GCE</option><option>NABTEB</option><option>BECE</option>
+              <option>UTME / JAMB</option><option>Common Entrance</option>
+              <option>Cambridge Checkpoint</option><option>IGCSE</option><option>A-Level</option>
+              <option>IELTS</option><option>TOEFL</option><option>SAT</option>
+              <option>Olympiad / competition</option>
+            </select></div>
+          <div class="form-group" style="grid-column:1/-1" data-ps-need="source" hidden><label>Source link — the article, video, material or past paper the questions come from</label>
+            <input class="form-input" id="ps-src" placeholder="https://… or a Google Drive / YouTube link">
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">Links only — never upload a file (protects the free Supabase storage quota). The student opens this same link from the Digital Library / Assignment, so the questions and the material always match.</div></div>
+          <div class="form-group" style="grid-column:1/-1" data-ps-need="subjects" hidden>
+            <label>Subjects (comma separated)</label>
+            <input class="form-input" id="ps-subjects-list" placeholder="Mathematics, English, Basic Science">
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">Type the subjects, separated by commas. A topic box appears for each one below.</div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1" data-ps-need="subjects" hidden>
+            <label>Topic for each subject</label>
+            <div id="ps-subject-topics"></div>
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">Give each subject its own topic. Leave one blank to let the model choose a representative topic for that subject.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" type="button" id="ps-build">⚙️ Build prompt</button>
+          <button class="btn btn-outline" type="button" id="ps-copy">📋 Copy prompt</button>
+        </div>
+        <textarea class="form-input" id="ps-out" rows="16" style="margin-top:12px;font-family:monospace;font-size:.78rem" placeholder="Your tailored prompt appears here — click Build prompt."></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:stretch">
+          <textarea class="form-input" id="ps-csvback" rows="3" style="flex:1;min-width:260px" placeholder="Paste the CSV the chat gave you here, then press Save as .csv"></textarea>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn btn-outline" type="button" id="ps-savecsv">⬇ Save as .csv</button>
+            <a class="btn btn-outline" href="cbt.html">Open CBT to upload</a>
+          </div>
+        </div>
+      </div>
+
       <div class="card" style="margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
             <h3 style="margin:0">1. Simple question prompt</h3>
@@ -722,4 +803,445 @@ Now output/generate the downloadable CSV file only.</textarea></div>
 <script>
 const CPUI={ copy(id){ var t=document.getElementById(id); t.select(); t.setSelectionRange(0,99999);
   try{ if(navigator.clipboard){ navigator.clipboard.writeText(t.value); } else { document.execCommand('copy'); } toast('Prompt copied — paste it into any free AI chat ✓','success',5000); }catch(e){ document.execCommand('copy'); toast('Prompt copied ✓','success'); } } };
+
+/* ===========================================================================
+   V10.3 PROMPT STUDIO ENGINE — Tutoring Connect parity, School Connect made.
+   Every pack is a DIFFERENT prompt: its own role, mission, type distribution
+   (scaled exactly to the requested count), briefing sections, quality bar and
+   final checklist. Only the CSV OUTPUT CONTRACT is shared — that must stay
+   byte-identical across packs or files stop importing. School-specific packs
+   (Digital Library link readings, Assignment briefs) speak School Connect's
+   own vocabulary: read_link, class/arm, term/session, report-card columns.
+   =========================================================================== */
+const PS = {
+  HEADER: 'Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section',
+
+  /* Per-type column rules — emitted only for the types a pack actually uses,
+     so a 20-item MCQ paper is not padded with pages of irrelevant rules. */
+  RULES: {
+    mcq: 'mcq — one correct option\n  Col2-5: four plausible options. Col6: the correct LETTER (A/B/C/D).\n  Col8: mcq',
+    truefalse: 'truefalse — true/false\n  Col2: True   Col3: False   Col4-5: blank.  Col6: A (True) or B (False).  Col8: truefalse',
+    mrq: 'mrq — several correct options\n  Col2-5: options. Col6: correct letters joined by | (e.g. A|C).\n  Col12: true for all-or-nothing, false for per-option partial credit.  Col8: mrq',
+    short: 'short — typed short answer\n  Col6: the primary answer.  Col11: accepted alternatives separated by |.\n  Col8: short',
+    numeric: 'numeric — a number\n  Col6: the number only.  Col9: tolerance.  Col10: unit.  Col8: numeric',
+    multi_numeric: 'multi_numeric — several numeric sub-parts, part marks\n  Col14: [{"label":"x","answer":3,"tolerance":0},{"label":"y","answer":2,"tolerance":0}]\n  Col8: multi_numeric',
+    matching: 'matching — pair left with right\n  Col13: [{"left":"Na","right":"Sodium"},{"left":"K","right":"Potassium"}]\n  Col11 may add distractors separated by |.  Col8: matching',
+    ordering: 'ordering — arrange in sequence\n  Col14: the items IN THE CORRECT ORDER, e.g. ["Mercury","Venus","Earth"]\n  Col8: ordering',
+    cloze: 'cloze — fill several blanks\n  Col1: the sentence, each blank written as ___ (three underscores).\n  Col14: accepted answers per blank in order, alternatives with |,\n         e.g. ["mass|m","acceleration|a"]\n  Col8: cloze',
+    categorization: 'categorization — sort items into groups\n  Col14: [{"item":"Sodium","category":"Metal"},{"item":"Oxygen","category":"Non-metal"}]\n  Col8: categorization',
+    matrix: 'matrix — several rows sharing one set of options\n  Col11: the shared options separated by |, e.g. True|False\n  Col14: [{"statement":"Water boils at 100 °C at sea level","answer":"True"}]\n  Col8: matrix',
+    hot_text: 'hot_text — tap the correct parts\n  Col14: [{"text":"2","correct":true},{"text":"4","correct":false}]\n  Col8: hot_text',
+    assertion_reason: 'assertion_reason — WAEC/JAMB logic item\n  Col14: {"assertion":"...","reason":"..."}\n  Col6: A/B/C/D/E where A = both true and Reason explains Assertion,\n        B = both true but Reason does not explain it, C = Assertion true only,\n        D = Reason true only, E = both false.  Col8: assertion_reason',
+    case_study: 'case_study — passage or scenario, then a question\n  Col14: {"passage":"Write the full passage or data here."}\n  Col1: the question. Col2-5: options. Col6: the letter.  Col8: case_study',
+    image_based: 'image_based — diagram question\n  Col14: {"image":"https://..."} — a public https or Drive LINK only.\n  With no real image, describe the diagram fully in Col1.  Col8: image_based',
+    essay: 'essay — extended response, marked by the TEACHER (no AI)\n  Col14: {"min_words":40,"keywords":["photosynthesis","chlorophyll"]}\n  Col7 must contain the model answer / marking points.  Col8: essay',
+    code: 'code — code, pseudocode or SQL\n  Col14: {"language":"JavaScript","keywords":["function","return"]}\n  Col8: code'
+  },
+
+  /* Scale a pack's reference mix to the requested count. `minOne` keeps every
+     declared type alive at small counts (a pack promising breadth must
+     deliver it); the remainder lands on the pack's dominant type. */
+  mix(ref, n, dominant, minOne) {
+    const keys = Object.keys(ref);
+    const total = keys.reduce((a, k) => a + ref[k], 0);
+    const out = {}; let running = 0;
+    keys.forEach(k => {
+      let v = Math.floor(ref[k] * n / total);
+      if (minOne && v < 1) v = 1;
+      if (v > 0) { out[k] = v; running += v; }
+    });
+    const d = dominant || keys[0];
+    if (running > n) {
+      out[d] = Math.max(minOne ? 1 : 0, (out[d] || 0) - (running - n));
+      running = keys.reduce((a, k) => a + (out[k] || 0), 0);
+      let guard = 0;
+      while (running > n && guard++ < 500) {
+        const biggest = keys.filter(k => (out[k] || 0) > 1).sort((a, b) => out[b] - out[a])[0];
+        if (!biggest) break;
+        out[biggest] -= 1; running -= 1;
+      }
+    } else out[d] = (out[d] || 0) + Math.max(0, n - running);
+    return out;
+  },
+
+  PACKS: {
+    simple: {
+      label: 'Simple recall',
+      role: 'a patient Nigerian classroom teacher who writes clear, confidence-building questions for learners still finding their feet',
+      mission: 'Build fluency and confidence. This paper should reward a student who has done the reading, and never punish them for misreading a convoluted stem.',
+      ref: { mcq: 14, truefalse: 6 }, dominant: 'mcq',
+      sections: [
+        ['LANGUAGE', 'Use the shortest sentence that asks the question. No subordinate clauses.\nNo negatives ("which is NOT..."). No double negatives ever. A learner\nreading at two years below the nominal level should still understand the task.'],
+        ['SCOPE', 'One idea per question. Never combine two skills in one item — if a\nstudent gets it wrong you must be able to say exactly which idea they missed.']
+      ],
+      quality: [
+        'Every stem is under 25 words.',
+        'Options are similar in length; the longest option is not always the answer.',
+        'Explanations restate the rule in one plain sentence.',
+        'No trick questions of any kind.'
+      ]
+    },
+    intermediate: {
+      label: 'Intermediate application',
+      role: 'an experienced {{BOARD}} subject teacher writing a balanced continuous-assessment paper',
+      mission: 'Test application, not just recall: the student should have to USE the idea — calculate, choose the right method, spot the exception — in familiar contexts.',
+      ref: { mcq: 9, truefalse: 3, numeric: 3, short: 3, mrq: 2 }, dominant: 'mcq',
+      sections: [
+        ['APPLICATION OVER RECALL', 'At most a third of the items may be answerable from memory alone. The rest\nmust require one worked step: a small calculation, a comparison, a\nclassification, or applying a rule to a new example.'],
+        ['NUMERIC DISCIPLINE', 'Every numeric item must state its unit in Col10 and carry a sensible\ntolerance in Col9 wherever rounding is possible.']
+      ],
+      quality: [
+        'Distractors reflect real student misconceptions, never random filler.',
+        'Short-answer items list every legitimate alternative in Col11.',
+        'The Explanation column teaches the method, not just the answer.'
+      ]
+    },
+    advanced: {
+      label: 'Advanced examiner',
+      role: 'a senior {{BOARD}} examiner who has marked thousands of scripts and knows exactly where candidates lose marks',
+      mission: 'Produce an exam-grade paper with genuine structural variety — matching, ordering and extended writing alongside objective items — that discriminates fairly between grades.',
+      ref: { mcq: 8, mrq: 2, numeric: 3, short: 2, matching: 2, ordering: 2, essay: 1 }, dominant: 'mcq',
+      sections: [
+        ['STRUCTURAL VARIETY IS THE POINT', 'The matching, ordering and essay items are not decoration. Matching must\npair concepts a candidate genuinely confuses; ordering must sequence a real\nprocess; the essay must demand an argument, not a list.'],
+        ['PROGRESSION', 'Open with accessible items, build steadily, and place the most demanding\nitems in the final third. Col15 (Difficulty) must show that curve.']
+      ],
+      quality: [
+        'Matching right-hand pools include at least one plausible distractor.',
+        'Ordering sequences have exactly one defensible correct order.',
+        'The essay item carries a model answer and keywords in Col7/Col14.',
+        'Difficulty rises across the paper rather than jumping about.'
+      ]
+    },
+    enterprise: {
+      label: 'Enterprise 17+ types',
+      role: 'an assessment designer building a full-spectrum diagnostic paper that exercises EVERY question control the School Connect CBT player supports',
+      mission: 'Breadth is the deliverable: every declared type must appear, so the school can verify each control — cards, dropdowns, drag lists, grids, chips, gap-fills, multi-part numerics — renders and grades correctly.',
+      ref: { mcq: 4, truefalse: 2, mrq: 2, short: 2, numeric: 2, multi_numeric: 1, cloze: 1, matching: 1, ordering: 1, categorization: 1, matrix: 1, hot_text: 1, assertion_reason: 1, case_study: 1, image_based: 1, essay: 1, code: 1 },
+      dominant: 'mcq', minOne: true,
+      sections: [
+        ['EVERY TYPE MUST SURVIVE', 'The distribution below guarantees at least one item of every type even at\nsmall counts. Do not silently drop a type because it is harder to write.'],
+        ['JSON CELLS', 'Structured types live in Col13 (Pairs) and Col14 (Items) as JSON with every\ninner double quote doubled (""). One malformed JSON cell breaks the import\nof the whole row — validate each one mentally before moving on.']
+      ],
+      quality: [
+        'Every declared type appears at least once.',
+        'Every JSON cell parses after un-doubling the quotes.',
+        'Partial-credit types (matching, ordering, cloze, matrix, multi_numeric) have at least 3 rows/parts each so partial credit is meaningful.'
+      ]
+    },
+    mcq_only: {
+      label: 'MCQ-only strict',
+      role: 'an objective-test specialist writing a machine-gradable multiple-choice paper',
+      mission: 'One clean skill per item, four working distractors, zero ambiguity. This paper feeds directly into report-card columns, so the key must be beyond dispute.',
+      ref: { mcq: 20 }, dominant: 'mcq',
+      sections: [
+        ['DISTRACTOR CRAFT', 'Each wrong option must be the answer a student gets by making one SPECIFIC\nmistake (sign error, off-by-one, confused definition). Name the mistake to\nyourself before writing the distractor.'],
+        ['KEY BALANCE', 'Spread the correct letter evenly across A–D. Never three of the same\nletter in a row.']
+      ],
+      quality: [
+        'Every item has exactly one defensibly correct option.',
+        'No "all of the above" / "none of the above".',
+        'Consecutive questions never test the same fact.'
+      ]
+    },
+    multi_subject: {
+      label: 'Multi-subject paper',
+      role: 'an examinations officer assembling a combined UTME / Common-Entrance style paper across several subjects',
+      mission: 'Build one sitting that covers several subjects cleanly, with the subject tabs the candidate sees driven correctly by the data.',
+      ref: { mcq: 14, short: 2, numeric: 3, truefalse: 1 }, dominant: 'mcq',
+      sections: [
+        ['SUBJECTS AND THEIR TOPICS', 'Cover these subjects: {{SUBJECTS}}\n{{SUBJECT_TOPICS}}\nDivide the items as evenly as possible between them.'],
+        ['SECTION COLUMN IS CRITICAL', 'Col17 (Section) must contain the SUBJECT NAME for that row, spelled\nidentically every time. This column drives the subject tabs in the School\nConnect exam player — an inconsistent spelling creates a phantom extra tab.'],
+        ['NO CROSS-CONTAMINATION', 'A Mathematics item must not require Biology knowledge, and vice versa.\nEach item belongs to exactly one subject.']
+      ],
+      quality: [
+        'Item counts per subject differ by at most one.',
+        'Col17 spellings are identical within each subject, with no stray spaces.',
+        'No item requires knowledge from another subject in the set.'
+      ]
+    },
+    exam_board: {
+      label: 'Exam-board style',
+      role: 'a chief examiner reproducing the authentic voice, structure and difficulty profile of real {{BOARD}} papers',
+      mission: 'A candidate who sits this paper should feel they are sitting the real {{BOARD}} exam — same stems, same pacing, same topic weighting.',
+      ref: { mcq: 12, numeric: 3, short: 2, case_study: 2, essay: 1 }, dominant: 'mcq',
+      sections: [
+        ['BOARD REGISTER', 'Use {{BOARD}}\'s habitual phrasing ("Which of the following...", "Calculate,\ncorrect to 2 decimal places..."). Weight sub-topics the way the board\nhistorically does, not evenly.'],
+        ['AUTHENTIC PROGRESSION', 'Real papers ramp: open accessible, finish demanding. Col15 must show the curve.']
+      ],
+      quality: [
+        'Phrasing is idiomatic to {{BOARD}}, not generic.',
+        'The topic weighting is defensible against real past papers.',
+        'Difficulty rises across the paper.'
+      ]
+    },
+    past_paper: {
+      label: 'From a past paper link',
+      role: 'an archivist reconstructing a paper in the authentic style of the past paper at the source link',
+      mission: 'Recreate the feel of the linked past paper — its structure, its progression, its topic emphasis — with entirely NEW questions (never copy an item verbatim).',
+      ref: { mcq: 12, short: 3, numeric: 3, case_study: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE SOURCE', 'Base the style, difficulty and topic emphasis on this past paper:\n{{SOURCE}}\nWrite NEW items in the same spirit — never reproduce an original question.'],
+        ['PERIOD REGISTER', 'Match the linked paper\'s stem conventions and section structure.']
+      ],
+      quality: [
+        'No item is a copy or near-copy of a source item.',
+        'The topic emphasis mirrors the source paper.',
+        'Difficulty progression matches the source.'
+      ]
+    },
+    marking_scheme: {
+      label: 'Paper + marking scheme',
+      role: 'a chief examiner writing both the paper AND the marking scheme that accompanies it',
+      mission: 'Produce a paper a second marker could mark identically without speaking to you.',
+      ref: { short: 6, numeric: 4, multi_numeric: 3, essay: 2, mcq: 3, case_study: 2 }, dominant: 'short',
+      sections: [
+        ['COL7 IS A MARKING SCHEME', 'The Explanation column must read as a marking scheme, not a hint: the\nacceptable answers, where each mark is earned, and what earns no credit.\nUse the convention "M1 — method mark for ...; A1 — accuracy mark for ...".'],
+        ['ACCEPT GENEROUSLY', 'Col11 must list every legitimate alternative wording, spelling and form,\nseparated by |. This is what prevents a correct answer being marked wrong.'],
+        ['TOLERANCES', 'Every numeric item MUST carry a tolerance in Col9.']
+      ],
+      quality: [
+        'Every row\'s Col7 identifies where each mark is earned.',
+        'Col11 is populated for every non-objective item.',
+        'A second marker would award the same marks.'
+      ]
+    },
+    differentiated: {
+      label: 'Differentiated — Support / Core / Stretch',
+      role: 'an inclusion-minded subject lead writing one paper that serves three ability tiers honestly',
+      mission: 'Every student meets questions they can start AND questions that stretch them. Tag each item Support, Core or Stretch in Col16 (Tags) so the teacher can filter.',
+      ref: { mcq: 10, truefalse: 2, numeric: 3, short: 3, essay: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE THREE TIERS', 'Support (≈30%): the entry version of the skill, concrete numbers, familiar\ncontexts. Core (≈50%): the standard curriculum expectation. Stretch (≈20%):\ntransfer to an unfamiliar context or a multi-step chain.\nWrite the tier name as the FIRST tag in Col16 on every row.'],
+        ['SAME TOPIC, THREE DEPTHS', 'All three tiers examine THE SAME topic. Do not make Support a different,\neasier topic — that defeats the diagnosis.']
+      ],
+      quality: [
+        'Every row\'s Col16 starts with Support, Core or Stretch.',
+        'The three tiers are the same topic at different depths.',
+        'Tier proportions are within ±1 item of 30/50/20.'
+      ]
+    },
+    misconception: {
+      label: 'Misconception hunter',
+      role: 'a diagnostic assessment specialist who designs items that make hidden misconceptions VISIBLE',
+      mission: 'Every distractor is a named misconception. When the class data comes back, the teacher must be able to read WHICH wrong idea each student holds from WHICH option they picked.',
+      ref: { mcq: 16, truefalse: 2, mrq: 2 }, dominant: 'mcq',
+      sections: [
+        ['ONE MISCONCEPTION PER DISTRACTOR', 'For every wrong option, write in Col7 the exact misconception that produces\nit, in the form "B = believes multiplication always makes bigger". The\nExplanation column is the teacher\'s diagnosis key.'],
+        ['NO FILLER DISTRACTORS', 'If you cannot name the wrong thinking that produces an option, replace the\noption. Random wrong numbers diagnose nothing.']
+      ],
+      quality: [
+        'Every distractor maps to a named, real misconception in Col7.',
+        'The same misconception is probed by at least two different items.',
+        'No option is filler.'
+      ]
+    },
+    dl_article: {
+      label: '📚 Digital Library — article / material',
+      role: 'a reading-comprehension specialist preparing a School Connect Digital Library assignment: a linked article or material plus the comprehension quiz that proves it was read',
+      mission: 'The student opens the LINK from the 📚 Digital Library page, reads it, then answers the quiz. Every question must be answerable ONLY by someone who actually engaged with the linked material — not from general knowledge.',
+      ref: { mcq: 10, truefalse: 3, short: 3, cloze: 2, essay: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE LINKED MATERIAL', 'The reading is at this link (article / Drive material):\n{{SOURCE}}\nSchool Connect stores LINKS ONLY (read_link) — never uploads — to protect\nthe free storage quota. If you cannot open links, say so in ONE line and\nask the teacher to paste the text; then continue from the pasted text.'],
+        ['QUESTIONS MUST PROVE READING', 'Reference specific sections, figures, arguments and examples FROM the\nmaterial ("According to the third paragraph...", "The author\'s example of\n..."). A student who has not opened the link should not be able to guess.'],
+        ['TEACHER SETUP NOTE (include as a comment in Col7 of row 1)', 'Remind the teacher: paste the same link into the Digital Library "Read\nlink" field, tick "Has comprehension questions", and set the Max score so\nthe quiz feeds the report card as CA.']
+      ],
+      quality: [
+        'Every item cites something specific in the linked material.',
+        'The two essay items ask for the author\'s argument, not opinion.',
+        'Cloze items quote sentences from the material with key terms gapped.'
+      ]
+    },
+    dl_video: {
+      label: '📚 Digital Library — video',
+      role: 'a media-literacy teacher preparing a School Connect Digital Library video assignment: a linked video plus the comprehension quiz that proves it was watched',
+      mission: 'The student opens the VIDEO LINK from the 📚 Digital Library page, watches it, then answers. Every question must be answerable only by someone who actually watched — anchored to moments, demonstrations and spoken claims in the video.',
+      ref: { mcq: 10, truefalse: 3, short: 3, ordering: 2, essay: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE LINKED VIDEO', 'The video is at this link (YouTube / Drive):\n{{SOURCE}}\nSchool Connect stores LINKS ONLY — never uploads. If you cannot open\nlinks, say so in ONE line and ask the teacher for the transcript or a\ndescription of the video; then continue from that.'],
+        ['ANCHOR TO THE TIMELINE', 'Reference visible moments ("the demonstration at the start", "the second\nexperiment", "the final summary"). Use ordering items to sequence the\nsteps the video actually shows.'],
+        ['TEACHER SETUP NOTE (include as a comment in Col7 of row 1)', 'Remind the teacher: paste the same link into the Digital Library "Read\nlink" field, tick "Has comprehension questions", and set the Max score so\nthe quiz feeds the report card as CA.']
+      ],
+      quality: [
+        'Every item is anchored to a specific moment or claim in the video.',
+        'Ordering items sequence steps exactly as demonstrated.',
+        'No item is answerable from the title alone.'
+      ]
+    },
+    assignment: {
+      label: '📝 Assignment brief + rubric',
+      role: 'a curriculum-aligned assignment designer writing a complete take-home task for the School Connect 📝 Assignments page',
+      mission: 'Produce a professional assignment BRIEF (not an exam): the task, the linked resources, the submission expectations and a transparent marking rubric a parent could read. Then a short self-check quiz the teacher may optionally import as CBT.',
+      ref: { essay: 3, short: 4, mcq: 3 }, dominant: 'short',
+      isBrief: true,
+      sections: [
+        ['PART 1 — THE ASSIGNMENT BRIEF (plain text, BEFORE the CSV)', 'Write these sections in clear student-facing language:\n  TITLE — one line.\n  TASK — exactly what to produce, in numbered steps.\n  RESOURCES — this link (Drive/web, LINKS ONLY, never uploads):\n  {{SOURCE}}\n  DELIVERABLE — what the student hands in and HOW (School Connect stores a\n  link in the assignment record; physical work is handed to the teacher).\n  DUE — leave as [DUE DATE] for the teacher to fill.\n  RUBRIC — a marks table totalling [TOTAL MARKS]: criterion, what full marks\n  looks like, marks available. Plain language a parent could read.'],
+        ['PART 2 — THE SELF-CHECK QUIZ (the CSV)', 'After the brief, output the CSV: a short self-check the student answers\nBEFORE submitting, testing that they understood the task and the resource.\nThe teacher may import it on the CBT page as a low-stakes check.'],
+        ['TEACHER SETUP NOTE (last line of the brief)', 'Remind the teacher: create the assignment on the 📝 Assignments page with\nthe same title, paste the resource link into "Drive link", set the due\ndate — and optionally import the self-check CSV on the CBT page.']
+      ],
+      quality: [
+        'The brief is complete enough to hand out without editing (except the due date).',
+        'The rubric criteria add up to exactly the stated total marks.',
+        'Every resource is a LINK — the brief never asks for a file upload into School Connect.',
+        'The self-check quiz tests understanding of the TASK and RESOURCE, not new content.'
+      ]
+    }
+  },
+
+  build() {
+    const packKey = document.getElementById('ps-pack').value;
+    const P = this.PACKS[packKey] || this.PACKS.enterprise;
+    const topic = document.getElementById('ps-topic').value.trim() || '[TOPIC]';
+    const n = Math.max(1, Number(document.getElementById('ps-n').value) || 20);
+    const lv = document.getElementById('ps-lv').value.trim() || '[CLASS/LEVEL]';
+    const subject = document.getElementById('ps-subject').value.trim() || '[SUBJECT]';
+    const board = document.getElementById('ps-board').value || 'General classwork';
+    const source = document.getElementById('ps-src').value.trim() || '[PASTE THE LINK HERE]';
+    const subjectsRaw = document.getElementById('ps-subjects-list').value.trim();
+    const subjects = subjectsRaw || subject;
+    const school = (window.SCHOOL && SCHOOL.name) || document.body.getAttribute('data-school') || 'this school';
+
+    const st = {};
+    document.querySelectorAll('[data-ps-subject-topic]').forEach(i => { if (i.value.trim()) st[i.dataset.psSubjectTopic] = i.value.trim(); });
+    const stLines = Object.keys(st).length
+      ? 'Use these topics, one per subject — do NOT apply one topic to all:\n' + Object.keys(st).map(k => '  - ' + k + ': ' + st[k]).join('\n')
+      : 'No per-subject topic was given, so choose a representative core topic for each subject.';
+
+    const fill = s => String(s)
+      .replace(/\{\{BOARD\}\}/g, board)
+      .replace(/\{\{SOURCE\}\}/g, source)
+      .replace(/\{\{SUBJECT_TOPICS\}\}/g, stLines)
+      .replace(/\{\{SUBJECTS\}\}/g, subjects);
+
+    const mixed = this.mix(P.ref, n, P.dominant, P.minOne);
+    const usedTypes = Object.keys(mixed);
+    const distribution = usedTypes.map(k => k + '=' + mixed[k]).join(', ');
+    const rule = '===================================================================';
+    const fname = (topic === '[TOPIC]' ? 'questions' : topic).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'questions';
+
+    const sections = (P.sections || []).map(s => rule + '\n' + fill(s[0]) + '\n' + rule + '\n' + fill(s[1])).join('\n\n');
+    const quality = (P.quality || []).map(q => '- ' + fill(q)).join('\n');
+    const checks = [
+      'Output is a DOWNLOADABLE .csv FILE named "' + fname + '.csv".',
+      'Exactly ' + n + ' data rows, plus the one header row.',
+      'Header matches the contract character for character (17 columns).',
+      'Type counts match the distribution and sum to ' + n + '.',
+      'Every JSON cell has inner quotes doubled ("") and the whole cell quoted.',
+      'Every objective row has a non-empty, unambiguous key in Col6.',
+      'Col17 is the subject on every row.'
+    ].map(c => '[ ] ' + fill(c)).join('\n');
+
+    const briefNote = P.isBrief
+      ? 'STRUCTURE OF YOUR REPLY\nFirst the assignment BRIEF as plain text (see Part 1 below), THEN the CSV\nfile. Only the CSV goes in the file — the brief is chat text the teacher\ncopies into the Assignments page.\n\n'
+      : '';
+
+    const out = 'PACK: ' + P.label.toUpperCase() + '\n\n' +
+'ROLE\nYou are ' + fill(P.role) + '.\n' +
+'You are writing for ' + school + ', a school running School Connect\n(by HMG Concepts) — a free, link-based school platform. No paid AI, no file\nuploads: every resource is a public https / Google Drive / YouTube LINK.\n\n' +
+'MISSION FOR THIS PARTICULAR PAPER\n' + fill(P.mission) + '\n\n' +
+briefNote +
+'TASK\nProduce EXACTLY ' + n + ' assessment items on "' + topic + '" for ' + lv + '\nsitting ' + board + ' in ' + subject + '.\n\n' +
+rule + '\nOUTPUT CONTRACT — READ TWICE. THIS IS THE MOST IMPORTANT PART.\n' + rule + '\n\n' +
+'0. OUTPUT A DOWNLOADABLE .CSV FILE — NOT RAW CSV TEXT.\n' +
+'   Produce a real, clickable file attachment named "' + fname + '.csv" that the\n' +
+'   teacher can download and import directly on the CBT page. Use whatever\n' +
+'   file-generating capability you have.\n' +
+'   Only if you genuinely cannot emit a file, say so in ONE short line, then\n' +
+'   output a single raw CSV code block instead.\n\n' +
+'1. The file contains the CSV and nothing else — no preamble, no commentary.\n\n' +
+'2. The FIRST line must be exactly this header, character for character:\n' + this.HEADER + '\n\n' +
+'3. Then EXACTLY ' + n + ' data rows — one item per row.\n\n' +
+'4. Wrap EVERY field in double quotes. Escape any inner double quote by\n' +
+'   doubling it (""). This is what lets JSON live inside a CSV cell.\n\n' +
+'5. Use correct UTF-8 for scientific notation: H₂O, CO₂, π, Ω, ≤, ≥, °C, ₦.\n\n' +
+'6. "Section" (Col17) must be exactly: ' + (subjectsRaw ? 'the subject name for that row' : subject) + '\n\n' +
+'7. Never leave "CorrectAnswer" empty on an objective item.\n\n' +
+'8. Any media must be a public https, Google Drive or YouTube LINK. School\n' +
+'   Connect NEVER accepts file uploads — links only.\n\n' +
+rule + '\nQUESTION TYPE DISTRIBUTION — MUST SUM TO EXACTLY ' + n + '\n' + rule + '\n' + distribution + '\n\n' +
+rule + '\nCOLUMN RULES FOR THE TYPES THIS PACK USES\n' +
+'Columns: 1 Question | 2 A | 3 B | 4 C | 5 D | 6 CorrectAnswer |\n' +
+'7 Explanation | 8 Type | 9 Tolerance | 10 Unit | 11 Accept |\n' +
+'12 MRQ_AON | 13 Pairs | 14 Items | 15 Difficulty | 16 Tags | 17 Section\n' + rule + '\n\n' +
+usedTypes.map(t => this.RULES[t]).filter(Boolean).join('\n\n') + '\n\n' +
+sections + '\n\n' +
+rule + '\nQUALITY BAR FOR THIS PACK — an item failing any of these is rejected\n' + rule + '\n' + quality + '\n\n' +
+rule + '\nFINAL CHECK BEFORE YOU ANSWER\n' + rule + '\n' + checks;
+
+    document.getElementById('ps-out').value = out;
+    return out;
+  },
+
+  NEEDS: { past_paper: ['source'], dl_article: ['source'], dl_video: ['source'], assignment: ['source'], multi_subject: ['subjects'] },
+
+  syncFields() {
+    const pack = document.getElementById('ps-pack').value;
+    const need = this.NEEDS[pack] || [];
+    document.querySelectorAll('[data-ps-need]').forEach(el => { el.hidden = need.indexOf(el.dataset.psNeed) === -1; });
+    document.querySelectorAll('[data-ps-hide]').forEach(el => { el.hidden = need.indexOf(el.dataset.psHide) !== -1; });
+    if (need.indexOf('subjects') !== -1) this.syncSubjectTopics();
+  },
+
+  syncSubjectTopics() {
+    const host = document.getElementById('ps-subject-topics');
+    if (!host) return;
+    const list = (document.getElementById('ps-subjects-list').value || '').split(',').map(x => x.trim()).filter(Boolean);
+    const keep = {};
+    host.querySelectorAll('[data-ps-subject-topic]').forEach(i => { keep[i.dataset.psSubjectTopic] = i.value; });
+    const escq = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    host.innerHTML = list.length
+      ? list.map(sub => '<div style="display:flex;align-items:center;gap:10px;margin:4px 0"><label style="min-width:130px;font-weight:700;font-size:.85rem">' + escq(sub) + '</label><input class="form-input" data-ps-subject-topic="' + escq(sub) + '" value="' + escq(keep[sub] || '') + '" placeholder="Topic for ' + escq(sub) + '"></div>').join('')
+      : '<p style="color:var(--gray-500);margin:0;font-size:.85rem">Type the subjects above and a topic box will appear for each.</p>';
+    host.querySelectorAll('[data-ps-subject-topic]').forEach(i => i.addEventListener('input', () => PS.build()));
+  },
+
+  async init() {
+    const pk = document.getElementById('ps-pack');
+    if (!pk) return;
+    /* Deep link: cbt-prompts.html?pack=dl_article|dl_video|assignment|…
+       lets the 📚 Digital Library and 📝 Assignments pages open the studio
+       with the right pack already selected. */
+    try {
+      const want = new URLSearchParams(location.search).get('pack');
+      if (want && this.PACKS[want]) { pk.value = want; setTimeout(() => { const c = pk.closest('.card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); }
+    } catch (_) {}
+    pk.addEventListener('change', () => { this.syncFields(); this.build(); });
+    ['ps-topic','ps-n','ps-lv','ps-subject','ps-board','ps-src'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.addEventListener('input', () => this.build());
+    });
+    document.getElementById('ps-subjects-list').addEventListener('input', () => { this.syncSubjectTopics(); this.build(); });
+    document.getElementById('ps-build').addEventListener('click', () => { this.build(); toast('Prompt built — copy it into any free AI chat.', 'success', 4000); });
+    document.getElementById('ps-copy').addEventListener('click', async () => {
+      if (!document.getElementById('ps-out').value) this.build();
+      const t = document.getElementById('ps-out'); t.select(); t.setSelectionRange(0, 999999);
+      try { if (navigator.clipboard) await navigator.clipboard.writeText(t.value); else document.execCommand('copy'); toast('Prompt copied — paste into any free AI chat ✓', 'success', 5000); }
+      catch (e) { document.execCommand('copy'); toast('Prompt copied ✓', 'success'); }
+    });
+    document.getElementById('ps-savecsv').addEventListener('click', () => {
+      const t = (document.getElementById('ps-csvback').value || '').trim().replace(/^```[a-z]*\s*/i, '').replace(/```$/, '').trim();
+      if (!t) { toast('Paste the CSV the chat produced first.', 'warning'); return; }
+      const topic = (document.getElementById('ps-topic').value || 'questions').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'questions';
+      const blob = new Blob([t], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = topic + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+      const rows = t.split(/\r?\n/).filter(Boolean).length - 1;
+      toast('Saved ' + topic + '.csv (' + rows + ' question rows). Upload it on the CBT page.', 'success', 7000);
+    });
+    /* Pull real classes + subjects into datalists so the teacher picks
+       instead of typing (typo-proof, matches student records). */
+    try {
+      if (window.sb) {
+        const [cls, subs] = await Promise.all([
+          sb.from('classes').select('name').order('name'),
+          sb.from('subjects').select('name').order('name')
+        ]);
+        const cd = document.getElementById('ps-classes'), sd = document.getElementById('ps-subjects');
+        (cls.data || []).forEach(c => { const o = document.createElement('option'); o.value = c.name; cd && cd.appendChild(o); });
+        (subs.data || []).forEach(s => { const o = document.createElement('option'); o.value = s.name; sd && sd.appendChild(o); });
+      }
+    } catch (_) {}
+    this.syncFields();
+    this.build();
+  }
+};
+document.addEventListener('DOMContentLoaded', () => { try { PS.init(); } catch (e) { console.warn('Prompt Studio init failed:', e); } });
 </script></body></html>

@@ -480,6 +480,22 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         auto-marked score is recorded — it can count toward their continuous-assessment grade. No files are uploaded
         (links only), so it stays free on Supabase.</p></div>
 
+      <!-- V10.3 (#3): AI-assisted authoring for readings — link-aware prompt
+           packs, structured like Tutoring Connect. No paid AI: the teacher
+           copies a prompt into any free chat and pastes the questions back. -->
+      <div class="card" style="margin-bottom:16px;border-left:6px solid #059669" data-staff-only>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">🤖 Draft the comprehension questions with AI (free chat, no API)</h3>
+          <span class="badge" style="background:#059669;color:#fff">NEW · V10.3</span>
+        </div>
+        <p style="color:var(--gray-600);margin:6px 0 10px">Have an <b>article/material link</b> or a <b>video link</b>? The Prompt Studio writes a professional, link-aware prompt that makes any free AI chat generate questions <b>answerable only by a student who actually opened your link</b> — then upload the CSV on the CBT page, or type the questions below by hand.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn btn-sm btn-primary" href="cbt-prompts.html?pack=dl_article">📰 Article / material prompt</a>
+          <a class="btn btn-sm btn-primary" href="cbt-prompts.html?pack=dl_video">🎬 Video prompt</a>
+          <span style="align-self:center;font-size:.8rem;color:var(--gray-500)">Tip: after saving a reading with questions, use <b>🧪 Send to CBT</b> on its card to publish it as a timed, anti-cheat CBT exam.</span>
+        </div>
+      </div>
+
       <div class="card" style="margin-bottom:16px" data-staff-only>
         <h3>➕ Add / set a reading (teacher)</h3>
         <div class="grid grid-2">
@@ -631,6 +647,7 @@ const DL={ qs:[],
         '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
           '<a class="btn btn-sm btn-primary" href="'+esc(DL.drive(b.read_link))+'" target="_blank" rel="noopener">📖 Read</a> '+
           (b.has_quiz?'<button type="button" class="btn btn-sm btn-outline" data-act="quiz" data-i="'+i+'">📝 Take quiz</button>':'')+
+          (canEdit&&b.has_quiz?'<button type="button" class="btn btn-sm btn-outline" data-act="tocbt" data-i="'+i+'" title="Publish this reading\'s comprehension questions as a timed, anti-cheat CBT exam with its own exam code">🧪 Send to CBT</button>':'')+
           (canEdit?'<button type="button" class="btn btn-sm btn-outline" data-act="edit" data-i="'+i+'">✏️ Edit</button>':'')+
           (canEdit?'<button type="button" class="btn btn-sm btn-outline" data-act="delete" data-i="'+i+'" style="color:#dc2626;border-color:#fca5a5">🗑 Delete</button>':'')+
         '</div></div></div>';
@@ -641,6 +658,7 @@ const DL={ qs:[],
         const i = Number(btn.dataset.i);
         const act = btn.dataset.act;
         if (act === 'quiz') DL.quiz(i);
+        else if (act === 'tocbt') DL.sendToCBT(i);
         else if (act === 'edit') DL.edit(i);
         else if (act === 'delete') DL.del(i);
       });
@@ -713,6 +731,54 @@ const DL={ qs:[],
     this.list();
   },
   drive(u){ if(!u)return '#'; var m=u.match(/drive\.google\.com\/file\/d\/([^/]+)/); return m?('https://drive.google.com/file/d/'+m[1]+'/view'):u; },
+  /* V10.3 (#3): PROFESSIONAL CBT FOR THE DIGITAL LIBRARY. One click converts
+     a reading's comprehension questions into a real, timed, anti-cheat CBT
+     exam (own exam code, attempt limits, registered/open modes, server-side
+     grading) — the reading link travels with it as the exam instructions so
+     the candidate can open the material policy the teacher chooses. The
+     lightweight in-page quiz stays exactly as it was; this is additive. */
+  async sendToCBT(i){
+    var b=this._books[i]; if(!b){toast('Reading not found.','warning');return;}
+    var qs=(b.questions||[]).filter(function(q){return q&&String(q.q||'').trim();});
+    if(!qs.length){toast('This reading has no comprehension questions yet — edit it and add some first.','warning',7000);return;}
+    if(!sb){toast('DB not configured','warning');return;}
+    if(!confirm('Publish "'+(b.title||'this reading')+'" as a CBT exam?\n\n• '+qs.length+' question(s) will be copied into a new CBT exam\n• It gets its own exam code, timer, attempt limit and anti-cheat\n• The reading stays here unchanged — students can still use the light quiz\n\nContinue?'))return;
+    var letters=['A','B','C','D','E'];
+    var bank=qs.map(function(q){
+      var t=q.type||'mcq';
+      var row={question:q.q,mark:1,section:b.subject||'',subject:b.subject||''};
+      if(t==='mcq'){ row.type='mcq'; row.options=(q.options||[]).filter(Boolean);
+        var ai=row.options.findIndex(function(o){return String(o).trim().toLowerCase()===String(q.answer||'').trim().toLowerCase();});
+        row.answer=ai>=0?letters[ai]:(q.answer||''); }
+      else if(t==='multi'){ row.type='multi_select'; row.options=(q.options||[]).filter(Boolean);
+        row.answer=(q.answers||[]).map(function(a){var j=row.options.findIndex(function(o){return String(o).trim().toLowerCase()===String(a).trim().toLowerCase();});return j>=0?letters[j]:a;}); }
+      else if(t==='tf'){ row.type='true_false'; row.options=['True','False']; row.answer=(String(q.answer||'True').toLowerCase()==='true')?'A':'B'; }
+      else if(t==='short'){ row.type='short_answer'; row.answer=q.answer||''; }
+      else if(t==='keyword'){ row.type='short_answer'; var ks=String(q.keywords||'').split(/\s*,\s*/).filter(Boolean); row.answer=ks[0]||''; row.accept=ks.join('|'); }
+      else { row.type='short_answer'; row.answer=q.answer||''; }
+      return row;
+    });
+    var code=(function(n){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='';for(var k=0;k<n;k++)r+=c.charAt(Math.floor(Math.random()*c.length));return r;})(6);
+    var cp={}; try{ var r0=await sb.from('academic_periods').select('term,session').eq('is_current',true).limit(1); cp=(r0.data&&r0.data[0])||{}; }catch(_){}
+    var exam={ code:code, title:'📚 Reading CBT — '+(b.title||'Digital Library'),
+      subject:b.subject||'General', class:b.class||'', term:cp.term||null, session:cp.session||null,
+      assessment_type:'quiz', exam_mode:'registered', duration:Math.max(10,Math.min(60,qs.length*2)),
+      attempt_limit:Number(b.attempts_allowed||1)||1, max_score:Number(b.max_score||0)||qs.length,
+      report_column:'CA1', is_open:false, release_results:true, randomise:false, select_count:0, negative_mark:0,
+      instructions:'This CBT is based on the reading "'+(b.title||'')+'". Material link: '+(b.read_link||'')+(b.instructions?('\n'+b.instructions):'')+'\nAnswer from the material you read.',
+      anti_cheat_config:{tab_switch:true,window_blur:true,copy_paste:true,right_click:true,fullscreen:true,watermark:true,max_violations:5},
+      csv_data:bank, questions:bank, created_at:new Date().toISOString() };
+    if(window.SC_PROFILE&&SC_PROFILE.id)exam.teacher_id=SC_PROFILE.id;
+    var res=await sb.from('cbt_exams').insert(exam).select('id,code').single();
+    if(res.error&&/attempt_limit|randomise|select_count|negative_mark|release_results/.test(res.error.message||'')){
+      ['attempt_limit','randomise','select_count','negative_mark','release_results'].forEach(function(k){delete exam[k];});
+      res=await sb.from('cbt_exams').insert(exam).select('id,code').single();
+    }
+    if(res.error){toast('Could not create the CBT exam: '+res.error.message,'danger',9000);return;}
+    if(window.App&&App.logActivity)App.logActivity('create','cbt_exam','Reading CBT '+code);
+    toast('✅ CBT exam created from "'+(b.title||'reading')+'" — code '+((res.data&&res.data.code)||code)+'. It is CLOSED until you open it in the CBT Manager (review questions, set schedule, then Open).','success',12000);
+    setTimeout(function(){ if(confirm('Open the CBT Manager now to review and publish it?')) location.href='cbt.html'; },600);
+  },
   quiz(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[];
     /* V8.6: some rows store questions as a JSON STRING — parse defensively. */
     if(typeof qs==='string'){try{qs=JSON.parse(qs);}catch(_){qs=[];}}

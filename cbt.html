@@ -897,8 +897,28 @@ window.CBTUI = {
     const blob=new Blob([head+body],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cbt-results.csv'; a.click();
   },
   downloadTemplate(){
-    const csv='Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section\n"What is 5 + 7?",10,11,12,13,C,"Addition.",mcq,,,,,,,Easy,Arithmetic,Numbers\n"Capital of Nigeria?",,,,,Abuja,"FCT.",short,,,FCT,,,,Easy,Geography,Nigeria\n';
-    const blob=new Blob([csv],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cbt-template.csv'; a.click();
+    /* V10.3: the template now demonstrates every structured advanced type
+       with worked JSON shapes (Pairs/Items) so teachers can see the exact
+       format rather than guess it from the header alone. */
+    const rows=[
+      'Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section',
+      '"What is 5 + 7?",10,11,12,13,C,"Addition.",mcq,,,,,,,Easy,Arithmetic,Numbers',
+      '"Water boils at 100 °C at sea level.",True,False,,,A,"At 1 atmosphere.",truefalse,,,,,,,Easy,States of matter,Physics',
+      '"Capital of Nigeria?",,,,,Abuja,"FCT since 1991.",short,,,FCT|Federal Capital Territory,,,,Easy,Geography,Nigeria',
+      '"Select ALL prime numbers.",2,9,11,15,A|C,"1 is not prime.",mrq,,,,false,,,Medium,Number theory,Numbers',
+      '"Area of a circle of radius 7 cm (π = 22/7)?",,,,,154,"A = πr².",numeric,0.5,cm²,,,,,Medium,Mensuration,Mathematics',
+      '"Match each symbol with its element.",,,,,,"Standard symbols.",matching,,,Calcium,,"[{""left"":""Na"",""right"":""Sodium""},{""left"":""K"",""right"":""Potassium""}]",,Medium,Periodic table,Chemistry',
+      '"Arrange the planets from the Sun outward.",,,,,,"Order from the Sun.",ordering,,,,,,"[""Mercury"",""Venus"",""Earth"",""Mars""]",Medium,Solar system,Basic Science',
+      '"Newton\u2019s ___ law explains inertia; force equals mass times ___.",,,,,,"F = ma.",cloze,,,,,,"[""first|1st"",""acceleration|a""]",Medium,Laws of motion,Physics',
+      '"Sort each material into its group.",,,,,,"Conductors carry current.",categorization,,,,,,"[{""item"":""Copper"",""category"":""Conductor""},{""item"":""Rubber"",""category"":""Insulator""}]",Easy,Electricity,Basic Science',
+      '"Answer every row: True or False.",,,,,,"Check each statement.",matrix,,,True|False,,,"[{""statement"":""The heart pumps blood"",""answer"":""True""},{""statement"":""Plants breathe out oxygen at night"",""answer"":""False""}]",Medium,Human biology,Biology',
+      '"Solve: x + y = 5 and x − y = 1.",,,,,,"Add then substitute.",multi_numeric,,,,,,"[{""label"":""x"",""answer"":3,""tolerance"":0},{""label"":""y"",""answer"":2,""tolerance"":0}]",Hard,Simultaneous equations,Mathematics',
+      '"Tap every even number.",,,,,,"Even numbers divide by 2.",hot_text,,,,,,"[{""text"":""3"",""correct"":false},{""text"":""4"",""correct"":true},{""text"":""7"",""correct"":false},{""text"":""10"",""correct"":true}]",Easy,Number sense,Numbers',
+      '"Choose the option that best describes the Assertion and Reason.",Both true and Reason explains Assertion,Both true but Reason does not explain it,Assertion true only,Reason true only,A,"Photosynthesis needs chlorophyll.",assertion_reason,,,,,,"{""assertion"":""Green plants make their own food"",""reason"":""Chlorophyll absorbs light energy""}",Hard,Photosynthesis,Biology',
+      '"Explain why the boy sold the family goat in the passage.",,,,,,"Model: school fees; cite paragraph 2. Teacher marks this.",essay,,,,,,"{""min_words"":40,""keywords"":[""school fees"",""sacrifice""]}",Hard,Comprehension,English'
+    ];
+    const blob=new Blob([rows.join('\n')+'\n'],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cbt-template.csv'; a.click();
+    toast('Template downloaded — it demonstrates all 17+ question types including matching, ordering, grids, gap-fills, hot-text and multi-part numeric with worked JSON shapes.','success',9000);
   }
 };
 document.addEventListener('DOMContentLoaded', CBTUI.refresh); CBTUI.refresh();
