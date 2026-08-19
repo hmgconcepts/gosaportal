@@ -1559,8 +1559,21 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
               if (tEl && !tEl.value && f.term) tEl.value = f.term;
               if (sEl && !sEl.value && f.session) sEl.value = f.session;
             }
-            totEl.ondblclick = () => { totEl.readOnly = false; totEl.focus(); if (typeof toast === 'function') toast('Total due unlocked for manual override (admin discretion).', 'info', 4000); };
-            totEl.oninput = recompute;
+            /* V10.3 (#4) ROOT-CAUSE FIX: the double-click override used to be
+               saved into fee_payments.fee_total but sc_student_fee_state kept
+               recomputing the bill from the CLASS fee structure, so the
+               student dashboard ignored the adjusted figure. Now the unlock
+               remembers the auto value; if the admin actually CHANGES it, the
+               row is flagged total_overridden=true and the V10.3 RPC treats
+               that figure as this student's personal total due everywhere
+               (dashboard, receipts, family panel). */
+            totEl.dataset.scAutoTotal = totEl.value || '';
+            totEl.ondblclick = () => { totEl.readOnly = false; totEl.focus(); if (typeof toast === 'function') toast('Total due unlocked for manual override (admin discretion). If you change it, the new figure becomes this student\'s personal total due on their dashboard and receipts.', 'info', 7000); };
+            totEl.oninput = () => {
+              recompute();
+              const auto = Number(totEl.dataset.scAutoTotal || 0);
+              totEl.dataset.scOverridden = (!totEl.readOnly && Math.abs((Number(totEl.value) || 0) - auto) > 0.005) ? '1' : '';
+            };
             if (paidEl) paidEl.oninput = recompute;
             recompute();
           } catch (_) {}
@@ -1683,6 +1696,17 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     // ENTERPRISE V11 (issue 13): auto-compute fee balance when blank
     if (d.table === 'fee_payments' && payload.balance == null && payload.fee_total != null) {
       payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
+    }
+    /* V10.3 (#4): persist the DELIBERATE total-due override flag. Only set
+       when the admin double-click-unlocked the field AND changed the value —
+       an untouched auto-filled total keeps the class fee structure authority.
+       The self-healing save strips the column automatically on databases
+       that have not run database/v10.3 yet. */
+    if (d.table === 'fee_payments') {
+      try {
+        const totEl = document.getElementById('cf-' + this.fid('fee_total'));
+        if (totEl && totEl.dataset.scOverridden === '1') payload.total_overridden = true;
+      } catch(_) {}
     }
     // ENTERPRISE FINAL V2 (#8): normalise balance to a number when present
     if (d.table === 'fee_payments' && payload.balance != null) payload.balance = Number(payload.balance) || 0;

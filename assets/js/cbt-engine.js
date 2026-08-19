@@ -5,6 +5,10 @@
    ==================================================================== */
 const CBT = {
   QUESTION_TYPES_17: ['mcq','multi_select','true_false','fill_blank','short_answer','essay','numeric','matching','ordering','drag_drop','hotspot','comprehension','case_study','image_based','audio_based','video_based','math_equation'],
+  /* V10.3: the full advanced family (Tutoring Connect parity). Structured
+     types render with purpose-built controls via assets/js/cbt-types.js and
+     grade with per-row partial credit server-side (database/v10.3). */
+  QUESTION_TYPES_ADVANCED: ['cloze','multi_numeric','categorization','matrix','hot_text','code','assertion_reason','likert','timeline','error_spotting','classification','scenario_mcq','data_interpretation','graph_read','oral_prompt','peer_review','true_false_justify','map_label','code_output','citation'],
   _sb: null,
   calcState: { mode: 'basic', memory: 0, display: '' },
 
@@ -87,6 +91,17 @@ const CBT = {
       accepted_answers: pick('accept','accepted_answers','alternatives') || '',
       passage: pick('passage','context','case_text','comprehension') || '',
       media_url: pick('media_url','media','image_url','image','audio_url','video_url') || '',
+      /* V10.3: structured-type payloads (Tutoring Connect parity). `items`
+         carries matching pairs / ordering lists / matrix rows / numeric
+         parts / hot-text chunks; `pool` and `blanks` are the sanitised
+         render shapes the V10.3 server getter emits for candidates. */
+      items: pick('items','pairs') ?? null,
+      pairs: pick('pairs') ?? null,
+      pool: pick('pool') ?? null,
+      blanks: pick('blanks') ?? null,
+      unit: pick('unit') || '',
+      mrq_aon: pick('mrq_aon','mrqaon','all_or_nothing') ?? null,
+      distractors: pick('distractors') || '',
       metadata: pick('metadata') || null
     };
   },
@@ -158,6 +173,17 @@ const CBT = {
       if (given == null || given === undefined) { skipped++; return; }
       if (typeof given === 'string' && given.trim() === '') { skipped++; return; }
       if (Array.isArray(given) && given.length === 0) { skipped++; return; }
+      /* V10.3: structured types earn per-row partial credit in the client
+         preview too, mirroring the canonical server engine. Anything the
+         advanced grader does not own returns null and falls back here. */
+      let frac = null;
+      try { if (window.CBTTypes && CBTTypes.handles && CBTTypes.handles(q)) { const g = CBTTypes.grade(q, given); if (g && !g.pending && !g.unmarkable) frac = g.fraction; } } catch(_) {}
+      if (frac != null) {
+        if (frac >= 0.999) { score += mark; correct++; }
+        else if (frac <= 0.001) { score -= Number(exam.negative_mark || 0) || 0; wrong++; }
+        else { score += Math.round(mark * frac * 100) / 100; wrong++; }
+        return;
+      }
       const ok = this.isCorrect(q, given);
       if (ok) { score += mark; correct++; }
       else { score -= Number(exam.negative_mark || 0) || 0; wrong++; }
@@ -271,15 +297,25 @@ const CBT = {
   },
 
   validateQuestionBank(questions) {
-    const manualTypes=new Set(['essay','long_answer','file_upload']);
+    /* V10.3: code / oral / peer-review join essay in the teacher-marked
+       family, and structured types (matching, ordering, matrix…) count a
+       populated Items/Pairs column as their answer key — matching the
+       server-side keyed check in database/v10.3. */
+    const manualTypes=new Set(['essay','long_answer','file_upload','code','oral_prompt','peer_review']);
+    const structuredTypes=new Set(['matching','ordering','categorization','matrix','multi_numeric','cloze','hot_text']);
+    const canon=t=>{const x=String(t||'mcq').toLowerCase().replace(/[\s\/\\-]+/g,'_');return (window.CBTTypes&&CBTTypes.ALIAS&&CBTTypes.ALIAS[x])||x;};
     const errors=[],warnings=[];
     (questions||[]).forEach((raw,i)=>{
-      const q=this.normalizeQuestion(raw,i), label='Question '+(i+1);
+      const q=this.normalizeQuestion(raw,i), label='Question '+(i+1), ct=canon(q.type);
       if(!String(q.question||'').trim()) errors.push(label+': question text is missing.');
-      const missing=q.answer==null || (typeof q.answer==='string'&&!q.answer.trim()) || (Array.isArray(q.answer)&&!q.answer.length);
-      if(missing && !manualTypes.has(q.type)) errors.push(label+': correct answer key is missing. Check the CorrectAnswer/Correct Answer column.');
-      if(['mcq','true_false','multi_select'].includes(q.type) && q.options.length<2) errors.push(label+': at least two options are required for '+q.type+'.');
-      if(manualTypes.has(q.type)&&missing) warnings.push(label+': requires manual review and is excluded from automatic percentage.');
+      let missing=q.answer==null || (typeof q.answer==='string'&&!q.answer.trim()) || (Array.isArray(q.answer)&&!q.answer.length);
+      if(missing && structuredTypes.has(ct)){
+        const its=(window.CBTTypes&&CBTTypes.parseList)?CBTTypes.parseList(q.items!=null&&q.items!==''?q.items:q.pairs):[];
+        if(its.length) missing=false;
+      }
+      if(missing && !manualTypes.has(ct)) errors.push(label+': correct answer key is missing. Check the CorrectAnswer column (or the Items/Pairs column for structured types).');
+      if(['mcq','true_false','multi_select'].includes(ct) && q.options.length<2) errors.push(label+': at least two options are required for '+q.type+'.');
+      if(manualTypes.has(ct)&&missing) warnings.push(label+': requires manual review and is excluded from automatic percentage.');
     });
     return {ok:errors.length===0,errors,warnings,question_count:(questions||[]).length,engine_version:'v5.1'};
   },
@@ -317,12 +353,24 @@ const CBT = {
         mark: Number(get('mark','marks','score','points') || 1) || 1,
         difficulty: get('difficulty','level') || '',
         topic: get('topic','lesson') || '',
-        tolerance: get('tolerance','accept') || '',
+        tolerance: get('tolerance') || '',
         section: get('section','subject','subject_section','exam_subject') || '',
         subject: get('subject','section','subject_section','exam_subject') || '',
         passage: get('passage','context','case_text','comprehension') || '',
-        media_url: get('media_url','media','image_url','image','audio_url','video_url') || ''
+        media_url: get('media_url','media','image_url','image','audio_url','video_url') || '',
+        /* V10.3: the 17-column contract (Tutoring Connect parity) —
+           Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,
+           Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section. JSON lives in
+           Pairs/Items with doubled inner quotes; parseCSVRows already
+           unescapes them, cbt-types.js parses the JSON lazily. */
+        unit: get('unit') || '',
+        accept: get('accept','accepted_answers','alternatives') || '',
+        mrq_aon: get('mrq_aon','mrqaon','all_or_nothing') || '',
+        pairs: get('pairs') || '',
+        items: get('items') || '',
+        tags: get('tags') || ''
       };
+      if (!q.tolerance && !q.items && !q.pairs) q.tolerance = get('accept') && /^[0-9.]+$/.test(get('accept')) ? get('accept') : q.tolerance;
       questions.push(this.normalizeQuestion(q, i));
     });
     return questions;
