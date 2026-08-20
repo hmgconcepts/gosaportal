@@ -504,6 +504,19 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <div class="form-group"><label>Subject</label><select class="form-select" id="dl-subject"><option value="">—</option></select></div>
           <div class="form-group"><label>Assigned class</label><select class="form-select" id="dl-class"><option value="">—</option></select></div>
           <div class="form-group" style="grid-column:1/-1"><label>Read link (Drive / web) *</label><input class="form-input" id="dl-link" placeholder="https://drive.google.com/file/d/..."></div>
+          <!-- V10.5: LINKED CBT — a reading can carry a full CBT exam (timed,
+               anti-cheat, own code, server-graded) ALONGSIDE the lightweight
+               embedded quiz below. Paste an existing exam code / cbt-exam.html
+               link, or pick from the school's exam list. Scores from BOTH
+               engines merge in the 🚀 push-to-report-card panel. -->
+          <div class="form-group" style="grid-column:1/-1">
+            <label>🧪 Linked CBT (optional — exam code or cbt-exam.html link)</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input class="form-input" id="dl-cbt" style="flex:1;min-width:220px" placeholder="e.g. AB3K9P  or  https://…/cbt-exam.html?code=AB3K9P">
+              <button type="button" class="btn btn-sm btn-outline" onclick="DL.pickCBT('dl-cbt')">📋 Pick from exam list</button>
+            </div>
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">The full CBT engine (timer, anti-cheat, attempts, server grading) for this reading — separate from the light comprehension quiz below; you can use either or both. Build one from a prompt on <a href="cbt-prompts.html?pack=dl_article">Prompt Studio</a> → upload the CSV on the <a href="cbt.html">CBT page</a> → paste its code here. Results push to the report card from the panel below, together with quiz scores.</div>
+          </div>
           <div class="form-group" style="grid-column:1/-1"><label>Instructions</label><textarea class="form-input" id="dl-inst" rows="2"></textarea></div>
           <div class="form-group"><label>Due date</label><input class="form-input" type="date" id="dl-due"></div>
           <div class="form-group"><label>Max score (counts to grade)</label><input class="form-input" type="number" id="dl-max" value="10"></div>
@@ -521,7 +534,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
       <div class="card" style="margin-top:16px" data-staff-only>
         <h3>🏅 Digital-library points → Report card</h3>
-        <p class="help">Every quiz a student completes ACCUMULATES per class + subject + term. Show the running totals, then push them into any report-card column in one click (scaled to the column's maximum mark).</p>
+        <p class="help">Every 📝 embedded quiz a student completes ACCUMULATES per class + subject + term — and readings with a 🧪 Linked CBT contribute their full exam results too (best attempt per student, merged automatically). Show the running totals, then push everything into any report-card column in one click (scaled to the column's maximum mark).</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
           <div class="form-group"><label>Class</label><select class="form-select" id="dlp-class"><option value="">— class —</option></select></div>
           <div class="form-group"><label>Subject</label><select class="form-select" id="dlp-subject"><option value="">— subject —</option></select></div>
@@ -593,17 +606,56 @@ const DL={ qs:[],
     else if(t==='short') body='<div class="form-group"><label>Correct answer (case-insensitive; extra spaces ignored)</label><input class="form-input" value="'+esc(q.answer||'')+'" oninput="DL.qs['+i+'].answer=this.value"></div>';
     else if(t==='keyword') body='<div class="form-group"><label>Accepted keywords (comma-separated — ANY one in the student\'s answer scores)</label><input class="form-input" value="'+esc(q.keywords||'')+'" oninput="DL.qs['+i+'].keywords=this.value" placeholder="photosynthesis, chlorophyll, sunlight"></div>';
     return head+body+'</div>';}).join(''); },
+  /* V10.5: accept a bare exam code OR a full cbt-exam.html?code=… link and
+     normalise to the canonical uppercase code. */
+  cbtCode(v){
+    v=String(v||'').trim(); if(!v)return'';
+    try{ if(/cbt-exam/i.test(v)||/^https?:/i.test(v)){ var u=new URL(v, location.href); var c=u.searchParams.get('code'); if(c)v=c; } }catch(_){}
+    return v.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  },
+  /* V10.5: verify the code exists before saving — a typo here would strand
+     students on a "no exam matches that code" page. */
+  async cbtVerify(code){
+    if(!code)return{ok:true};
+    try{ var r=await sb.from('cbt_exams').select('id,title,is_open,is_archived').ilike('code',code).limit(1);
+      if(r.error)return{ok:true,unknown:true}; /* RLS may hide other teachers' exams — do not block */
+      if(!r.data||!r.data.length)return{ok:false,msg:'No CBT exam matches code "'+code+'". Check the code on the CBT page (it may also belong to another teacher — an admin can confirm).'};
+      var e=r.data[0]; return{ok:true,title:e.title,open:e.is_open&&!e.is_archived};
+    }catch(_){return{ok:true,unknown:true};}
+  },
+  /* V10.5: pick a linked CBT from the exams this account can see. */
+  async pickCBT(targetId){
+    if(!sb){toast('DB not configured','warning');return;}
+    var r=await sb.from('cbt_exams').select('code,title,subject,class,is_open,is_archived').order('created_at',{ascending:false}).limit(300);
+    if(r.error){toast(r.error.message,'danger');return;}
+    var rows=(r.data||[]).filter(function(e){return !e.is_archived;});
+    if(!rows.length){toast('No CBT exams visible to your account yet — create one on the CBT page first (Prompt Studio → CSV → CBT Manager).','info',8000);return;}
+    openModal('📋 Pick the linked CBT exam',
+      '<input class="form-input" id="dl-cbt-filter" placeholder="Filter by title / subject / class / code" style="margin-bottom:10px">'+
+      '<div class="table-wrap" style="max-height:50vh;overflow:auto"><table><thead><tr><th>Exam</th><th>Code</th><th>Status</th><th></th></tr></thead><tbody id="dl-cbt-rows">'+
+      rows.map(function(e){return '<tr data-blob="'+esc((e.title+' '+e.subject+' '+e.class+' '+e.code).toLowerCase())+'"><td><b>'+esc(e.title||'Untitled')+'</b><br><small>'+esc(e.subject||'')+' · '+esc(e.class||'')+'</small></td><td><code>'+esc(e.code)+'</code></td><td>'+(e.is_open?'🟢 open':'⚪ closed')+'</td><td><button class="btn btn-sm btn-primary" onclick="DL.useCBT(\''+esc(e.code)+'\',\''+esc(targetId)+'\')">Use</button></td></tr>';}).join('')+
+      '</tbody></table></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+    var f=document.getElementById('dl-cbt-filter');
+    if(f)f.addEventListener('input',function(){var q=f.value.toLowerCase();document.querySelectorAll('#dl-cbt-rows tr').forEach(function(tr){tr.style.display=(tr.dataset.blob||'').indexOf(q)>-1?'':'none';});});
+  },
+  useCBT(code,targetId){ var el=document.getElementById(targetId||'dl-cbt'); if(el)el.value=code; closeModal(); toast('Linked CBT set to '+code+' ✓','success'); },
   async save(){ if(!sb){toast('DB not configured','warning');return;}
     var title=document.getElementById('dl-title').value, link=document.getElementById('dl-link').value;
     if(!title||!link){toast('Title and read link are required','warning');return;}
+    /* V10.5: linked CBT — normalise, verify, save alongside the reading. */
+    var cbt=this.cbtCode((document.getElementById('dl-cbt')||{}).value||'');
+    if(cbt){ var chk=await this.cbtVerify(cbt); if(!chk.ok){toast('⚠️ '+chk.msg,'warning',10000);return;}
+      if(chk.title&&!chk.open)toast('ℹ️ Linked CBT "'+chk.title+'" is currently CLOSED — open it in the CBT Manager when students should sit it.','info',8000); }
     var rec={ title:title, author:document.getElementById('dl-author').value, subject:document.getElementById('dl-subject').value,
       class:document.getElementById('dl-class').value, read_link:link, instructions:document.getElementById('dl-inst').value,
       due_date:document.getElementById('dl-due').value||null, has_quiz:this.qs.length>0, questions:this.qs,
-      max_score:Number(document.getElementById('dl-max').value||0),
+      max_score:Number(document.getElementById('dl-max').value||0), cbt_code:cbt,
       attempts_allowed:Number((document.getElementById('dl-attempts')||{}).value??1) };
     var {error}=await sb.from('digital_library').insert(rec);
     if(error&&/attempts_allowed/.test(error.message||'')){delete rec.attempts_allowed;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Attempt-limit column missing on this database — run database/v8.7-payroll-rebuild.sql to enforce limits.','warning',9000);}
-    if(error){toast(error.message,'danger',6000);return;} toast('Reading saved ✓','success'); this.qs=[]; this.render(); this.list();
+    if(error&&/cbt_code/.test(error.message||'')){delete rec.cbt_code;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Linked-CBT column missing on this database — run database/v10.5-dl-cbt-link.sql to store CBT links with readings.','warning',10000);}
+    if(error){toast(error.message,'danger',6000);return;} toast('Reading saved ✓'+(cbt&&rec.cbt_code?' · linked CBT '+cbt:''),'success'); this.qs=[]; this.render(); var de=document.getElementById('dl-cbt'); if(de)de.value=''; this.list();
   },
   _books:[],
   async list(){ var box=document.getElementById('dl-list'); if(!sb){box.innerHTML='<p>DB not configured.</p>';return;}
@@ -647,6 +699,9 @@ const DL={ qs:[],
         '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
           '<a class="btn btn-sm btn-primary" href="'+esc(DL.drive(b.read_link))+'" target="_blank" rel="noopener">📖 Read</a> '+
           (b.has_quiz?'<button type="button" class="btn btn-sm btn-outline" data-act="quiz" data-i="'+i+'">📝 Take quiz</button>':'')+
+          /* V10.5: a reading with a LINKED CBT gets a Take-CBT button for
+             everyone — it opens the full exam player with the code prefilled. */
+          (b.cbt_code?'<a class="btn btn-sm btn-outline" style="border-color:#7c3aed;color:#7c3aed" href="cbt-exam.html?code='+encodeURIComponent(b.cbt_code)+'" title="Full CBT exam linked to this reading (timed, anti-cheat, server-graded) — code '+esc(b.cbt_code)+'">🧪 Take CBT</a>':'')+
           (canEdit&&b.has_quiz?'<button type="button" class="btn btn-sm btn-outline" data-act="tocbt" data-i="'+i+'" title="Publish this reading\'s comprehension questions as a timed, anti-cheat CBT exam with its own exam code">🧪 Send to CBT</button>':'')+
           (canEdit?'<button type="button" class="btn btn-sm btn-outline" data-act="edit" data-i="'+i+'">✏️ Edit</button>':'')+
           (canEdit?'<button type="button" class="btn btn-sm btn-outline" data-act="delete" data-i="'+i+'" style="color:#dc2626;border-color:#fca5a5">🗑 Delete</button>':'')+
@@ -683,6 +738,7 @@ const DL={ qs:[],
       '<div class="form-group"><label>Subject</label><input class="form-input" id="dl-edit-subject" value="'+esc(b.subject||'')+'"></div>' +
       '<div class="form-group"><label>Class</label><input class="form-input" id="dl-edit-class" value="'+esc(b.class||'')+'"></div>' +
       '<div class="form-group"><label>Read link</label><input class="form-input" id="dl-edit-link" value="'+esc(b.read_link)+'"></div>' +
+      '<div class="form-group"><label>🧪 Linked CBT (exam code or cbt-exam.html link — blank = none)</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="form-input" id="dl-edit-cbt" style="flex:1;min-width:180px" value="'+esc(b.cbt_code||'')+'" placeholder="e.g. AB3K9P"><button type="button" class="btn btn-sm btn-outline" onclick="DL.pickCBT(\'dl-edit-cbt\')">📋 Pick</button></div></div>' +
       '<div class="form-group"><label>Instructions</label><textarea class="form-input" id="dl-edit-inst" rows="2">'+esc(b.instructions||'')+'</textarea></div>' +
       '<div class="grid grid-2"><div class="form-group"><label>Due date</label><input class="form-input" type="date" id="dl-edit-due" value="'+esc(b.due_date||'')+'"></div>' +
       '<div class="form-group"><label>Max score</label><input class="form-input" type="number" id="dl-edit-max" value="'+(b.max_score||0)+'"></div></div>' +
@@ -704,10 +760,14 @@ const DL={ qs:[],
       read_link: document.getElementById('dl-edit-link').value.trim(),
       instructions: document.getElementById('dl-edit-inst').value,
       due_date: document.getElementById('dl-edit-due').value || null,
-      max_score: Number(document.getElementById('dl-edit-max').value || 0)
+      max_score: Number(document.getElementById('dl-edit-max').value || 0),
+      cbt_code: this.cbtCode((document.getElementById('dl-edit-cbt')||{}).value||'')
     };
     if (!patch.title || !patch.read_link) { toast('Title and read link are required.', 'warning'); return; }
-    const { error } = await window.sb.from('digital_library').update(patch).eq('id', b.id);
+    /* V10.5: verify a non-empty linked code before saving. */
+    if (patch.cbt_code) { const chk = await this.cbtVerify(patch.cbt_code); if (!chk.ok) { toast('⚠️ ' + chk.msg, 'warning', 10000); return; } }
+    let { error } = await window.sb.from('digital_library').update(patch).eq('id', b.id);
+    if (error && /cbt_code/.test(error.message||'')) { delete patch.cbt_code; ({ error } = await window.sb.from('digital_library').update(patch).eq('id', b.id)); if (!error) toast('Linked-CBT column missing — run database/v10.5-dl-cbt-link.sql to store CBT links with readings.', 'warning', 10000); }
     if (error) { toast(error.message, 'danger', 6000); return; }
     if (window.App) App.logActivity('update', 'digital_library', b.id);
     closeModal();
@@ -779,7 +839,14 @@ const DL={ qs:[],
     }
     if(res.error){toast('Could not create the CBT exam: '+res.error.message,'danger',9000);return;}
     if(window.App&&App.logActivity)App.logActivity('create','cbt_exam','Reading CBT '+code);
-    toast('✅ CBT exam created from "'+(b.title||'reading')+'" — code '+((res.data&&res.data.code)||code)+'. It is CLOSED until you open it in the CBT Manager (review questions, set schedule, then Open).','success',12000);
+    /* V10.5: auto-link the freshly created exam back onto the reading so the
+       🧪 Take CBT button appears for students the moment it is opened. */
+    var newCode=(res.data&&res.data.code)||code;
+    try{ var lr=await sb.from('digital_library').update({cbt_code:newCode}).eq('id',b.id);
+      if(lr.error&&/cbt_code/.test(lr.error.message||''))toast('Reading↔CBT auto-link needs database/v10.5-dl-cbt-link.sql — the exam was still created (code '+newCode+'); paste it into the reading\'s "Linked CBT" box after the update.','warning',12000);
+      else b.cbt_code=newCode;
+    }catch(_){}
+    toast('✅ CBT exam created from "'+(b.title||'reading')+'" — code '+newCode+' — and linked to this reading (🧪 Take CBT button). It is CLOSED until you open it in the CBT Manager (review questions, set schedule, then Open).','success',12000);
     setTimeout(function(){ if(confirm('Open the CBT Manager now to review and publish it?')) location.href='cbt.html'; },600);
   },
   quiz(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[];
@@ -872,10 +939,35 @@ const DLP={
     let rows=r.data||[];
     /* prefer the current term's rows when the term columns exist and are stamped */
     if(cp.term&&rows.some(x=>x.term)){rows=rows.filter(x=>!x.term||x.term===cp.term);}
-    const by={};rows.forEach(x=>{const k=(x.student_id_ref||'')+'|'+String(x.student_name||'').toLowerCase();(by[k]=by[k]||{name:x.student_name,ref:x.student_id_ref,got:0,max:0,n:0});by[k].got+=Number(x.score)||0;by[k].max+=Number(x.max_score)||0;by[k].n++;});
+    const by={};const add=(name,ref,score,max,kind)=>{const k=(ref||'')+'|'+String(name||'').toLowerCase();(by[k]=by[k]||{name:name,ref:ref,got:0,max:0,n:0,quiz:0,cbt:0});by[k].got+=Number(score)||0;by[k].max+=Number(max)||0;by[k].n++;by[k][kind]++;};
+    rows.forEach(x=>add(x.student_name,x.student_id_ref,x.score,x.max_score,'quiz'));
+    /* V10.5: MERGE LINKED-CBT RESULTS. Readings of this class+subject that
+       carry a cbt_code contribute their FULL CBT results (best attempt per
+       student per exam) into the same accumulation, so both the light quiz
+       and the linked exam feed one report-card push. */
+    let cbtExams=0,cbtResults=0,cbtNote='';
+    try{
+      const lb=await sb.from('digital_library').select('cbt_code,max_score').eq('class',cls).eq('subject',sub).neq('cbt_code','').limit(200);
+      const codes=[...new Set((lb.data||[]).map(x=>String(x.cbt_code||'').toUpperCase()).filter(Boolean))];
+      if(codes.length){
+        const ex=await sb.from('cbt_exams').select('id,code,max_score').in('code',codes);
+        if(ex.error&&/cbt_code|column/.test(ex.error.message||''))cbtNote='';
+        const exams=ex.data||[];cbtExams=exams.length;
+        if(exams.length){
+          const ids=exams.map(e=>e.id);
+          const rr=await sb.from('cbt_results').select('exam_id,student_name,student_id_ref,score,total,percent').in('exam_id',ids).limit(5000);
+          if(rr.error){cbtNote='<p style=\"color:#92400e;font-size:.8rem\">⚠️ Linked-CBT results could not be read ('+DLP.esc(rr.error.message)+') — quiz totals shown alone.</p>';}
+          else{
+            /* best attempt per student per exam */
+            const best={};(rr.data||[]).forEach(x=>{const k=x.exam_id+'|'+(x.student_id_ref||'')+'|'+String(x.student_name||'').toLowerCase();if(!best[k]||Number(x.percent||0)>Number(best[k].percent||0))best[k]=x;});
+            Object.values(best).forEach(x=>{add(x.student_name,x.student_id_ref,x.score,x.total,'cbt');cbtResults++;});
+          }
+        }
+      }
+    }catch(_){cbtNote='';}
     const list=Object.values(by).sort((a,b)=>(b.got/(b.max||1))-(a.got/(a.max||1)));
     this._totals={list:list,cls:cls,sub:sub,cp:cp};
-    box.innerHTML=list.length?'<div class=\"table-wrap\"><table><thead><tr><th>Student</th><th>Quizzes</th><th>Points</th><th>%</th></tr></thead><tbody>'+list.map(t=>'<tr><td><b>'+DLP.esc(t.name)+'</b><br><small>'+DLP.esc(t.ref||'')+'</small></td><td>'+t.n+'</td><td>'+t.got+' / '+t.max+'</td><td><b>'+(t.max?Math.round(t.got/t.max*1000)/10:0)+'%</b></td></tr>').join('')+'</tbody></table></div>':'<p style=\"color:var(--gray-500)\">No quiz scores yet for '+DLP.esc(cls)+' · '+DLP.esc(sub)+'. Students take quizzes on the readings above.</p>';
+    box.innerHTML=(list.length?'<div class=\"table-wrap\"><table><thead><tr><th>Student</th><th>📝 Quizzes</th><th>🧪 CBTs</th><th>Points</th><th>%</th></tr></thead><tbody>'+list.map(t=>'<tr><td><b>'+DLP.esc(t.name)+'</b><br><small>'+DLP.esc(t.ref||'')+'</small></td><td>'+(t.quiz||0)+'</td><td>'+(t.cbt||0)+'</td><td>'+t.got+' / '+t.max+'</td><td><b>'+(t.max?Math.round(t.got/t.max*1000)/10:0)+'%</b></td></tr>').join('')+'</tbody></table></div>'+(cbtExams?'<p style=\"color:var(--gray-500);font-size:.8rem;margin:6px 0 0\">Includes '+cbtResults+' best-attempt result(s) from '+cbtExams+' linked CBT exam(s) — merged with embedded quiz scores.</p>':''):'<p style=\"color:var(--gray-500)\">No quiz or linked-CBT scores yet for '+DLP.esc(cls)+' · '+DLP.esc(sub)+'. Students take quizzes / linked CBTs on the readings above.</p>')+cbtNote;
   },
   async pushModal(){
     if(!this._totals||!this._totals.list.length){toast('Click Σ Show accumulated totals first.','warning');return;}
