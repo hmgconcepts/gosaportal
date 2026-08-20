@@ -206,14 +206,28 @@ const Notifications = {
 
   async fetchRecent(limit = 20) {
     if (!this.sb) return [];
+    /* V10.6 (#4) ROOT CAUSE of "badge shows a number but the dropdown says
+       'No notifications yet'": the limit was applied to the RAW query and the
+       audience filter ran AFTERWARDS. The dropdown pulled the 10 newest rows;
+       if those happened to be addressed to students/parents, a staff member's
+       filtered list came back EMPTY — while the badge (scanning 50 rows)
+       still counted their notifications deeper in the table. The two views
+       disagreed by construction. Fix: over-fetch, filter by audience FIRST,
+       then slice to the requested limit — every role now sees exactly the
+       rows its badge counted. Profile readiness is also awaited so the role
+       check never runs before sign-in resolves. */
     try {
+      for (let i = 0; i < 15 && !(window.SC_PROFILE && SC_PROFILE.role) && !(window.App && App.currentRole); i++) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+      const scan = Math.min(Math.max(limit * 10, 100), 400);
       const { data, error } = await this.sb
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(limit);
+        .limit(scan);
       if (error) return [];
-      return (data || []).filter(n => Notifications.allowedForMe(n));
+      return (data || []).filter(n => Notifications.allowedForMe(n)).slice(0, limit);
     } catch(e) { return []; }
   },
 

@@ -815,6 +815,11 @@ const App = {
         '<td><small>'+esc(r.href)+'</small></td></tr>').join('') +
       '</tbody></table></div></section>';
     content.insertAdjacentHTML('beforeend', html);
+    /* V10.6 (#5): the Permission Manager is a long, wide matrix — freeze its
+       two-row header at the top and the Page/Module column at the left so
+       admins always see WHICH page and WHICH role a checkbox belongs to,
+       on desktop and mobile alike. */
+    try { const t = document.querySelector('#role-access-manager table'); if (t && window.CRUD && CRUD.applyStickyTable) CRUD.applyStickyTable(t); } catch(_) {}
   },
 
   async saveAccessManager() {
