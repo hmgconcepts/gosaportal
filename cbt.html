@@ -888,8 +888,80 @@ window.CBTUI = {
   async results(id,code){
     if(!sb)return;
     const { data } = await sb.from('cbt_results').select('*').eq('exam_id',id).order('score',{ascending:false});
-    const rows=(data||[]).map((r,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(r.student_name)+'</td><td>'+esc(r.student_id_ref||'-')+'</td><td><b>'+r.score+'/'+r.total+'</b></td><td>'+(r.percent||0)+'%</td><td>'+Number(r.correct_count||0)+' / '+Number(r.wrong_count||0)+' / '+Number(r.skipped_count||0)+'</td><td><span class="badge" style="background:'+(String(r.engine_version||'').startsWith('v5.1')?'#dcfce7':'#fee2e2')+'">'+esc(r.engine_version||'legacy')+'</span><br><small>'+esc(r.grading_status||'unknown')+'</small></td><td>'+esc(r.cert_code||'-')+'</td></tr>').join('');
-    openModal('Results — '+code, '<div style="margin-bottom:10px"><button class="btn btn-sm btn-outline" onclick="CBTUI.exportCSV(\''+id+'\')">⬇ Export CSV</button> <button class="btn btn-sm btn-primary" onclick="closeModal();CBTUI.regradeResults(\''+id+'\')">Regrade Saved Results with V5.1</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="closeModal();CBTUI.clearResults(\''+id+'\',\''+esc(code)+'\')">Export then clear results</button></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>%</th><th>Correct/Wrong/Skipped</th><th>Engine / Status</th><th>Cert</th></tr></thead><tbody>'+(rows||'<tr><td colspan=8>No submissions yet.</td></tr>')+'</tbody></table></div>');
+    CBTUI._resultsCache={examId:id,code:code,rows:data||[]};
+    const pending=(data||[]).filter(r=>Number(r.ungraded_count||0)>0||String(r.grading_status||'')==='manual_review').length;
+    /* V10.6 (#1): TEACHER REVIEW — results with essay/code/oral questions need
+       the teacher to award those marks. Each such row gets a ✍️ Review button
+       opening the per-question marking panel (student's answer + model answer
+       + award box), saved via the auditable cbt_review_result RPC. */
+    const rows=(data||[]).map((r,i)=>{
+      const needs=Number(r.ungraded_count||0)>0||String(r.grading_status||'')==='manual_review';
+      return '<tr><td>'+(i+1)+'</td><td>'+esc(r.student_name)+'</td><td>'+esc(r.student_id_ref||'-')+'</td><td><b>'+r.score+'/'+r.total+'</b></td><td>'+(r.percent||0)+'%</td><td>'+Number(r.correct_count||0)+' / '+Number(r.wrong_count||0)+' / '+Number(r.skipped_count||0)+'</td><td><span class="badge" style="background:'+(String(r.engine_version||'').startsWith('v5.1')?'#dcfce7':'#fee2e2')+'">'+esc(r.engine_version||'legacy')+'</span><br><small>'+(needs?'<span style="color:#b45309;font-weight:800">✍️ awaiting review'+(Number(r.ungraded_count||0)?' ('+r.ungraded_count+' Q)':'')+'</span>':esc(r.grading_status||'unknown'))+(r.reviewed_at?'<br>reviewed':'')+'</small></td><td>'+esc(r.cert_code||'-')+'</td><td>'+(needs?'<button class="btn btn-sm btn-primary" onclick="CBTUI.reviewResult(\''+r.id+'\')">✍️ Review</button>':(r.manual_awards&&Object.keys(r.manual_awards||{}).length?'<button class="btn btn-sm btn-outline" onclick="CBTUI.reviewResult(\''+r.id+'\')">✏️ Re-review</button>':''))+'</td></tr>';
+    }).join('');
+    openModal('Results — '+code, '<div style="margin-bottom:10px">'+(pending?'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-bottom:8px"><b>✍️ '+pending+' result(s) contain teacher-marked questions (essay / code / oral) awaiting your review.</b> Their percentages exclude those marks until you award them — click Review on each row.</div>':'')+'<button class="btn btn-sm btn-outline" onclick="CBTUI.exportCSV(\''+id+'\')">⬇ Export CSV</button> <button class="btn btn-sm btn-primary" onclick="closeModal();CBTUI.regradeResults(\''+id+'\')">Regrade Saved Results with V5.1</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="closeModal();CBTUI.clearResults(\''+id+'\',\''+esc(code)+'\')">Export then clear results</button></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>%</th><th>Correct/Wrong/Skipped</th><th>Engine / Status</th><th>Cert</th><th>Review</th></tr></thead><tbody>'+(rows||'<tr><td colspan=9>No submissions yet.</td></tr>')+'</tbody></table></div>');
+  },
+  /* V10.6 (#1): per-question marking panel for manual-review types. */
+  async reviewResult(resultId){
+    if(!sb)return;
+    const cache=CBTUI._resultsCache||{};
+    const r=(cache.rows||[]).find(x=>String(x.id)===String(resultId));
+    if(!r){toast('Open the Results list first.','warning');return;}
+    const {data:e}=await sb.from('cbt_exams').select('*').eq('id',r.exam_id).maybeSingle();
+    if(!e){toast('Exam not found.','warning');return;}
+    const bank=(Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((Array.isArray(e.questions))?e.questions:[]);
+    const manualT=['essay','long_answer','file_upload','code','oral_prompt','peer_review'];
+    const canon=t=>{const x=String(t||'mcq').toLowerCase().replace(/[\s\/\\-]+/g,'_');return x==='oral'?'oral_prompt':x;};
+    const answers={};(Array.isArray(r.answers_data)?r.answers_data:[]).forEach((a,j)=>{const qi=(a&&a.index!=null)?Number(a.index):j;answers[qi]=a&&a.answer!==undefined?a.answer:a;});
+    const awards=r.manual_awards||{};
+    const items=[];
+    bank.forEach((raw,qi)=>{
+      const q=(window.CBT&&CBT.normalizeQuestion)?CBT.normalizeQuestion(raw,qi):raw;
+      const ct=canon(q.type);
+      const hasKey=q.answer!=null&&String(q.answer).trim()!=='';
+      if(manualT.includes(ct)&&!hasKey)items.push({qi:qi,q:q});
+    });
+    if(!items.length){toast('This result has no teacher-marked questions.','info');return;}
+    const fmtAns=v=>{if(v==null||v==='')return '<i style="color:#94a3b8">(no answer given)</i>';if(Array.isArray(v))return esc(v.join(' | '));return esc(String(v)).replace(/\n/g,'<br>');};
+    const body='<p style="color:var(--gray-600)">Candidate: <b>'+esc(r.student_name||'')+'</b> · current score <b>'+r.score+'/'+r.total+'</b>. Award marks for each teacher-marked question below (0 up to the question\'s mark). Objective questions stay machine-graded — your awards are ADDED by the server and the whole result is re-totalled atomically. Leave a box blank to keep that question unmarked (result stays "awaiting review").</p>'+
+      items.map(it=>{
+        const mark=Number(it.q.mark||1)||1;
+        const cur=awards[String(it.qi)];
+        const model=String(it.q.explanation||'').trim();
+        return '<div class="card" style="background:#f8fafc;margin:10px 0;padding:12px">'+
+          '<div style="font-weight:800">Q'+(it.qi+1)+' · '+esc(it.q.type||'essay')+' · '+mark+' mark'+(mark>1?'s':'')+(it.q.section?' · '+esc(it.q.section):'')+'</div>'+
+          '<div style="margin:6px 0;color:#0f172a">'+esc(it.q.question||'')+'</div>'+
+          (model?'<details style="margin:6px 0"><summary style="cursor:pointer;font-size:.82rem;color:#166534;font-weight:700">📖 Model answer / marking guide</summary><div style="font-size:.85rem;color:#334155;padding:6px 0">'+esc(model)+'</div></details>':'')+
+          '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;font-size:.9rem"><b>Student\'s answer:</b><br>'+fmtAns(answers[it.qi])+'</div>'+
+          '<div class="form-group" style="margin-top:8px;max-width:220px"><label>Award (0–'+mark+')</label><input class="form-input" type="number" min="0" max="'+mark+'" step="0.5" data-review-q="'+it.qi+'" value="'+(cur!=null?esc(String(cur)):'')+'"></div>'+
+        '</div>';
+      }).join('');
+    openModal('✍️ Review teacher-marked questions — '+esc(r.student_name||''),body,
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CBTUI.saveReview(\''+resultId+'\')">💾 Save awards & re-grade</button>');
+  },
+  async saveReview(resultId){
+    const awards={};let bad=null;
+    document.querySelectorAll('[data-review-q]').forEach(inp=>{
+      const qi=inp.getAttribute('data-review-q');const v=inp.value.trim();
+      if(v==='')return; // blank = leave unmarked
+      const n=Number(v);const max=Number(inp.getAttribute('max'))||1;
+      if(isNaN(n)||n<0||n>max)bad='Q'+(Number(qi)+1)+': award must be between 0 and '+max+'.';
+      else awards[qi]=n;
+    });
+    if(bad){toast(bad,'warning');return;}
+    if(!Object.keys(awards).length){toast('Enter at least one award (or Cancel).','warning');return;}
+    const r=await sb.rpc('cbt_review_result',{p_result_id:resultId,p_awards:awards});
+    if(r.error||!r.data||r.data.ok===false){
+      const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Review failed';
+      if(/cbt_review_result|schema cache|function/i.test(String(msg)))toast('The review engine is not installed in this database yet — an administrator must run database/v10.6-cbt-review-community.sql once.','warning',12000);
+      else toast(msg,'danger',9000);
+      return;
+    }
+    const d=r.data;
+    if(window.App&&App.logActivity)App.logActivity('review','cbt_result',resultId+' → '+d.score+'/'+d.total);
+    closeModal();
+    toast('✅ Awards saved. New score '+d.score+'/'+d.total+' ('+d.percent+'%). '+(d.manual_left>0?d.manual_left+' teacher-marked question(s) still unmarked — result stays "awaiting review".':'All teacher-marked questions are now graded — result finalised'+(d.release_results?' and released to the candidate':'')+'.'),'success',10000);
+    const cache=CBTUI._resultsCache||{};
+    if(cache.examId)CBTUI.results(cache.examId,cache.code||'');
   },
   async exportCSV(id){
     const { data } = await sb.from('cbt_results').select('*').eq('exam_id',id);
