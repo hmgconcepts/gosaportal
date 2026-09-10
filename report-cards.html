@@ -700,10 +700,34 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
             host.innerHTML = '<div class="card" style="border-left:5px solid var(--primary);margin-bottom:16px"><h3 style="margin:0 0 6px">🧾 My Children Report Cards</h3><p>No child is linked to this parent account yet. Ask the school to add a parent–child link in the <em>Parents</em> page.</p></div>';
             return;
           }
+          /* V10.9 (#2): report-locked children are REMOVED from the parent's
+             picker entirely and replaced by the bold lock notice — a parent
+             cannot even attempt to open a locked child's card. */
+          let lockNotices = '';
+          try {
+            const g = window.SC_ACCESS_STATE || {};
+            const lockedNames = (g.students || []).filter(k => k.report_locked);
+            if (lockedNames.length) {
+              const lockedSet = new Set(lockedNames.map(k => String(k.name || '').toLowerCase()));
+              const before = kids.length;
+              kids = kids.filter(k => !lockedSet.has(String(k.full_name || '').toLowerCase()));
+              this._kids = kids;
+              if (before !== kids.length) {
+                lockNotices = lockedNames.map(k =>
+                  '<div style="background:#fef2f2;border:3px solid #dc2626;border-radius:12px;padding:14px 16px;margin:0 0 10px">' +
+                  '<b style="color:#b91c1c">🔒 Report card unavailable — ' + esc(k.name || 'student') + '</b>' +
+                  '<p style="margin:6px 0 0;font-weight:800;color:#7f1d1d;line-height:1.6">' + esc(k.report_lock_message || 'This report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.') + '</p></div>').join('');
+              }
+              if (!kids.length) {
+                host.innerHTML = '<div class="card" style="border-left:5px solid #dc2626;margin-bottom:16px"><h3 style="margin:0 0 6px">🧾 My Children Report Cards</h3>' + lockNotices + '</div>';
+                return;
+              }
+            }
+          } catch(_) {}
           const opts = kids.map(k => '<option value="' + esc(k.id) + '">' + esc(k.full_name) + ' — ' + esc(k.class || '—') + '</option>').join('');
           host.innerHTML =
             '<div class="card" style="border-left:5px solid var(--primary);margin-bottom:16px">' +
-            '<h3 style="margin:0 0 6px">🧾 My Children Report Cards</h3>' +
+            '<h3 style="margin:0 0 6px">🧾 My Children Report Cards</h3>' + lockNotices +
             '<p style="color:var(--gray-500);font-size:.88rem;margin:0 0 10px">Read-only view. Select a child to view their report card. You can only view your own children.</p>' +
             '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
             '<select class="form-select" id="rc-child-safe" style="max-width:340px">' + opts + '</select>' +
@@ -1134,6 +1158,24 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       if (name && window.sb) { const stu = await this.resolveStudent(name); if (stu && stu.full_name) { name = stu.full_name; resolvedClass = stu.class || ''; if (stu.class && !this.ctx.class) this.ctx.class = stu.class; } }
       // Family-mode enforcement
       if (this._familyMode) {
+        /* V10.9 (#2): REPORT LOCK — a parent must not be able to generate a
+           locked child's card even though their portal stays open for other
+           children. The access-state RPC names each locked child; refuse
+           with the school's BOLD message before any data is fetched (RLS
+           blanks the rows server-side anyway — this is the honest UI). */
+        try {
+          const g = window.SC_ACCESS_STATE || {};
+          const lk = (g.students || []).find(k => k.report_locked && String(k.name || '').toLowerCase() === String(name || '').toLowerCase());
+          if (lk) {
+            const out = document.getElementById('rc-output') || document.getElementById('rc-out') || null;
+            const msgHtml = '<div style="background:#fef2f2;border:3px solid #dc2626;border-radius:14px;padding:22px;text-align:center">' +
+              '<div style="font-size:2.2rem">🔒</div>' +
+              '<h3 style="color:#b91c1c;margin:8px 0">Report card unavailable — ' + esc(lk.name || 'student') + '</h3>' +
+              '<p style="font-weight:800;color:#7f1d1d;line-height:1.6">' + esc(lk.report_lock_message || 'This report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.') + '</p></div>';
+            if (out) out.innerHTML = msgHtml; else toast('🔒 ' + (lk.report_lock_message || 'This child\'s report card is temporarily unavailable. Please contact the school bursary.'), 'warning', 12000);
+            return;
+          }
+        } catch(_) {}
         if (this._role === 'parent') {
           const allowed = this._kids.map(k => String(k.full_name).toLowerCase());
           if (!name || !allowed.includes(name.toLowerCase())) {
