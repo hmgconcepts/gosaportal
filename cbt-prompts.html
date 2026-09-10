@@ -510,7 +510,7 @@
                 <option value="simple">Simple recall (MCQ + True/False)</option>
                 <option value="intermediate">Intermediate (adds numeric, short, MRQ)</option>
                 <option value="advanced">Advanced (matching, ordering, essay)</option>
-                <option value="enterprise" selected>Enterprise — full 17+ type paper</option>
+                <option value="enterprise" selected>Auto-Graded Ultimate Pack (every auto-marked type)</option>
                 <option value="mcq_only">MCQ-only strict paper</option>
                 <option value="multi_subject">Multi-subject paper (UTME / Common Entrance)</option>
               </optgroup>
@@ -520,6 +520,11 @@
                 <option value="marking_scheme">Paper + full marking scheme</option>
                 <option value="differentiated">Differentiated — Support / Core / Stretch</option>
                 <option value="misconception">Diagnostic misconception hunter</option>
+              </optgroup>
+              <optgroup label="STEM & materials (NEW)">
+                <option value="multiline_math">🧮 Multi-line maths / STEM (typeset fractions, surds, matrices)</option>
+                <option value="material_upload">📄 Uploaded Material CBT (paste/attach a document)</option>
+                <option value="material_link">🔗 Linked Material CBT (questions strictly from a URL)</option>
               </optgroup>
               <optgroup label="School Connect specials">
                 <option value="dl_article">📚 Digital Library — article / material link</option>
@@ -647,7 +652,7 @@ Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pa
 - Do not include paid API instructions.
 
 SUPPORTED TYPES:
-mcq, tf, mrq, short, numeric, matching, ordering, cloze, categorization, multi_numeric, essay, assertion_reason, case_study, image_mcq, matrix, hot_text, code.
+mcq, tf, mrq, short, numeric, matching, ordering, cloze, categorization, multi_numeric, essay, assertion_reason, case_study, image_mcq, matrix, hot_text.
 
 TYPE RULES:
 mcq: A-D options, CorrectAnswer=A/B/C/D.
@@ -666,7 +671,6 @@ case_study: Question includes a short case, A-D options follow.
 image_mcq: Question includes an image/video/Drive link and text.
 matrix: Items contains rows/columns JSON.
 hot_text: CorrectAnswer contains the exact phrase(s) to select.
-code: Question contains code; CorrectAnswer/Accept contains expected output or keywords.
 
 QUALITY RULES:
 - Mix easy, medium and challenging items (roughly 30% easy, 50% medium, 20% hard).
@@ -816,6 +820,73 @@ const CPUI={ copy(id){ var t=document.getElementById(id); t.select(); t.setSelec
 const PS = {
   HEADER: 'Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section',
 
+  /* =====================================================================
+     V10.7 — THE UNIVERSAL EXPLANATION STANDARD (Adewale Classroom parity).
+     Injected into EVERY generated prompt ahead of the pack sections, so no
+     pack can forget it and no pack can dilute it. "Be detailed" is advice a
+     model ignores; "name the misconception behind each wrong option" is an
+     instruction it can be graded against — and the FINAL CHECK grades it.
+     ===================================================================== */
+  EXPLANATION_STANDARD: [
+    'Col7 (Explanation) is the single most valuable column in the file. It is',
+    'the only teaching the student receives after the paper closes. Treat it as',
+    'a marking-scheme entry written for a student sitting alone, not as a note',
+    'to a colleague.',
+    '',
+    'EVERY row — every type, including numeric, matching, ordering and essay —',
+    'must carry an explanation with these FOUR MOVES, in this order:',
+    '',
+    '  MOVE 1 — VERDICT. State the correct answer in full words, not just a',
+    '           letter. Write "The correct answer is 3/4, option C" and never',
+    '           "C" or "Option C is correct". The letter may have moved: this',
+    '           platform can randomise option order per candidate, so a review',
+    '           sheet that only says "B" is meaningless to the student reading it.',
+    '',
+    '  MOVE 2 — REASONING. Show HOW the answer is reached, step by numbered',
+    '           step. For calculations, every line of working, with the rule or',
+    '           formula named at the step where it is used ("multiply both sides',
+    '           by the LCM, 6"). For language items, quote the exact words from',
+    '           the passage or option that decide it. For factual items, give the',
+    '           principle, then apply it to this specific stem. Never write',
+    '           "by simple calculation" or "as we know" — that is the exact',
+    '           sentence the struggling student cannot fill in.',
+    '',
+    '  MOVE 3 — THE DISTRACTOR AUTOPSY. Take each wrong option in turn and name',
+    '           the SPECIFIC misconception or slip that produces it: "Option A,',
+    '           7/12, comes from adding the numerators and the denominators',
+    '           separately." A student who chose A must be able to find their own',
+    '           mistake described in words. This move is what turns a score into',
+    '           a diagnosis, and it is mandatory on every option-based item.',
+    '',
+    '  MOVE 4 — THE TAKEAWAY. One sentence naming the transferable rule or the',
+    '           checkpoint that prevents the error next time ("Always convert to',
+    '           a common denominator before adding fractions").',
+    '',
+    'LENGTH AND FORM',
+    '  - Minimum 45 words for a one-mark objective item; 80 or more for numeric,',
+    '    multi-part, case-study and essay items.',
+    '  - Number the reasoning steps 1) 2) 3) and put each on its own line using',
+    '    the literal two-character sequence \\n. The review screen renders those',
+    '    as real line breaks, so a wall of text is never necessary.',
+    '  - Plain language at the student\'s reading age. Define any technical term',
+    '    the moment it is used.',
+    '  - Self-contained: never write "see above", "as explained in question 4",',
+    '    "refer to your notes" or "the diagram makes this obvious". The student',
+    '    may be reviewing this one row on a phone, out of order, weeks later.',
+    '',
+    'FOR TYPES WITH NO WRONG OPTIONS TO DISSECT',
+    '  - numeric / multi_numeric: show the substitution and the arithmetic, state',
+    '    the unit, and name the two most common wrong answers and what causes',
+    '    them (usually a unit slip or a rounding slip).',
+    '  - matching / ordering / categorization: justify EVERY pair or position,',
+    '    not only the difficult ones, and name the pair most often swapped.',
+    '  - essay: give the full mark-scheme — the points that earn credit, the',
+    '    weight of each, a model answer, and the two most common ways candidates',
+    '    lose marks.',
+    '  - cloze / short: list every accepted variant spelling or phrasing and',
+    '    say plainly why a near-miss is or is not accepted.'
+  ].join('\n'),
+
   /* Per-type column rules — emitted only for the types a pack actually uses,
      so a 20-item MCQ paper is not padded with pages of irrelevant rules. */
   RULES: {
@@ -834,8 +905,7 @@ const PS = {
     assertion_reason: 'assertion_reason — WAEC/JAMB logic item\n  Col14: {"assertion":"...","reason":"..."}\n  Col6: A/B/C/D/E where A = both true and Reason explains Assertion,\n        B = both true but Reason does not explain it, C = Assertion true only,\n        D = Reason true only, E = both false.  Col8: assertion_reason',
     case_study: 'case_study — passage or scenario, then a question\n  Col14: {"passage":"Write the full passage or data here."}\n  Col1: the question. Col2-5: options. Col6: the letter.  Col8: case_study',
     image_based: 'image_based — diagram question\n  Col14: {"image":"https://..."} — a public https or Drive LINK only.\n  With no real image, describe the diagram fully in Col1.  Col8: image_based',
-    essay: 'essay — extended response, marked by the TEACHER (no AI)\n  Col14: {"min_words":40,"keywords":["photosynthesis","chlorophyll"]}\n  Col7 must contain the model answer / marking points.  Col8: essay',
-    code: 'code — code, pseudocode or SQL\n  Col14: {"language":"JavaScript","keywords":["function","return"]}\n  Col8: code'
+    essay: 'essay — extended response, marked by the TEACHER (no AI)\n  Col14: {"min_words":40,"keywords":["photosynthesis","chlorophyll"]}\n  Col7 must contain the model answer / marking points.  Col8: essay'
   },
 
   /* Scale a pack's reference mix to the requested count. `minOne` keeps every
@@ -913,19 +983,21 @@ const PS = {
       ]
     },
     enterprise: {
-      label: 'Enterprise 17+ types',
-      role: 'an assessment designer building a full-spectrum diagnostic paper that exercises EVERY question control the School Connect CBT player supports',
-      mission: 'Breadth is the deliverable: every declared type must appear, so the school can verify each control — cards, dropdowns, drag lists, grids, chips, gap-fills, multi-part numerics — renders and grades correctly.',
-      ref: { mcq: 4, truefalse: 2, mrq: 2, short: 2, numeric: 2, multi_numeric: 1, cloze: 1, matching: 1, ordering: 1, categorization: 1, matrix: 1, hot_text: 1, assertion_reason: 1, case_study: 1, image_based: 1, essay: 1, code: 1 },
+      label: 'Auto-Graded Ultimate Pack',
+      role: 'an assessment architect building a reference paper that demonstrates all AUTO-GRADED question formats School Connect supports',
+      mission: 'Exercise the FULL range of auto-graded question types with 100% automated scoring. Do NOT use any type that needs teacher review (no essay, no code, no oral, no file uploads). Every mark on this paper is awarded by the engine the moment the candidate submits.',
+      ref: { mcq: 3, truefalse: 2, mrq: 2, short: 2, numeric: 2, multi_numeric: 2, cloze: 2, matching: 2, ordering: 2, categorization: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2, image_based: 2 },
       dominant: 'mcq', minOne: true,
       sections: [
-        ['EVERY TYPE MUST SURVIVE', 'The distribution below guarantees at least one item of every type even at\nsmall counts. Do not silently drop a type because it is harder to write.'],
+        ['COVERAGE — EVERY AUTO-GRADED TYPE MUST SURVIVE', 'The distribution below guarantees at least one item of every auto-graded\ntype even at small counts. Strictly EXCLUDE essay, code and any manual-\nreview type. Do not silently drop a type because it is harder to write.'],
+        ['SELF-DOCUMENTING', 'Because teachers read this paper to learn the formats, each Explanation\nshould also note in one clause why that TYPE suited that question.'],
         ['JSON CELLS', 'Structured types live in Col13 (Pairs) and Col14 (Items) as JSON with every\ninner double quote doubled (""). One malformed JSON cell breaks the import\nof the whole row — validate each one mentally before moving on.']
       ],
       quality: [
-        'Every declared type appears at least once.',
+        'All auto-graded types present; strictly NO essay, NO code, NO manual-review types.',
         'Every JSON cell parses after un-doubling the quotes.',
-        'Partial-credit types (matching, ordering, cloze, matrix, multi_numeric) have at least 3 rows/parts each so partial credit is meaningful.'
+        'Partial-credit types (matching, ordering, cloze, matrix, multi_numeric) have at least 3 rows/parts each so partial credit is meaningful.',
+        'The paper still reads as a coherent assessment, not a format catalogue.'
       ]
     },
     mcq_only: {
@@ -944,19 +1016,22 @@ const PS = {
       ]
     },
     multi_subject: {
-      label: 'Multi-subject paper',
-      role: 'an examinations officer assembling a combined UTME / Common-Entrance style paper across several subjects',
-      mission: 'Build one sitting that covers several subjects cleanly, with the subject tabs the candidate sees driven correctly by the data.',
-      ref: { mcq: 14, short: 2, numeric: 3, truefalse: 1 }, dominant: 'mcq',
+      label: 'Multi-subject paper (all auto-graded types)',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner assembling a combined UTME / Common-Entrance style paper across several subjects',
+      mission: 'Build one comprehensive sitting that covers several subjects cleanly, exclusively using AUTO-GRADED question types (no teacher supervision needed), with the subject tabs the candidate sees driven correctly by the data.',
+      ref: { mcq: 4, truefalse: 2, mrq: 2, short: 2, numeric: 2, matching: 2, ordering: 2, cloze: 2, categorization: 2, multi_numeric: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2, image_based: 2 },
+      dominant: 'mcq',
       sections: [
         ['SUBJECTS AND THEIR TOPICS', 'Cover these subjects: {{SUBJECTS}}\n{{SUBJECT_TOPICS}}\nDivide the items as evenly as possible between them.'],
         ['SECTION COLUMN IS CRITICAL', 'Col17 (Section) must contain the SUBJECT NAME for that row, spelled\nidentically every time. This column drives the subject tabs in the School\nConnect exam player — an inconsistent spelling creates a phantom extra tab.'],
-        ['NO CROSS-CONTAMINATION', 'A Mathematics item must not require Biology knowledge, and vice versa.\nEach item belongs to exactly one subject.']
+        ['NO CROSS-CONTAMINATION', 'A Mathematics item must not require Biology knowledge, and vice versa.\nEach item belongs to exactly one subject.'],
+        ['TYPE SPREAD PER SUBJECT', 'Spread the structured types across the subjects — every subject should\ncarry at least one structured item (matching / ordering / matrix / cloze /\nmulti-numeric), not just MCQs.']
       ],
       quality: [
         'Item counts per subject differ by at most one.',
         'Col17 spellings are identical within each subject, with no stray spaces.',
-        'No item requires knowledge from another subject in the set.'
+        'No item requires knowledge from another subject in the set.',
+        'All question types are entirely auto-graded — no essay, no manual review.'
       ]
     },
     exam_board: {
@@ -1018,6 +1093,58 @@ const PS = {
         'Every row\'s Col16 starts with Support, Core or Stretch.',
         'The three tiers are the same topic at different depths.',
         'Tier proportions are within ±1 item of 30/50/20.'
+      ]
+    },
+    /* V10.7 — Adewale Classroom parity packs, School Connect flavour. */
+    multiline_math: {
+      label: '🧮 Multi-line maths / STEM',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner crafting a rigorous, self-contained, perfectly auto-graded STEM assessment',
+      mission: 'Generate a highly robust auto-graded CBT. ONLY use question types that grade without teacher supervision (no essay, no oral, no uploads). Multi-line working, fractions, surds, indices and matrices must be encoded so the platform renders them as real typeset maths.',
+      ref: { mcq: 4, truefalse: 2, mrq: 2, short: 2, numeric: 3, multi_numeric: 3, cloze: 2, matching: 2, ordering: 2, matrix: 2, assertion_reason: 2, case_study: 2 },
+      dominant: 'multi_numeric',
+      sections: [
+        ['ENCODING RULES (MANDATORY) — WHAT THE RENDERER ACTUALLY SUPPORTS', 'School Connect renders a LaTeX subset as real typeset maths on the\ncandidate screen — stacked fractions with a horizontal bar, surds, raised\nindices, bracketed matrices. Stay inside this subset:\n\n1. LINE BREAKS. A CSV cell cannot hold a real newline safely, so write the\n   literal two-character sequence \\n. The renderer converts it to a real\n   line break. One equation per line is always clearer.\n   Example: "Solve the simultaneous equations:\\n2x + 3y = 12\\nx - y = 1"\n2. FRACTIONS. Always \\frac{NUMERATOR}{DENOMINATOR}. Never "3x+6/9" (ambiguous)\n   and never an ASCII-art bar. Nested fractions are supported.\n3. INDICES AND SUBSCRIPTS. x^2, e^{2x}, a_1, \\log_{10}. Brace anything longer\n   than one character: x^{n+1}, not x^n+1.\n4. ROOTS. \\sqrt{x+1}; cube roots as \\sqrt[3]{8}.\n5. SYMBOLS. \\times \\div \\pm \\leq \\geq \\neq \\pi \\theta \\alpha \\beta \\Delta\n   \\infty \\degree render as real symbols. Use them instead of *, /, <=, !=.\n6. MATRICES. \\begin{matrix}1 & 2\\\\3 & 4\\end{matrix} inside $$…$$.\n7. Anything outside this subset degrades to plain text — so stay inside it.'],
+        ['WORKING SHOWN', 'Numeric and multi-part items must be solvable with clean values; the\nExplanation column carries the full worked solution line by line using the\nsame \\n and \\frac conventions so the review screen shows real maths.']
+      ],
+      quality: [
+        'Every multi-line stem uses literal \\n, never a semicolon run-on.',
+        'Every fraction uses \\frac{}{}, every index is braced when longer than one character.',
+        'No essay, no code, no manual-review types — 100% auto-graded.',
+        'Values are clean enough to sanity-check without a calculator where possible.'
+      ]
+    },
+    material_upload: {
+      label: '📄 Uploaded Material CBT',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner creating a rigorous auto-graded assessment strictly from the provided document material',
+      mission: 'Generate a comprehensive CBT strictly based on the material the teacher pastes or attaches into the chat. ONLY use facts found in the document — no external knowledge. Exclude any type requiring teacher review (no essay). Prepare students to local, national and international examination standards.',
+      ref: { mcq: 5, truefalse: 2, mrq: 2, short: 2, numeric: 2, matching: 2, ordering: 2, cloze: 2, categorization: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2 },
+      dominant: 'mcq',
+      sections: [
+        ['SOURCE ADHERENCE', 'Every single question MUST be derivable directly from the uploaded/pasted\nmaterial. No hallucinated facts, no outside syllabus content. If the\nmaterial does not support the requested count, say so and produce fewer\nrather than inventing.'],
+        ['TARGETED EXTRACTION', 'Focus entirely on the pages, chapters or sections the teacher names:\n{{SOURCE}}'],
+        ['EXAMINATION RIGOR', 'Design questions that test critical thinking, analysis and application of\nthe text — not just line-by-line recall — matching world-class standards.']
+      ],
+      quality: [
+        'No hallucinated information; every answer is verifiable against the text.',
+        'Strictly auto-graded types only.',
+        'Question difficulty spans recall, application and analysis of the material.'
+      ]
+    },
+    material_link: {
+      label: '🔗 Linked Material CBT',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner creating a rigorous auto-graded assessment strictly from the material at the provided link(s)',
+      mission: 'Analyse the material at the provided URL(s) and generate a comprehensive CBT strictly based on it. ONLY use facts found in the linked material. Exclude any type requiring teacher review. If you cannot open links, say so in ONE line and ask the teacher to paste the text, then continue from the pasted text.',
+      ref: { mcq: 5, truefalse: 2, mrq: 2, short: 2, numeric: 2, matching: 2, ordering: 2, cloze: 2, categorization: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2 },
+      dominant: 'mcq',
+      sections: [
+        ['THE LINKED MATERIAL', 'The material is at this link (public https / Drive / web):\n{{SOURCE}}\nSchool Connect stores LINKS ONLY — never uploads.'],
+        ['SOURCE ADHERENCE', 'Every single question MUST be derivable directly from the linked material.\nNo external facts. Reference specific sections, figures and arguments FROM\nthe material so only a student who read it can answer.'],
+        ['EXAMINATION RIGOR', 'Design questions that test critical thinking, analysis and application of\nthe text, matching world-class standards.']
+      ],
+      quality: [
+        'No hallucinated information; stick perfectly to the linked text.',
+        'Strictly auto-graded types only.',
+        'Every item cites something specific in the linked material.'
       ]
     },
     misconception: {
@@ -1127,7 +1254,15 @@ const PS = {
       'Type counts match the distribution and sum to ' + n + '.',
       'Every JSON cell has inner quotes doubled ("") and the whole cell quoted.',
       'Every objective row has a non-empty, unambiguous key in Col6.',
-      'Col17 is the subject on every row.'
+      'Col17 is the subject on every row.',
+      /* V10.7 — the Explanation Standard is only real if it is checked. */
+      'EVERY row\'s Col7 contains all four moves: verdict in words, numbered',
+      '   reasoning, a named misconception for EACH wrong option, and a takeaway.',
+      'No Col7 is under 45 words. No Col7 says only "Option X is correct".',
+      'No Col7 refers to another question, to "the above", or to notes the',
+      '   student does not have in front of them.',
+      'Col7 names the correct answer in WORDS, never by letter alone, because',
+      '   option order can be randomised per candidate.'
     ].map(c => '[ ] ' + fill(c)).join('\n');
 
     const briefNote = P.isBrief
@@ -1163,6 +1298,8 @@ rule + '\nCOLUMN RULES FOR THE TYPES THIS PACK USES\n' +
 '7 Explanation | 8 Type | 9 Tolerance | 10 Unit | 11 Accept |\n' +
 '12 MRQ_AON | 13 Pairs | 14 Items | 15 Difficulty | 16 Tags | 17 Section\n' + rule + '\n\n' +
 usedTypes.map(t => this.RULES[t]).filter(Boolean).join('\n\n') + '\n\n' +
+rule + '\nEXPLANATION STANDARD — APPLIES TO EVERY ROW, EVERY TYPE\n' + rule + '\n' +
+this.EXPLANATION_STANDARD + '\n\n' +
 sections + '\n\n' +
 rule + '\nQUALITY BAR FOR THIS PACK — an item failing any of these is rejected\n' + rule + '\n' + quality + '\n\n' +
 rule + '\nFINAL CHECK BEFORE YOU ANSWER\n' + rule + '\n' + checks;
@@ -1171,7 +1308,7 @@ rule + '\nFINAL CHECK BEFORE YOU ANSWER\n' + rule + '\n' + checks;
     return out;
   },
 
-  NEEDS: { past_paper: ['source'], dl_article: ['source'], dl_video: ['source'], assignment: ['source'], multi_subject: ['subjects'] },
+  NEEDS: { past_paper: ['source'], dl_article: ['source'], dl_video: ['source'], assignment: ['source'], material_upload: ['source'], material_link: ['source'], multi_subject: ['subjects'] },
 
   syncFields() {
     const pack = document.getElementById('ps-pack').value;

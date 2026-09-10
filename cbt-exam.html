@@ -115,6 +115,8 @@ textarea.form-input{min-height:80px;resize:vertical}
 <script src="assets/js/config.js"></script>
 <script src="assets/js/cbt-engine.js"></script>
 <script src="assets/js/cbt-types.js"></script>
+<script src="assets/js/cbt-richtext.js"></script>
+<script src="assets/js/cbt-speech.js"></script>
 <script src="assets/js/proctor.js"></script>
 <script>
 /* ===================================================================
@@ -344,7 +346,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     const opts = hasOptions ? (q.options || []).map((o, i) => {
       const L = String.fromCharCode(65 + i);
       const checked = selectedValues.includes(L);
-      return '<label class="option-label' + (checked ? ' selected' : '') + '" data-option="' + L + '"><input type="' + (isMultiSelect ? 'checkbox' : 'radio') + '" name="opt" value="' + L + '" ' + (checked ? 'checked' : '') + ' style="display:none"><span class="option-letter">' + L + '</span><span class="option-text">' + esc(o) + '</span></label>';
+      return '<label class="option-label' + (checked ? ' selected' : '') + '" data-option="' + L + '"><input type="' + (isMultiSelect ? 'checkbox' : 'radio') + '" name="opt" value="' + L + '" ' + (checked ? 'checked' : '') + ' style="display:none"><span class="option-letter">' + L + '</span><span class="option-text">' + (window.CBTRich ? CBTRich.html(o) : esc(o)) + '</span></label>';
     }).join('') : '';
 
     const existingText = Array.isArray(this.answers[this.idx]) ? this.answers[this.idx].join(', ') : (this.answers[this.idx] || '');
@@ -352,7 +354,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     /* Assertion/Reason stems (kept on the classic option-card path) show the
        assertion + reason briefing block above the options. */
     const arBlock = (!advanced && window.CBTTypes && ['assertion_reason','ar'].includes(qType.replace(/[\s\/\\-]+/g,'_'))) ? CBTTypes.arBlock(q) : '';
-    const passage = q.passage ? '<div class="notice" style="background:#f8fafc;border-color:#cbd5e1;color:#334155"><strong>Passage / Case:</strong><br>' + esc(q.passage) + '</div>' : '';
+    const passage = q.passage ? '<div class="notice" style="background:#f8fafc;border-color:#cbd5e1;color:#334155"><strong>Passage / Case:</strong><br>' + (window.CBTRich ? CBTRich.html(q.passage) : esc(q.passage)) + '</div>' : '';
     const media = q.media_url ? (/\.(mp3|wav|ogg|m4a)(\?|$)/i.test(q.media_url) ? '<audio controls style="width:100%;margin:8px 0" src="'+esc(q.media_url)+'"></audio>' : (/\.(mp4|webm|mov)(\?|$)/i.test(q.media_url) ? '<video controls style="max-width:100%;max-height:360px;margin:8px auto;display:block" src="'+esc(q.media_url)+'"></video>' : '<img src="'+esc(q.media_url)+'" alt="Question media" style="max-width:100%;max-height:360px;object-fit:contain;margin:8px auto;display:block" referrerpolicy="no-referrer">')) : '';
     const m = Math.floor(this.remaining / 60), ss = this.remaining % 60;
     const urgent = this.remaining <= 60;
@@ -372,7 +374,7 @@ textarea.form-input{min-height:80px;resize:vertical}
       passage + media + arBlock +
       ((advanced && window.CBTTypes && CBTTypes.canonical(q.type) === 'cloze')
         ? '<p style="font-size:.85rem;color:#64748b;margin:0 0 8px">Fill the gaps below' + (q.mark ? ' <span style="color:#64748b;font-size:.85rem">[' + q.mark + ' mark' + (q.mark > 1 ? 's' : '') + ']</span>' : '') + '</p>'
-        : '<p style="font-size:1.05rem;margin:0 0 12px;line-height:1.5">' + esc(q.question || '(no question text)') + (q.mark ? ' <span style="color:#64748b;font-size:.85rem">[' + q.mark + ' mark' + (q.mark > 1 ? 's' : '') + ']</span>' : '') + '</p>') +
+        : '<p style="font-size:1.05rem;margin:0 0 12px;line-height:1.5">' + (window.CBTRich ? CBTRich.html(q.question || '(no question text)') : esc(q.question || '(no question text)')) + (q.mark ? ' <span style="color:#64748b;font-size:.85rem">[' + q.mark + ' mark' + (q.mark > 1 ? 's' : '') + ']</span>' : '') + '</p>') +
       (isMultiSelect && !advanced ? '<p style="font-size:.78rem;color:#475569;margin:-4px 0 8px">Select every correct option.</p>' : '') +
       (advanced ? '<div id="scq-holder">' + advHTML + '</div>' : opts + free) +
       '<div class="actions">' +
@@ -388,6 +390,29 @@ textarea.form-input{min-height:80px;resize:vertical}
     '</div>';
 
     this.root().innerHTML = html;
+
+    /* V10.8 (#3): READ-ALOUD (Adewale Classroom parity + Nigerian languages).
+       A 🔊 Read-aloud bar mounts under the exam header: candidate-initiated,
+       per-question, reads question + options via the device's free Web
+       Speech voices (never the answer key), auto-cancels on question change/
+       submit/tab-blur. School Connect extension: Yorùbá, Igbo and Hausa
+       papers are DETECTED from their orthography and read with a matching
+       device voice (or the closest African-English voice, with a tip to
+       install the language pack). Maths is spoken via CBTRich.plain so
+       \\frac{3x+6}{9} reads naturally. */
+    try {
+      if (window.CBTSpeech && CBTSpeech.available()) {
+        CBTSpeech.stop();                       // never let audio leak across questions
+        const card = this.root().querySelector('.card');
+        const anchorEl = card ? card.querySelector('.actions') : null;
+        if (card) {
+          const host = document.createElement('div');
+          host.className = 'sc-speech-host';
+          if (anchorEl) card.insertBefore(host, anchorEl); else card.appendChild(host);
+          CBTSpeech.mount(host, { getQuestion: () => this.qs()[this.idx] });
+        }
+      }
+    } catch(_) {}
 
     /* V10.3: wire the advanced control — restore any saved answer, activate
        drag/chips/word-count behaviour, and stream every change into the
@@ -660,6 +685,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     if (this._done) return;
     this._done = true;
     clearInterval(this.timer);
+    try { if (window.CBTSpeech) CBTSpeech.stop(); } catch(_) {}   /* V10.8: audio never outlives the exam */
     if (this.monitor) try { this.monitor.stop(); } catch (e) {}
     if (window.Proctor && Proctor.active) try { Proctor.stop(); } catch (e) {}
     const graded = (window.CBT && window.CBT.gradeSubmission) ? window.CBT.gradeSubmission(this.data, this.answers) : { score: 0, total: 0, percent: 0, grade: 'F', correct: 0, wrong: 0, skipped: 0 };

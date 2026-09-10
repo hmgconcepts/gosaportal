@@ -487,6 +487,20 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div id="fam-fees" style="display:none;margin-bottom:16px"></div>
       <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:14px"><b>👀 See samples first:</b> <a href="samples/sample-report-card.html" target="_blank">Report Card</a> · <a href="samples/sample-class-broadsheet.html" target="_blank">Class Broadsheet</a> · <a href="samples/sample-subject-broadsheet.html" target="_blank">Subject Broadsheet</a> · <a href="samples/sample-e-receipt.html" target="_blank">Fee E-Receipt</a></div>
       
+      <!-- V10.9 (#1): FEE LEDGER DOCTOR — every recording error a bursar can
+           make, found in advance: duplicates, unlinked rows, zero/negative
+           amounts, future dates, overpayments, missing term/session, stale
+           snapshots. One click scans; Heal rewrites every stale snapshot. -->
+      <div class="card" style="margin-bottom:16px;border:2px solid #fbbf24" data-admin-only>
+        <h2 style="margin-top:0">🩺 Fee Ledger Doctor — find & fix recording errors</h2>
+        <p style="color:var(--gray-600);margin:6px 0 10px">Scans every payment row for the seven error patterns bursars actually make: <b>double entries</b>, <b>rows with no student linked</b>, <b>zero/negative amounts</b>, <b>future dates</b>, <b>overpayments beyond the bill</b>, <b>missing term/session</b> and <b>stale totals</b> from before the self-healing update. Deleting or editing any row is safe — the whole term recomputes automatically (V10.8).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="FeeDoctor.run(false)">🔍 Scan the ledger</button>
+          <button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="FeeDoctor.run(true)">🧮 Scan + Heal snapshots</button>
+        </div>
+        <div id="fee-doctor-out" style="margin-top:12px"></div>
+      </div>
+
       <div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe" data-admin-only><h2 style="margin-top:0">📑 Master Financial Records — export by class (V10.1)</h2>
         <p style="color:var(--gray-600);font-size:.9rem">One row per student: current-term bill, scholarship/aid, paid so far, balance, previous-term arrears and TOTAL outstanding — computed live by the same engine that powers the dashboards. Print/save as PDF or download CSV. Needs <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>
         <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
@@ -659,4 +673,34 @@ const FM={rows:[],ctx:{},
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='master-financial-records'+(this.ctx.cls?'-'+this.ctx.cls.replace(/\s+/g,'_'):'')+'.csv';a.click();}
 };
 document.addEventListener('DOMContentLoaded',()=>FM.init());FM.init();
+</script>
+<script>
+/* V10.9 (#1): FEE LEDGER DOCTOR UI — renders the sc_fee_ledger_doctor scan,
+   grouped by error kind, with per-row shortcuts into the fees table. */
+const FeeDoctor={
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  async run(heal){
+    const box=document.getElementById('fee-doctor-out'); if(!box||!window.sb)return;
+    box.innerHTML='<span class="pulse">Scanning the whole ledger…</span>';
+    const r=await sb.rpc('sc_fee_ledger_doctor',{p_heal:!!heal});
+    if(r.error||!r.data||r.data.ok===false){
+      const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Scan failed';
+      box.innerHTML='<p style="color:#b91c1c">'+(/sc_fee_ledger_doctor|schema cache|function/i.test(String(msg))?'The Fee Doctor needs a one-time database update — run database/v10.9b-fee-doctor.sql (or the latest complete-schema.sql) in Supabase.':this.esc(msg))+'</p>';
+      return;
+    }
+    const d=r.data, issues=d.issues||[];
+    const KINDS={duplicate:['👯 Possible double entries','#fef2f2','#dc2626'],unlinked:['🔗 Payments with no student linked','#fff7ed','#ea580c'],non_positive:['0️⃣ Zero / negative amounts','#fef2f2','#dc2626'],future_dated:['📅 Future-dated payments','#fefce8','#ca8a04'],overpayment:['💸 Paid beyond the bill','#fdf2f8','#be185d'],no_period:['🗓 Missing term/session','#eff6ff','#2563eb'],stale_snapshot:['🧮 Stale totals (run Heal)','#f5f3ff','#7c3aed']};
+    if(!issues.length){box.innerHTML='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;color:#166534;font-weight:700">✅ Ledger clean — no duplicates, no unlinked rows, no overpayments, no stale totals.'+(heal?' Snapshots re-verified for '+(d.healed_terms||0)+' student-term(s).':'')+'</div>';return;}
+    const groups={};issues.forEach(i=>{(groups[i.kind]=groups[i.kind]||[]).push(i);});
+    box.innerHTML=(heal?'<p style="color:#166534;font-weight:700">🧮 Healed snapshots across '+(d.healed_terms||0)+' student-term(s). Remaining findings need a human decision:</p>':'')+
+      Object.keys(groups).map(k=>{
+        const meta=KINDS[k]||['❓ '+k,'#f8fafc','#334155'];
+        return '<div style="background:'+meta[1]+';border:1px solid '+meta[2]+'33;border-left:5px solid '+meta[2]+';border-radius:10px;padding:10px 14px;margin-bottom:10px">'+
+          '<b style="color:'+meta[2]+'">'+meta[0]+' · '+groups[k].length+'</b>'+
+          '<ul style="margin:6px 0 0 18px;font-size:.86rem;line-height:1.6">'+groups[k].slice(0,12).map(i=>'<li><b>'+this.esc(i.student||'')+'</b>'+(i.amount!=null?' · '+Number(i.amount).toLocaleString():'')+(i.term?' · '+this.esc(i.term):'')+(i.excess!=null?' · excess '+Number(i.excess).toLocaleString():'')+'<br><span style="color:var(--gray-600)">'+this.esc(i.advice||'')+'</span></li>').join('')+(groups[k].length>12?'<li>… and '+(groups[k].length-12)+' more</li>':'')+'</ul></div>';
+      }).join('')+
+      '<p style="font-size:.82rem;color:var(--gray-500)">Fix rows in the table below (Edit/Delete) — every change recomputes the student\'s whole term automatically. Re-scan afterwards.</p>';
+    if(window.App&&App.logActivity)App.logActivity(heal?'fee-doctor-heal':'fee-doctor-scan','fee_payments',String(issues.length)+' finding(s)');
+  }
+};
 </script></body></html>
