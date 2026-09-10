@@ -6255,122 +6255,7 @@ create or replace function public.cbt_submit_v2(p_payload jsonb)returns jsonb la
 --    treated as already folded into the bursar's single figure (they were on
 --    screen when the figure was set), so nothing is double-counted.
 -- ---------------------------------------------------------------------------
-create or replace function public.sc_student_fee_state(p_student uuid)
-returns jsonb language plpgsql stable security definer set search_path = public as $$
-declare st record; cur record; fs record; paid_now numeric := 0;
-        arrears numeric := 0; arr_rows jsonb := '[]'::jsonb;
-        bill numeric := 0; breakdown jsonb := '[]'::jsonb;
-        t record; tbill numeric; tpaid numeric; allowed boolean;
-        aid_total numeric := 0; aid_rows jsonb := '[]'::jsonb; a record;
-        ovr record; overridden boolean := false;
-begin
-  select * into st from public.students where id = p_student;
-  if st is null then return jsonb_build_object('ok', false, 'error', 'Student not found.'); end if;
-  allowed := coalesce(public.is_staff(auth.uid()), false)
-          or coalesce(st.user_id = auth.uid(), false)
-          or coalesce(public.is_parent_of(auth.uid(), st.id), false)
-          or coalesce(st.guardian_email = auth.jwt()->>'email', false);
-  if not allowed then return jsonb_build_object('ok', false, 'error', 'Not authorised for this student.'); end if;
-
-  select term, session into cur from public.academic_periods where is_current = true limit 1;
-
-  -- V10 BEST-MATCH SCORING (kept): never hard-exclude on arm/department.
-  select * into fs from public.class_fee_structure f
-   where f.active is not false
-     and lower(trim(f.class)) = lower(trim(coalesce(st.class,'')))
-     and (coalesce(f.session,'') = '' or f.session = coalesce(cur.session,''))
-     and coalesce(f.term,'Current Term') in ('Current Term', coalesce(cur.term,''))
-   order by
-     (lower(coalesce(f.arm,''))        = lower(coalesce(st.arm,'')))        desc,
-     (coalesce(f.arm,'') = '')                                              desc,
-     (lower(coalesce(f.department,'')) = lower(coalesce(st.department,''))) desc,
-     (coalesce(f.department,'') = '')                                       desc,
-     (coalesce(f.session,'') <> '')                                         desc,
-     f.updated_at desc nulls last
-   limit 1;
-
-  if fs.id is not null then
-    bill := coalesce(nullif(fs.total,0), coalesce(fs.tuition,0)+coalesce(fs.exam_fee,0)+coalesce(fs.development,0)+coalesce(fs.transport,0)+coalesce(fs.boarding,0)+coalesce(fs.other_fee,0)-coalesce(fs.discount,0));
-    breakdown := jsonb_build_array();
-    if coalesce(fs.tuition,0)     <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Tuition','amount',fs.tuition)); end if;
-    if coalesce(fs.exam_fee,0)    <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Exam / assessment','amount',fs.exam_fee)); end if;
-    if coalesce(fs.development,0) <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Development / PTA','amount',fs.development)); end if;
-    if coalesce(fs.transport,0)   <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Transport','amount',fs.transport)); end if;
-    if coalesce(fs.boarding,0)    <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Boarding / hostel','amount',fs.boarding)); end if;
-    if coalesce(fs.other_fee,0)   <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Other compulsory','amount',fs.other_fee)); end if;
-    if coalesce(fs.discount,0)    <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Discount','amount',-fs.discount)); end if;
-  end if;
-
-  begin
-    for a in select mr.title, mr.amount from public.module_records mr
-              where mr.module = 'financial_aid'
-                and coalesce(mr.status,'applied') in ('approved','renewed')
-                and coalesce(mr.amount,0) > 0
-                and ( mr.data->>'student' = st.id::text
-                   or lower(coalesce(mr.data->>'student','')) = lower(coalesce(st.full_name,''))
-                   or mr.data->>'student_id' = st.id::text )
-    loop
-      aid_total := aid_total + a.amount;
-      aid_rows := aid_rows || jsonb_build_array(jsonb_build_object('scheme', coalesce(a.title,'Scholarship/Aid'), 'amount', a.amount));
-      breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','🎓 '||coalesce(a.title,'Scholarship/Aid'),'amount',-a.amount));
-    end loop;
-  exception when undefined_table or undefined_column then null;
-  end;
-  bill := greatest(coalesce(bill,0) - aid_total, 0);
-
-  select coalesce(sum(amount_paid),0) into paid_now from public.fee_payments
-   where student_id = p_student
-     and (coalesce(cur.term,'')    = '' or coalesce(term,'')    = cur.term)
-     and (coalesce(cur.session,'') = '' or coalesce(session,'') = cur.session);
-
-  for t in
-    select coalesce(term,'') as term, coalesce(session,'') as session,
-           max(coalesce(fee_total,0)) as tb, sum(coalesce(amount_paid,0)) as tp
-      from public.fee_payments
-     where student_id = p_student
-       and not (coalesce(term,'') = coalesce(cur.term,'') and coalesce(session,'') = coalesce(cur.session,''))
-     group by 1,2
-  loop
-    tbill := coalesce(t.tb,0); tpaid := coalesce(t.tp,0);
-    if tbill > tpaid then
-      arrears := arrears + (tbill - tpaid);
-      arr_rows := arr_rows || jsonb_build_array(jsonb_build_object('term',t.term,'session',t.session,'bill',tbill,'paid',tpaid,'owing',tbill-tpaid));
-    end if;
-  end loop;
-
-  -- V10.3 (#4): the bursar's deliberate per-student override WINS.
-  begin
-    select fee_total into ovr from public.fee_payments
-     where student_id = p_student
-       and coalesce(total_overridden,false) = true
-       and coalesce(fee_total,0) > 0
-       and (coalesce(cur.term,'')    = '' or coalesce(term,'')    = cur.term)
-       and (coalesce(cur.session,'') = '' or coalesce(session,'') = cur.session)
-     order by created_at desc nulls last limit 1;
-    if found and ovr.fee_total is not null then
-      overridden := true;
-      bill := coalesce(ovr.fee_total,0);
-      arrears := 0; arr_rows := '[]'::jsonb;      -- folded into the bursar's figure
-      breakdown := jsonb_build_array(jsonb_build_object('item','✏️ Personal total set by the bursar (override)','amount',bill));
-    end if;
-  exception when undefined_column then null;
-  end;
-
-  return jsonb_build_object('ok', true,
-    'student_id', st.id, 'student_name', st.full_name, 'class', st.class,
-    'term', coalesce(cur.term,''), 'session', coalesce(cur.session,''),
-    'bill', coalesce(bill,0), 'breakdown', breakdown,
-    'aid', case when overridden then 0 else aid_total end, 'aid_rows', case when overridden then '[]'::jsonb else aid_rows end,
-    'paid', paid_now, 'balance', greatest(coalesce(bill,0) - paid_now, 0),
-    'arrears', arrears, 'arrears_rows', arr_rows,
-    'total_due', greatest(coalesce(bill,0) - paid_now, 0) + arrears,
-    'grand_total', coalesce(bill,0) + arrears,
-    'currency', coalesce(fs.currency, '₦'),
-    'due_date', fs.due_date, 'note', coalesce(fs.note,''),
-    'matched', overridden or fs.id is not null,
-    'override', overridden,
-    'matched_arm', coalesce(fs.arm,''), 'matched_department', coalesce(fs.department,''));
-end $$;
+-- (sc_student_fee_state superseded by the V10.7 opening-arrears definition embedded below — single authoritative copy)
 
 -- ---------------------------------------------------------------------------
 -- Grants
@@ -6384,8 +6269,7 @@ grant execute on function public.cbt_submit(jsonb)to anon,authenticated;
 revoke execute on function public.cbt_submit_v2(jsonb)from public;
 grant execute on function public.cbt_submit_v2(jsonb)to anon,authenticated;
 -- (cbt_regrade_exam_results_v5 grants issued with the V10.6 definition embedded below)
-revoke all on function public.sc_student_fee_state(uuid) from public, anon;
-grant execute on function public.sc_student_fee_state(uuid) to authenticated;
+-- (sc_student_fee_state grants issued with the V10.7 definition embedded below)
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V10.3 CBT advanced types + fee override pack installed' as status;
@@ -6709,6 +6593,670 @@ grant execute on function public.cbt_regrade_exam_results_v5(uuid)to authenticat
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V10.6 CBT review + community pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V10.7 — Fee discipline locks, manual arrears, community feed
+-- ----------------------------------------------------------------------------
+-- Run AFTER complete-schema.sql (or any earlier pack) on an EXISTING database.
+-- Fresh installs get all of this from complete-schema.sql automatically.
+--
+-- WHAT THIS PACK DOES
+-- 1. PORTAL LOCK + REPORT-CARD LOCK (pass-55 issue 6). Admin/bursar can, per
+--    student or per selection, with one click:
+--      • lock the student (and their parents) OUT of the portal entirely, or
+--      • hide only their REPORT CARD / results,
+--    each with a custom bold message shown to the student. Enforced at THREE
+--    layers: (a) columns on students, (b) sc_my_access_state() RPC the client
+--    calls on sign-in, (c) RLS — locked students/parents lose SELECT on
+--    report_scores / report_cards / results via a helper the policies call.
+-- 2. MANUAL OPENING ARREARS (pass-55 issue 5). Schools adopting School
+--    Connect mid-session have prior-term debts that predate the database.
+--    New columns opening_arrears + opening_arrears_note on students, an
+--    editable field in the fee form, and sc_student_fee_state now ADDS the
+--    opening balance into arrears/total_due with its own breakdown row.
+-- 3. COMMUNITY FEED HARDENING (pass-55 issue 4). V10.6 stamped new community
+--    rows audience='all' and backfilled — this pack RE-backfills (schools
+--    that ran V10.6 before entering data) and adds a trigger so community
+--    module rows can NEVER fall back to private again, no matter which
+--    client wrote them.
+-- ============================================================================
+select 'RUNNING: School Connect fee-locks/arrears/community pack V10.7' as running_version;
+
+-- ---------------------------------------------------------------------------
+-- 0. Schema
+-- ---------------------------------------------------------------------------
+alter table public.students add column if not exists portal_locked boolean not null default false;
+alter table public.students add column if not exists portal_lock_message text not null default '';
+alter table public.students add column if not exists report_locked boolean not null default false;
+alter table public.students add column if not exists report_lock_message text not null default '';
+alter table public.students add column if not exists locked_by uuid references public.profiles(id) on delete set null;
+alter table public.students add column if not exists locked_at timestamptz;
+alter table public.students add column if not exists opening_arrears numeric not null default 0;
+alter table public.students add column if not exists opening_arrears_note text not null default '';
+
+-- ---------------------------------------------------------------------------
+-- 1. Lock helpers — used by RLS and by the client access gate
+-- ---------------------------------------------------------------------------
+create or replace function public.sc_is_locked_out(p_uid uuid)
+returns boolean language sql security definer stable set search_path=public as $$
+  select exists(
+    select 1 from public.students s
+     where coalesce(s.portal_locked,false)
+       and (s.user_id = p_uid or public.is_parent_of(p_uid, s.id))
+  ) and not coalesce(public.is_staff(p_uid),false)
+$$;
+
+create or replace function public.sc_report_hidden_for(p_uid uuid, p_student uuid)
+returns boolean language sql security definer stable set search_path=public as $$
+  select case when coalesce(public.is_staff(p_uid),false) then false
+    else exists(
+      select 1 from public.students s
+       where s.id = p_student
+         and (coalesce(s.report_locked,false) or coalesce(s.portal_locked,false))
+         and (s.user_id = p_uid or public.is_parent_of(p_uid, s.id)))
+    end
+$$;
+
+-- The one RPC the client calls after sign-in: am I (or my children) locked?
+create or replace function public.sc_my_access_state()
+returns jsonb language plpgsql security definer stable set search_path=public as $$
+declare uid uuid := auth.uid(); s record; kids jsonb := '[]'::jsonb; plocked boolean := false; pmsg text := '';
+begin
+  if uid is null then return jsonb_build_object('ok',true,'portal_locked',false); end if;
+  if coalesce(public.is_staff(uid),false) then return jsonb_build_object('ok',true,'portal_locked',false,'staff',true); end if;
+  for s in
+    select st.* from public.students st
+     where st.user_id = uid or public.is_parent_of(uid, st.id)
+  loop
+    if coalesce(s.portal_locked,false) then
+      plocked := true;
+      if coalesce(s.portal_lock_message,'') <> '' then pmsg := s.portal_lock_message; end if;
+    end if;
+    kids := kids || jsonb_build_array(jsonb_build_object(
+      'student_id', s.id, 'name', s.full_name,
+      'portal_locked', coalesce(s.portal_locked,false),
+      'portal_lock_message', coalesce(s.portal_lock_message,''),
+      'report_locked', coalesce(s.report_locked,false) or coalesce(s.portal_locked,false),
+      'report_lock_message', coalesce(nullif(s.report_lock_message,''), nullif(s.portal_lock_message,''), '')));
+  end loop;
+  return jsonb_build_object('ok',true,'portal_locked',plocked,
+    'portal_lock_message',coalesce(nullif(pmsg,''),
+      'Access to the school portal has been suspended. Please contact the school bursary to resolve outstanding school fees.'),
+    'students',kids);
+end $$;
+revoke execute on function public.sc_is_locked_out(uuid) from public, anon;
+grant execute on function public.sc_is_locked_out(uuid) to authenticated;
+revoke execute on function public.sc_report_hidden_for(uuid,uuid) from public, anon;
+grant execute on function public.sc_report_hidden_for(uuid,uuid) to authenticated;
+revoke execute on function public.sc_my_access_state() from public, anon;
+grant execute on function public.sc_my_access_state() to authenticated;
+
+-- One-click (bulk-capable) lock RPC — admin tier only, audit-stamped.
+create or replace function public.sc_set_student_locks(p_student_ids uuid[], p_kind text, p_locked boolean, p_message text default '')
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare n int;
+begin
+  if not coalesce(public.is_admin(auth.uid()),false) then
+    return jsonb_build_object('ok',false,'error','Only an administrator/bursar-tier account can lock or unlock students.');
+  end if;
+  if coalesce(array_length(p_student_ids,1),0)=0 then return jsonb_build_object('ok',false,'error','No students selected.'); end if;
+  if p_kind='portal' then
+    update public.students set portal_locked=p_locked,
+      portal_lock_message=case when p_locked then coalesce(nullif(p_message,''),portal_lock_message) else '' end,
+      locked_by=case when p_locked then auth.uid() else locked_by end,
+      locked_at=case when p_locked then now() else locked_at end
+     where id=any(p_student_ids);
+  elsif p_kind='report' then
+    update public.students set report_locked=p_locked,
+      report_lock_message=case when p_locked then coalesce(nullif(p_message,''),report_lock_message) else '' end,
+      locked_by=case when p_locked then auth.uid() else locked_by end,
+      locked_at=case when p_locked then now() else locked_at end
+     where id=any(p_student_ids);
+  else
+    return jsonb_build_object('ok',false,'error','Unknown lock kind: '||coalesce(p_kind,'(null)'));
+  end if;
+  get diagnostics n = row_count;
+  return jsonb_build_object('ok',true,'kind',p_kind,'locked',p_locked,'updated',n);
+end $$;
+revoke execute on function public.sc_set_student_locks(uuid[],text,boolean,text) from public, anon;
+grant execute on function public.sc_set_student_locks(uuid[],text,boolean,text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 2. RLS enforcement — a locked family cannot read report data even by
+--    direct REST calls. Additive policies-as-restrictive is not available on
+--    older setups, so we rebuild the three family-read policies with the
+--    hidden-check folded in. Staff paths are untouched.
+-- ---------------------------------------------------------------------------
+drop policy if exists "v7_report_scores_read" on public.report_scores;
+create policy "v7_report_scores_read" on public.report_scores for select using (
+  public.is_staff(auth.uid())
+  or exists(select 1 from public.students s where s.id=report_scores.student_id
+        and (s.user_id=auth.uid() or public.is_parent_of(auth.uid(),s.id))
+        and not public.sc_report_hidden_for(auth.uid(), s.id))
+  or exists(select 1 from public.students s where s.admission_no=report_scores.student_id_ref
+        and (s.user_id=auth.uid() or public.is_parent_of(auth.uid(),s.id))
+        and not public.sc_report_hidden_for(auth.uid(), s.id))
+);
+drop policy if exists "v7_report_cards_family" on public.report_cards;
+create policy "v7_report_cards_family" on public.report_cards for select using (
+  public.is_staff(auth.uid())
+  or ((public.is_parent_of(auth.uid(),student_id)
+       or exists(select 1 from public.students s where s.id=report_cards.student_id and s.user_id=auth.uid()))
+      and not public.sc_report_hidden_for(auth.uid(), student_id))
+);
+
+-- ---------------------------------------------------------------------------
+-- 3. sc_student_fee_state V10.7 — manual OPENING ARREARS included.
+--    Supersedes the V10.3 definition (override logic kept verbatim).
+-- ---------------------------------------------------------------------------
+create or replace function public.sc_student_fee_state(p_student uuid)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare st record; cur record; fs record; paid_now numeric := 0;
+        arrears numeric := 0; arr_rows jsonb := '[]'::jsonb;
+        bill numeric := 0; breakdown jsonb := '[]'::jsonb;
+        t record; tbill numeric; tpaid numeric; allowed boolean;
+        aid_total numeric := 0; aid_rows jsonb := '[]'::jsonb; a record;
+        ovr record; overridden boolean := false; opening numeric := 0;
+begin
+  select * into st from public.students where id = p_student;
+  if st is null then return jsonb_build_object('ok', false, 'error', 'Student not found.'); end if;
+  allowed := coalesce(public.is_staff(auth.uid()), false)
+          or coalesce(st.user_id = auth.uid(), false)
+          or coalesce(public.is_parent_of(auth.uid(), st.id), false)
+          or coalesce(st.guardian_email = auth.jwt()->>'email', false);
+  if not allowed then return jsonb_build_object('ok', false, 'error', 'Not authorised for this student.'); end if;
+
+  select term, session into cur from public.academic_periods where is_current = true limit 1;
+
+  -- V10 BEST-MATCH SCORING (kept): never hard-exclude on arm/department.
+  select * into fs from public.class_fee_structure f
+   where f.active is not false
+     and lower(trim(f.class)) = lower(trim(coalesce(st.class,'')))
+     and (coalesce(f.session,'') = '' or f.session = coalesce(cur.session,''))
+     and coalesce(f.term,'Current Term') in ('Current Term', coalesce(cur.term,''))
+   order by
+     (lower(coalesce(f.arm,''))        = lower(coalesce(st.arm,'')))        desc,
+     (coalesce(f.arm,'') = '')                                              desc,
+     (lower(coalesce(f.department,'')) = lower(coalesce(st.department,''))) desc,
+     (coalesce(f.department,'') = '')                                       desc,
+     (coalesce(f.session,'') <> '')                                         desc,
+     f.updated_at desc nulls last
+   limit 1;
+
+  if fs.id is not null then
+    bill := coalesce(nullif(fs.total,0), coalesce(fs.tuition,0)+coalesce(fs.exam_fee,0)+coalesce(fs.development,0)+coalesce(fs.transport,0)+coalesce(fs.boarding,0)+coalesce(fs.other_fee,0)-coalesce(fs.discount,0));
+    breakdown := jsonb_build_array();
+    if coalesce(fs.tuition,0)     <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Tuition','amount',fs.tuition)); end if;
+    if coalesce(fs.exam_fee,0)    <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Exam / assessment','amount',fs.exam_fee)); end if;
+    if coalesce(fs.development,0) <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Development / PTA','amount',fs.development)); end if;
+    if coalesce(fs.transport,0)   <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Transport','amount',fs.transport)); end if;
+    if coalesce(fs.boarding,0)    <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Boarding / hostel','amount',fs.boarding)); end if;
+    if coalesce(fs.other_fee,0)   <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Other compulsory','amount',fs.other_fee)); end if;
+    if coalesce(fs.discount,0)    <> 0 then breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','Discount','amount',-fs.discount)); end if;
+  end if;
+
+  begin
+    for a in select mr.title, mr.amount from public.module_records mr
+              where mr.module = 'financial_aid'
+                and coalesce(mr.status,'applied') in ('approved','renewed')
+                and coalesce(mr.amount,0) > 0
+                and ( mr.data->>'student' = st.id::text
+                   or lower(coalesce(mr.data->>'student','')) = lower(coalesce(st.full_name,''))
+                   or mr.data->>'student_id' = st.id::text )
+    loop
+      aid_total := aid_total + a.amount;
+      aid_rows := aid_rows || jsonb_build_array(jsonb_build_object('scheme', coalesce(a.title,'Scholarship/Aid'), 'amount', a.amount));
+      breakdown := breakdown || jsonb_build_array(jsonb_build_object('item','🎓 '||coalesce(a.title,'Scholarship/Aid'),'amount',-a.amount));
+    end loop;
+  exception when undefined_table or undefined_column then null;
+  end;
+  bill := greatest(coalesce(bill,0) - aid_total, 0);
+
+  select coalesce(sum(amount_paid),0) into paid_now from public.fee_payments
+   where student_id = p_student
+     and (coalesce(cur.term,'')    = '' or coalesce(term,'')    = cur.term)
+     and (coalesce(cur.session,'') = '' or coalesce(session,'') = cur.session);
+
+  for t in
+    select coalesce(term,'') as term, coalesce(session,'') as session,
+           max(coalesce(fee_total,0)) as tb, sum(coalesce(amount_paid,0)) as tp
+      from public.fee_payments
+     where student_id = p_student
+       and not (coalesce(term,'') = coalesce(cur.term,'') and coalesce(session,'') = coalesce(cur.session,''))
+     group by 1,2
+  loop
+    tbill := coalesce(t.tb,0); tpaid := coalesce(t.tp,0);
+    if tbill > tpaid then
+      arrears := arrears + (tbill - tpaid);
+      arr_rows := arr_rows || jsonb_build_array(jsonb_build_object('term',t.term,'session',t.session,'bill',tbill,'paid',tpaid,'owing',tbill-tpaid));
+    end if;
+  end loop;
+
+  -- V10.7 (#5): MANUAL OPENING ARREARS — debts from before the school adopted
+  -- School Connect, entered per student. They join arrears/total_due with
+  -- their own labelled rows so families see exactly where the figure is from.
+  begin
+    opening := coalesce(st.opening_arrears,0);
+    if opening > 0 then
+      arrears := arrears + opening;
+      arr_rows := arr_rows || jsonb_build_array(jsonb_build_object(
+        'term','Before School Connect','session',coalesce(nullif(st.opening_arrears_note,''),'Opening balance'),
+        'bill',opening,'paid',0,'owing',opening,'opening',true));
+    end if;
+  exception when undefined_column then opening := 0;
+  end;
+
+  -- V10.3 (#4): the bursar's deliberate per-student override WINS.
+  begin
+    select fee_total into ovr from public.fee_payments
+     where student_id = p_student
+       and coalesce(total_overridden,false) = true
+       and coalesce(fee_total,0) > 0
+       and (coalesce(cur.term,'')    = '' or coalesce(term,'')    = cur.term)
+       and (coalesce(cur.session,'') = '' or coalesce(session,'') = cur.session)
+     order by created_at desc nulls last limit 1;
+    if found and ovr.fee_total is not null then
+      overridden := true;
+      bill := coalesce(ovr.fee_total,0);
+      arrears := 0; arr_rows := '[]'::jsonb;      -- folded into the bursar's figure
+      breakdown := jsonb_build_array(jsonb_build_object('item','✏️ Personal total set by the bursar (override)','amount',bill));
+    end if;
+  exception when undefined_column then null;
+  end;
+
+  return jsonb_build_object('ok', true,
+    'student_id', st.id, 'student_name', st.full_name, 'class', st.class,
+    'term', coalesce(cur.term,''), 'session', coalesce(cur.session,''),
+    'bill', coalesce(bill,0), 'breakdown', breakdown,
+    'aid', case when overridden then 0 else aid_total end, 'aid_rows', case when overridden then '[]'::jsonb else aid_rows end,
+    'paid', paid_now, 'balance', greatest(coalesce(bill,0) - paid_now, 0),
+    'arrears', arrears, 'arrears_rows', arr_rows,
+    'opening_arrears', case when overridden then 0 else opening end,
+    'total_due', greatest(coalesce(bill,0) - paid_now, 0) + arrears,
+    'grand_total', coalesce(bill,0) + arrears,
+    'currency', coalesce(fs.currency, '₦'),
+    'due_date', fs.due_date, 'note', coalesce(fs.note,''),
+    'matched', overridden or fs.id is not null,
+    'override', overridden,
+    'matched_arm', coalesce(fs.arm,''), 'matched_department', coalesce(fs.department,''));
+end $$;
+revoke all on function public.sc_student_fee_state(uuid) from public, anon;
+grant execute on function public.sc_student_fee_state(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 4. Community feed hardening — trigger keeps community rows public forever.
+-- ---------------------------------------------------------------------------
+update public.module_records set audience='all'
+ where module in ('lost_found','parent_meeting','cafeteria','menu','school_calendar','gallery')
+   and coalesce(audience,'private') in ('private','');
+
+create or replace function public.sc_community_audience()
+returns trigger language plpgsql as $$
+begin
+  if new.module in ('lost_found','parent_meeting','cafeteria','menu','school_calendar','gallery')
+     and coalesce(new.audience,'') in ('','private') then
+    new.audience := 'all';
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_community_audience on public.module_records;
+create trigger trg_community_audience before insert or update on public.module_records
+for each row execute function public.sc_community_audience();
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V10.7 fee-locks/arrears/community pack installed' as status;
+
+
+
+
+
+-- ============================================================================
+-- School Connect V10.8 — Self-healing fee ledger (edit/delete recompute)
+-- ----------------------------------------------------------------------------
+-- Run AFTER complete-schema.sql (or any earlier pack) on an EXISTING database.
+-- Fresh installs get all of this from complete-schema.sql automatically.
+--
+-- THE SCENARIO (pass-56 issue 2): the bursar records ₦15,000 for a student
+-- who paid ₦10,000, or records ₦50,000 for a student who paid nothing. When
+-- the erroneous row is EDITED or DELETED, every other row of that student's
+-- term must adjust — because each payment row snapshots "total due at the
+-- time" (fee_total) and "balance after this payment" (balance), and those
+-- snapshots go stale the moment an earlier row changes.
+--
+-- THE ENGINE: sc_recompute_fee_rows(student, term, session) re-walks the
+-- student's payments for the term in chronological order and rewrites every
+-- snapshot from one reconstructed GRAND TOTAL:
+--   grand = the bursar's override row (fee_total + payments made before it)
+--           when one exists — the override stays authoritative;
+--   else    the maximum of (row.fee_total + payments before that row) across
+--           rows — i.e. the best evidence of the original full bill, immune
+--           to any single wrong row.
+-- Then row i gets fee_total = grand − paid_before_i and
+--                 balance   = fee_total − amount_paid_i  (floor 0).
+-- A statement-level trigger runs it automatically after ANY insert, update
+-- or delete on fee_payments, so the ledger heals itself no matter which
+-- client (form, CSV import, REST) touched it. Recursion is depth-guarded.
+-- sc_student_fee_state (dashboards/receipts) already computes live from the
+-- rows, so it agrees with the healed snapshots automatically.
+-- ============================================================================
+select 'RUNNING: School Connect fee-recompute pack V10.8' as running_version;
+
+create or replace function public.sc_recompute_fee_rows(p_student uuid, p_term text default '', p_session text default '')
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare grand numeric := null; r record; paid_before numeric := 0; n int := 0; cand numeric;
+begin
+  if p_student is null then return jsonb_build_object('ok',false,'error','No student.'); end if;
+
+  -- 1. Reconstruct the grand total for this student+term.
+  --    Override row wins; else best evidence across rows.
+  for r in
+    select id, coalesce(amount_paid,0) as amt, coalesce(fee_total,0) as ft, coalesce(total_overridden,false) as ovr
+      from public.fee_payments
+     where student_id = p_student
+       and coalesce(term,'')    = coalesce(p_term,'')
+       and coalesce(session,'') = coalesce(p_session,'')
+     order by created_at asc nulls last, id asc
+  loop
+    if r.ovr and r.ft > 0 then
+      grand := r.ft + paid_before;         -- override defined the total AT THAT POINT
+    elsif grand is null or not exists (
+        select 1 from public.fee_payments fp
+         where fp.student_id = p_student
+           and coalesce(fp.term,'') = coalesce(p_term,'')
+           and coalesce(fp.session,'') = coalesce(p_session,'')
+           and coalesce(fp.total_overridden,false) and coalesce(fp.fee_total,0) > 0) then
+      cand := r.ft + paid_before;
+      if grand is null or cand > grand then grand := cand; end if;
+    end if;
+    paid_before := paid_before + r.amt;
+  end loop;
+  if grand is null then return jsonb_build_object('ok',true,'rows',0); end if;
+
+  -- 2. Rewrite every snapshot from the reconstructed grand total.
+  paid_before := 0;
+  for r in
+    select id, coalesce(amount_paid,0) as amt
+      from public.fee_payments
+     where student_id = p_student
+       and coalesce(term,'')    = coalesce(p_term,'')
+       and coalesce(session,'') = coalesce(p_session,'')
+     order by created_at asc nulls last, id asc
+  loop
+    update public.fee_payments
+       set fee_total = greatest(grand - paid_before, 0),
+           balance   = greatest(grand - paid_before - r.amt, 0)
+     where id = r.id
+       and (coalesce(fee_total,-1) <> greatest(grand - paid_before, 0)
+         or coalesce(balance,-1)   <> greatest(grand - paid_before - r.amt, 0));
+    paid_before := paid_before + r.amt;
+    n := n + 1;
+  end loop;
+  return jsonb_build_object('ok',true,'rows',n,'grand_total',grand,'paid',paid_before,'outstanding',greatest(grand-paid_before,0));
+end $$;
+revoke execute on function public.sc_recompute_fee_rows(uuid,text,text) from public, anon;
+grant execute on function public.sc_recompute_fee_rows(uuid,text,text) to authenticated;
+
+-- Statement-level trigger: heal the affected student+term after ANY write.
+create or replace function public.sc_fee_rows_autoheal()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare r record;
+begin
+  if pg_trigger_depth() > 1 then return null; end if;   -- our own rewrites do not re-trigger
+  if tg_op = 'DELETE' then
+    for r in select distinct student_id, coalesce(term,'') as term, coalesce(session,'') as session from old_table where student_id is not null loop
+      perform public.sc_recompute_fee_rows(r.student_id, r.term, r.session);
+    end loop;
+  else
+    for r in select distinct student_id, coalesce(term,'') as term, coalesce(session,'') as session from new_table where student_id is not null loop
+      perform public.sc_recompute_fee_rows(r.student_id, r.term, r.session);
+    end loop;
+    if tg_op = 'UPDATE' then
+      -- a row moved to another term/student: heal the OLD context too
+      for r in select distinct student_id, coalesce(term,'') as term, coalesce(session,'') as session from old_table where student_id is not null loop
+        perform public.sc_recompute_fee_rows(r.student_id, r.term, r.session);
+      end loop;
+    end if;
+  end if;
+  return null;
+end $$;
+drop trigger if exists trg_fee_rows_autoheal_ins on public.fee_payments;
+create trigger trg_fee_rows_autoheal_ins after insert on public.fee_payments
+referencing new table as new_table for each statement execute function public.sc_fee_rows_autoheal();
+drop trigger if exists trg_fee_rows_autoheal_upd on public.fee_payments;
+create trigger trg_fee_rows_autoheal_upd after update on public.fee_payments
+referencing old table as old_table new table as new_table for each statement execute function public.sc_fee_rows_autoheal();
+drop trigger if exists trg_fee_rows_autoheal_del on public.fee_payments;
+create trigger trg_fee_rows_autoheal_del after delete on public.fee_payments
+referencing old table as old_table for each statement execute function public.sc_fee_rows_autoheal();
+
+-- ---------------------------------------------------------------------------
+-- 2. REPORT LOCK now covers RESULTS and CBT RESULTS too (pass-56 issue 1).
+--    V10.7 blanked report_scores/report_cards; a locked family could still
+--    read raw subject results and CBT attempt rows. All four family-read
+--    surfaces now honour sc_report_hidden_for. Staff paths untouched.
+-- ---------------------------------------------------------------------------
+drop policy if exists results_scope_select on public.results;
+create policy results_scope_select on public.results for select using(
+  public.is_admin(auth.uid())
+  or public.teacher_can_manage_subject_class(auth.uid(),subject,class)
+  or exists(select 1 from public.students s where s.id=results.student_id
+        and(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))
+        and not public.sc_report_hidden_for(auth.uid(), s.id)));
+
+drop policy if exists cbt_result_scope_select on public.cbt_results;
+create policy cbt_result_scope_select on public.cbt_results for select using(
+  public.is_admin(auth.uid())
+  or exists(select 1 from public.cbt_exams e where e.id=cbt_results.exam_id
+        and(e.teacher_id=auth.uid()or public.teacher_can_manage_subject_class(auth.uid(),e.subject,e.class)))
+  or exists(select 1 from public.students s where s.id=cbt_results.student_id
+        and(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))
+        and not public.sc_report_hidden_for(auth.uid(), s.id)));
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V10.8 fee-recompute pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V10.9 — Report-lock full coverage (every report component)
+-- ----------------------------------------------------------------------------
+-- Run AFTER complete-schema.sql (or any earlier pack) on an EXISTING database.
+-- Fresh installs get all of this from complete-schema.sql automatically.
+--
+-- WHAT THIS PACK DOES (pass-57 issue 2)
+-- V10.7/10.8 blanked report_scores, report_cards, results and cbt_results for
+-- report-locked families. This audit found FOUR more surfaces a report card
+-- is assembled from that still had wide-open family reads:
+--   • affective_traits      (read: any authenticated user!)
+--   • psychomotor_traits    (read: any authenticated user!)
+--   • report_comments       (read: any authenticated user!)
+--   • student_term_metrics  (family read, no lock check)
+-- Beyond the lock, the first three were a privacy hole — ANY signed-in
+-- student could read ANY student's traits and teacher comments. Both fixed
+-- in one move: family reads are now scoped to OWN children AND honour
+-- sc_report_hidden_for; staff keep full access.
+-- ============================================================================
+select 'RUNNING: School Connect lock-coverage pack V10.9' as running_version;
+
+drop policy if exists "affective_traits_read" on public.affective_traits;
+create policy "affective_traits_read" on public.affective_traits for select using (
+  public.is_staff(auth.uid())
+  or exists(select 1 from public.students s where s.id=affective_traits.student_id
+        and (s.user_id=auth.uid() or public.is_parent_of(auth.uid(),s.id))
+        and not public.sc_report_hidden_for(auth.uid(), s.id))
+);
+
+drop policy if exists "psychomotor_traits_read" on public.psychomotor_traits;
+create policy "psychomotor_traits_read" on public.psychomotor_traits for select using (
+  public.is_staff(auth.uid())
+  or exists(select 1 from public.students s where s.id=psychomotor_traits.student_id
+        and (s.user_id=auth.uid() or public.is_parent_of(auth.uid(),s.id))
+        and not public.sc_report_hidden_for(auth.uid(), s.id))
+);
+
+drop policy if exists "report_comments_read" on public.report_comments;
+create policy "report_comments_read" on public.report_comments for select using (
+  public.is_staff(auth.uid())
+  or exists(select 1 from public.students s where s.id=report_comments.student_id
+        and (s.user_id=auth.uid() or public.is_parent_of(auth.uid(),s.id))
+        and not public.sc_report_hidden_for(auth.uid(), s.id))
+);
+
+drop policy if exists metrics_family_read on public.student_term_metrics;
+create policy metrics_family_read on public.student_term_metrics for select using (
+  exists(select 1 from public.students s where s.id=student_term_metrics.student_id
+     and (s.user_id=auth.uid() or public.is_parent_of(auth.uid(),s.id))
+     and not public.sc_report_hidden_for(auth.uid(), s.id))
+);
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V10.9 lock-coverage pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V10.9 (part B) — Fee Ledger Doctor
+-- ----------------------------------------------------------------------------
+-- Run AFTER complete-schema.sql on an EXISTING database (fresh installs get
+-- it from complete-schema.sql). Ships in the same pass as v10.9-lock-coverage.
+--
+-- WHAT THIS DOES (pass-57 issue 1, "identify every kind of error in advance")
+-- One RPC that scans the whole fee ledger for every recording error a bursar
+-- can realistically make, and (optionally) heals what is mechanically
+-- healable:
+--   duplicate        — same student + amount + same calendar day recorded
+--                      twice (double-entry / double-click)
+--   unlinked         — a payment row with NO student link (typed free-hand,
+--                      invisible to every dashboard and receipt)
+--   non_positive     — zero or negative amount_paid
+--   future_dated     — payment recorded with a future date
+--   overpayment      — a term where total paid exceeds the reconstructed
+--                      grand total (wrong amount, or missing bill)
+--   no_period        — rows missing term/session (they escape every term
+--                      filter and every arrears computation)
+--   stale_snapshot   — fee_total/balance that disagree with the recomputed
+--                      ledger (pre-V10.8 rows, or foreign writers)
+-- p_heal=true additionally re-runs sc_recompute_fee_rows on every affected
+-- student+term (fixing all stale snapshots) — destructive fixes (deleting a
+-- duplicate, relinking a student) remain deliberate human actions, surfaced
+-- with the exact row ids so one click in the fees table finishes the job.
+-- ============================================================================
+select 'RUNNING: School Connect fee-doctor pack V10.9b' as running_version;
+
+create or replace function public.sc_fee_ledger_doctor(p_heal boolean default false)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare issues jsonb := '[]'::jsonb; r record; healed int := 0; cur record;
+begin
+  if not coalesce(public.is_staff(auth.uid()),false) then
+    return jsonb_build_object('ok',false,'error','Staff role required.');
+  end if;
+  select term, session into cur from public.academic_periods where is_current = true limit 1;
+
+  -- 1. duplicates: same student + amount + same day, 2+ rows
+  for r in
+    select student_id, coalesce(student_name,'') as student_name, amount_paid,
+           date(created_at) as day, count(*) as n, array_agg(id order by created_at) as ids
+      from public.fee_payments
+     where student_id is not null and coalesce(amount_paid,0) > 0
+     group by student_id, coalesce(student_name,''), amount_paid, date(created_at)
+    having count(*) > 1
+  loop
+    issues := issues || jsonb_build_array(jsonb_build_object(
+      'kind','duplicate','student_id',r.student_id,'student',r.student_name,
+      'amount',r.amount_paid,'day',r.day,'count',r.n,'row_ids',to_jsonb(r.ids),
+      'advice','Same student, same amount, same day, recorded '||r.n||' times. If it is a double entry, delete the extra row(s) — the ledger recomputes itself.'));
+  end loop;
+
+  -- 2. unlinked rows
+  for r in select id, coalesce(student_name,'') as student_name, amount_paid, created_at
+             from public.fee_payments where student_id is null limit 200
+  loop
+    issues := issues || jsonb_build_array(jsonb_build_object(
+      'kind','unlinked','row_id',r.id,'student',r.student_name,'amount',r.amount_paid,
+      'advice','No student is linked — this payment reaches NO dashboard, receipt or arrears computation. Edit the row and pick the student.'));
+  end loop;
+
+  -- 3. non-positive amounts
+  for r in select id, student_id, coalesce(student_name,'') as student_name, amount_paid
+             from public.fee_payments where coalesce(amount_paid,0) <= 0 limit 200
+  loop
+    issues := issues || jsonb_build_array(jsonb_build_object(
+      'kind','non_positive','row_id',r.id,'student',r.student_name,'amount',r.amount_paid,
+      'advice','Zero or negative amount. Delete it, or edit it to the real figure.'));
+  end loop;
+
+  -- 4. future-dated
+  for r in select id, coalesce(student_name,'') as student_name, amount_paid, created_at
+             from public.fee_payments where created_at > now() + interval '1 day' limit 200
+  loop
+    issues := issues || jsonb_build_array(jsonb_build_object(
+      'kind','future_dated','row_id',r.id,'student',r.student_name,'amount',r.amount_paid,'when',r.created_at,
+      'advice','Recorded with a future date — it will sort above real payments and distort the running balance order.'));
+  end loop;
+
+  -- 5. missing term/session
+  for r in select id, coalesce(student_name,'') as student_name, amount_paid
+             from public.fee_payments
+            where student_id is not null and (coalesce(term,'')='' or coalesce(session,'')='') limit 200
+  loop
+    issues := issues || jsonb_build_array(jsonb_build_object(
+      'kind','no_period','row_id',r.id,'student',r.student_name,'amount',r.amount_paid,
+      'advice','Missing term/session — this row escapes every term filter and every arrears computation. Edit it and set the period (current: '||coalesce(cur.term,'?')||' '||coalesce(cur.session,'?')||').'));
+  end loop;
+
+  -- 6+7. per student+term: overpayment and stale snapshots (recompute simulation)
+  for r in
+    select student_id, coalesce(term,'') as term, coalesce(session,'') as session,
+           max(coalesce(student_name,'')) as student_name,
+           sum(coalesce(amount_paid,0)) as paid,
+           max(coalesce(fee_total,0) + paid_before) as grand_guess
+      from (
+        select fp.*, coalesce((select sum(coalesce(f2.amount_paid,0)) from public.fee_payments f2
+                 where f2.student_id = fp.student_id
+                   and coalesce(f2.term,'') = coalesce(fp.term,'')
+                   and coalesce(f2.session,'') = coalesce(fp.session,'')
+                   and (f2.created_at < fp.created_at or (f2.created_at = fp.created_at and f2.id < fp.id))),0) as paid_before
+          from public.fee_payments fp
+         where fp.student_id is not null
+      ) x
+     group by student_id, coalesce(term,''), coalesce(session,'')
+  loop
+    if r.grand_guess > 0 and r.paid > r.grand_guess then
+      issues := issues || jsonb_build_array(jsonb_build_object(
+        'kind','overpayment','student_id',r.student_id,'student',r.student_name,
+        'term',r.term,'session',r.session,'paid',r.paid,'grand_total',r.grand_guess,'excess',r.paid - r.grand_guess,
+        'advice','Total recorded ('||r.paid||') exceeds the reconstructed bill ('||r.grand_guess||'). Either an amount was typed too high, a payment landed on the wrong student, or the bill itself is missing — review this student''s rows.'));
+    end if;
+    if p_heal then
+      perform public.sc_recompute_fee_rows(r.student_id, r.term, r.session);
+      healed := healed + 1;
+    end if;
+  end loop;
+
+  -- stale snapshots (only reported when NOT healing — heal fixes them all)
+  if not p_heal then
+    for r in
+      select fp.id, coalesce(fp.student_name,'') as student_name, fp.student_id,
+             coalesce(fp.term,'') as term, coalesce(fp.session,'') as session
+        from public.fee_payments fp
+       where fp.student_id is not null and coalesce(fp.fee_total,0) > 0
+         and coalesce(fp.balance,-1) <> greatest(coalesce(fp.fee_total,0) - coalesce(fp.amount_paid,0), 0)
+       limit 200
+    loop
+      issues := issues || jsonb_build_array(jsonb_build_object(
+        'kind','stale_snapshot','row_id',r.id,'student',r.student_name,
+        'advice','Stored balance disagrees with total − paid (pre-V10.8 row or external writer). Run the doctor with Heal to rewrite all snapshots.'));
+    end loop;
+  end if;
+
+  return jsonb_build_object('ok',true,'issues',issues,'issue_count',jsonb_array_length(issues),
+    'healed_terms',case when p_heal then healed else 0 end,
+    'current_term',coalesce(cur.term,''),'current_session',coalesce(cur.session,''));
+end $$;
+revoke execute on function public.sc_fee_ledger_doctor(boolean) from public, anon;
+grant execute on function public.sc_fee_ledger_doctor(boolean) to authenticated;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V10.9b fee-doctor pack installed' as status;
 
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
