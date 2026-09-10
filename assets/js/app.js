@@ -342,6 +342,87 @@ const App = {
     App.currentUserName = name;
     App.currentProfile = profile || {};
     window.SC_PROFILE = Object.assign({ id: user.id, email: user.email }, profile || {}, { role: role, status, full_name: name });
+    /* V10.7 (#6): FEE-DISCIPLINE ACCESS GATE. Students/parents flagged
+       portal_locked by the admin are stopped here with the school's bold
+       message — before any page content loads. Server-side RLS additionally
+       hides report data even from direct REST calls, so this screen is the
+       friendly layer of a two-layer enforcement. Fails open when the RPC is
+       missing (database not yet on v10.7). */
+    if (['student','parent'].includes(App.currentRole)) {
+      try {
+        const gate = await (window.sb || this.sb).rpc('sc_my_access_state');
+        const g = (gate && gate.data) || {};
+        window.SC_ACCESS_STATE = g;
+        if (g && g.portal_locked === true) {
+          document.body.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#fef2f2">' +
+            '<div style="max-width:560px;text-align:center;background:#fff;padding:44px 36px;border-radius:20px;border:3px solid #dc2626;box-shadow:0 24px 60px rgba(153,27,27,.25)">' +
+            '<div style="font-size:3rem">🔒</div>' +
+            '<h1 style="color:#b91c1c;margin:10px 0;font-size:1.5rem;letter-spacing:-.01em">Portal access suspended</h1>' +
+            '<p style="font-size:1.05rem;font-weight:800;color:#7f1d1d;background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:14px 16px;line-height:1.6">' + esc(g.portal_lock_message || 'Access to the school portal has been suspended. Please contact the school bursary to resolve outstanding school fees.') + '</p>' +
+            '<p style="color:#64748b;font-size:.9rem;margin-top:14px">Once the matter is resolved, the school will restore your access immediately — no new account is needed.</p>' +
+            '<div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
+            ((window.SCHOOL && (SCHOOL.phone || SCHOOL.email)) ? '<a class="btn btn-primary" href="' + (SCHOOL.phone ? 'tel:' + esc(SCHOOL.phone) : 'mailto:' + esc(SCHOOL.email)) + '">📞 Contact the school</a>' : '') +
+            '<a class="btn btn-outline" href="login.html" onclick="try{if(window.sb)sb.auth.signOut()}catch(_){}">Sign out</a>' +
+            '</div></div></div>';
+          return;
+        }
+      } catch(_) { /* RPC not installed yet — fail open, RLS still guards report data */ }
+      /* V10.8 (#1): REPORT LOCK NOW BLOCKS THE WHOLE PAGE. V10.7 showed a
+         banner above the page; the user rightly demands that a report-locked
+         family must not see ANYTHING on results/report pages at all. When
+         EVERY linked student is report-locked, the page body is replaced by
+         the bold lock screen (nothing loads underneath — same treatment as
+         the portal lock). When only SOME children are locked (parent with a
+         mixed set), the page stays usable for the unlocked children and each
+         locked child gets the bold per-child notice; RLS keeps the locked
+         children's rows blanked server-side either way. */
+      try {
+        const g2 = window.SC_ACCESS_STATE || {};
+        const kids = g2.students || [];
+        const lockedKids = kids.filter(k => k.report_locked);
+        const page = (location.pathname.split('/').pop() || '').replace('.html','');
+        const reportPages = ['report-cards','results','academic-records','academic_records','transcripts','broadsheet','report_comments'];
+        if (lockedKids.length && reportPages.includes(page)) {
+          if (kids.length && lockedKids.length === kids.length) {
+            // ALL students locked → full-page bold lock screen; nothing renders.
+            document.body.innerHTML =
+              '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#fef2f2">' +
+              '<div style="max-width:560px;text-align:center;background:#fff;padding:44px 36px;border-radius:20px;border:3px solid #dc2626;box-shadow:0 24px 60px rgba(153,27,27,.25)">' +
+              '<div style="font-size:3rem">🔒</div>' +
+              '<h1 style="color:#b91c1c;margin:10px 0;font-size:1.45rem;letter-spacing:-.01em">Report card unavailable</h1>' +
+              '<p style="font-size:1.05rem;font-weight:800;color:#7f1d1d;background:#fee2e2;border:1px solid #fca5a5;border-radius:12px;padding:14px 16px;line-height:1.6">' + esc(lockedKids[0].report_lock_message || 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.') + '</p>' +
+              '<p style="color:#64748b;font-size:.9rem;margin-top:14px">Once the matter is resolved, the school will restore access immediately.</p>' +
+              '<div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
+              ((window.SCHOOL && (SCHOOL.phone || SCHOOL.email)) ? '<a class="btn btn-primary" href="' + (SCHOOL.phone ? 'tel:' + esc(SCHOOL.phone) : 'mailto:' + esc(SCHOOL.email)) + '">📞 Contact the school</a>' : '') +
+              '<a class="btn btn-outline" href="dashboard.html">← Back to dashboard</a>' +
+              '</div></div></div>';
+            return;
+          }
+          // Mixed set: bold per-child notice, page continues for unlocked children.
+          const content = document.querySelector('.app-content');
+          if (content && !document.getElementById('sc-report-lock-banner')) {
+            const div = document.createElement('div');
+            div.id = 'sc-report-lock-banner';
+            div.innerHTML = lockedKids.map(k =>
+              '<div style="background:#fef2f2;border:3px solid #dc2626;border-radius:14px;padding:18px 20px;margin-bottom:14px">' +
+              '<div style="font-size:1.05rem;font-weight:900;color:#b91c1c">🔒 Report card unavailable — ' + esc(k.name || 'student') + '</div>' +
+              '<p style="margin:8px 0 0;font-weight:800;color:#7f1d1d;line-height:1.6">' + esc(k.report_lock_message || 'This report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.') + '</p>' +
+              '</div>').join('');
+            content.insertBefore(div, content.firstChild);
+          }
+        }
+        /* Nav honesty: when every linked student is report-locked, hide the
+           report-page links from the sidebar so the family is not invited
+           into pages that will refuse them. */
+        if (kids.length && lockedKids.length === kids.length) {
+          document.querySelectorAll('.app-nav a').forEach(a => {
+            const href = (a.getAttribute('href') || '').replace('.html','');
+            if (reportPages.includes(href)) a.style.display = 'none';
+          });
+        }
+      } catch(_) {}
+    }
     this.setCachedProfile(window.SC_PROFILE);
     App.applyVisibilityTokens(App.currentRole);
     App.applyRoleDashboard(App.currentRole, { full_name: name, email: user.email, role: App.currentRole });
@@ -1490,6 +1571,15 @@ const App = {
         return r && !r.error ? (r.data || []) : [];
       } catch (_) { return []; }
     };
+    /* V10.7 (#4): module_records fetch that filters by module ON THE SERVER,
+       so a busy school can never push community records out of the window. */
+    const safeModuleRows = async (modules, limit=5) => {
+      if (!supabase) return [];
+      try {
+        const r = await supabase.from('module_records').select('*').in('module', modules).order('created_at',{ascending:false}).limit(limit);
+        return r && !r.error ? (r.data || []) : [];
+      } catch (_) { return []; }
+    };
     try {
       const [studentCount, staffCount, feeRows, announcements, openPolls, events, broadcasts, surveys, lostFound, ptaMeetings, meals, attendanceCount, cbtCount, resultCount, parentCount, complaintCount, hostelRows, announcementCount] = await Promise.all([
         safeCount('students'), safeCount('staff'),
@@ -1497,11 +1587,17 @@ const App = {
         safeRows('announcements', '*', 5),
         safeRows('polls', '*', 5).then(x=>(x||[]).filter(p=>String(p.status||'open')==='open')),
         safeRows('events', '*', 5),
-        safeRows('module_records', '*', 5).then(x=>(x||[]).filter(r=>r.module==='broadcast')),
-        safeRows('module_records', '*', 5).then(x=>(x||[]).filter(r=>r.module==='surveys')),
-        safeRows('module_records', '*', 5).then(x=>(x||[]).filter(r=>r.module==='lost_found')),
-        safeRows('module_records', '*', 5).then(x=>(x||[]).filter(r=>r.module==='parent_meeting')),
-        safeRows('module_records', '*', 5).then(x=>(x||[]).filter(r=>r.module==='cafeteria' || r.module==='menu')),
+        /* V10.7 (#4) ROOT CAUSE of "Lost & Found never shows on the dashboard":
+           these used to fetch the 5 NEWEST module_records of ANY module and
+           filter afterwards — the moment five newer records of other modules
+           existed, the filter returned nothing (same fetch-then-filter bug as
+           the V10.6 notifications fix). Each module now gets its own
+           server-side filtered query, so its 5 newest rows always arrive. */
+        safeModuleRows(['broadcast'], 5),
+        safeModuleRows(['surveys'], 5),
+        safeModuleRows(['lost_found'], 5),
+        safeModuleRows(['parent_meeting'], 5),
+        safeModuleRows(['cafeteria','menu'], 5),
         safeCount('attendance'), safeCount('cbt_exams'), safeCount('results'),
         safeCount('parent_child'), safeCount('complaints'),
         safeRows('hostel_allocations', '*', 4),

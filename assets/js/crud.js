@@ -204,7 +204,9 @@ const CRUD = {
     fees: { table:'fee_payments', title:'Fee payment', help:'V9.4: pick the student and the SYSTEM fills the total due (class fee structure + any previous-term arrears) and computes the balance live as you type the amount paid — no manual maths, no typing errors.', cols:[
       {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,required:true,autofill:{student_name:'full_name'}},
       {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
-      {key:'fee_total',label:'Total due (auto — class fee structure + arrears)',type:'number',readonly:true,help:'Pulled automatically when the student is picked: current-term bill from the Class Fee Structure MINUS what is already paid this term PLUS previous-term arrears. Admin can still adjust after unlock (double-click).'},
+      {key:'fee_total',label:'Total due (auto — class fee structure + arrears)',type:'number',readonly:true,help:'Pulled automatically when the student is picked: current-term bill from the Class Fee Structure MINUS what is already paid this term PLUS previous-term arrears (including any manually-entered opening arrears). Admin can still adjust after unlock (double-click).'},
+      {key:'opening_arrears',label:'Opening arrears — debt from BEFORE School Connect (optional)',type:'number',computeOnly:true,help:'V10.7: for schools that adopted School Connect mid-session. Enter the student\'s outstanding balance from previous terms that were never captured here. Saved ON THE STUDENT RECORD (not this payment) and automatically added to every future total-due, dashboard and receipt until cleared. Enter 0 to clear it.'},
+      {key:'opening_arrears_note',label:'Opening arrears note (e.g. "2nd Term 2025/2026 balance")',type:'text',computeOnly:true,help:'Shown to the family in the fee breakdown so they know exactly what the old debt covers.'},
       {key:'amount_paid',label:'Amount paid now',type:'number',required:true},
       {key:'balance',label:'Remaining balance (computed)',type:'number',readonly:true,help:'Always total due − amount paid. Computed live — never typed.'},
       {key:'method',label:'Method',type:'select',options:['cash','transfer','pos','online']},
@@ -917,7 +919,31 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     // FIX V2.1 — Persistent table: never clear existing rows when filtered result is empty.
     // This resolves issue #1 where parent/student pages flashed data then disappeared.
     // Strategy: keep cached HTML or existing DOM, show informative banner above table.
+    /* V10.9 (#1) ROOT-CAUSE FIX (reported: "deleted/edited fee payments still
+       reflect at the student's portal"): this anti-flash persistence KEPT the
+       cached/existing rows whenever the role-filtered list came back EMPTY —
+       which is exactly the state after the bursar deletes a student's only
+       payment row(s). The student then stared at ghost money rows forever.
+       LEDGER-TRUTH modules (fees, online payments, results, report cards)
+       now always render the fresh database truth once the query has
+       SUCCEEDED and the viewer's identity is resolved: empty means empty,
+       and the stale cache entry is destroyed so it can never resurrect.
+       The anti-flash keep only applies while identity is still resolving. */
     if (!filteredData || !filteredData.length) {
+      const LEDGER_TRUTH = ['fees','payments_online','results','report_cards','finance'];
+      const identityReady = !!(window.App && App._roleResolved) || !!(window.SC_PROFILE && SC_PROFILE.role);
+      if (LEDGER_TRUTH.includes(key) && identityReady) {
+        try { sessionStorage.removeItem(cacheKey); } catch(_) {}
+        const wrapT = tableEl.closest('.table-wrap') || tableEl.parentNode;
+        const oldInfo = wrapT ? wrapT.querySelector('.sc-table-persist-info') : null;
+        if (oldInfo) oldInfo.remove();
+        const emptyMsg = (isParent || isStudent)
+          ? 'ℹ️ No records here right now. If a payment or result was corrected by the school, this list updates instantly — what you see IS the current official record.'
+          : 'No records yet.' + (writable ? ' Click “+ Add new”.' : '');
+        tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '" style="color:var(--gray-500);padding:20px;text-align:center" class="empty-msg">' + emptyMsg + '</td></tr>';
+        try { CRUD.injectTableSearch(moduleId, tableEl, 0); } catch(_) {}
+        return;
+      }
       let cached = null;
       try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch(_) {}
       const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
@@ -992,6 +1018,13 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       '<td><span class="badge" style="background:#fef9c3;color:#a16207" title="Built-in demo preview — load the real sample data from Admin Data to edit">🎬 sample</span></td>' :
       '<td style="white-space:nowrap">' +
         (moduleId === 'students' ? '<a class="btn btn-sm btn-primary" href="student-profile.html?student=' + row.id + '">Dashboard</a> ' : '') +
+        /* V10.7 (#6): one-click fee-discipline locks — admin tier only. 🔓/🔒
+           toggles the whole portal for the student+parents; 🧾 toggles just
+           the report card. Both prompt for the bold message shown to the
+           family. Bulk locking lives in the 🔒 bar above the table. */
+        (moduleId === 'students' && window.App && App.isAdminRole && App.isAdminRole(currentRole) ?
+          '<button class="btn btn-sm ' + (row.portal_locked ? 'btn-primary' : 'btn-outline') + '" style="' + (row.portal_locked ? 'background:#dc2626;border-color:#dc2626' : 'color:#dc2626;border-color:#fca5a5') + '" onclick="CRUD.toggleStudentLock(\'' + row.id + '\',\'portal\',' + (row.portal_locked ? 'false' : 'true') + ',\'' + esc(String(row.full_name||'').replace(/'/g,'')) + '\')" title="' + (row.portal_locked ? 'Portal is LOCKED — click to restore access' : 'Lock this student (and their parents) out of the portal') + '">' + (row.portal_locked ? '🔒 Locked' : '🔓 Lock portal') + '</button> ' +
+          '<button class="btn btn-sm btn-outline" style="' + (row.report_locked ? 'background:#f59e0b;border-color:#f59e0b;color:#fff' : 'color:#b45309;border-color:#fcd34d') + '" onclick="CRUD.toggleStudentLock(\'' + row.id + '\',\'report\',' + (row.report_locked ? 'false' : 'true') + ',\'' + esc(String(row.full_name||'').replace(/'/g,'')) + '\')" title="' + (row.report_locked ? 'Report card is HIDDEN — click to restore' : 'Hide this student\'s report card / results') + '">' + (row.report_locked ? '🧾 Report hidden' : '🧾 Hide report') + '</button> ' : '') +
         (moduleId === 'staff' ? '<a class="btn btn-sm btn-primary" href="teacher-overview.html?staff=' + row.id + '">Teacher overview</a> ' : '') +
         (moduleId === 'parent_child' ? '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'parent_child\',\'' + row.id + '\')">Unlink</button> ' : '') +
         ((moduleId === 'payroll' || moduleId === 'hr') ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printPayslip(\'' + row.id + '\')">Payslip</button> ' : '') +
@@ -1227,7 +1260,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
   /* V7.6 #2: modules where admins routinely need multi-row housekeeping.
      Promotion drafts especially: an auto-promote run creates one row per
      student, so clearing a bad run row-by-row was unusable. */
-  BULK_MODULES: ['promotion','results','attendance','activity_log','admissions','alumni','behaviour','inventory','library','announcements','events','birthdays','visitors','exam_registrations','helpdesk','complaints'],
+  BULK_MODULES: ['students','promotion','results','attendance','activity_log','admissions','alumni','behaviour','inventory','library','announcements','events','birthdays','visitors','exam_registrations','helpdesk','complaints'],
   bulkToggleAll(moduleId, checked) {
     const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
     if (!tableEl) return;
@@ -1251,6 +1284,13 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       bar.className = 'sc-bulk-bar';
       bar.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;margin-bottom:12px';
       bar.innerHTML = '<b class="sc-bulk-count" style="color:#b91c1c"></b>' +
+        /* V10.7 (#6): fee-discipline bulk actions on the Students table. */
+        (this.canonicalId(moduleId) === 'students'
+          ? '<button class="btn btn-sm btn-outline" style="border-color:#dc2626;color:#b91c1c" onclick="CRUD.bulkStudentLock(\'portal\',true)">🔒 Lock portal</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'portal\',false)">🔓 Restore portal</button>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="CRUD.bulkStudentLock(\'report\',true)">🧾 Hide report cards</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'report\',false)">🧾 Restore report cards</button>'
+          : '') +
         '<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#b91c1c" onclick="CRUD.bulkDelete(\'' + moduleId + '\')">🗑 Delete selected</button>' +
         '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',false)">Clear selection</button>';
       wrap.insertBefore(bar, wrap.firstChild);
@@ -1635,11 +1675,37 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
               const bits = ['bill ' + (f.currency||'₦') + Number(f.bill||0).toLocaleString()];
               if (Number(f.paid||0) > 0) bits.push('already paid ' + (f.currency||'₦') + Number(f.paid).toLocaleString());
               if (Number(f.arrears||0) > 0) bits.push('previous terms owing ' + (f.currency||'₦') + Number(f.arrears).toLocaleString());
+              if (Number(f.opening_arrears||0) > 0) bits.push('incl. pre-School-Connect balance ' + (f.currency||'₦') + Number(f.opening_arrears).toLocaleString());
               if (typeof toast === 'function') toast('💰 Total due auto-filled: ' + (f.currency||'₦') + due.toLocaleString() + ' (' + bits.join(' · ') + '). Double-click the field to override.', 'info', 9000);
               const tEl = document.getElementById('cf-' + CRUD.fid('term')), sEl = document.getElementById('cf-' + CRUD.fid('session'));
               if (tEl && !tEl.value && f.term) tEl.value = f.term;
               if (sEl && !sEl.value && f.session) sEl.value = f.session;
             }
+            /* V10.7 (#5): show the student's saved OPENING ARREARS in the form
+               so the bursar can review/correct it; changed values save onto
+               the student record and recompute the live total. */
+            try {
+              const oaEl = document.getElementById('cf-' + CRUD.fid('opening_arrears'));
+              const onEl = document.getElementById('cf-' + CRUD.fid('opening_arrears_note'));
+              if (oaEl || onEl) {
+                const sr = await this.sb.from('students').select('opening_arrears,opening_arrears_note').eq('id', stuId).maybeSingle();
+                if (!sr.error && sr.data) {
+                  if (oaEl && oaEl.value === '') { oaEl.value = Number(sr.data.opening_arrears || 0) || ''; oaEl.dataset.scLoaded = String(Number(sr.data.opening_arrears || 0)); }
+                  if (onEl && !onEl.value) { onEl.value = sr.data.opening_arrears_note || ''; onEl.dataset.scLoaded = sr.data.opening_arrears_note || ''; }
+                }
+                if (oaEl && !oaEl._scWired) { oaEl._scWired = true;
+                  oaEl.addEventListener('input', () => {
+                    const base = Number(totEl.value) || 0;
+                    const was = Number(oaEl.dataset.scLoaded || 0);
+                    const now = Number(oaEl.value) || 0;
+                    /* live preview: adjust total by the CHANGE in opening arrears */
+                    totEl.value = Math.max(0, base - was + now).toFixed(2);
+                    oaEl.dataset.scLoaded = String(now);
+                    recompute();
+                  });
+                }
+              }
+            } catch(_) {}
             /* V10.3 (#4) ROOT-CAUSE FIX: the double-click override used to be
                saved into fee_payments.fee_total but sc_student_fee_state kept
                recomputing the bill from the CLASS fee structure, so the
@@ -1796,6 +1862,26 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         const totEl = document.getElementById('cf-' + this.fid('fee_total'));
         if (totEl && totEl.dataset.scOverridden === '1') payload.total_overridden = true;
       } catch(_) {}
+      /* V10.7 (#5): OPENING ARREARS live on the STUDENT record, not on this
+         payment row — write them there so every future fee lookup, dashboard
+         card and receipt includes the pre-School-Connect balance. Blank =
+         untouched; explicit 0 clears the debt. Self-heals on databases that
+         have not run database/v10.7 (column missing → clear guidance). */
+      try {
+        const oaEl = document.getElementById('cf-' + this.fid('opening_arrears'));
+        const onEl = document.getElementById('cf-' + this.fid('opening_arrears_note'));
+        const stuId = payload.student_id;
+        if (stuId && oaEl && String(oaEl.value).trim() !== '') {
+          const patch = { opening_arrears: Number(oaEl.value) || 0 };
+          if (onEl) patch.opening_arrears_note = onEl.value || '';
+          const ur = await this.sb.from('students').update(patch).eq('id', stuId);
+          if (ur.error && /opening_arrears/.test(ur.error.message || '')) {
+            toast('Opening-arrears needs a one-time database update — admin: run database/v10.7-fee-locks-arrears.sql. The payment itself still saves.', 'warning', 10000);
+          } else if (!ur.error && patch.opening_arrears > 0) {
+            toast('🧾 Opening arrears of ' + patch.opening_arrears.toLocaleString() + ' saved on the student record — it now joins every total-due computation until cleared (enter 0 to clear).', 'info', 9000);
+          }
+        }
+      } catch(_) {}
     }
     // ENTERPRISE FINAL V2 (#8): normalise balance to a number when present
     if (d.table === 'fee_payments' && payload.balance != null) payload.balance = Number(payload.balance) || 0;
@@ -1822,6 +1908,30 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     }
 
 
+    /* V10.9 (#1): PRE-SAVE ENTRY GUARDS for fee payments — catch the classic
+       recording errors BEFORE they enter the ledger:
+         a) zero / negative / non-numeric amount → hard block;
+         b) same student + same amount already recorded TODAY → double-entry
+            confirm (the #1 real-world duplicate: a double-click or a retry
+            after a slow save);
+         c) implausibly large amount (>10× the current bill) → typo confirm. */
+    if (!id && d.table === 'fee_payments') {
+      const amt = Number(payload.amount_paid);
+      if (!isFinite(amt) || amt <= 0) { toast('⛔ Amount paid must be a positive number. To CORRECT an earlier entry, edit or delete that entry instead of adding a negative one — the ledger recomputes itself.', 'warning', 10000); return; }
+      if (payload.student_id) {
+        try {
+          const today = new Date(); today.setHours(0,0,0,0);
+          const dup = await this.sb.from('fee_payments').select('id,amount_paid,created_at').eq('student_id', payload.student_id).eq('amount_paid', amt).gte('created_at', today.toISOString()).limit(3);
+          if (!dup.error && dup.data && dup.data.length) {
+            if (!confirm('⚠️ POSSIBLE DOUBLE ENTRY\n\nA payment of ' + amt.toLocaleString() + ' for this SAME student was already recorded TODAY (' + dup.data.length + ' time' + (dup.data.length>1?'s':'') + ').\n\nRecord it again anyway?')) return;
+          }
+          const tot = Number(payload.fee_total || 0);
+          if (tot > 0 && amt > tot * 10) {
+            if (!confirm('⚠️ UNUSUALLY LARGE AMOUNT\n\nYou are recording ' + amt.toLocaleString() + ' against a bill of ' + tot.toLocaleString() + ' — more than 10× the total due. Is this a typo (extra zero)?\n\nSave anyway?')) return;
+          }
+        } catch(_) {}
+      }
+    }
     // parent_child duplicate guard: show a friendly message instead of Supabase unique constraint error.
     if (!id && d.table === 'parent_child' && payload.parent_id && payload.student_id) {
       const ex = await this.sb.from('parent_child').select('id').eq('parent_id', payload.parent_id).eq('student_id', payload.student_id).maybeSingle().then(r=>r, ()=>({data:null}));
@@ -1859,6 +1969,22 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     }
     if (res.error) { toast(res.error.message, 'danger', 6000); return; }
     if (window.App && App.logActivity) App.logActivity(id ? 'update' : 'create', d.table, id || d.title);
+    /* V10.8 (#2): EDITING a fee payment (wrong amount, wrong student) goes
+       stale on every later row of that student's term. Recompute the whole
+       term ledger after any fee save — inserts included (a backdated entry
+       shifts later snapshots too). The DB trigger mirrors this server-side;
+       calling it here too gives instant feedback + a corrected outstanding
+       figure, and warns clearly on databases missing v10.8. */
+    if (d.table === 'fee_payments' && payload.student_id) {
+      const rr = await this.recomputeFeeLedger(payload.student_id, payload.term, payload.session);
+      if (rr && rr.ok && Number(rr.rows||0) > 0) toast('🧮 Ledger recomputed for the term: ' + rr.rows + ' payment row(s) re-aligned · grand total ' + Number(rr.grand_total||0).toLocaleString() + ' · outstanding ' + Number(rr.outstanding||0).toLocaleString() + '.', 'info', 9000);
+      /* V10.9 (#1): post-save overpayment sentinel — if this entry pushed the
+         term's paid ABOVE the reconstructed bill, tell the bursar right now
+         (wrong amount / wrong student), not at end-of-term reconciliation. */
+      if (rr && rr.ok && Number(rr.grand_total||0) > 0 && Number(rr.paid||0) > Number(rr.grand_total||0)) {
+        toast('⚠️ OVERPAYMENT: this student\'s recorded payments (' + Number(rr.paid).toLocaleString() + ') now EXCEED the term bill (' + Number(rr.grand_total).toLocaleString() + ') by ' + (Number(rr.paid)-Number(rr.grand_total)).toLocaleString() + '. Check for a typo or a payment recorded on the wrong student — the 🩺 Fee Ledger Doctor lists it too.', 'warning', 14000);
+      }
+    }
     try {
       if (!id && window.Notifications && Notifications.create) {
         if (moduleId === 'announcements') {
@@ -2040,6 +2166,67 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     w.document.write('<!DOCTYPE html><html><head><title>E-Receipt</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'">' + css + '</head><body>' + html + '<script>window.onload=function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}});setTimeout(function(){window.print()},2200)};<\/script></body></html>');
     w.document.close(); w.focus();
   },
+  /* =====================================================================
+     V10.7 (#6): FEE-DISCIPLINE LOCKS — one click per student, or bulk on
+     the current selection. Two independent locks:
+       portal → the student AND their parents cannot enter the portal at
+                all (bold message screen + RLS report protection);
+       report → the portal stays open but the report card / results are
+                hidden with a bold message where the card would be.
+     Server enforced (sc_set_student_locks is admin-tier only + RLS), so
+     these buttons can never be spoofed from the console.
+     ===================================================================== */
+  async toggleStudentLock(studentId, kind, lock, name) {
+    if (!this.sb) return;
+    const label = kind === 'portal' ? 'PORTAL ACCESS' : 'REPORT CARD';
+    let message = '';
+    if (lock) {
+      const def = kind === 'portal'
+        ? 'Access to the school portal has been suspended because of outstanding school fees. Please contact the school bursary to resolve this.'
+        : 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.';
+      message = prompt('Lock ' + label + ' for ' + (name || 'this student') + '?\n\nThis BOLD message will be shown to the student/parents (edit it if needed):', def);
+      if (message == null) return;   // cancelled
+    } else if (!confirm('Restore ' + label + ' for ' + (name || 'this student') + '?')) return;
+    const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: [studentId], p_kind: kind, p_locked: lock, p_message: message || '' });
+    if (r.error || !r.data || r.data.ok === false) {
+      const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Lock update failed';
+      if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v10.7-fee-locks-arrears.sql once in Supabase.', 'warning', 12000);
+      else toast(msg, 'danger', 9000);
+      return;
+    }
+    if (window.App && App.logActivity) App.logActivity(lock ? 'lock' : 'unlock', 'students', kind + ':' + (name || studentId));
+    toast(lock
+      ? '🔒 ' + label + ' locked for ' + (name || 'the student') + '. They will see the bold message ' + (kind === 'portal' ? 'at sign-in (parents included), and their report data is server-blocked too.' : 'in place of their report card.')
+      : '🔓 ' + label + ' restored for ' + (name || 'the student') + '.', lock ? 'warning' : 'success', 9000);
+    this.invalidateTableCaches('students');
+    this.renderList('students');
+  },
+  /* Bulk: lock/unlock every currently-selected row on the Students table. */
+  async bulkStudentLock(kind, lock) {
+    const ids = this.bulkSelected('students');
+    if (!ids.length) { toast('Tick at least one student first (use the checkboxes).', 'warning', 6000); return; }
+    const label = kind === 'portal' ? 'PORTAL ACCESS' : 'REPORT CARD';
+    let message = '';
+    if (lock) {
+      const def = kind === 'portal'
+        ? 'Access to the school portal has been suspended because of outstanding school fees. Please contact the school bursary to resolve this.'
+        : 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.';
+      message = prompt('Lock ' + label + ' for ' + ids.length + ' selected student(s)?\n\nThis BOLD message will be shown to each of them (edit it if needed):', def);
+      if (message == null) return;
+    } else if (!confirm('Restore ' + label + ' for ' + ids.length + ' selected student(s)?')) return;
+    const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: ids, p_kind: kind, p_locked: lock, p_message: message || '' });
+    if (r.error || !r.data || r.data.ok === false) {
+      const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Bulk lock failed';
+      if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v10.7-fee-locks-arrears.sql once in Supabase.', 'warning', 12000);
+      else toast(msg, 'danger', 9000);
+      return;
+    }
+    if (window.App && App.logActivity) App.logActivity(lock ? 'bulk-lock' : 'bulk-unlock', 'students', kind + ':' + r.data.updated);
+    toast((lock ? '🔒 Locked ' : '🔓 Restored ') + r.data.updated + ' student(s) — ' + label + '.', lock ? 'warning' : 'success', 9000);
+    this.invalidateTableCaches('students');
+    this.renderList('students');
+  },
+
   async remove(moduleId, id) {
     const d = this.def(moduleId);
     if (!this.canWrite(moduleId)) { toast('Read-only for your role on this page.', 'warning', 5000); return; }
@@ -2081,11 +2268,44 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       return;
     }
     if (!confirm('Delete this ' + d.title.toLowerCase() + '?')) return;
+    /* V10.8 (#2): deleting a FEE PAYMENT must heal the student's whole term
+       ledger (later rows snapshot totals/balances that go stale). Capture the
+       row context BEFORE the delete, then call the recompute RPC afterwards —
+       the DB trigger does this too, but the explicit call also works on
+       databases that have not run v10.8, degrades with clear guidance, and
+       lets us show the corrected outstanding figure in the toast. */
+    let feeCtx = null;
+    if (d.table === 'fee_payments') {
+      try { const fr = await this.sb.from('fee_payments').select('student_id,term,session,amount_paid,student_name').eq('id', id).maybeSingle(); feeCtx = fr.data || null; } catch(_) {}
+      if (feeCtx && !confirm('Delete this payment of ' + Number(feeCtx.amount_paid||0).toLocaleString() + (feeCtx.student_name ? ' for ' + feeCtx.student_name : '') + '?\n\nThe platform will automatically RECOMPUTE every remaining payment row for this student\'s term — totals, balances, receipts and the family dashboard all adjust instantly.')) return;
+    }
     const { data:deleted,error } = await this.sb.from(d.table).delete().eq('id', id).select('id');
     if (error) { toast(error.message, 'danger'); return; }if(!deleted||!deleted.length){toast('Nothing was deleted. You may not own this subject/class record.','danger',7000);return;}
     this.invalidateTableCaches(moduleId);
     if(window.App&&App.logActivity)App.logActivity('delete',d.table,id);
+    if (feeCtx && feeCtx.student_id) {
+      const rr = await this.recomputeFeeLedger(feeCtx.student_id, feeCtx.term, feeCtx.session);
+      toast('🧾 Payment deleted' + (rr && rr.ok ? ' — ledger recomputed: ' + Number(rr.rows||0) + ' row(s) adjusted, outstanding now ' + Number(rr.outstanding||0).toLocaleString() + '.' : ' — ledger recompute pending (see warning).'), 'success', 9000);
+      await this.renderList(moduleId);
+      return;
+    }
     toast('Deleted permanently and verified.','success');await this.renderList(moduleId);
+  },
+
+  /* V10.8 (#2): recompute a student's fee snapshots for one term. Server-side
+     RPC preferred (atomic, matches the DB trigger); clear guidance if the
+     database has not run v10.8 yet. */
+  async recomputeFeeLedger(studentId, term, session) {
+    if (!this.sb || !studentId) return null;
+    try {
+      const r = await this.sb.rpc('sc_recompute_fee_rows', { p_student: studentId, p_term: term || '', p_session: session || '' });
+      if (r.error) {
+        if (/sc_recompute_fee_rows|schema cache|function/i.test(String(r.error.message||''))) toast('Ledger self-healing needs a one-time database update — admin: run database/v10.8-fee-recompute.sql in Supabase. Until then, re-check this student\'s other payment rows manually.', 'warning', 12000);
+        else toast(r.error.message, 'warning', 8000);
+        return null;
+      }
+      return r.data || null;
+    } catch(_) { return null; }
   },
 
   /* Issue 10: bulk-import student birthdays from the students table */

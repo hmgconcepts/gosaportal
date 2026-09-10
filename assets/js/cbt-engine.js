@@ -455,13 +455,14 @@ const CBT = {
     const basic=['7','8','9','÷','4','5','6','×','1','2','3','−','0','.','⌫','+'];
     const sci1=['sin','cos','tan','π','√','asin','acos','atan','e','xʸ'];
     const sci2=['x²','x³','ln','log','10ˣ','eˣ','1/x','x!','|x|','mod'];
+    const sci3=['sinh','cosh','tanh','ⁿ√','EXP','g','c','Nₐ','R','h'];
     const mem=['MC','MR','M+','M−','Ans','(' ,')','%',st.deg?'DEG':'RAD','C'];
     const btn=(b,extra)=>'<button onclick="CBT.calcInput(\''+b.replace(/'/g,"\\'")+'\')" style="padding:9px 4px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:13px;font-weight:700;cursor:pointer'+(extra||'')+'">'+b+'</button>';
     calc.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong>🧮 Calculator</strong><span><button onclick="CBT.toggleCalcMode()" class="btn btn-sm btn-outline">'+(st.mode==='basic'?'Basic ▸ Sci':'Scientific')+'</button> <button onclick="document.getElementById(\'cbt-calculator\').remove()" class="btn btn-sm btn-outline">×</button></span></div>'+
       '<input id="calc-display" value="'+String(st.display||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:22px;padding:10px;text-align:right;margin-bottom:4px;border:1px solid #cbd5e1;border-radius:8px" inputmode="none">'+
       '<div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:8px"><span>'+(st.deg?'DEG':'RAD')+' · M='+(st.memory||0)+'</span><span>Ans='+(st.ans!=null?st.ans:'—')+'</span></div>'+
       (st.mode==='scientific'
-        ? '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci1.map(b=>btn(b)).join('')+'</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci2.map(b=>btn(b)).join('')+'</div>'
+        ? '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci1.map(b=>btn(b)).join('')+'</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci2.map(b=>btn(b)).join('')+'</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci3.map(b=>btn(b)).join('')+'</div>'
         : '')+
       '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+mem.map(b=>btn(b)).join('')+'</div>'+
       '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">'+basic.map(b=>btn(b)).join('')+'</div>'+
@@ -490,6 +491,14 @@ const CBT = {
     else if(v==='x!')d.value+='!';
     else if(v==='|x|')d.value='abs('+(d.value||'0')+')';
     else if(v==='mod')d.value+=' mod ';
+    else if(v==='sinh'||v==='cosh'||v==='tanh')d.value+=v+'(';
+    else if(v==='ⁿ√')d.value+='^(1/';
+    else if(v==='EXP')d.value+='E';
+    else if(v==='g')d.value+='(9.80665)';
+    else if(v==='c')d.value+='(299792458)';
+    else if(v==='Nₐ')d.value+='(6.02214076E23)';
+    else if(v==='R')d.value+='(8.314462618)';
+    else if(v==='h')d.value+='(6.62607015E-34)';
     else if(v==='−')d.value+='-';
     else d.value+=v;
     st.display=d.value;
@@ -501,7 +510,7 @@ const CBT = {
       let s=String(expr||'').replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/π/g,'('+Math.PI+')').replace(/\be\b/g,'('+Math.E+')').replace(/√/g,'sqrt').replace(/\bmod\b/gi,'%').replace(/(\d+(?:\.\d+)?)%(?!\d)/g,'($1/100)');
       const deg=this.calcState.deg!==false;
       const toRad=x=>deg?x*Math.PI/180:x, fromRad=x=>deg?x*180/Math.PI:x;
-      const F={sin:x=>Math.sin(toRad(x)),cos:x=>Math.cos(toRad(x)),tan:x=>Math.tan(toRad(x)),asin:x=>fromRad(Math.asin(x)),acos:x=>fromRad(Math.acos(x)),atan:x=>fromRad(Math.atan(x)),ln:x=>Math.log(x),log:x=>Math.log10(x),sqrt:x=>Math.sqrt(x),abs:x=>Math.abs(x)};
+      const F={sin:x=>Math.sin(toRad(x)),cos:x=>Math.cos(toRad(x)),tan:x=>Math.tan(toRad(x)),asin:x=>fromRad(Math.asin(x)),acos:x=>fromRad(Math.acos(x)),atan:x=>fromRad(Math.atan(x)),sinh:x=>Math.sinh(x),cosh:x=>Math.cosh(x),tanh:x=>Math.tanh(x),ln:x=>Math.log(x),log:x=>Math.log10(x),sqrt:x=>Math.sqrt(x),cbrt:x=>Math.cbrt(x),abs:x=>Math.abs(x)};
       const fact=n=>{if(n<0||n!==Math.floor(n)||n>170)return NaN;let r=1;for(let i=2;i<=n;i++)r*=i;return r;};
       const toks=[];let i=0;
       while(i<s.length){const c=s[i];
@@ -574,7 +583,10 @@ const CBT = {
       ['Algebra & calculus',['ƒ','∫','∂','∞','∑','∏','!','|x|','→','⇒','⇌','∴','∵']],
       ['Set & logic',['∈','∉','⊂','⊆','∪','∩','∅','∧','∨','¬']],
       ['Geometry',['°','∠','⊥','∥','≅','~','△','□','⊙']],
-      ['Science',['·','⁺','⁻','₀','₁','₂','₃','₄','ₓ','℃','℉','Å','µ']]
+      ['Science',['·','⁺','⁻','₀','₁','₂','₃','₄','ₓ','℃','℉','Å','µ']],
+      ['Functions',['sin','cos','tan','log','ln','exp','lim','f(x)','√(',')²','mod']],
+      ['Vectors & more',['→','←','↑','↓','↔','⇌','⇒','⇔','∇','∮','∝','∦','‖','∗','⊕','⊗']],
+      ['Statistics',['x̄','σ','σ²','μ','Σx','n!','ⁿCᵣ','ⁿPᵣ','P(A)','χ²','±']]
     ];
     kb.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><strong>⌨️ Math Keyboard</strong><button onclick="document.getElementById(\'cbt-math-keyboard\').remove()" style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;width:28px;height:28px;cursor:pointer">×</button></div>'+
       '<p style="font-size:12px;color:#64748b;margin:6px 0">Tap inside an answer box, then tap symbols — they insert at the cursor.</p>'+
