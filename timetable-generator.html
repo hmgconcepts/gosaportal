@@ -630,7 +630,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div id="tb-list" style="margin-top:10px"></div>
       </div>
       <div id="tt-reqs"></div>
-      <div class="card" style="margin-bottom:16px" data-staff-only><h3>⚙️ Step 4 · Validate and generate the WHOLE school</h3><p class="help">One click builds every ticked class's grid + the combined master timetable + every teacher's personal timetable. Click again any time for a different random arrangement — nothing is final until you print.</p><div id="tt-summary" class="notice">Tick classes and add subject demand first.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="TTG.validate()">✅ Validate demand</button><button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate / regenerate timetable</button><button class="btn btn-outline" onclick="TTG.printGrid()">🖨️ Print timetable</button><button class="btn btn-outline" onclick="TTG.clearGenerated()">Clear generated timetable</button></div></div>
+      <div class="card" style="margin-bottom:16px" data-staff-only><h3>⚙️ Step 4 · Validate and generate the WHOLE school</h3><p class="help">One click builds every ticked class's grid + the combined master timetable + every teacher's personal timetable. Click again any time for a different random arrangement — nothing is final until you print.</p><div id="tt-summary" class="notice">Tick classes and add subject demand first.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="TTG.validate()">✅ Validate demand</button><button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="TTG.analyze()">🩻 Overload Analyzer</button><button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate / regenerate timetable</button><button class="btn btn-outline" onclick="TTG.printGrid()">🖨️ Print timetable</button><button class="btn btn-outline" onclick="TTG.clearGenerated()">Clear generated timetable</button></div></div>
       <div id="tt-grid"></div>
       <div id="tt-master" style="margin-top:16px"></div>
       <div id="tt-teachers" style="margin-top:16px"></div>
@@ -707,15 +707,40 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     /* V8.0 #2: subject → mapped teacher lookup (from the Subjects module). */
     this.subjectTeachers={};this.subjectClasses={};(su.data||[]).forEach(s=>{if(s.name){this.subjectTeachers[s.name]=s.teacher||'';if(Array.isArray(s.classes)&&s.classes.length)this.subjectClasses[s.name]=s.classes;}});
     this.lookups.classes=cl.data||[];this.lookups.subjects=su.data||[];this.lookups.teachers=st.data||[];this.lookups.terms=[...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value),...(ap.data||[]).map(x=>x.term)];this.lookups.sessions=[...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value),...(ap.data||[]).map(x=>x.session)];this.fill('tt-class',this.lookups.classes,'choose class');try{const tb=document.getElementById('tb-class');if(tb){(this.lookups.classes||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name||c;o.textContent=c.name||c;tb.appendChild(o);});}this.fillMulticlass();this.listBlocks();this.fillGroupSubjects();}catch(_){}this.fill('tt-subject',this.lookups.subjects,'choose subject');this.fill('tt-teacher',this.lookups.teachers,'choose teacher','full_name');this.fill('tt-term',this.lookups.terms,'choose term','');this.fill('tt-session',this.lookups.sessions,'choose session','');const current=(ap.data||[]).find(x=>x.is_current);if(current){document.getElementById('tt-term').value=current.term||'';document.getElementById('tt-session').value=current.session||'';}const rowsCfg=(cfg.data||[]).filter(x=>x.label!=='__daycounts__'&&Number(x.period_no)!==0);
-    if(rowsCfg.length){PC.rows=rowsCfg.map(x=>({period_no:Number(x.period_no),label:x.label,start_time:x.start_time,end_time:x.end_time,is_break:x.is_break}));document.getElementById('pc-count').value=PC.rows.filter(x=>!x.is_break).length;PC.preview();toast('📥 Saved school-day schedule loaded — continue where you stopped.','info',4500);}else PC.build();
+    if(rowsCfg.length){PC.rows=rowsCfg.map(x=>({period_no:Number(x.period_no),label:x.label,start_time:x.start_time,end_time:x.end_time,is_break:x.is_break}));document.getElementById('pc-count').value=PC.rows.filter(x=>!x.is_break).length;PC.preview();}else PC.build();
     /* V8.0 #3: restore per-day period counts from the carrier row. */
     try{const carrier=(cfg.data||[]).find(x=>x.label==='__daycounts__');if(carrier){if(carrier.start_time){const counts=JSON.parse(carrier.start_time);Object.entries(counts).forEach(([d,n])=>{const inp=document.querySelector('.pc-day-count[data-day="'+d+'"]');if(inp)inp.value=n;});}if(carrier.end_time){try{const lens=JSON.parse(carrier.end_time);Object.entries(lens).forEach(([d,n])=>{const inp=document.querySelector('.pc-day-len[data-day="'+d+'"]');if(inp)inp.value=n;});}catch(_){}}}}catch(_){}
     this.refreshPpdInfo();
     /* V8.0 #4: class TICK-LIST for whole-school builds. */
     try{const host=document.getElementById('tt-classes');if(host){host.innerHTML=(this.lookups.classes||[]).map(c=>{const n=c.name||c;return '<label><input type="checkbox" class="tt-cls" value="'+esc(n)+'" onchange="TTG.classesTicked()"> '+esc(n)+'</label>';}).join('');}}catch(_){}
+    /* V11.0 (#1) ROOT-CAUSE FIX of "it says continue where you stopped but
+       nothing was restored": Step 1's schedule WAS restored (it lives in
+       timetable_config), but the WORKING STATE — which classes were ticked,
+       the term/session, part-time day/period selections — lived nowhere, so
+       Steps 2–4 always came back blank and the toast over-promised.
+       The whole wizard state is now SNAPSHOTTED to localStorage on every
+       change (per school, survives reloads/sign-outs on this device) and
+       restored here; the demand rows and blocks were always in the DB, so
+       restoring the tick-list + context brings the full session back. */
+    let resumed=false;
+    try{
+      const snap=JSON.parse(localStorage.getItem(this.stateKey())||'null');
+      if(snap&&snap.classes&&snap.classes.length){
+        [...document.querySelectorAll('.tt-cls')].forEach(cb=>{cb.checked=snap.classes.includes(cb.value);});
+        if(snap.term)document.getElementById('tt-term').value=snap.term;
+        if(snap.session)document.getElementById('tt-session').value=snap.session;
+        await this.contextChanged();
+        resumed=true;
+      }
+    }catch(_){}
+    if(resumed)toast('📥 Session restored — your ticked classes, term/session and saved demand are exactly where you stopped. Continue from Step 3 or generate.','success',7000);
+    else if(rowsCfg.length)toast('📥 Saved school-day schedule loaded. Tick your classes (Step 2) to continue — every subject demand you saved earlier is still in the database.','info',6000);
     this.updateChecklist();},
+  /* V11.0 (#1): wizard working-state snapshot (per school, per device). */
+  stateKey(){return 'sc-ttg-state-'+(((window.SCHOOL||{}).shortName)||'school');},
+  saveState(){try{localStorage.setItem(this.stateKey(),JSON.stringify({classes:this.tickedClasses(),term:this.val('tt-term'),session:this.val('tt-session'),at:Date.now()}));}catch(_){}},
   tickAllClasses(on){[...document.querySelectorAll('.tt-cls')].forEach(c=>{c.checked=!!on;});this.classesTicked();},
-  classesTicked(){this.contextChanged();},
+  classesTicked(){this.saveState();this.contextChanged();},
   tickedClasses(){return [...document.querySelectorAll('.tt-cls:checked')].map(x=>x.value);},
   /* V8.0 #2: picking a subject reveals its MAPPED teacher automatically. */
   fillGroupSubjects(){try{const host=document.getElementById('tt-group-subjects');if(!host)return;host.innerHTML=(this.lookups.subjects||[]).map(s=>{const n=s.name||s;return '<label><input type="checkbox" class="tt-gs" value="'+esc(n)+'" onchange="TTG.groupSubjectsChanged()"> '+esc(n)+'</label>';}).join('');}catch(_){}},
@@ -820,7 +845,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     const dc=this.collectDayCounts()||{};let capacity=0;['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach(day=>{capacity+=Math.min(12,Math.max(0,Number(dc[day]!=null?dc[day]:(teaching||6))||0));});if(host)host.innerHTML='<b>Setup status:</b> '+(PC.rows.length?'✅ Day schedule':'❌ Day schedule')+' · '+(c.class&&c.term&&c.session?'✅ Context selected':'❌ Pick class/term/session')+' · '+(req?'✅ '+req+' subject demand(s)':'❌ Add subjects')+' · Requested '+total+' / capacity '+capacity;const sum=document.getElementById('tt-summary');if(sum)sum.innerHTML='<b>'+esc(c.class||'No class selected')+'</b> · '+esc(c.term||'No term')+' · '+esc(c.session||'No session')+' · '+req+' subjects · '+total+' requested periods · '+capacity+' weekly slots'+(total>capacity?' <b style="color:#dc2626">OVER CAPACITY</b>':'');},
   /* V8.1 #6: changing context/classes ONLY refreshes lists — timetables are
      built exclusively by the Step-4 Generate button, never as a side effect. */
-  async contextChanged(){this.fillMulticlass();this.refreshPpdInfo();const first=this.tickedClasses()[0]||'';const sel=document.getElementById('tt-class');if(sel)sel.value=first;if(first)await Promise.all([this.loadReqs(first),this.listBlocks()]);else{this.reqs=[];document.getElementById('tt-reqs').innerHTML='';}this.updateChecklist();},
+  async contextChanged(){this.saveState();this.fillMulticlass();this.refreshPpdInfo();const first=this.tickedClasses()[0]||'';const sel=document.getElementById('tt-class');if(sel)sel.value=first;if(first)await Promise.all([this.loadReqs(first),this.listBlocks()]);else{this.reqs=[];document.getElementById('tt-reqs').innerHTML='';}this.updateChecklist();},
   /* V8.1 #5/#6: Step-3 class list = the Step-2 ticked classes, ALL PRE-TICKED
      and fully editable (untick the classes that don't take this subject). */
   fillMulticlass(){const host=document.getElementById('tt-multiclass');if(!host)return;const ticked=this.tickedClasses();
@@ -922,6 +947,33 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     if(r.error){toast(r.error.message,'danger');return;}
     toast('🧹 All demand rows for '+cls+' removed. Add your real subjects now.','success');await this.loadReqs(cls);},
   async removeReq(id){if(!confirm('Remove this subject demand?'))return;const r=await Enterprise.timetable.removeRequirement(id);if(r.error){toast(r.error.message||r.error,'danger');return;}await this.loadReqs(this.context().class);},
+  /* ===== V11.0 (#4): 🩻 OVERLOAD ANALYZER =====
+     Feasibility X-ray BEFORE generation: per-class demand vs capacity per
+     day, restricted windows too small for their demand, and teachers booked
+     beyond what one body can teach across the ticked classes — each finding
+     names the exact day/period/teacher to adjust. */
+  async analyze(){
+    const c=this.context();const classes=this.tickedClasses().length?this.tickedClasses():(c.class?[c.class]:[]);
+    if(!classes.length){toast('Tick at least one class first.','warning');return;}
+    const dayCounts=this.collectDayCounts();
+    const r=await sb.rpc('sc_timetable_capacity',{p_classes:classes,p_periods_per_day:Number(c.ppd)||6,p_day_periods:dayCounts});
+    if(r.error||!r.data||r.data.ok===false){
+      const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Analyzer failed';
+      if(/sc_timetable_capacity|schema cache|function/i.test(String(msg)))toast('The Overload Analyzer needs a one-time database update — run database/v11.0-timetable-pro.sql in Supabase.','warning',12000);
+      else toast(msg,'danger',9000);
+      return;
+    }
+    const d=r.data;const f=d.findings||[];
+    const KIND={over_capacity:['🧱 Class over capacity','#dc2626'],window_too_small:['🪟 Restricted window too small','#ea580c'],teacher_overloaded:['🧑‍🏫 Teacher booked beyond one body','#7c3aed']};
+    const classRows=(d.classes||[]).map(x=>'<tr><td><b>'+esc(x.class)+'</b></td><td>'+x.demand+'</td><td>'+x.capacity+'</td><td style="font-weight:800;color:'+(x.surplus<0?'#b91c1c':'#166534')+'">'+(x.surplus>=0?'+':'')+x.surplus+'</td><td style="font-size:.78rem">'+(x.days||[]).map(dd=>dd.day.slice(0,3)+' '+dd.usable+(dd.blocked?('('+dd.blocked+'⛔)'):'')).join(' · ')+'</td></tr>').join('');
+    openModal('🩻 Overload Analyzer — '+classes.length+' class(es)',
+      '<div class="table-wrap"><table><thead><tr><th>Class</th><th>Demand</th><th>Usable slots</th><th>Surplus</th><th>Per day</th></tr></thead><tbody>'+classRows+'</tbody></table></div>'+
+      (f.length?'<h4 style="margin:12px 0 4px">'+f.length+' overload finding(s) — fix these BEFORE generating:</h4>'+f.map(x=>{const k=KIND[x.kind]||['❓ '+x.kind,'#334155'];return '<div style="border-left:4px solid '+k[1]+';background:#f8fafc;border-radius:8px;padding:8px 12px;margin:6px 0"><b style="color:'+k[1]+'">'+k[0]+'</b><div style="font-size:.86rem;margin-top:3px;line-height:1.6">'+esc(x.advice||'')+'</div></div>';}).join('')
+        :'<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px 14px;color:#166534;font-weight:700;margin-top:10px">✅ No overloads detected — every class fits, every restricted window is big enough, and no teacher is double-booked beyond capacity. Generate with confidence.</div>')+
+      '<p style="font-size:.8rem;color:var(--gray-500);margin-top:8px">Levers: add periods to a light day (Step 1 per-day counts) · unblock reserved slots · widen a subject\'s allowed periods/days · reduce periods/week · split a subject between two teachers.</p>',
+      '<button class="btn btn-primary" onclick="closeModal()">Adjust & re-check</button>');
+    if(window.App&&App.logActivity)App.logActivity('analyze','timetable',classes.join(','));
+  },
   validate(){const c=this.context(),total=this.reqs.reduce((a,x)=>a+Number(x.periods_per_week||0),0),missing=this.reqs.filter(x=>!x.teacher);
     /* V9.5 (BUG C): capacity now respects per-day period COUNTS (short
        Fridays etc.) instead of assuming 5 uniform days. */
@@ -940,14 +992,14 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
          run an OLDER engine than this page. The v9.4+ engine returns
          engine:'9.5'; anything else means the school never ran the latest SQL
          and doubles/ghost-guards silently didn't apply. Detect and SAY it. */
-      if(data.engine!=='9.5')engineStale=true;
+      if(data.engine!=='11')engineStale=true; /* V11: repair-swap + restricted-first engine */
       totPlaced+=Number(data.placed||0);totUnplaced+=Number(data.unplaced||0);
       (data.unplaced_items||[]).forEach(x=>problems.push(cls+': '+x.subject+' — '+(x.teacher||'')+' ('+x.reason+')'));
     }
     if(engineStale)openModal('⚠️ Database engine is OUTDATED',
       '<p>The timetable was generated by an <b>older database engine</b> — that is exactly why double periods can be missing and why stale subjects can slip in.</p>'+
-      '<p><b>Fix (one time, 2 minutes):</b> run <code>database/v9.4-fees-and-exams.sql</code> (or the full <code>complete-schema.sql</code>) in the Supabase SQL Editor, then click Generate again.</p>'+
-      '<p style="font-size:.85rem;color:var(--gray-600)">The modern engine places ALL double periods first (two-phase), enforces part-time teacher periods, and only ever places subjects you added for each class.</p>',
+      '<p><b>Fix (one time, 2 minutes):</b> run <code>database/v11.0-timetable-pro.sql</code> (or the full <code>complete-schema.sql</code>) in the Supabase SQL Editor, then click Generate again.</p>'+
+      '<p style="font-size:.85rem;color:var(--gray-600)">The V11 engine places restricted-period subjects FIRST (fair across classes), then doubles, then singles — and finishes with a repair-swap pass that fills the dead-end slots older engines left empty.</p>',
       '<button class="btn btn-primary" onclick="closeModal()">OK — I will run the SQL</button>');
     /* V9.5 (BUG D): post-generation RECONCILIATION — verify the grid matches
        the demand for every class; surface ghosts + missing doubles with fixes. */

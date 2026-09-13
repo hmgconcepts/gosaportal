@@ -702,10 +702,20 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           }
           /* V10.9 (#2): report-locked children are REMOVED from the parent's
              picker entirely and replaced by the bold lock notice — a parent
-             cannot even attempt to open a locked child's card. */
+             cannot even attempt to open a locked child's card.
+             V11.0 (#9) ROOT-CAUSE FIX: this used to read window.SC_ACCESS_STATE,
+             which app.js sets ASYNCHRONOUSLY — on a fast page load this panel
+             rendered BEFORE the RPC resolved, so the locked child appeared in
+             the picker anyway (the reported bug; RLS still blanked the data,
+             but the page looked accessible). The page now fetches the access
+             state ITSELF and awaits it — no race, no leak. */
           let lockNotices = '';
           try {
-            const g = window.SC_ACCESS_STATE || {};
+            let g = window.SC_ACCESS_STATE;
+            if (!g || !Array.isArray(g.students)) {
+              try { const ar = await window.sb.rpc('sc_my_access_state'); g = (ar && ar.data) || {}; window.SC_ACCESS_STATE = g; }
+              catch(_) { g = g || {}; }
+            }
             const lockedNames = (g.students || []).filter(k => k.report_locked);
             if (lockedNames.length) {
               const lockedSet = new Set(lockedNames.map(k => String(k.name || '').toLowerCase()));
@@ -1164,7 +1174,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
            with the school's BOLD message before any data is fetched (RLS
            blanks the rows server-side anyway — this is the honest UI). */
         try {
-          const g = window.SC_ACCESS_STATE || {};
+          /* V11.0 (#9): await the access state here too — never trust the
+             async global to have resolved before a fast click. */
+          let g = window.SC_ACCESS_STATE;
+          if (!g || !Array.isArray(g.students)) {
+            try { const ar = await window.sb.rpc('sc_my_access_state'); g = (ar && ar.data) || {}; window.SC_ACCESS_STATE = g; }
+            catch(_) { g = g || {}; }
+          }
           const lk = (g.students || []).find(k => k.report_locked && String(k.name || '').toLowerCase() === String(name || '').toLowerCase());
           if (lk) {
             const out = document.getElementById('rc-output') || document.getElementById('rc-out') || null;
