@@ -164,11 +164,23 @@ const MM = {
       } catch(_){}
     };
     fill('mm-class','classes','name');
-    try { const { data } = await sb.from('school_settings').select('*').eq('id',1).maybeSingle();
-      const terms = (data && data.terms) || ['First Term','Second Term','Third Term'];
-      const sessions = (data && data.sessions) || [];
-      (Array.isArray(terms)?terms:[]).forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-term').appendChild(o);});
-      (Array.isArray(sessions)?sessions:[]).forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-session').appendChild(o);});
+    /* V11.0 (#6) ROOT CAUSE of the empty Session dropdown: this page read
+       school_settings.sessions — a column that does not exist. Sessions (and
+       terms) actually live in the `lookups` table and `academic_periods`,
+       exactly as every other page loads them. Now sourced from BOTH, deduped,
+       with the CURRENT academic period preselected. */
+    try {
+      const [lo, ap] = await Promise.all([
+        sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'),
+        sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false})
+      ]);
+      const dedupe = a => { const seen=new Set(); return a.filter(v=>{const k=String(v||'').trim().toLowerCase(); if(!v||seen.has(k))return false; seen.add(k); return true;}); };
+      const terms = dedupe([...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value), ...(ap.data||[]).map(x=>x.term)]);
+      const sessions = dedupe([...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value), ...(ap.data||[]).map(x=>x.session)]);
+      (terms.length?terms:['First Term','Second Term','Third Term']).forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-term').appendChild(o);});
+      sessions.forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-session').appendChild(o);});
+      const cur=(ap.data||[]).find(x=>x.is_current);
+      if(cur){ if(cur.term)document.getElementById('mm-term').value=cur.term; if(cur.session)document.getElementById('mm-session').value=cur.session; }
     } catch(_){
       ['First Term','Second Term','Third Term'].forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-term').appendChild(o);});
     }

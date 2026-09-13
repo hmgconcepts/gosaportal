@@ -52,6 +52,22 @@
       · Back to subscription later: issue a normal key with a new expiry.
     </div>
     <div id="lic-monitor" style="margin-bottom:10px"></div>
+    <!-- V11.0 (#7): HMG-SIDE FLEET MONITORING + PAUSE-PROOF GUARANTEE.
+         One copyable block that tells the HMG representative everything
+         needed to monitor a client from OUTSIDE the portal, plus the
+         written guarantee that an expired subscription can never lose its
+         database to the Supabase 7-day pause. -->
+    <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:10px">
+      <h4 style="margin-top:0">📡 HMG fleet monitoring — how to watch this school from outside</h4>
+      <ol style="margin:4px 0 8px 18px;font-size:.85rem;line-height:1.8;color:var(--gray-700)">
+        <li><b>Server verdict URL (no sign-in needed):</b> <code id="lic-verdict-url" style="word-break:break-all"></code>
+          <button class="btn btn-sm btn-outline" onclick="(function(){var t=document.getElementById('lic-verdict-url').textContent;navigator.clipboard&&navigator.clipboard.writeText(t);toast('Verdict URL copied — bookmark it or add it to UptimeRobot.','success');})()">📋 Copy</button><br>
+          <small style="color:var(--gray-500)">Returns the live subscription state (<code>active / grace / expired</code>, expiry date, days over). Add it to UptimeRobot with a keyword alert on <code>expired</code> and HMG gets an email the day any client lapses — no portal login, no database access.</small></li>
+        <li><b>Renew from anywhere:</b> generate a key with the recipes above and send it on WhatsApp — the school pastes it here. No Supabase access needed on either side.</li>
+        <li><b>⏸️ Pause-proof guarantee:</b> an EXPIRED subscription never loses data. Three independent keep-alive layers continue while locked: the GitHub-Actions workflow (client-independent), the locked page itself (pings on every visit, once/day), and the Vercel keep-alive endpoint. The school's Supabase stays awake until they renew — whenever that is.</li>
+      </ol>
+    </div>
+    <script>document.addEventListener('DOMContentLoaded',function(){try{var u=(window.SUPABASE_URL||(window.SCHOOL&&SCHOOL.supabaseUrl)||'').replace(/\/$/,'');var k=window.SUPABASE_ANON_KEY||'';var el=document.getElementById('lic-verdict-url');if(el)el.textContent=u?(u+'/rest/v1/rpc/sc_license_status?apikey='+(k?k.slice(0,12)+'…(anon key)':'ANON_KEY')):'(configure Supabase in config.js first)';}catch(_){}});</script>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
       <div class="form-group" style="flex:1;min-width:260px"><label>Activation key</label><input id="lic-key" class="form-input" placeholder="SC1.eyJleHBpcmVzX29uIjoi….3fb2…"></div>
       <button class="btn btn-primary" onclick="applyActivationKey()">✅ Apply key</button>
