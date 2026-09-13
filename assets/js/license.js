@@ -264,6 +264,25 @@
         sh = ensureHost();
         var inner = '';
         if (r.state === 'expired' || r.state === 'suspended') inner = lockHtml(res);
+        /* V11.0 (#7): RENEWAL-SAFE KEEP-ALIVE. The subscription lock must
+           NEVER let the school's free Supabase pause from 7-day inactivity —
+           the data has to survive until the school renews. Every visit to
+           the locked portal still fires the keep-alive heartbeat (the lock
+           screen is shown BEFORE app.js's daily ping can run, so we ping
+           here explicitly, throttled to once per day per device). The
+           GitHub-Actions keep-alive workflow is client-independent and keeps
+           running regardless — this is the second, in-browser layer. */
+        if ((r.state === 'expired' || r.state === 'suspended') && window.sb) {
+          try {
+            var kaKey = 'sc-keepalive-at';
+            var kaLast = +(localStorage.getItem(kaKey) || 0);
+            if (Date.now() - kaLast > 24*60*60*1000) {
+              window.sb.rpc('sc_keep_alive', { src: 'locked-portal' }).then(function (kr) {
+                if (!kr.error) localStorage.setItem(kaKey, String(Date.now()));
+              }).catch(function(){});
+            }
+          } catch (e) {}
+        }
         else if (r.state === 'grace' || r.state === 'warning' || (res.tampered && r.state !== 'lifetime')) inner = bannerHtml(res);
         if (sh.innerHTML !== inner) {
           sh.innerHTML = inner;

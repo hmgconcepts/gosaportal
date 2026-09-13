@@ -252,15 +252,46 @@
     return final.filter(Boolean);
   }
 
+  /* V11.0 (#8): PHONETIC FALLBACK for African languages. Most phones have no
+     Yorùbá/Igbo/Hausa voice; an English voice given raw tone-marked text
+     skips or garbles the marked characters ("Kí ni orúkọ" came out broken —
+     the reported bug). When — and only when — no NATIVE voice exists, the
+     text is transformed to its closest plain-letter pronunciation:
+       Yorùbá: ẹ→e ọ→o ṣ→sh, all tone marks stripped (á à ā → a …), ń/ǹ→n
+       Igbo:   ị→i ọ→o ụ→u ṅ→n, tone marks stripped
+       Hausa:  ɓ→b ɗ→d ƙ→k ʼy→y
+     and the speech rate drops 15% for clarity. A native voice always gets
+     the ORIGINAL text — tones intact. */
+  function phoneticFallback(text, lang) {
+    var t = String(text || '');
+    // decompose → strip combining marks (tones) → recompose
+    try { t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').normalize('NFC'); } catch (e) {}
+    if (lang === 'yo') t = t.replace(/ṣ/g,'sh').replace(/Ṣ/g,'Sh').replace(/ẹ/g,'e').replace(/Ẹ/g,'E').replace(/ọ/g,'o').replace(/Ọ/g,'O').replace(/gb/g,'gb');
+    if (lang === 'ig') t = t.replace(/ị/g,'i').replace(/Ị/g,'I').replace(/ọ/g,'o').replace(/Ọ/g,'O').replace(/ụ/g,'u').replace(/Ụ/g,'U').replace(/ṅ/g,'n').replace(/Ṅ/g,'N');
+    if (lang === 'ha') t = t.replace(/ɓ/g,'b').replace(/Ɓ/g,'B').replace(/ɗ/g,'d').replace(/Ɗ/g,'D').replace(/ƙ/g,'k').replace(/Ƙ/g,'K').replace(/ʼy/g,'y').replace(/'y/g,'y');
+    return t;
+  }
+  function isNativeFor(v, lang) {
+    if (!v || lang === 'en') return true;
+    return new RegExp('^' + lang + '(-|_|$)', 'i').test(v.lang || '') ||
+           new RegExp({yo:'yoruba',ig:'igbo',ha:'hausa',sw:'swahili'}[lang] || ('^'+lang), 'i').test(v.name || '');
+  }
+
   function next() {
     if (!queue.length) { speaking = false; setBtnState(false); return; }
     var text = queue.shift();
-    var u = new SSU(text);
     var v = pickVoice(currentLang);
+    var native = isNativeFor(v, currentLang);
+    /* African languages without a native voice: speak the phonetic form. */
+    if (!native && (currentLang === 'yo' || currentLang === 'ig' || currentLang === 'ha')) {
+      text = phoneticFallback(text, currentLang);
+    }
+    var u = new SSU(text);
     /* V10.8: tag the utterance with the detected language so engines that
        route by utterance.lang pick a matching voice even when voice is null. */
-    if (v) { u.voice = v; u.lang = v.lang || LANG_TAG[currentLang] || 'en-US'; } else { u.lang = LANG_TAG[currentLang] || 'en-US'; }
+    if (v) { u.voice = v; u.lang = native ? (v.lang || LANG_TAG[currentLang] || 'en-US') : (v.lang || 'en-US'); } else { u.lang = LANG_TAG[currentLang] || 'en-US'; }
     u.rate = Math.min(2, Math.max(0.5, Number(prefs.rate) || 0.95));
+    if (!native && currentLang !== 'en') u.rate = Math.min(2, Math.max(0.5, u.rate * 0.85));   /* slower for phonetic fallback clarity */
     u.pitch = Math.min(2, Math.max(0, Number(prefs.pitch) || 1));
     u.volume = Math.min(1, Math.max(0, Number(prefs.volume) == null ? 1 : Number(prefs.volume)));
     if (liveEl) liveEl.textContent = text;
