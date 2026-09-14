@@ -486,7 +486,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div class="app-content">
       
       <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">🗓️ Published School Timetable</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Everyone can read the school timetable. Staff/admin can add or edit timetable slots; generated slots from Auto-Timetable are shown here for classes, students and parents.</p></div>
-      <div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="tt-class" onchange="TT.load()"><option value="">All classes</option></select></div><button class="btn btn-outline" onclick="TT.load()">Refresh</button><button class="btn btn-primary" data-staff-only onclick="CRUD.openForm('timetable')">+ Add slot</button><a class="btn btn-outline" data-staff-only href="timetable-generator.html">Auto-generate</a></div></div>
+      <div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="tt-class" onchange="TT.load()"><option value="">All classes</option></select></div><button class="btn btn-outline" onclick="TT.load()">Refresh</button><button class="btn btn-outline" onclick="TT.print(false)">🖨️ Print / PDF this view</button><button class="btn btn-outline" onclick="TT.print(true)">📄 PDF master (all classes)</button><button class="btn btn-outline" onclick="TT.printPack()">📄 PDF pack — one class per page</button><button class="btn btn-primary" data-staff-only onclick="CRUD.openForm('timetable')">+ Add slot</button><a class="btn btn-outline" data-staff-only href="timetable-generator.html">Auto-generate</a></div></div>
       <div id="tt-view"><p class="pulse">Loading timetable…</p></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
@@ -554,5 +554,41 @@ const TT={days:['Monday','Tuesday','Wednesday','Thursday','Friday'],
     if(!slots.length)slots=[...new Set(rows.map(r=>Number(r.period)))].sort((a,b)=>a-b).map(p=>({period_no:p,label:'Period '+p,is_break:false}));
     let html='<div class="card"><div class="table-wrap"><table><thead><tr><th>Day</th>'+slots.map(s=>'<th>'+(s.is_break?'<i>'+esc(s.label)+'</i>':esc(s.label))+(s.start_time?'<br><small>'+esc(s.start_time)+'–'+esc(s.end_time)+'</small>':'')+'</th>').join('')+'</tr></thead><tbody>';
     this.days.forEach(d=>{html+='<tr><td><strong>'+d+'</strong></td>'+slots.map(s=>{if(s.is_break)return '<td style="background:var(--gray-100);font-style:italic;text-align:center">'+esc(s.label)+'</td>';const cell=rows.filter(r=>Number(r.period)===Number(s.period_no)&&(r.day||'')===d).map(r=>'<div>'+(cls?'':'<strong>'+esc(r.class||'')+'</strong> · ')+esc(r.subject||'')+(r.teacher?'<br><small>'+esc(r.teacher)+' '+esc(r.room||'')+'</small>':'')+'</div>').join('<hr>');return '<td>'+cell+'</td>';}).join('')+'</tr>';});
-    box.innerHTML=html+'</tbody></table></div></div>'; }}; document.addEventListener('DOMContentLoaded',()=>TT.init()); TT.init();
+    box.innerHTML='<div id="tt-pub-print">'+ '<h2 style="text-align:center;margin:4px 0">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center;margin:4px 0 10px">Timetable'+(cls?' · '+esc(cls):' · All classes')+(curTerm?' · '+esc(curTerm):'')+(curSession?' · '+esc(curSession):'')+'</h3>'+html+'</tbody></table></div></div>'+'</div>';
+    this._rows=rows;this._slots=slots;this._term=curTerm;this._session=curSession; },
+  /* V11.1 (#1): print/PDF from the published page — current view or the
+     full master (all classes). Browser print dialog → "Save as PDF". */
+  print(master){
+    if(master){const sel=document.getElementById('tt-class');const keep=sel.value;sel.value='';this.load().then(()=>{setTimeout(()=>{this._doPrint('Master Timetable');sel.value=keep;this.load();},400);});return;}
+    this._doPrint('Timetable');
+  },
+  _doPrint(title){
+    const el=document.getElementById('tt-pub-print');if(!el){toast('Load the timetable first.','warning');return;}
+    const w=window.open('','_blank');if(!w){toast('Allow popups. In the print dialog choose "Save as PDF" for a PDF file.','warning');return;}
+    w.document.write('<html><head><title>'+title+'</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #111;padding:6px;text-align:center;font-size:11px}th{background:#e2e8f0}h2,h3{text-align:center;margin:4px 0}hr{border:0;border-top:1px dashed #cbd5e1;margin:2px 0}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');
+    w.document.close();
+  },
+  /* V11.1 (#1): CLASS-BY-CLASS PDF PACK from the published table — every
+     class on its own A4 landscape page. */
+  async printPack(){
+    if(!sb)return;
+    let curTerm='',curSession='';try{const cp=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();if(cp.data){curTerm=cp.data.term||'';curSession=cp.data.session||'';}}catch(_){ }
+    let q=sb.from('timetable').select('*').limit(8000);
+    const {data,error}=await q;if(error){toast(error.message,'danger');return;}
+    let rows=data||[];
+    if(curTerm||curSession){const scoped=rows.filter(r=>(!curTerm||(r.term||'')===curTerm)&&(!curSession||(r.session||'')===curSession));if(scoped.length)rows=scoped;}
+    (function(){const seen={};const out=[];for(let i=rows.length-1;i>=0;i--){const r=rows[i],k=(r.class||'')+'|'+(r.day||'')+'|'+(r.period||'');if(seen[k])continue;seen[k]=1;out.push(r);}rows=out.reverse();})();
+    if(!rows.length){toast('No timetable rows to print yet.','warning');return;}
+    let slots=[];try{const cfg=await sb.from('timetable_config').select('*').eq('class','ALL').order('position');slots=(cfg.data||[]).filter(x=>x.label!=='__daycounts__'&&Number(x.period_no)!==0);}catch(_){ }
+    if(!slots.length)slots=[...new Set(rows.map(r=>Number(r.period)))].sort((a,b)=>a-b).map(p=>({period_no:p,label:'Period '+p,is_break:false}));
+    const classes=[...new Set(rows.map(r=>r.class).filter(Boolean))].sort();
+    let pages='';
+    classes.forEach(cls=>{const mine=rows.filter(r=>r.class===cls);
+      pages+='<div class="page"><h2>'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3>Class Timetable · '+esc(cls)+(curTerm?' · '+esc(curTerm):'')+(curSession?' · '+esc(curSession):'')+'</h3><table><thead><tr><th>Day</th>'+slots.map(s=>'<th>'+(s.is_break?'<i>'+esc(s.label)+'</i>':esc(s.label))+(s.start_time?'<br><small>'+esc(s.start_time)+'–'+esc(s.end_time)+'</small>':'')+'</th>').join('')+'</tr></thead><tbody>'+
+        this.days.map(d=>'<tr><td><b>'+d+'</b></td>'+slots.map(s=>{if(s.is_break)return '<td style="background:#f1f5f9;font-style:italic">'+esc(s.label)+'</td>';const x=mine.find(y=>(y.day||'')===d&&Number(y.period)===Number(s.period_no));return '<td>'+(x?('<b>'+esc(x.subject||'')+'</b>'+(x.teacher?'<br><small>'+esc(x.teacher)+'</small>':'')):'—')+'</td>';}).join('')+'</tr>').join('')+
+        '</tbody></table><p class="foot">Printed '+new Date().toLocaleString()+'</p></div>';});
+    const w=window.open('','_blank');if(!w){toast('Allow popups. In the print dialog choose "Save as PDF" for a PDF file.','warning');return;}
+    w.document.write('<html><head><title>Class Timetables — one per page</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;margin:0}.page{page-break-after:always;padding:10px}h2,h3{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #111;padding:6px;text-align:center;font-size:11px}th{background:#e2e8f0}.foot{font-size:9px;color:#64748b}</style></head><body>'+pages+'<script>window.onload=()=>window.print()<\/script></body></html>');
+    w.document.close();
+  }}; document.addEventListener('DOMContentLoaded',()=>TT.init()); TT.init();
 </script></body></html>

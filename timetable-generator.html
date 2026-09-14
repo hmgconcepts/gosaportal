@@ -630,7 +630,33 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div id="tb-list" style="margin-top:10px"></div>
       </div>
       <div id="tt-reqs"></div>
-      <div class="card" style="margin-bottom:16px" data-staff-only><h3>⚙️ Step 4 · Validate and generate the WHOLE school</h3><p class="help">One click builds every ticked class's grid + the combined master timetable + every teacher's personal timetable. Click again any time for a different random arrangement — nothing is final until you print.</p><div id="tt-summary" class="notice">Tick classes and add subject demand first.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="TTG.validate()">✅ Validate demand</button><button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="TTG.analyze()">🩻 Overload Analyzer</button><button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate / regenerate timetable</button><button class="btn btn-outline" onclick="TTG.printGrid()">🖨️ Print timetable</button><button class="btn btn-outline" onclick="TTG.clearGenerated()">Clear generated timetable</button></div></div>
+      <!-- V11.1 (#2): STAFF CHANGES — mid-term teacher turnover without starting
+     over. Every scenario covered: a teacher LEAVES (reassign or strip),
+     a NEW teacher joins (take over subjects, with own availability),
+     an availability CHANGE (part-time days/periods), and a clean rename.
+     One click updates every demand row + availability + regenerates. -->
+<div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe" data-staff-only>
+  <h3>🧑‍🏫 Staff changes — update the timetable without starting over</h3>
+  <p class="help">A teacher joined, left, or changed their available days? Fix it here — every saved subject demand updates in one click, then regenerate. Your classes, periods and subjects stay exactly as saved.</p>
+  <div class="grid grid-2">
+    <div class="form-group"><label>Teacher (as saved in the demand rows)</label><select class="form-select" id="tsc-old"><option value="">— choose teacher —</option></select><div id="tsc-load" style="font-size:.8rem;color:var(--gray-500);margin-top:4px"></div></div>
+    <div class="form-group"><label>Action</label><select class="form-select" id="tsc-action" onchange="TTG.staffActionChanged()">
+      <option value="replace">🔁 Replace with another / new teacher (teacher left · new teacher takes over)</option>
+      <option value="availability">📅 Change availability (days / periods — full-time ⇄ part-time)</option>
+      <option value="rename">✏️ Rename (spelling fix — same person)</option>
+      <option value="remove">🗑 Remove teacher from all demands (subject keeps running unassigned until you pick a replacement)</option>
+    </select></div>
+    <div class="form-group" id="tsc-new-wrap"><label>New / replacement teacher</label><input class="form-input" id="tsc-new" list="tsc-teachers" placeholder="Pick from staff or type a brand-new name"><datalist id="tsc-teachers"></datalist></div>
+  </div>
+  <div id="tsc-avail" style="display:none;margin:4px 0 10px">
+    <b>New availability for this teacher:</b>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin:6px 0"><label><input type="checkbox" class="tsc-day" value="Monday"> Mon</label><label><input type="checkbox" class="tsc-day" value="Tuesday"> Tue</label><label><input type="checkbox" class="tsc-day" value="Wednesday"> Wed</label><label><input type="checkbox" class="tsc-day" value="Thursday"> Thu</label><label><input type="checkbox" class="tsc-day" value="Friday"> Fri</label></div>
+    <small style="color:var(--gray-500)">Tick none = available every day (full-time). Ticked days = part-time; the engine only schedules them on those days.</small>
+  </div>
+  <button class="btn btn-primary" onclick="TTG.applyStaffChange()">✅ Apply staff change</button>
+  <span style="font-size:.8rem;color:var(--gray-500);margin-left:8px">Then click ⚙️ Generate below — the whole school re-arranges around the change.</span>
+</div>
+<div class="card" style="margin-bottom:16px" data-staff-only><h3>⚙️ Step 4 · Validate and generate the WHOLE school</h3><p class="help">One click builds every ticked class's grid + the combined master timetable + every teacher's personal timetable. Click again any time for a different random arrangement — nothing is final until you print.</p><div id="tt-summary" class="notice">Tick classes and add subject demand first.</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-outline" onclick="TTG.validate()">✅ Validate demand</button><button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="TTG.analyze()">🩻 Overload Analyzer</button><button class="btn btn-primary" onclick="TTG.generate()">⚙️ Generate / regenerate timetable</button><button class="btn btn-outline" onclick="TTG.printGrid()">🖨️ Print / PDF (this class)</button><button class="btn btn-outline" onclick="TTG.printClassPack()">📄 PDF pack — every class, one per page</button><button class="btn btn-outline" onclick="TTG.clearGenerated()">Clear generated timetable</button></div></div>
       <div id="tt-grid"></div>
       <div id="tt-master" style="margin-top:16px"></div>
       <div id="tt-teachers" style="margin-top:16px"></div>
@@ -733,6 +759,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
         resumed=true;
       }
     }catch(_){}
+    try{this.fillStaffChange();}catch(_){}
     if(resumed)toast('📥 Session restored — your ticked classes, term/session and saved demand are exactly where you stopped. Continue from Step 3 or generate.','success',7000);
     else if(rowsCfg.length)toast('📥 Saved school-day schedule loaded. Tick your classes (Step 2) to continue — every subject demand you saved earlier is still in the database.','info',6000);
     this.updateChecklist();},
@@ -947,6 +974,74 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     if(r.error){toast(r.error.message,'danger');return;}
     toast('🧹 All demand rows for '+cls+' removed. Add your real subjects now.','success');await this.loadReqs(cls);},
   async removeReq(id){if(!confirm('Remove this subject demand?'))return;const r=await Enterprise.timetable.removeRequirement(id);if(r.error){toast(r.error.message||r.error,'danger');return;}await this.loadReqs(this.context().class);},
+  /* ===== V11.1 (#2): STAFF-CHANGE ENGINE =====
+     Handles every mid-term turnover scenario against the SAVED demand rows
+     (timetable_requirements) + teacher_availability — no restart needed:
+       replace      — teacher left; another (or brand-new) teacher takes all
+                      their demand rows; the new teacher's availability rides
+                      along (part-time days honoured by the engine).
+       availability — same teacher, new days (full-time ⇄ part-time).
+       rename       — spelling fix across demand rows + availability.
+       remove       — strip the teacher from demands; subjects stay, engine
+                      schedules them unconstrained until a successor is set.
+     Multi-teacher group rows ("A / B") are handled by token replacement. */
+  async fillStaffChange(){try{
+    const sel=document.getElementById('tsc-old');if(!sel)return;
+    const r=await sb.from('timetable_requirements').select('teacher');
+    const names=[...new Set((r.data||[]).map(x=>String(x.teacher||'').trim()).filter(Boolean).flatMap(t=>t.split('/').map(x=>x.trim())))].sort();
+    sel.innerHTML='<option value="">— choose teacher —</option>'+names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+    const dl=document.getElementById('tsc-teachers');if(dl)dl.innerHTML=(this.lookups.teachers||[]).map(t=>'<option value="'+esc(t.full_name||t)+'">').join('');
+    sel.onchange=async()=>{const t=sel.value;const info=document.getElementById('tsc-load');if(!t||!info)return;
+      const q=await sb.from('timetable_requirements').select('class,subject,periods_per_week').ilike('teacher','%'+t+'%');
+      const rows=q.data||[];const tot=rows.reduce((a,x)=>a+Number(x.periods_per_week||0),0);
+      info.innerHTML=rows.length?('Teaches <b>'+rows.length+'</b> demand row(s) · <b>'+tot+'</b> periods/week: '+rows.slice(0,6).map(x=>esc(x.subject)+' ('+esc(x.class)+')').join(', ')+(rows.length>6?' …':'')):'No demand rows carry this teacher.';};
+  }catch(_){}},
+  staffActionChanged(){const a=(document.getElementById('tsc-action')||{}).value;
+    document.getElementById('tsc-new-wrap').style.display=(a==='replace'||a==='rename')?'':'none';
+    document.getElementById('tsc-avail').style.display=(a==='availability'||a==='replace')?'block':'none';},
+  async applyStaffChange(){
+    const oldT=this.val('tsc-old'),action=this.val('tsc-action'),newT=this.val('tsc-new').trim();
+    if(!oldT){toast('Choose the teacher first.','warning');return;}
+    if((action==='replace'||action==='rename')&&!newT){toast('Enter the new/replacement teacher name.','warning');return;}
+    if((action==='replace'||action==='rename')&&newT.toLowerCase()===oldT.toLowerCase()){toast('New name is the same as the old one.','warning');return;}
+    const days=[...document.querySelectorAll('.tsc-day:checked')].map(x=>x.value);
+    const q=await sb.from('timetable_requirements').select('id,teacher').ilike('teacher','%'+oldT+'%');
+    if(q.error){toast(q.error.message,'danger');return;}
+    const rows=q.data||[];
+    if(!rows.length&&action!=='availability'){toast('No demand rows carry "'+oldT+'" — nothing to change.','info');return;}
+    const label={replace:'Replace '+oldT+' with '+newT,availability:'Update availability for '+oldT,rename:'Rename '+oldT+' to '+newT,remove:'Remove '+oldT+' from all demands'}[action];
+    if(!confirm(label+'?\n\n• '+rows.length+' demand row(s) affected\n• Your classes, subjects and periods stay exactly as saved\n• Regenerate afterwards to rebuild the grids'))return;
+    let changed=0,firstErr=null;
+    /* token-accurate replacement inside single-teacher AND "A / B" group rows */
+    const retoken=(teacher)=>{const parts=String(teacher||'').split('/').map(x=>x.trim());
+      const out=parts.map(pt=>{
+        if(pt.toLowerCase()!==oldT.toLowerCase())return pt;
+        if(action==='remove')return null;
+        if(action==='replace'||action==='rename')return newT;
+        return pt;}).filter(Boolean);
+      return [...new Set(out)].join(' / ');};
+    for(const row of rows){
+      if(action==='availability')break;
+      const nt=retoken(row.teacher);
+      const r2=await sb.from('timetable_requirements').update({teacher:nt||''}).eq('id',row.id);
+      if(r2.error)firstErr=firstErr||r2.error;else changed++;
+    }
+    /* availability: upsert for the target teacher (replace → the NEW teacher) */
+    if(action==='availability'||action==='replace'){
+      const target=action==='replace'?newT:oldT;
+      try{
+        if(days.length&&days.length<5)await sb.from('teacher_availability').upsert({teacher:target,available_days:days},{onConflict:'teacher'});
+        else await sb.from('teacher_availability').delete().ilike('teacher',target); /* full-time = no restriction row */
+      }catch(_){}
+    }
+    /* leaving teacher: clean their availability row so it can never haunt a future hire with the same name */
+    if(action==='replace'||action==='remove'){try{await sb.from('teacher_availability').delete().ilike('teacher',oldT);}catch(_){}}
+    if(firstErr&&!changed){toast(firstErr.message||firstErr,'danger');return;}
+    if(window.App&&App.logActivity)App.logActivity('staff-change','timetable_requirements',action+':'+oldT+(newT?'→'+newT:''));
+    toast('✅ '+label+' — '+changed+' demand row(s) updated'+(action==='remove'?' (subjects now unassigned: pick a replacement later or generate unconstrained)':'')+'. Now click ⚙️ Generate to rebuild every grid around the change.','success',12000);
+    await this.fillStaffChange();
+    await this.loadReqs(this.context().class||this.tickedClasses()[0]||'');
+  },
   /* ===== V11.0 (#4): 🩻 OVERLOAD ANALYZER =====
      Feasibility X-ray BEFORE generation: per-class demand vs capacity per
      day, restricted windows too small for their demand, and teachers booked
@@ -1063,7 +1158,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
       h+='<h4 style="margin:14px 0 6px">'+esc(cls)+'</h4><div class="table-wrap"><table><thead><tr><th>Day</th>'+slots.map(s=>'<th>'+(s.is_break?'<i>'+esc(s.label)+'</i>':esc(s.label))+(s.start_time?'<br><small>'+esc(s.start_time)+'–'+esc(s.end_time)+'</small>':'')+'</th>').join('')+'</tr></thead><tbody>';
       days.forEach(d=>{h+='<tr><td><b>'+d.slice(0,3)+'</b></td>'+slots.map(s=>{if(s.is_break)return '<td style="background:var(--gray-100);font-style:italic;text-align:center">'+esc(s.label)+'</td>';const x=data.find(y=>y.class===cls&&y.day===d&&Number(y.period)===Number(s.period_no));return '<td>'+(x?('<b>'+esc(x.subject)+'</b>'+(x.teacher?'<br><small>'+esc(x.teacher)+'</small>':'')):'—')+'</td>';}).join('')+'</tr>';});
       h+='</tbody></table></div>';});
-    h+=this.dayNotes()+'<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+' · Teacher conflicts checked across all classes.</p></div><div style="margin-top:8px"><button class="btn btn-outline" onclick="TTG.printMaster()">🖨️ Print master timetable</button></div>';
+    h+=this.dayNotes()+'<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+' · Teacher conflicts checked across all classes.</p></div><div style="margin-top:8px"><button class="btn btn-outline" onclick="TTG.printMaster()">🖨️ Print / PDF master timetable</button> <button class="btn btn-outline" onclick="TTG.printClassPack()">📄 PDF pack — one class per page</button></div>';
     host.innerHTML=h;},
   /* V8.1 #3: PERSONAL TEACHER TIMETABLES — one grid per teacher across all
      their classes; printable pack for the staff room. */
@@ -1083,7 +1178,31 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     h+='</div><div style="margin-top:8px"><button class="btn btn-outline" onclick="TTG.printTeachers()">🖨️ Print all teacher timetables</button></div>';
     host.innerHTML=h;},
   printTeachers(){const el=document.getElementById('tt-teachers-print');if(!el){toast('Generate the timetables first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Teacher Timetables</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #111;padding:5px;text-align:center;font-size:11px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
-  printMaster(){const el=document.getElementById('tt-master-print');if(!el){toast('Generate the timetables first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Master Timetable</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:14px}th,td{border:1px solid #111;padding:6px;text-align:center;font-size:11px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
+  printMaster(){const el=document.getElementById('tt-master-print');if(!el){toast('Generate the timetables first.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print. In the print dialog choose "Save as PDF" for a PDF file.','warning');return;}w.document.write('<html><head><title>Master Timetable</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:14px}th,td{border:1px solid #111;padding:6px;text-align:center;font-size:11px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
+  /* V11.1 (#1): CLASS-BY-CLASS PDF PACK — every generated class on its OWN
+     A4 page (page-break-after), school header repeated, ready for the
+     browser's "Save as PDF". One click covers the whole school. */
+  async printClassPack(){
+    const c=this.context();const classes=this.tickedClasses().length?this.tickedClasses():(c.class?[c.class]:[]);
+    if(!classes.length){toast('Tick the classes first.','warning');return;}
+    const r=await sb.from('timetable').select('*').in('class',classes).eq('session',c.session||'').eq('term',c.term||'').limit(8000);
+    if(r.error){toast(r.error.message,'danger');return;}
+    const data=r.data||[];if(!data.length){toast('No generated timetable for these classes yet — click Generate first.','warning');return;}
+    const days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    const slots=PC.rows.length?PC.rows:[...new Set(data.map(x=>Number(x.period)))].sort((a,b)=>a-b).map(p=>({period_no:p,label:'Period '+p,is_break:false}));
+    let pages='';
+    classes.forEach(cls=>{
+      const mine=data.filter(x=>x.class===cls);if(!mine.length)return;
+      pages+='<div class="page"><h2>'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3>Class Timetable · '+esc(cls)+' · '+esc(c.term)+' · '+esc(c.session)+'</h3><table><thead><tr><th>Day</th>'+slots.map(s=>'<th>'+(s.is_break?'<i>'+esc(s.label)+'</i>':esc(s.label))+(s.start_time?'<br><small>'+esc(s.start_time)+'–'+esc(s.end_time)+'</small>':'')+'</th>').join('')+'</tr></thead><tbody>'+
+        days.map(d=>'<tr><td><b>'+d+'</b></td>'+slots.map(s=>{if(s.is_break)return '<td style="background:#f1f5f9;font-style:italic">'+esc(s.label)+'</td>';const x=mine.find(y=>y.day===d&&Number(y.period)===Number(s.period_no));return '<td>'+(x?('<b>'+esc(x.subject)+'</b>'+(x.teacher?'<br><small>'+esc(x.teacher)+'</small>':'')):'—')+'</td>';}).join('')+'</tr>').join('')+
+        '</tbody></table><p class="foot">Generated '+new Date().toLocaleString()+'</p></div>';
+    });
+    if(!pages){toast('No rows found for the ticked classes.','warning');return;}
+    const w=window.open('','_blank');if(!w){toast('Allow popups. In the print dialog choose "Save as PDF" for a PDF file.','warning');return;}
+    w.document.write('<html><head><title>Class Timetables — one per page</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;margin:0}.page{page-break-after:always;padding:10px}h2,h3{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #111;padding:6px;text-align:center;font-size:11px}th{background:#e2e8f0}.foot{font-size:9px;color:#64748b}</style></head><body>'+pages+'<script>window.onload=()=>window.print()<\/script></body></html>');
+    w.document.close();
+    if(window.App&&App.logActivity)App.logActivity('print','timetable','class-pack:'+classes.length);
+  },
   /* V8.0 #8: DAYS AS ROWS, PERIODS AS COLUMNS — with the Step-1 breaks shown in place. */
   async grid(cls){const c=this.context(),target=cls||c.class,r=await Enterprise.timetable.grid(target,c.session,c.term),data=r.data||[],days=['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const slots=PC.rows.length?PC.rows:[...new Set(data.map(x=>Number(x.period)))].sort((a,b)=>a-b).map(p=>({period_no:p,label:'Period '+p,is_break:false}));
