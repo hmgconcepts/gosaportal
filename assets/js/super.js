@@ -594,6 +594,37 @@ const Super = {
 
   idcard: {
     qrUrl(data, size) { size = size || 120; return 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(data); },
+    /* ================================================================
+       V11.7 (pass 65 #1): REAL Code 39 barcode — generated locally as an
+       SVG data URI (no CDN, works offline/printed). Encodes the plain
+       admission/staff number so ANY barcode scanner (USB/Bluetooth
+       keyboard-wedge, or the camera scanner on the check-in pages) reads
+       the exact ID that the check-in flow already accepts. Code 39 chosen
+       because it is self-checking, needs no checksum, and supports the
+       characters admission numbers use (A-Z 0-9 - . / + %).
+       ================================================================ */
+    C39: { '0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','A':'wnnnnwnnw','B':'nnwnnwnnw','C':'wnwnnwnnn','D':'nnnnwwnnw','E':'wnnnwwnnn','F':'nnwnwwnnn','G':'nnnnnwwnw','H':'wnnnnwwnn','I':'nnwnnwwnn','J':'nnnnwwwnn','K':'wnnnnnnww','L':'nnwnnnnww','M':'wnwnnnnwn','N':'nnnnwnnww','O':'wnnnwnnwn','P':'nnwnwnnwn','Q':'nnnnnnwww','R':'wnnnnnwwn','S':'nnwnnnwwn','T':'nnnnwnwwn','U':'wwnnnnnnw','V':'nwwnnnnnw','W':'wwwnnnnnn','X':'nwnnwnnnw','Y':'wwnnwnnnn','Z':'nwwnwnnnn','-':'nwnnnnwnw','.':'wwnnnnwnn',' ':'nwwnnnwnn','$':'nwnwnwnnn','/':'nwnwnnnwn','+':'nwnnnwnwn','%':'nnnwnwnwn','*':'nwnnwnwnn' },
+    barcodeSvg(text, h) {
+      h = h || 34;
+      let s = String(text == null ? '' : text).toUpperCase().replace(/[^A-Z0-9 \-.$/+%]/g, '-');
+      if (!s) s = '0';
+      const chars = ('*' + s + '*').split('');
+      let x = 0; const rects = [];
+      for (const ch of chars) {
+        const pat = this.C39[ch] || this.C39['-'];
+        for (let i = 0; i < 9; i++) {
+          const w = pat[i] === 'w' ? 3 : 1;
+          if (i % 2 === 0) rects.push('<rect x="' + x + '" y="0" width="' + w + '" height="' + h + '"/>');
+          x += w;
+        }
+        x += 1; // inter-character narrow space
+      }
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + x + '" height="' + h + '" viewBox="0 0 ' + x + ' ' + h + '" shape-rendering="crispEdges"><g fill="#111">' + rects.join('') + '</g></svg>';
+      return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    },
+    barcodeImg(id, h, wpx) {
+      return '<img src="' + this.barcodeSvg(id, h || 34) + '" alt="barcode ' + Super.esc(id) + '" style="height:' + (h || 34) / 2 + 'px;' + (wpx ? 'width:' + wpx + 'px;' : 'max-width:100%;') + 'object-fit:fill;image-rendering:crisp-edges;display:block"/>';
+    },
     /* Convert a Google-Drive share link to a direct-image URL so student
        photos stored on Drive actually render on the ID card (issue 11). */
     driveDirect(url) {
@@ -637,13 +668,14 @@ const Super = {
        expiry. Class changes every year; the card must not. */
     dmy(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d)) return String(v); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); },
     admittedYear(person) {
-      // Best evidence order: explicit admission year → year inside the
-      // admission number (e.g. GSA/2023/041) → record creation year.
-      if (person.admission_year) return String(person.admission_year);
-      const m = String(person.admission_no || '').match(/(?:^|[^0-9])((?:19|20)\d{2})(?:[^0-9]|$)/);
-      if (m) return m[1];
-      if (person.created_at) { const d = new Date(person.created_at); if (!isNaN(d)) return String(d.getFullYear()); }
-      return '';
+      /* V11.7 (pass 65 #2): ONLY the explicit admission_year column is
+         trusted. The old guesswork (year inside the admission number, or the
+         record-creation year) was WRONG for onboarded schools: a school
+         deployed in 2026 stamps 2026 into every pre-existing student's
+         admission number, yet those students joined years earlier. A lifetime
+         card must never print a confident guess — no recorded year, no row. */
+      const y = parseInt(person.admission_year, 10);
+      return (y >= 1900 && y <= new Date().getFullYear() + 1) ? String(y) : '';
     },
     validityNote(isStaff) { return isStaff ? 'Valid for the duration of employment' : 'Valid throughout studentship'; },
     html(person) {
@@ -722,7 +754,7 @@ const Super = {
             '<div style="flex-shrink:0;text-align:center;width:118px">' +
               '<img src="' + this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || '', type: person.type || 'student' }), 220) + '" style="width:108px;height:108px" alt="QR">' +
               '<div style="font-size:.66rem;font-weight:900;letter-spacing:1.5px;color:' + navy + ';margin-top:3px">SCAN TO VERIFY</div>' +
-              '<div style="margin-top:8px;display:flex;align-items:center;gap:5px;justify-content:center"><img src="' + logo + '" style="width:22px;height:22px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="text-align:left"><div style="font-size:.55rem;font-weight:900;color:#0f172a;line-height:1">' + Super.esc((s.shortName || '').toUpperCase()) + '</div><div style="height:12px;width:64px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px)"></div></div></div>' +
+              '<div style="margin-top:8px;display:flex;align-items:center;gap:5px;justify-content:center"><img src="' + logo + '" style="width:22px;height:22px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="text-align:left"><div style="font-size:.55rem;font-weight:900;color:#0f172a;line-height:1">' + Super.esc((s.shortName || '').toUpperCase()) + '</div>' + this.barcodeImg(idNo, 24, 72) + '</div></div>' +
             '<div style="margin-top:6px">' + this.signBlock(navy, 86) + '</div>' +
             '</div></div>' +
           contactFooter + credit + '</div>';
@@ -854,7 +886,7 @@ const Super = {
             <div style="font-style:italic">${this.validityNote(isStaff)}</div>
             </div><div style="margin-top:8px;width:100px">${this.signBlock('#334155', 92)}</div><div style="display:none">
           </div>
-          <div style="text-align:center"><img src="${qr}" style="width:78px;height:78px" alt="QR"><div style="font-size:.55rem;font-weight:800;color:#0f172a">SCAN TO VERIFY</div><div style="height:18px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px);margin-top:3px"></div></div>
+          <div style="text-align:center"><img src="${qr}" style="width:78px;height:78px" alt="QR"><div style="font-size:.55rem;font-weight:800;color:#0f172a">SCAN TO VERIFY</div><div style="margin-top:3px;display:flex;justify-content:center">${this.barcodeImg(idNo, 36, 120)}</div></div>
         </div>
         ${contactFooter}${credit}
       </div>`;
@@ -878,7 +910,8 @@ const Super = {
       const ac = person.ac || s.accent || '#0ea5e9';
       const logo = 'assets/img/logo.' + (s.logoExt || 'svg');
       const qr = this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || person.name || '', type: person.type || 'student' }), 200);
-      const issued = this.admittedYear(person) || String(new Date().getFullYear());
+      // Issue year = when THIS card was produced (honest: it is the print year).
+      const issued = String(new Date().getFullYear());
       const rules = isStaff ? [
         'This card identifies a bona-fide member of staff and remains the property of the school.',
         'It must be worn visibly within the school premises and presented on request.',
@@ -920,7 +953,7 @@ const Super = {
         '</div>' +
         '<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 8px">' +
           '<img src="' + logo + '" style="width:20px;height:20px;object-fit:contain" onerror="this.style.display=\'none\'">' +
-          '<div style="height:16px;flex:1;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px)"></div>' +
+          '<div style="flex:1;display:flex;justify-content:center">' + this.barcodeImg(idNo, 32) + '</div>' +
           '<span style="font-size:.52rem;font-weight:800;color:#0f172a">' + Super.esc(idNo) + '</span>' +
         '</div>' +
         '<div style="background:linear-gradient(90deg,' + pc + ',' + ac + ');color:#fff;font-size:.52rem;text-align:center;padding:3px 0;font-weight:700">' + Super.esc(s.motto || '') + (s.motto ? ' · ' : '') + 'Powered by HMG Concepts</div>' +
@@ -947,6 +980,94 @@ const Super = {
       w.document.open();
       w.document.write('<!DOCTYPE html><html><head><title>ID Card</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{display:flex;justify-content:center;align-items:flex-start;padding:24px;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sc-idcard{break-inside:avoid;page-break-inside:avoid}img{max-width:100%}@media print{body{padding:0}}</style></head><body>' + card + '<script>window.onload=function(){var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.focus();window.print()},250)};var imgs=[].slice.call(document.images),left=imgs.length;if(!left)return go();var tick=function(){if(--left<=0)go()};imgs.forEach(function(im){if(im.complete)tick();else{im.onload=tick;im.onerror=tick}});setTimeout(go,2200)};<\/script></body></html>');
       w.document.close();
+    }
+  },
+
+  /* ==================================================================
+     V11.7 (pass 65 #1): SHARED SCANNER ENGINE — one engine, three pages
+     (student check-in, staff check-in, class attendance).
+       • CAMERA: uses the native BarcodeDetector API when available
+         (Chrome/Edge/Android — reads BOTH the QR and the new Code 39
+         barcode printed on every card); falls back to jsQR (QR only)
+         on iOS/Safari — the QR is on every card precisely so the
+         fallback always works.
+       • HARDWARE WEDGE: any USB/Bluetooth barcode scanner acts as a
+         keyboard — attach() captures the burst of characters ending in
+         Enter and fires the same callback. Zero configuration: plug in
+         the scanner, click into the field (or anywhere), scan.
+     The callback always receives the RAW text (QR JSON or plain ID);
+     every consumer already parses both via Enterprise.checkin.parseQR.
+     ================================================================== */
+  scanner: {
+    _detector: null, _raf: null, _last: '', _lastAt: 0,
+    supportsNative() { return typeof window !== 'undefined' && 'BarcodeDetector' in window; },
+    async detector() {
+      if (this._detector !== null) return this._detector;
+      try {
+        if (this.supportsNative()) {
+          const fmts = await window.BarcodeDetector.getSupportedFormats();
+          const want = ['qr_code', 'code_39', 'code_128'].filter(f => fmts.includes(f));
+          this._detector = want.length ? new window.BarcodeDetector({ formats: want }) : false;
+        } else this._detector = false;
+      } catch (_) { this._detector = false; }
+      return this._detector;
+    },
+    /* Camera loop: video element + canvas element + onhit(rawText). */
+    async loop(video, canvas, onhit, isActive) {
+      const det = await this.detector();
+      const tick = async () => {
+        if (!isActive()) return;
+        try {
+          if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            let raw = '';
+            if (det) {
+              const codes = await det.detect(video).catch(() => []);
+              if (codes && codes.length) raw = codes[0].rawValue || '';
+            } else if (window.jsQR) {
+              canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const code = window.jsQR(img.data, img.width, img.height);
+              if (code && code.data) raw = code.data;
+            }
+            if (raw) {
+              const now = Date.now();
+              if (raw !== this._last || now - this._lastAt > 4000) {
+                this._last = raw; this._lastAt = now;
+                if (navigator.vibrate) navigator.vibrate(120);
+                onhit(raw);
+              }
+            }
+          }
+        } catch (_) { }
+        this._raf = requestAnimationFrame(tick);
+      };
+      tick();
+    },
+    /* Keyboard-wedge: hardware scanners type fast and end with Enter.
+       Buffers keystrokes globally; a burst of 4+ chars arriving <35 ms apart
+       followed by Enter = a scan (human typing is far slower). */
+    attach(onhit) {
+      let buf = '', lastKey = 0;
+      document.addEventListener('keydown', (e) => {
+        const now = Date.now();
+        const isFast = now - lastKey < 35;
+        lastKey = now;
+        if (e.key === 'Enter') {
+          if (buf.length >= 4 && isFast) {
+            const scanned = buf; buf = '';
+            const el = document.activeElement;
+            const editing = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA');
+            // Never hijack normal form typing: only fire when the burst was scanner-fast.
+            e.preventDefault();
+            if (editing && el.value && el.value.endsWith(scanned)) el.value = '';
+            onhit(scanned);
+          } else buf = '';
+          return;
+        }
+        if (e.key.length === 1) { buf = isFast ? buf + e.key : e.key; }
+      }, true);
     }
   },
 

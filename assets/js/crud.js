@@ -56,6 +56,7 @@ const CRUD = {
       {key:'arm',label:'Arm',type:'text'},
       {key:'gender',label:'Gender',type:'select',options:['male','female']},
       {key:'date_of_birth',label:'Date of birth',type:'date'},
+      {key:'admission_year',label:'Admission year (actual year the student joined the school)',type:'number',help:'V11.7: printed on the lifetime ID card. For pre-existing students this is the year they REALLY joined — often earlier than the year in the auto admission number. Leave blank if unknown (the card then omits it).'},
       {key:'guardian_name',label:'Guardian name',type:'text'},
       {key:'guardian_phone',label:'Guardian phone',type:'tel'},
       {key:'guardian_email',label:'Guardian email',type:'email'},
