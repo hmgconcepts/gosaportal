@@ -612,7 +612,10 @@ const App = {
   /* V10.2 (#8): status_manager moved OUT of the hard owner-only set — it is
      now governed by Module Access Control (default 'none' seeded by v10.2
      SQL, so behaviour is unchanged until the owner flips it). */
-  LEADERSHIP_OWNER_ONLY:new Set(['site_license','license','developer']),
+  /* V11.5 (#2): 'developer' removed — it is the About-the-Developer BRAND page
+     (founder bio + ecosystem links, no controls). Every role may see it; the
+     owner cockpit remains site_license/license only. */
+  LEADERSHIP_OWNER_ONLY:new Set(['site_license','license']),
 
   /* Modules that parents/students should NEVER see. The whitelist
      (PARENT_WHITELIST / STUDENT_WHITELIST) handles everything else.
@@ -681,7 +684,7 @@ const App = {
     
     'feature-guide','feature_guide','about','contact',
     'index','login','apply',
-    'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products'
+    'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products','developer'
   ]),
 
   /* Role-friendly modules that PARENTS can see (no admin/finance/HR) */
@@ -705,7 +708,7 @@ const App = {
     'voting',
     'feature-guide','feature_guide','about','contact',
     'index','login','apply',
-    'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products'
+    'cbt-exam','cbt_exam','ecosystem','ecosystem_products','hmg_digital_products','developer'
   ]),
 
   /* denyParent ... financial_aid, denyStudent ... transport — second safety net
