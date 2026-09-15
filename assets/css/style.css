@@ -484,7 +484,12 @@ body { letter-spacing: -0.01em; background: linear-gradient(180deg,#f8fafc 0%,#e
 .app-nav a { color:#334155 !important; }
 .app-nav a:hover { background:#eaf2ff !important; color:var(--primary) !important; }
 .app-nav a.active { background:linear-gradient(135deg,var(--primary),var(--accent)) !important; color:#fff !important; }
-.card, .stat-card { background:rgba(255,255,255,.96) !important; border:1px solid #dde7f3 !important; box-shadow:0 12px 30px rgba(15,23,42,.07) !important; }
+/* V11.4 FIX: the previous universal !important white background beat every inline
+   gradient hero card (analytics, developer…), leaving white text on a white card —
+   invisible until highlighted. Cards that declare their own gradient are excluded. */
+.card:not([style*="linear-gradient"]), .stat-card { background:rgba(255,255,255,.96) !important; border:1px solid #dde7f3 !important; box-shadow:0 12px 30px rgba(15,23,42,.07) !important; }
+.card[style*="linear-gradient"] { border:0 !important; box-shadow:0 12px 30px rgba(15,23,42,.18) !important; }
+.card[style*="linear-gradient"] h2, .card[style*="linear-gradient"] h3, .card[style*="linear-gradient"] h4, .card[style*="linear-gradient"] p { color:#fff; }
 .btn-primary { background:linear-gradient(135deg,var(--primary),var(--accent)) !important; border:0 !important; box-shadow:0 10px 22px rgba(37,99,235,.18); }
 .btn-outline { background:#fff !important; border-color:#cbd5e1 !important; }
 .form-input:focus, .form-select:focus, .form-textarea:focus { box-shadow:0 0 0 4px var(--ring) !important; }

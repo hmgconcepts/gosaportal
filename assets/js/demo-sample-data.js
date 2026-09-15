@@ -155,6 +155,84 @@ const DemoSampleData = {
 };
 window.DemoSampleData = DemoSampleData;
 
+/* ====================================================================
+   V11.4 — ONE-CLICK SAMPLE-DATA REMOVAL (the mirror of run()).
+   Deletes EXACTLY the rows the loader creates and nothing else: every
+   sample row carries distinctive fingerprint values (titles, asset
+   tags, ISBNs, reasons, subjects) that real school data will not
+   collide with, so removal is surgical. Idempotent: rows already gone
+   are simply skipped. Admin-gated by RLS like every other delete.
+   ==================================================================== */
+DemoSampleData.MANIFEST = [
+  { table:'inventory',        col:'asset_tag', vals:['ICT-001','ICT-002','LAB-014','FUR-101','TRN-001','FAC-003'], label:'Inventory (asset register)' },
+  { table:'library',          col:'isbn',      vals:['978-0385474542','978-9781255429','978-9781234567','978-9785401234','978-0333456789','978-9788765432'], label:'Library catalogue' },
+  { table:'admission_links',  col:'label',     vals:['2026/2027 JSS 1 Entrance Intake','2025/2026 SS 1 Transfer Window (closed)'], label:'Application links' },
+  { table:'assignments',      col:'title',     vals:['Essay: My Role Model','Simultaneous Equations Worksheet','States of Matter Poster','Civic Education Group Project'], label:'Assignments' },
+  { table:'behaviour_points', col:'reason',    vals:['Led the class study group all week','Volunteered to clean the laboratory','Perfect punctuality this month','Late submission of two assignments'], label:'Behaviour points' },
+  { table:'support_plans',    col:'need_type', vals:['Reading fluency','Mathematics anxiety','Speech support'], label:'Support plans' },
+  { table:'helpdesk_tickets', col:'subject',   vals:['Projector in SS2 not displaying','Leaking tap in junior block','Faulty socket in science lab','Broken chairs in JSS 1B'], label:'Help-desk tickets' },
+  { table:'staff_bonus',      col:'reason',    vals:['Best WAEC Mathematics results in three years','Coordinated inter-house sports'], label:'Staff bonuses' },
+  { table:'staff_loans',      col:'notes',     vals:['Laptop purchase support, approved by proprietor.','Medical advance, fully repaid.'], label:'Staff loans' },
+  { table:'staff_appraisals', col:'comments',  vals:['Outstanding lesson delivery; class average rose 14% this session.','Strong classroom management; recommend ICT-integration training.'], label:'Staff appraisals' },
+  { table:'eresources',       col:'title',     vals:['WAEC Past Questions — Mathematics','Phonics drill audio pack'], label:'E-resources' }
+];
+DemoSampleData.MR_TITLES = {
+  inbox:['Welcome to the portal','PTA meeting reminder','Submit scheme of work'],
+  gamification:['Blue House — Inter-house Quiz Champions','Reading Challenge — 1000 Pages Club'],
+  cafeteria:['Jollof rice & grilled chicken','Beans porridge & plantain'],
+  lost_found:['Blue water bottle (found)','Casio fx-991 calculator (lost)'],
+  parent_meeting:['Third-Term PTA General Meeting'],
+  front_desk:['Prospectus enquiry — walk-in','Courier dispatch — WAEC forms'],
+  broadcast:['Results released','Resumption reminder'],
+  reports:['Termly enrolment summary'],
+  lms:['Quadratic Equations — video lesson','Photosynthesis explained'],
+  document_builder:['Fee clearance letter'],
+  facility_booking:['School hall — PTA meeting','Football pitch — inter-house practice'],
+  compliance:['Fire extinguisher service','Ministry of Education inspection'],
+  fleet_tracking:['Bus 1 — morning route'],
+  transcripts:['Session transcript'],
+  counselling:['Exam anxiety session'],
+  rubrics:['Argumentative essay rubric'],
+  career_counseling:['University guidance — sciences'],
+  financial_aid:["Proprietor\u2019s Scholarship"],
+  book_request:['Further Mathematics — Egbe et al'],
+  school_calendar:['Next term resumption'],
+  messages:['Revision groups announced','Fee balance reminder']
+};
+DemoSampleData.clear = async function(onProgress){
+  if (!this.sb()) throw new Error('Database not configured.');
+  this.log = [];
+  const zap = async (label, fn) => {
+    try {
+      const r = await fn();
+      if (r && r.error) this.log.push(label + ': ⚠ ' + r.error.message);
+      else this.log.push(label + ': 🧹 ' + ((r && r.count != null) ? r.count : 'matching') + ' sample row(s) removed');
+    } catch(e){ this.log.push(label + ': ⚠ ' + (e.message || e)); }
+    if (onProgress) onProgress(this.log);
+  };
+  for (const m of this.MANIFEST){
+    await zap(m.label, () => this.sb().from(m.table).delete({ count:'exact' }).in(m.col, m.vals));
+  }
+  // module_records: match module + exact sample title so real records survive.
+  for (const [module, titles] of Object.entries(this.MR_TITLES)){
+    await zap('module_records/' + module, () => this.sb().from('module_records').delete({ count:'exact' }).eq('module', module).in('title', titles));
+  }
+  // transfer_cert titles are year-stamped (TC/<year>/003) — match the pattern.
+  await zap('module_records/transfer_cert', () => this.sb().from('module_records').delete({ count:'exact' }).eq('module','transfer_cert').like('title','TC/%/003'));
+  // Payroll: the loader's June-2026 bank-transfer run with its exact basic ladder.
+  await zap('Payroll (June run)', () => this.sb().from('payroll').delete({ count:'exact' })
+    .eq('month','June').eq('year',2026).eq('method','bank transfer').in('basic',[150000,160000,170000,180000]));
+  // Promotion drafts: the loader's synthetic averages in draft states only.
+  await zap('Promotion drafts', () => this.sb().from('promotions').delete({ count:'exact' })
+    .in('average',[41,70,75,85,90]).in('status',['pending','applied']));
+  // Block the auto-fill from re-adding rows for 24h on this device.
+  try { localStorage.setItem('sc-demo-autofill-at', String(Date.now())); } catch(_){ }
+  this.log.push('Done — sample rows removed. Real school records were never touched (deletes match the loader\u2019s exact fingerprint values only).');
+  if (onProgress) onProgress(this.log);
+  return this.log;
+};
+
+
 /* DEMO AUTO-FILL: on demo deployments the sample loader runs by itself the
    moment an admin/teacher opens any page — prospects never see empty pages.
    Idempotent (tables with data are skipped) + once-per-day per device. */
