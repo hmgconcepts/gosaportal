@@ -493,7 +493,11 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
             <div class="card" style="margin-bottom:16px;border:2px solid #f9a8d4" data-admin-only>
         <h3>🎬 One-Click Demo Sample Data</h3>
         <p style="color:var(--gray-600);margin-top:4px">Instantly fill every showcase page with believable rows — payroll run, asset register, application links, messages, assignments, behaviour points, support plans, library shelf, help-desk tickets, house points, cafeteria menu, lost &amp; found, PTA meetings and more. <b>Idempotent:</b> tables that already have data are skipped, so clicking twice never duplicates. Perfect before showing the platform to a prospective school.</p>
-        <button class="btn btn-primary" onclick="DS.fill()">🎬 Load sample data now</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="DS.fill()">🎬 Load sample data now</button>
+          <button class="btn btn-outline" style="border-color:#ef4444;color:#ef4444" onclick="DS.clear()">🧹 Delete loaded sample data</button>
+        </div>
+        <p style="color:var(--gray-500);font-size:.82rem;margin:8px 0 0">🧹 <b>Delete loaded sample data</b> removes exactly the rows the loader creates — payroll run, asset register, library shelf, tickets, messages, PTA, promotions and the rest — matched by their unique sample fingerprints, so <b>real school records are never touched</b>. Safe to click any time; rows already deleted are simply skipped.</p>
         <div id="ds-log" style="margin-top:10px;font-size:.85rem;color:var(--gray-600)"></div>
       </div>
 <div class="card" style="margin-bottom:16px" data-admin-only>
@@ -673,6 +677,15 @@ const DS={
     try{const log=await DemoSampleData.run(l=>{box.innerHTML=l.map(x=>'<div>'+x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');});
       box.innerHTML=log.map(x=>'<div>'+x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('')+'<div style="margin-top:6px"><b>Done ✓</b> Open any page in the sidebar to see the data live.</div>';
       toast('🎬 Sample data loaded — every showcase page now has rows.','success',8000);
+    }catch(e){box.textContent='';toast(e.message||e,'danger',9000);}
+  },
+  async clear(){
+    if(!window.DemoSampleData||!DemoSampleData.clear){toast('Sample-data engine still loading — try again in a second.','warning');return;}
+    if(!confirm('Delete ALL loaded sample data?\n\nOnly the rows created by the sample loader are removed (matched by their exact sample fingerprints — titles, asset tags, ISBNs…). Real school records are never touched.\n\nContinue?'))return;
+    const box=document.getElementById('ds-log');box.innerHTML='<span class="pulse">Removing sample data…</span>';
+    try{const log=await DemoSampleData.clear(l=>{box.innerHTML=l.map(x=>'<div>'+x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');});
+      box.innerHTML=log.map(x=>'<div>'+x.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</div>').join('');
+      toast('🧹 Sample data removed — every page now shows only real school records.','success',8000);
     }catch(e){box.textContent='';toast(e.message||e,'danger',9000);}
   }
 };

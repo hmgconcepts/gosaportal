@@ -492,6 +492,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <button class="btn btn-outline" style="background:rgba(255,255,255,.95);color:#0c4a6e;border-color:#fff" onclick="AN.exportPDF()">⬇ PDF</button>
         <button class="btn btn-outline" style="background:rgba(255,255,255,.95);color:#0c4a6e;border-color:#fff" onclick="AN.exportCSV()">⬇ JSON</button>
       </div>
+      <p id="an-refreshed" style="font-size:.78rem;color:rgba(255,255,255,.85);margin:8px 0 0"></p>
     </div>
     <div class="grid grid-3" style="margin-bottom:16px">
       <div class="card"><h4 style="margin:0 0 4px">👨‍🎓 Total students</h4><div style="font-size:1.8rem;font-weight:900;color:#4f46e5" id="an-students">–</div></div>
@@ -512,6 +513,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="card"><h3>💼 Staff by role</h3><div style="height:240px"><canvas id="an-staff-role"></canvas></div></div>
       <div class="card"><h3>📊 Top subjects</h3><div style="height:240px"><canvas id="an-top-subj"></canvas></div></div>
       <div class="card"><h3>🎂 Birthdays</h3><div style="height:240px"><canvas id="an-bday"></canvas></div></div>
+      <div class="card"><h3>🚻 Gender split</h3><div style="height:240px"><canvas id="an-gender"></canvas></div></div>
+      <div class="card"><h3>🧭 Reading this page</h3><p style="font-size:.88rem;line-height:1.7;color:var(--gray-600);margin:0">Green attendance bars are ≥85%, amber 70–84%, red below 70 — start conversations with the red classes. The Decision Center below analyses <b>official report scores</b> per term/session: prioritise subjects and classes under 50%, celebrate the Top&nbsp;10, and act on the at-risk list before the next exam cycle. Use ⬇ PDF for board meetings.</p></div>
     </div>
     <div class="grid grid-2" style="margin-bottom:16px">
       <div class="card"><h3>📊 Income vs Expense Monthly Trend</h3><div style="height:240px"><canvas id="an-finance-trend"></canvas></div></div>
@@ -576,7 +579,7 @@ const AN={
     };
     try{
       const [st, fees, att, cbt, news, unread, classes, staff, subjects, students, finance, checkins] = await Promise.all([
-        safeFetch('students', 'id,full_name,class,admission_no,date_of_birth,created_at'),
+        safeFetch('students', 'id,full_name,class,admission_no,date_of_birth,created_at,gender'),
         safeFetch('fee_payments', 'id,amount_paid,created_at'),
         safeFetch('attendance', 'id,status,date,class'),
         safeFetch('cbt_exams', 'id,subject,code,is_open,created_at'),
@@ -593,9 +596,14 @@ const AN={
       set('an-students', (st||[]).length);
       const feesTotal = (fees||[]).reduce((a,b)=>a + (Number(b.amount_paid)||0), 0);
       set('an-fees', '₦' + feesTotal.toLocaleString());
-      const attPresent = (att||[]).filter(a=>String(a.status).toLowerCase()==='present').length;
-      set('an-att', (att||[]).length ? Math.round(attPresent/(att||[]).length*100)+'%' : '—');
-      set('an-cbt', (cbt||[]).length ? Math.round(cbt.filter(c=>c.is_open).length/(cbt||[]).length*100)+'%' : '—');
+      /* V11.4: the KPI says 30d — measure 30 days, not all-time. */
+      const cut30 = new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+      const att30 = (att||[]).filter(a=>(a.date||'') >= cut30);
+      const attPresent = att30.filter(a=>String(a.status).toLowerCase()==='present').length;
+      set('an-att', att30.length ? Math.round(attPresent/att30.length*100)+'%' : '—');
+      const cbt30 = (cbt||[]).filter(c=>(c.created_at||'') >= cut30);
+      set('an-cbt', cbt30.length ? (cbt30.length+' exam'+(cbt30.length===1?'':'s')) : '—');
+      const stamp=document.getElementById('an-refreshed'); if(stamp) stamp.textContent='Data refreshed '+new Date().toLocaleTimeString()+' — every number below is live from your database.';
       set('an-news', (news||[]).filter(n=> (n.created_at||'') >= new Date(Date.now()-7*86400000).toISOString()).length);
       set('an-unread', (unread||[]).filter(n=>!n.read_by || n.read_by.length===0).length);
       this.renderAll(fees||[], att||[], cbt||[], classes||[], staff||[], subjects||[], students||[], finance||[], checkins||[]);
@@ -632,6 +640,8 @@ const AN={
     const bdayMonths = Array(12).fill(0);
     (students||[]).forEach(s => { if(s.date_of_birth){ const m = new Date(s.date_of_birth).getMonth(); if(!isNaN(m)) bdayMonths[m]++; } });
     this.makeChart('an-bday','bar',{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], datasets:[{label:'Birthdays', data:bdayMonths, backgroundColor:'rgba(236,72,153,.7)', borderRadius:6}]}, {plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}});
+    const genders={};(students||[]).forEach(s=>{const g=String(s.gender||'').trim().toLowerCase();const k=g.startsWith('m')?'Male':g.startsWith('f')?'Female':'Not set';genders[k]=(genders[k]||0)+1;});
+    this.makeChart('an-gender','doughnut',{labels:Object.keys(genders), datasets:[{data:Object.values(genders), backgroundColor:['#4f46e5','#ec4899','#94a3b8']}]}, {plugins:{legend:{position:'right'}}});
 
     // Income vs Expense Monthly Trend
     const finIncome = months.map(m => (finance||[]).filter(f => f.type === 'income' && (f.created_at||'').slice(0,7) === m.key).reduce((a,b)=>a + (Number(b.amount)||0), 0) + (fees||[]).filter(f => (f.created_at||'').slice(0,7) === m.key).reduce((a,b)=>a + (Number(b.amount_paid)||0), 0));
@@ -652,7 +662,32 @@ const AN={
     const cv = document.getElementById(id);
     if(!cv || !window.Chart) return;
     if(this.charts[id]) try{this.charts[id].destroy();}catch(_){}
+    /* V11.4: empty datasets render a helpful hint, never a silent blank box. */
+    const flat=(data.datasets||[]).flatMap(d=>d.data||[]);
+    const empty=!flat.length || flat.every(v=>!v);
+    let hint=cv.parentNode.querySelector('.an-empty');
+    if(empty){
+      cv.style.display='none';
+      if(!hint){hint=document.createElement('div');hint.className='an-empty';hint.setAttribute('style','height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--gray-500);font-size:.85rem;padding:14px');cv.parentNode.appendChild(hint);}
+      hint.textContent=(this.EMPTY_HINTS[id]||'No data yet — this chart fills up as the school uses the platform.');
+      return;
+    }
+    if(hint)hint.remove();
+    cv.style.display='';
     this.charts[id] = new Chart(cv, {type, data, options: Object.assign({responsive:true, maintainAspectRatio:false}, opts||{})});
+  },
+  EMPTY_HINTS:{
+    'an-enroll':'No enrolment dates yet — add students (Students page) and this trend draws itself.',
+    'an-fees-chart':'No fee payments recorded yet — record payments on the Fees page to see the monthly trend.',
+    'an-att-chart':'No attendance in the last 30 days — mark attendance and per-class rates appear here.',
+    'an-cbt-chart':'No CBT exams yet — create one on the CBT page.',
+    'an-class-size':'Add classes and students to see class sizes.',
+    'an-staff-role':'Add staff records to see the role split.',
+    'an-top-subj':'Add subjects to see popularity.',
+    'an-bday':'Add student dates of birth to see the birthday spread.',
+    'an-finance-trend':'Record income/expenses (Finance) or fee payments to see the trend.',
+    'an-staff-lateness':'Staff check-ins appear after the check-in module is used.',
+    'an-gender':'Set the gender field on student records to see the split.'
   },
   async initAcademicFilters(){if(this._academicFiltersReady)return;const [p,c,s]=await Promise.all([sb.from('academic_periods').select('term,session').order('starts_on',{ascending:false}),sb.from('classes').select('name').order('name'),sb.from('subjects').select('name').order('name')]);const fill=(id,vals,label)=>{const e=document.getElementById(id);if(e)e.innerHTML='<option value="">All '+label+'</option>'+[...new Set(vals.filter(Boolean))].map(v=>'<option value="'+this.esc(v)+'">'+this.esc(v)+'</option>').join('');};fill('ai-session',(p.data||[]).map(x=>x.session),'sessions');fill('ai-term',(p.data||[]).map(x=>x.term),'terms');fill('ai-class',(c.data||[]).map(x=>x.name),'classes');fill('ai-subject',(s.data||[]).map(x=>x.name),'subjects');this._academicFiltersReady=true;},
   async loadAcademicInsights(){const val=id=>(document.getElementById(id)||{}).value||'',session=val('ai-session'),term=val('ai-term'),cls=val('ai-class'),subject=val('ai-subject'),host=document.getElementById('ai-output');let q=sb.from('report_subject_totals').select('*').limit(20000);if(session)q=q.eq('session',session);if(term)q=q.eq('term',term);if(cls)q=q.eq('class',cls);if(subject)q=q.eq('subject',subject);const r=await q;if(r.error){host.innerHTML='<div class="notice notice-error">'+this.esc(r.error.message)+'</div>';return;}const rows=r.data||[];this.academicExport={filters:{session,term,class:cls,subject},rows,generated_at:new Date().toISOString()};if(!rows.length){host.innerHTML='<div class="notice">No official report scores match these filters. Bulk-push CBT scores or enter assessment scores first.</div>';document.getElementById('an-top-students').innerHTML='<p>No official scores.</p>';document.getElementById('an-low-students').innerHTML='<p>No official scores.</p>';return;}const avg=a=>a.length?a.reduce((x,y)=>x+Number(y.percent||0),0)/a.length:0,schoolAvg=avg(rows),pass=rows.filter(x=>Number(x.percent)>=50).length/rows.length*100,studentMap={},classMap={},subjectMap={};rows.forEach(x=>{const sk=x.student_id||x.student_id_ref||x.student_name;(studentMap[sk]||(studentMap[sk]={name:x.student_name||sk,class:x.class,values:[]})).values.push(Number(x.percent||0));(classMap[x.class]||(classMap[x.class]=[])).push(Number(x.percent||0));(subjectMap[x.subject]||(subjectMap[x.subject]=[])).push(Number(x.percent||0));});const students=Object.values(studentMap).map(x=>({...x,avg:avg(x.values)})).sort((a,b)=>b.avg-a.avg),classes=Object.entries(classMap).map(([name,v])=>({name,avg:avg(v)})).sort((a,b)=>b.avg-a.avg),subjects=Object.entries(subjectMap).map(([name,v])=>({name,avg:avg(v),pass:v.filter(x=>x>=50).length/v.length*100})).sort((a,b)=>b.avg-a.avg);this.academicExport.summary={school_average:schoolAvg,pass_rate:pass,student_count:students.length,class_count:classes.length,subject_count:subjects.length,students,classes,subjects};const table=(title,data,extra)=>'<div><h4>'+title+'</h4><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Average</th>'+(extra?'<th>Pass rate</th>':'')+'</tr></thead><tbody>'+data.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+this.esc(x.name)+'</td><td><b>'+x.avg.toFixed(1)+'%</b></td>'+(extra?'<td>'+x.pass.toFixed(1)+'%</td>':'')+'</tr>').join('')+'</tbody></table></div></div>';host.innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+schoolAvg.toFixed(1)+'%</div><div class="stat-label">School average</div></div><div class="stat-card"><div class="stat-value">'+pass.toFixed(1)+'%</div><div class="stat-label">Subject pass rate</div></div><div class="stat-card"><div class="stat-value">'+students.length+'</div><div class="stat-label">Students analysed</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Student-subject records</div></div></div><div class="grid grid-2">'+table('Class performance',classes,false)+table('Subject performance',subjects,true)+'</div><div class="notice" style="margin-top:10px">Decision guide: prioritise subjects/classes below 50%; compare pass rate and average; review learners in the at-risk table; document intervention and re-check next term.</div>';const studentRows=(arr,status)=>'<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Student</th><th>Class</th><th>Average</th><th>Status</th></tr></thead><tbody>'+arr.map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+this.esc(x.name)+'</b></td><td>'+this.esc(x.class||'')+'</td><td>'+x.avg.toFixed(1)+'%</td><td>'+status(x.avg)+'</td></tr>').join('')+'</tbody></table></div>';document.getElementById('an-top-students').innerHTML=studentRows(students.slice(0,10),x=>x>=80?'Excellent':x>=70?'Very good':'Good');document.getElementById('an-low-students').innerHTML=studentRows(students.slice().sort((a,b)=>a.avg-b.avg).slice(0,10),x=>x<40?'Critical':x<50?'At risk':'Monitor');},
