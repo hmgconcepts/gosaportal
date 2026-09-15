@@ -9,13 +9,11 @@
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Digital ID Cards • God of Seed Academy">
-<meta property="og:description" content="God of Seed Academy — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -60,22 +58,11 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 @media(max-width:900px){.app-sidebar,.app-layout.floating .app-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:min(86vw,310px)!important;height:100vh!important;margin:0!important;border-radius:0!important;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 40px rgba(0,0,0,.22);z-index:100}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{flex-direction:column;align-items:stretch}.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:auto;min-width:0;border-right:none;border-bottom:1px solid #e2e8f0}.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);justify-items:stretch;text-align:left;min-height:42px;font-size:.875rem}.app-content{padding:16px}.app-topbar{padding:12px 14px;gap:10px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}.user-chip{max-width:150px;overflow:hidden}.user-chip strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 @media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
 </style>
-
-    <meta name="description" content="God of Seed Academy — Digital ID Cards. Comprehensive school management platform.">
-    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <meta name="author" content="HMG Concepts">
-    <meta name="robots" content="index, follow">
     <link rel="canonical" href="./idcards.html">
-    <meta property="og:title" content="Digital ID Cards • God of Seed Academy">
-    <meta property="og:description" content="God of Seed Academy — Digital ID Cards. Comprehensive school management platform.">
     <meta property="og:url" content="./idcards.html">
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Digital ID Cards • God of Seed Academy">
-    <meta name="twitter:description" content="God of Seed Academy — Digital ID Cards. Comprehensive school management platform.">
-    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
-  </head>
+</head>
 <body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
 
 <div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
@@ -119,7 +106,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
           <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
@@ -510,7 +497,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         <div class="grid grid-2">
           <div class="form-group"><label>Pick a <span id="ic-pick-label">student</span></label><select class="form-select" id="ic-student" onchange="ICUI.pick(this.value)"><option value="">— choose —</option></select></div>
           <div class="form-group"><label>…or enter manually</label><input class="form-input" id="ic-name" placeholder="Full name" oninput="ICUI.render()"></div>
-          <div class="form-group"><label id="ic-class-label">Class</label><input class="form-input" id="ic-class" placeholder="JSS1" oninput="ICUI.render()"></div>
+          <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><input class="form-input" id="ic-class" placeholder="JSS1 (filters 🖨 Print ALL)" oninput="ICUI.render()"></div>
           <div class="form-group"><label>ID / Admission / Staff no</label><input class="form-input" id="ic-id" placeholder="(auto)" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Gender</label><input class="form-input" id="ic-gender" placeholder="male/female" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Phone</label><input class="form-input" id="ic-phone" placeholder="0803..." oninput="ICUI.render()"></div>
@@ -518,8 +505,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           <div class="form-group"><label>Blood group (optional)</label><input class="form-input" id="ic-blood" placeholder="O+" oninput="ICUI.render()"></div>
           <div class="form-group" style="grid-column:1/-1"><label>Photo URL (auto-filled; Google Drive links supported, no upload)</label><input class="form-input" id="ic-photo" placeholder="https://drive.google.com/file/d/..." oninput="ICUI.render()"></div>
         </div>
+        <div class="notice" style="margin-bottom:10px;font-size:.82rem">🪪 <b>Lifetime card design (V11.6):</b> student cards no longer print Class or Valid-Thru (and staff cards have no Valid-Thru) — one physical card serves the holder's entire studentship/employment. Printing now produces the <b>front AND a matching back side</b> (rules, if-found notice, emergency line, blood-group ribbon, verify QR, signature) laid side-by-side for cutting or duplex printing.</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="ICUI.print()">🖨 Print ID Card</button>
+          <button class="btn btn-primary" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
           <button class="btn btn-outline" onclick="ICUI.printAll()" title="Type a class in the Class box to print only that class">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
         </div>
       </div>
@@ -543,8 +531,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
-<script src="assets/js/report-engine.js"></script>
-<script src="assets/js/analytics.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
@@ -577,14 +563,16 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         const {data,error}=await sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url').order('full_name').limit(3000); if(error)throw error;
         ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
       } else {
+        /* V11.6: role-scoped like the field-proven template — parents see only
+           linked children, students only themselves; staff/admin see all. */
         const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.SCHOOL_USER && SCHOOL_USER.role) || '';
         const userId = (window.SC_PROFILE && SC_PROFILE.id) || (window.SCHOOL_USER && SCHOOL_USER.id) || null;
-        let query = sb.from('students').select('id,full_name,class,arm,admission_no,gender,photo_url,date_of_birth').order('full_name').limit(5000);
+        let query = sb.from('students').select('id,full_name,class,arm,admission_no,gender,photo_url,date_of_birth,created_at,guardian_phone').order('full_name').limit(5000);
         if (role === 'student' && userId) query=query.eq('user_id',userId);
         if (role === 'parent' && userId) { const linked=await sb.from('parent_child').select('student_id').eq('parent_id',userId); const ids=(linked.data||[]).map(x=>x.student_id).filter(Boolean); if(!ids.length){ICUI.all=[];this.loaded=true;this.render();return;} query=query.in('id',ids); }
         const {data,error}=await query; if(error)throw error;
         ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
-        // Auto-select an actual linked child/self, never a sample object.
+        // Auto-select first student/child for parents or students (role declared above)
         if (ICUI.all.length > 0 && (role === 'parent' || role === 'student')) {
           setTimeout(() => {
             sel.value = JSON.stringify(ICUI.all[0]);
@@ -595,7 +583,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     }catch(e){ console.warn('ID-card list load failed:', e); if(typeof toast==='function')toast('Could not load list. You can still type details manually and print.', 'warning', 7000); }
     this.loaded=true; this.render();
   },
-  pick(v){ if(!v){this.cur={}; this.render(); return;} let s={}; try{s=JSON.parse(v);}catch(_){s={};} this.cur=s;
+  pick(v){ if(!v){this.cur={}; this.render(); return;} let s={}; try{s=JSON.parse(v);}catch(_){s={};} if(!s.phone&&s.guardian_phone)s.phone=s.guardian_phone; this.cur=s;
     document.getElementById('ic-name').value=s.full_name||'';
     document.getElementById('ic-class').value=(this.kind==='staff'?(s.staff_type||s.role||''):(s.class||''));
     document.getElementById('ic-id').value=(this.kind==='staff'?(s.staff_no||s.id||''):(s.admission_no||s.id||''));
@@ -604,13 +592,15 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     if(document.getElementById('ic-dept')) document.getElementById('ic-dept').value=(s.department||s.role||'');
     document.getElementById('ic-photo').value=s.photo_url||''; this.render(); },
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
-  person(){ var to=this.tplOpts(); const typedName=(document.getElementById('ic-name').value||'').trim(); const sample=this.sample(); const base={ full_name:typedName||this.cur.full_name||sample.full_name, date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:document.getElementById('ic-photo').value||this.cur.photo_url||'', gender:document.getElementById('ic-gender').value||this.cur.gender||'', phone:document.getElementById('ic-phone').value||this.cur.phone||'', blood_group:document.getElementById('ic-blood').value||'', type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
+  person(){ var to=this.tplOpts(); const typedName=(document.getElementById('ic-name').value||'').trim(); const sample=this.sample(); const base={ full_name:typedName||this.cur.full_name||sample.full_name, created_at:(this.cur&&this.cur.created_at)||'', date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:document.getElementById('ic-photo').value||this.cur.photo_url||'', gender:document.getElementById('ic-gender').value||this.cur.gender||'', phone:document.getElementById('ic-phone').value||this.cur.phone||'', blood_group:document.getElementById('ic-blood').value||'', type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
     if(this.kind==='staff'){ base.staff_no=document.getElementById('ic-id').value||this.cur.staff_no||sample.staff_no; base.staff_type=document.getElementById('ic-class').value||this.cur.staff_type||sample.staff_type; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role||sample.role; base.department=this.cur.department||sample.department; }
     else { base.admission_no=document.getElementById('ic-id').value||this.cur.admission_no||sample.admission_no; base.class=document.getElementById('ic-class').value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
     return base; },
   fallbackHtml(p){ return '<div class="sc-idcard" style="width:340px;border:1px solid #e2e8f0;border-radius:16px;padding:18px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.12);font-family:system-ui"><h3 style="margin:0;color:#0506ae">'+(window.SCHOOL&&SCHOOL.name||'School')+'</h3><p style="font-size:.75rem;color:#64748b">'+(p.type==='staff'?'STAFF IDENTITY CARD':'STUDENT IDENTITY CARD')+'</p><div style="display:flex;gap:12px;align-items:center"><div style="width:76px;height:76px;border-radius:12px;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900">'+(p.full_name||'S').charAt(0).toUpperCase()+'</div><div><b>'+esc(p.full_name||'')+'</b><br><span>'+esc(p.admission_no||p.staff_no||'')+'</span><br><span>'+esc(p.class||p.role||'')+'</span></div></div><p style="font-size:.65rem;color:#94a3b8;margin-bottom:0">If found, please return to the school office.</p></div>'; },
   cardHtml(p){ try{ if(window.Super&&Super.idcard&&Super.idcard.html) return Super.idcard.html(p); }catch(e){ console.error('ID-card render failed:',e); } return this.fallbackHtml(p); },
-  render(){ const box=document.getElementById('ic-preview'); if(!box)return; const html=this.cardHtml(this.person()); box.innerHTML=html||this.fallbackHtml(this.person()); },
+  render(){ const box=document.getElementById('ic-preview'); if(!box)return; const p=this.person();
+    let html=''; try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) html=Super.idcard.pairHtml(p); }catch(e){ console.error('pair render failed:',e); }
+    box.innerHTML=html||this.cardHtml(p)||this.fallbackHtml(p); },
   print(){ const p=this.person(); if(window.Super&&Super.idcard&&Super.idcard.print) Super.idcard.print(p); else this.printHtml(this.cardHtml(p),'ID Card'); },
   printHtml(cards,title){ const w=window.open('','_blank'); if(!w){toast('Popup blocked. Please allow popups.','warning');return;} const base=document.baseURI.replace(/[^/]*$/,''); w.document.open(); w.document.write('<!DOCTYPE html><html><head><title>'+esc(title||'ID Cards')+'</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:10px;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sc-idcard{break-inside:avoid;page-break-inside:avoid}</style></head><body>'+cards+'<script>window.onload=function(){var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.focus();window.print()},250)};var i=[].slice.call(document.images),n=i.length;if(!n)return go();var d=function(){if(--n<=0)go()};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}});setTimeout(go,2400)};<\/script></body></html>'); w.document.close(); },
   printAll(){ var to=this.tplOpts();
@@ -620,9 +610,10 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     let source=(ICUI.all&&ICUI.all.length)?ICUI.all:[this.person()];
     if(cls&&ICUI.kind!=='staff'){const filtered=source.filter(s=>String(s.class||'').trim().toLowerCase()===cls||String(s.class||'').trim().toLowerCase().startsWith(cls));if(filtered.length)source=filtered;else{toast('No students found for class "'+cls+'" — printing every student instead.','warning',6000);}}
     if(source.length>1&&typeof toast==='function')toast('🖨️ Printing '+source.length+' ID card(s)'+(cls?' for class '+cls.toUpperCase():'')+' in one job.','info',5000);
+    const pair=(pp)=>{ try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) return Super.idcard.pairHtml(pp); }catch(_){ } return ICUI.cardHtml(pp); };
     const cards=source.map(s=> ICUI.kind==='staff'
-      ? '<div style="margin:8px;display:inline-block">'+ICUI.cardHtml({full_name:s.full_name,staff_no:s.staff_no||s.id,role:s.role,department:s.department,staff_type:s.staff_type,gender:s.gender,phone:s.phone,photo_url:s.photo_url,type:'staff',template:to.template,pc:to.pc,ac:to.ac})+'</div>'
-      : '<div style="margin:8px;display:inline-block">'+ICUI.cardHtml({full_name:s.full_name,class:s.class,arm:s.arm,admission_no:s.admission_no||s.id,gender:s.gender,photo_url:s.photo_url,date_of_birth:s.date_of_birth,type:'student',template:to.template,pc:to.pc,ac:to.ac})+'</div>').join('');
+      ? '<div style="margin:8px 8px 18px;display:inline-block;page-break-inside:avoid">'+pair({full_name:s.full_name,staff_no:s.staff_no||s.id,role:s.role,department:s.department,staff_type:s.staff_type,gender:s.gender,phone:s.phone,photo_url:s.photo_url,type:'staff',template:to.template,pc:to.pc,ac:to.ac})+'</div>'
+      : '<div style="margin:8px 8px 18px;display:inline-block;page-break-inside:avoid">'+pair({full_name:s.full_name,class:s.class,arm:s.arm,admission_no:s.admission_no||s.id,created_at:s.created_at,gender:s.gender,phone:s.phone||s.guardian_phone,photo_url:s.photo_url,date_of_birth:s.date_of_birth,type:'student',template:to.template,pc:to.pc,ac:to.ac})+'</div>').join('');
     this.printHtml(cards, 'ID Cards'); }
 };
 document.addEventListener('DOMContentLoaded',()=>{ if(window.Super)Super.init(window.sb||null,window.SCHOOL); ICUI.load(); ICUI.render(); setTimeout(()=>ICUI.render(),500); }); if(document.readyState!=='loading'){ ICUI.load(); ICUI.render(); }
