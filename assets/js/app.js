@@ -617,6 +617,17 @@ const App = {
      owner cockpit remains site_license/license only. */
   LEADERSHIP_OWNER_ONLY:new Set(['site_license','license']),
 
+  /* V11.8 ROOT CAUSE (gosa staff missing ID card / About the Developer while
+     demo showed them, IDENTICAL code on both): a school admin who saved the
+     Page Access Manager BEFORE a page allowed a role stores that stale role
+     list in school_settings.role_access — and the saved map overrode code
+     defaults forever. Fix: brand/identity/self-service pages are MAP-IMMUNE —
+     saved access maps and nav-show maps may ADD roles to them but can never
+     hide them from the roles the generator ships. Real operational modules
+     stay fully governable by the Access Manager as before. */
+  MAP_IMMUNE:new Set(['developer','idcards','profile','change_password','feature_guide',
+    'hmg_digital_products','ecosystem_products','notifications','dashboard','about']),
+
   /* Modules that parents/students should NEVER see. The whitelist
      (PARENT_WHITELIST / STUDENT_WHITELIST) handles everything else.
      Only put truly admin/finance/HR-only modules here. Modules that
@@ -783,7 +794,7 @@ const App = {
     }
     if(!App.moduleAllowedForRole(id,role))return false;
     const map = this.roleAccessMap || {};
-    if (map[id] && Array.isArray(map[id])) {
+    if (map[id] && Array.isArray(map[id]) && !App.MAP_IMMUNE.has(id)) {
       return map[id].includes(role) || (role === 'teacher' && map[id].includes('staff')) || (role === 'staff' && map[id].includes('teacher'));
     }
     if (typeof T !== 'undefined' && T.roleAllow) {
@@ -832,7 +843,7 @@ const App = {
     const rawId = el && (el.getAttribute('data-module-id') || el.getAttribute('href') || '');
     const id = this.normalizeModuleId(rawId);
     const map = this.roleAccessMap || {};
-    if (map[id] && Array.isArray(map[id])) {
+    if (map[id] && Array.isArray(map[id]) && !App.MAP_IMMUNE.has(id)) {
       /* V9.7: a saved access map must never strip the admin tier — principal,
          head teacher and bursar are always included. */
       return ['super_admin','admin','proprietor','principal','head_teacher','bursar'].concat(map[id]).join(' ');
@@ -1055,7 +1066,7 @@ const App = {
       const allowOk = familyReadOnly || (App.canAccessAllowList(App.allowTextForElement(el), role) && App.moduleAllowedForRole(moduleId, role));
       let ok = allowOk;
       /* v5: if the page is in the nav-show map and the role is NOT in it, hide it (even if allowOk=true) */
-      if (ok && navShowMap[moduleId] && Array.isArray(navShowMap[moduleId]) && !isAdmin) {
+      if (ok && navShowMap[moduleId] && Array.isArray(navShowMap[moduleId]) && !isAdmin && !App.MAP_IMMUNE.has(App.normalizeModuleId(moduleId))) {
         // Use the roleSet to expand admin/staff/teacher inheritance
         const roles = App.roleSet(role);
         const visible = navShowMap[moduleId].some(r => roles.has(r));
