@@ -631,6 +631,21 @@ const Super = {
       const bits = [s.address ? '📍 ' + Super.esc(s.address) : '', s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join(' · ');
       return bits ? '<div style="font-size:.58rem;color:' + (dark ? '#94a3b8' : '#475569') + ';text-align:center;padding:5px 10px;line-height:1.5">' + bits + '</div>' : '';
     },
+    /* V11.6 LIFETIME CARD helpers: the physical card serves the student for
+       their ENTIRE studentship (and staff for their employment), so only
+       PERMANENT identity facts are printed — never class, arm, session or an
+       expiry. Class changes every year; the card must not. */
+    dmy(v) { if (!v) return ''; const d = new Date(v); if (isNaN(d)) return String(v); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); },
+    admittedYear(person) {
+      // Best evidence order: explicit admission year → year inside the
+      // admission number (e.g. GSA/2023/041) → record creation year.
+      if (person.admission_year) return String(person.admission_year);
+      const m = String(person.admission_no || '').match(/(?:^|[^0-9])((?:19|20)\d{2})(?:[^0-9]|$)/);
+      if (m) return m[1];
+      if (person.created_at) { const d = new Date(person.created_at); if (!isNaN(d)) return String(d.getFullYear()); }
+      return '';
+    },
+    validityNote(isStaff) { return isStaff ? 'Valid for the duration of employment' : 'Valid throughout studentship'; },
     html(person) {
       const s = Super.school || {};
       const photo = this.driveDirect(person.photo_url || '');
@@ -648,8 +663,14 @@ const Super = {
       const add = (k, v) => { if (v) rows.push('<tr><td style="color:#64748b;padding:1px 8px 1px 0;white-space:nowrap">' + Super.esc(k) + '</td><td style="font-weight:600">' + Super.esc(v) + '</td></tr>'); };
       add('ID No', idNo);
       if (isStaff) { add('Designation', person.role); add('Department', person.department); add('Type', person.staff_type); }
-      else { add('Class', person.class); add('Arm', person.arm); }
-      add('Gender', person.gender); add('Phone', person.phone);
+      else {
+        /* V11.6: PERMANENT facts only — class/arm removed by design (the
+           printed card lasts the whole studentship). */
+        add('D.O.B', this.dmy(person.date_of_birth || person.dob));
+        add('Admitted', this.admittedYear(person));
+      }
+      add('Gender', person.gender);
+      add(isStaff ? 'Phone' : 'Emergency', person.phone);
       add('Blood', person.blood_group);
       const session = (s.session || (new Date().getFullYear() + '/' + (new Date().getFullYear() + 1)));
       const pc = person.pc || s.primary || 'var(--primary,#4f46e5)';
@@ -671,14 +692,12 @@ const Super = {
       //   • deep navy header band: logo+name left, "SCHOOL NAME /
       //     STUDENT ID CARD" right
       //   • white body: rounded photo left, bold name + Class /
-      //     Student ID / D.O.B. / Valid Thru rows centre
+      //     Student ID / D.O.B. / Admitted rows centre (V11.6 lifetime card)
       //   • large QR + "SCAN TO VERIFY" right, small crest + barcode
       //     bottom-right
       // ============================================================
       if (tpl === 'premium') {
-        const dmy = (v) => { if (!v) return ''; const d = new Date(v); if (isNaN(d)) return String(v); return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); };
-        const yr = new Date().getFullYear();
-        const validThru = s.session || (yr + '/' + (yr + 1));
+        const dmy = (v) => this.dmy(v);
         const navy = pc || '#2d3d8f';
         // v7: exact sample typography — bold NAVY "Label:" + dark value
         const row = (k, v, bold) => v ? '<div style="font-size:.95rem;color:#111;margin:3px 0;line-height:1.35"><b style="color:' + navy + ';font-weight:800">' + Super.esc(k) + ':</b> <span style="' + (bold ? 'font-weight:700;' : 'font-weight:600;') + 'color:#111827">' + Super.esc(v) + '</span></div>' : '';
@@ -697,8 +716,8 @@ const Super = {
               '<div style="font-weight:900;font-size:1.55rem;color:#0f172a;line-height:1.12;margin-bottom:8px;letter-spacing:-.01em">' + Super.esc(person.full_name || person.name || '') + '</div>' +
               (isStaff
                 ? row('Designation', person.role, true) + row('Department', person.department) + row('Staff ID', idNo, true) + row('Phone', person.phone)
-                : row('Class', ((person.class || '') + ' ' + (person.arm || '')).trim(), true) + row('Student ID', idNo, true) + row('D.O.B.', dmy(person.date_of_birth || person.dob)) ) +
-              row('Valid Thru', validThru, true) +
+                : row('Student ID', idNo, true) + row('D.O.B.', dmy(person.date_of_birth || person.dob)) + row('Admitted', this.admittedYear(person)) + row('Blood Group', person.blood_group) ) +
+              '<div style="font-size:.72rem;color:#475569;margin-top:6px;font-style:italic">' + this.validityNote(isStaff) + '</div>' +
             '</div>' +
             '<div style="flex-shrink:0;text-align:center;width:118px">' +
               '<img src="' + this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || '', type: person.type || 'student' }), 220) + '" style="width:108px;height:108px" alt="QR">' +
@@ -783,7 +802,7 @@ const Super = {
           '<div style="background:' + pc + ';color:#fffef8;font-size:.6rem;letter-spacing:3px;text-align:center;padding:3px 0;font-weight:700">' + tag + '</div>' +
           '<div style="display:flex;gap:14px;padding:12px 16px;align-items:center">' + miniPhoto(88,104,6) +
           '<div style="flex:1"><div style="font-weight:800;font-size:1.1rem;color:#1f2937">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.74rem;border-collapse:collapse;color:#374151">' + detailRows + '</table></div>' + qrImg(64) + '</div>' +
-          '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 16px 8px"><div style="font-size:.6rem;color:#6b7280">Session: <b>' + Super.esc(session) + '</b></div>' + this.signBlock(pc, 92) + '</div>' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 16px 8px"><div style="font-size:.6rem;color:#6b7280;font-style:italic">' + this.validityNote(isStaff) + '</div>' + this.signBlock(pc, 92) + '</div>' +
           '<div style="border-top:1px solid ' + pc + '33">' + this.contactStrip(s, false) + '</div>' + credit + '</div>';
       }
 
@@ -798,7 +817,7 @@ const Super = {
           '<div style="text-align:center;padding:0 14px">' + bigPhoto + '<div style="font-weight:800;font-size:1.05rem;margin-top:8px;color:#0f172a">' + Super.esc(person.full_name || person.name || '') + '</div>' +
           '<table style="font-size:.74rem;margin:6px auto 0;border-collapse:collapse;text-align:left">' + rows.join('') + '</table></div>' +
           '<div style="display:flex;justify-content:center;padding:10px 0 6px"><img src="' + qr + '" style="width:74px;height:74px"></div>' +
-          '<div style="text-align:center;font-size:.6rem;color:#64748b;margin-bottom:4px">Session: <strong>' + Super.esc(session) + '</strong></div>' +
+          '<div style="text-align:center;font-size:.6rem;color:#64748b;margin-bottom:4px;font-style:italic">' + this.validityNote(isStaff) + '</div>' +
           '<div style="margin:0 auto 6px;width:110px">' + this.signBlock(pc, 100) + '</div>' +
           contactFooter + credit + '</div>';
       }
@@ -814,7 +833,7 @@ const Super = {
           '<table style="font-size:.73rem;margin-top:5px;border-collapse:collapse;color:#cbd5e1">' + rows.join('').replace(/#64748b/g, '#94a3b8').replace(/font-weight:600/g, 'font-weight:600;color:#fff') + '</table></div>' +
           '<img src="' + qr + '" style="width:66px;height:66px;background:#fff;padding:3px;border-radius:6px"></div>' +
           '<div style="background:#1e293b;padding:7px 14px;font-size:.6rem;color:#94a3b8;text-align:center">' + Super.esc(s.address || '') + ' · ' + Super.esc(s.phone || '') + ' · ' + Super.esc(s.email || '') + '<div style="display:flex;justify-content:center;margin-top:4px;filter:invert(0)"><span style="background:#fff;border-radius:6px;padding:2px 8px;display:inline-block">' + this.signBlock('#0f172a', 84) + '</span></div></div>' +
-          '<div style="background:' + ac + ';color:#0f172a;font-size:.56rem;text-align:center;padding:3px 0;font-weight:700">Session ' + Super.esc(session) + ' · Powered by HMG Concepts</div></div>';
+          '<div style="background:' + ac + ';color:#0f172a;font-size:.56rem;text-align:center;padding:3px 0;font-weight:700">' + this.validityNote(isStaff) + ' · Powered by HMG Concepts</div></div>';
       }
       // HORIZONTAL (default, enhanced)
       return `<div class="sc-idcard" style="width:340px;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;font-family:'Segoe UI',Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff">
@@ -832,13 +851,86 @@ const Super = {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:flex-end;padding:0 14px 10px">
           <div style="font-size:.62rem;color:#64748b">
-            <div>Session: <strong>${Super.esc(session)}</strong></div>
+            <div style="font-style:italic">${this.validityNote(isStaff)}</div>
             </div><div style="margin-top:8px;width:100px">${this.signBlock('#334155', 92)}</div><div style="display:none">
           </div>
           <div style="text-align:center"><img src="${qr}" style="width:78px;height:78px" alt="QR"><div style="font-size:.55rem;font-weight:800;color:#0f172a">SCAN TO VERIFY</div><div style="height:18px;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px);margin-top:3px"></div></div>
         </div>
         ${contactFooter}${credit}
       </div>`;
+    },
+    /* ================================================================
+       V11.6: CARD BACK SIDE — the physical card is printed front AND
+       back (duplex or cut-and-fold). The back carries everything an
+       expert educator wants on a lifetime card:
+         • holder's declaration + card rules (numbered, school-grade),
+         • if-found / return-to notice with full school contacts,
+         • emergency line + blood group ribbon (first-aid critical),
+         • authorised signature + issue year, large verify QR,
+         • magnetic-stripe-style band + barcode for realism,
+         • matches the chosen template's colours automatically.
+       ================================================================ */
+    backHtml(person) {
+      const s = Super.school || {};
+      const isStaff = (person.type === 'staff');
+      const idNo = person.admission_no || person.staff_no || person.id || '';
+      const pc = person.pc || s.primary || '#1e3a8a';
+      const ac = person.ac || s.accent || '#0ea5e9';
+      const logo = 'assets/img/logo.' + (s.logoExt || 'svg');
+      const qr = this.qrUrl(JSON.stringify({ id: idNo, name: person.full_name || person.name || '', type: person.type || 'student' }), 200);
+      const issued = this.admittedYear(person) || String(new Date().getFullYear());
+      const rules = isStaff ? [
+        'This card identifies a bona-fide member of staff and remains the property of the school.',
+        'It must be worn visibly within the school premises and presented on request.',
+        'It is not transferable; misuse will attract disciplinary action.',
+        'Report loss or damage to the school office immediately for reissue.',
+        'Surrender this card to the school office upon exit from service.'
+      ] : [
+        'This card identifies a bona-fide student and remains the property of the school.',
+        'It must be carried at school and presented on request; it is not transferable.',
+        'It remains valid for the holder\u2019s ENTIRE period of studentship — no yearly renewal.',
+        'Report loss or damage to the class teacher or school office immediately.',
+        'Surrender this card to the school office on graduation or withdrawal.'
+      ];
+      const contact = [s.address ? '📍 ' + Super.esc(s.address) : '', s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join('<br>');
+      return '<div class="sc-idcard sc-idcard-back" style="width:340px;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff;display:flex;flex-direction:column">' +
+        // magnetic-stripe band (classic card realism)
+        '<div style="height:34px;background:#1f2937;margin-top:14px"></div>' +
+        '<div style="padding:10px 14px 4px;display:flex;gap:12px;align-items:flex-start">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:.6rem;font-weight:900;letter-spacing:1.6px;color:' + pc + ';margin-bottom:4px">CARD RULES · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>' +
+            '<ol style="margin:0;padding-left:14px;font-size:.56rem;line-height:1.55;color:#334155">' + rules.map(r => '<li>' + r + '</li>').join('') + '</ol>' +
+          '</div>' +
+          '<div style="flex-shrink:0;text-align:center;width:86px">' +
+            '<img src="' + qr + '" style="width:78px;height:78px" alt="QR">' +
+            '<div style="font-size:.5rem;font-weight:900;letter-spacing:1px;color:' + pc + '">SCAN TO VERIFY</div>' +
+            (person.blood_group ? '<div style="margin-top:5px;background:#dc2626;color:#fff;border-radius:7px;font-size:.6rem;font-weight:900;padding:2px 0">🩸 ' + Super.esc(person.blood_group) + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:12px;padding:6px 14px;align-items:flex-end">' +
+          '<div style="flex:1;font-size:.56rem;color:#475569;line-height:1.55">' +
+            '<b style="color:#0f172a">If found, please return to:</b><br>' +
+            '<b>' + Super.esc(s.name || 'the school') + '</b><br>' + contact +
+            (person.phone ? '<br><b style="color:#0f172a">' + (isStaff ? 'Holder\u2019s line' : 'Emergency contact') + ':</b> ' + Super.esc(person.phone) : '') +
+          '</div>' +
+          '<div style="flex-shrink:0;text-align:center">' +
+            this.signBlock(pc, 88) +
+            '<div style="font-size:.5rem;color:#64748b;margin-top:2px">Issued ' + Super.esc(issued) + ' · ' + this.validityNote(isStaff) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 8px">' +
+          '<img src="' + logo + '" style="width:20px;height:20px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+          '<div style="height:16px;flex:1;background:repeating-linear-gradient(90deg,#111 0 2px,transparent 2px 4px)"></div>' +
+          '<span style="font-size:.52rem;font-weight:800;color:#0f172a">' + Super.esc(idNo) + '</span>' +
+        '</div>' +
+        '<div style="background:linear-gradient(90deg,' + pc + ',' + ac + ');color:#fff;font-size:.52rem;text-align:center;padding:3px 0;font-weight:700">' + Super.esc(s.motto || '') + (s.motto ? ' · ' : '') + 'Powered by HMG Concepts</div>' +
+      '</div>';
+    },
+    /* Front + back pair, laid side-by-side for printing & cutting (or duplex). */
+    pairHtml(person) {
+      return '<div style="display:flex;gap:14px;align-items:stretch;flex-wrap:wrap;justify-content:center">' +
+        '<div>' + this.html(person) + '</div>' +
+        '<div style="display:flex;align-items:stretch">' + this.backHtml(person) + '</div></div>';
     },
     print(person) {
       // ENTERPRISE V11: robust ID-card printing. Never open an empty page:
@@ -847,7 +939,8 @@ const Super = {
       person = person || {};
       if (!person.full_name && !person.name) person.full_name = 'Sample Student';
       if (!person.admission_no && !person.staff_no && !person.id) person.admission_no = 'SAMPLE-ID';
-      const card = this.html(person) || '<div style="padding:30px;border:1px solid #ddd">ID card could not render.</div>';
+      // V11.6: physical card = FRONT + BACK, printed together for cutting/duplex.
+      const card = this.pairHtml(person) || this.html(person) || '<div style="padding:30px;border:1px solid #ddd">ID card could not render.</div>';
       const w = window.open('', '_blank');
       if (!w) { if (typeof toast === 'function') toast('Popup blocked. Please allow popups to print ID cards.', 'warning'); return; }
       const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI.replace(/[^/]*$/, '') : '';
