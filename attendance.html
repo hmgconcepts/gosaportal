@@ -330,7 +330,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">📄</span>
           <span>Transfer Certificates</span>
-        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🪪</span>
           <span>ID Cards</span>
         </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -484,7 +484,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
     </header>
     <div class="app-content">
-      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed. <b>V10.1:</b> QR/ID check-ins now mark the day's register PRESENT automatically (a teacher's explicit mark always wins), and 🚀 Push to report sheets writes each student's present/total counts onto their report card.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date" onchange="AT.load()" title="Pick ANY date — past registers load as saved for review or correction"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button><button class="btn btn-outline" data-staff-only onclick="AT.printRegister()">🖨️ Print register</button><button class="btn btn-primary" data-admin-only onclick="AT.pushToReports()" title="Fill every student's attendance count on their report sheet for this class + term">🚀 Push to report sheets</button></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
+      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📋 Class E-Register / Attendance</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Select a class to show every registered student in that class. Class/subject teachers can mark each learner Present, Absent, Late or Excused by clicking one button. Parents/students can read scoped attendance where allowed. <b>V10.1:</b> QR/ID check-ins now mark the day's register PRESENT automatically (a teacher's explicit mark always wins), and 🚀 Push to report sheets writes each student's present/total counts onto their report card.</p></div><div class="card" style="margin-bottom:16px"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end"><div class="form-group"><label>Class</label><select class="form-select" id="at-class" onchange="AT.load()"><option value="">— choose class —</option></select></div><div class="form-group"><label>Date</label><input class="form-input" id="at-date" type="date" onchange="AT.load()" title="Pick ANY date — past registers load as saved for review or correction"></div><button class="btn btn-outline" onclick="AT.load()">Load register</button><button class="btn btn-primary" data-staff-only onclick="AT.saveAll()">Save all marks</button><button class="btn btn-outline" data-staff-only onclick="AT.printRegister()">🖨️ Print register</button><button class="btn btn-outline" data-staff-only id="at-scan-btn" onclick="AT.toggleScan()">📷 Scan ID cards</button><button class="btn btn-primary" data-admin-only onclick="AT.pushToReports()" title="Fill every student's attendance count on their report sheet for this class + term">🚀 Push to report sheets</button></div></div><div id="at-scan-wrap" style="display:none;margin-bottom:16px" class="card"><h3 style="margin-top:0">📷 Scan to mark present</h3><p style="color:var(--gray-600);font-size:.85rem;margin:4px 0 10px">Load the class register first, then scan each student's physical ID card (QR or barcode) — their row flips to <b>Present</b> instantly and is highlighted. A plugged-in USB/Bluetooth barcode scanner works page-wide with no camera. Click <b>Save all marks</b> when done (unscanned students keep their current mark — set the dropdown default to Absent first if you prefer scan-only marking).</p><video id="at-video" style="width:100%;max-width:420px;border-radius:12px;display:none" muted playsinline></video><canvas id="at-canvas" style="display:none"></canvas><div id="at-scan-log" style="font-size:.85rem;color:var(--gray-600);margin-top:8px"></div></div><div id="at-register"><p style="color:var(--gray-500)">Choose a class to open the e-register.</p></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -526,6 +526,40 @@ const AT_printRegister=function(){
   w.document.close();w.focus();
 };
 const AT={
+  /* ============ V11.7 (pass 65 #1): SCAN-TO-MARK on the class register ============ */
+  scanStream:null, scanOn:false, scanCount:0,
+  async toggleScan(){
+    if(this.scanOn){ this.stopScan(); return; }
+    if(!this.students||!this.students.length){ toast('Load the class register first, then scan.','warning',5000); return; }
+    const wrap=document.getElementById('at-scan-wrap'); wrap.style.display='';
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ document.getElementById('at-scan-log').textContent='No camera on this device — use a USB/Bluetooth barcode scanner (works automatically) or mark manually.'; return; }
+    try{ this.scanStream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false }); }
+    catch(e){ document.getElementById('at-scan-log').textContent='Camera unavailable ('+(e.message||e)+') — a USB/Bluetooth scanner still works, or mark manually.'; return; }
+    const v=document.getElementById('at-video'); v.srcObject=this.scanStream; v.setAttribute('playsinline','true'); await v.play(); v.style.display='block';
+    document.getElementById('at-scan-btn').textContent='⏹ Stop scanning';
+    this.scanOn=true; this.scanCount=0;
+    if(window.Super&&Super.scanner) Super.scanner.loop(v,document.getElementById('at-canvas'),(raw)=>AT.markScanned(raw),()=>AT.scanOn);
+    else document.getElementById('at-scan-log').textContent='Scanner engine not loaded — use a hardware scanner or manual marks.';
+  },
+  stopScan(){ this.scanOn=false; if(this.scanStream){ this.scanStream.getTracks().forEach(t=>t.stop()); this.scanStream=null; }
+    const v=document.getElementById('at-video'); if(v){ v.style.display='none'; }
+    const b=document.getElementById('at-scan-btn'); if(b) b.textContent='📷 Scan ID cards'; },
+  markScanned(raw){
+    if(!this.students||!this.students.length) return;
+    let id=raw;
+    try{ const o=(window.Enterprise&&Enterprise.checkin)?Enterprise.checkin.parseQR(raw):JSON.parse(raw); id=(o&&o.id)||raw; }catch(_){ id=raw; }
+    id=String(id||'').trim().toLowerCase();
+    const hit=this.students.find(s=>String(s.admission_no||'').trim().toLowerCase()===id||String(s.id||'').toLowerCase()===id||String(s.full_name||'').trim().toLowerCase()===id);
+    const log=document.getElementById('at-scan-log');
+    if(!hit){ if(log) log.innerHTML='<span style="color:#b91c1c">❓ Scanned "'+esc(id)+'" — not in this class register.</span>'; return; }
+    const sel=document.getElementById('ats-'+hit.id);
+    if(sel){ sel.value='present';
+      const row=sel.closest('tr'); if(row){ row.style.background='#f0fdf4'; row.style.transition='background .3s'; }
+      this.scanCount++;
+      if(log) log.innerHTML='✅ <b>'+esc(hit.full_name)+'</b> marked Present ('+this.scanCount+' scanned this session). Remember to <b>Save all marks</b>.';
+      if(typeof toast==='function') toast('✅ '+hit.full_name+' — Present','success',2500);
+    }
+  },
   printRegister(){return AT_printRegister();},
   /* V10.1 (#4): push per-student attendance counts into report_cards */
   async pushToReports(){
@@ -702,7 +736,7 @@ const AT={
     toast('Attendance saved for '+rows.length+' student(s)','success'); 
   }
 }; 
-document.addEventListener('DOMContentLoaded',()=>AT.init());
+document.addEventListener('DOMContentLoaded',()=>{ AT.init(); if(window.Super&&Super.scanner) Super.scanner.attach(function(raw){ if(AT.students&&AT.students.length) AT.markScanned(raw); }); });
 // v12 FIX: removed the duplicate immediate AT.init() call that raced with the
 // DOMContentLoaded handler (double-init duplicated parent/student history loads).
 </script></body></html>

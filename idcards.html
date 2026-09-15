@@ -317,7 +317,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">📄</span>
           <span>Transfer Certificates</span>
-        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🪪</span>
           <span>ID Cards</span>
         </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -560,17 +560,27 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     }
     try{
       if(this.kind==='staff'){
-        const {data,error}=await sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url').order('full_name').limit(3000); if(error)throw error;
+        /* V11.7 (#4): staff self-service — teachers/staff see and print THEIR OWN
+           card; the admin tier still sees everyone. */
+        const sRole=((window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+        const sUid=(window.SC_PROFILE&&SC_PROFILE.id)||null;
+        const adminTier=['super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(sRole);
+        let sq=sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url,user_id').order('full_name').limit(3000);
+        if(!adminTier&&sUid) sq=sq.eq('user_id',sUid);
+        const {data,error}=await sq; if(error)throw error;
+        await ICUI.fillPhotos(data||[]);
         ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
+        if(!adminTier&&ICUI.all.length){ setTimeout(()=>{ sel.value=JSON.stringify(ICUI.all[0]); ICUI.pick(sel.value); },100); }
       } else {
         /* V11.6: role-scoped like the field-proven template — parents see only
            linked children, students only themselves; staff/admin see all. */
         const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.SCHOOL_USER && SCHOOL_USER.role) || '';
         const userId = (window.SC_PROFILE && SC_PROFILE.id) || (window.SCHOOL_USER && SCHOOL_USER.id) || null;
-        let query = sb.from('students').select('id,full_name,class,arm,admission_no,gender,photo_url,date_of_birth,created_at,guardian_phone').order('full_name').limit(5000);
+        let query = sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').order('full_name').limit(5000);
         if (role === 'student' && userId) query=query.eq('user_id',userId);
         if (role === 'parent' && userId) { const linked=await sb.from('parent_child').select('student_id').eq('parent_id',userId); const ids=(linked.data||[]).map(x=>x.student_id).filter(Boolean); if(!ids.length){ICUI.all=[];this.loaded=true;this.render();return;} query=query.in('id',ids); }
         const {data,error}=await query; if(error)throw error;
+        await ICUI.fillPhotos(data||[]);
         ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
         // Auto-select first student/child for parents or students (role declared above)
         if (ICUI.all.length > 0 && (role === 'parent' || role === 'student')) {
@@ -583,6 +593,20 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     }catch(e){ console.warn('ID-card list load failed:', e); if(typeof toast==='function')toast('Could not load list. You can still type details manually and print.', 'warning', 7000); }
     this.loaded=true; this.render();
   },
+  /* V11.7 (#3): AUTO PHOTO — people set their photo on My Profile
+     (profiles.photo_url). Any student/staff row without its own photo_url
+     inherits the linked profile's photo in ONE batched query, so single AND
+     bulk printing show every photo with no re-entering of Drive links. */
+  async fillPhotos(rows){
+    try{
+      const need=(rows||[]).filter(r=>!r.photo_url&&r.user_id);
+      if(!need.length) return;
+      const ids=[...new Set(need.map(r=>r.user_id))];
+      const r=await sb.from('profiles').select('id,photo_url').in('id',ids);
+      const map={}; (r.data||[]).forEach(p=>{ if(p.photo_url) map[p.id]=p.photo_url; });
+      need.forEach(row=>{ if(map[row.user_id]) row.photo_url=map[row.user_id]; });
+    }catch(e){ console.warn('profile photo enrichment skipped:', e.message||e); }
+  },
   pick(v){ if(!v){this.cur={}; this.render(); return;} let s={}; try{s=JSON.parse(v);}catch(_){s={};} if(!s.phone&&s.guardian_phone)s.phone=s.guardian_phone; this.cur=s;
     document.getElementById('ic-name').value=s.full_name||'';
     document.getElementById('ic-class').value=(this.kind==='staff'?(s.staff_type||s.role||''):(s.class||''));
@@ -594,7 +618,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
   person(){ var to=this.tplOpts(); const typedName=(document.getElementById('ic-name').value||'').trim(); const sample=this.sample(); const base={ full_name:typedName||this.cur.full_name||sample.full_name, created_at:(this.cur&&this.cur.created_at)||'', date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:document.getElementById('ic-photo').value||this.cur.photo_url||'', gender:document.getElementById('ic-gender').value||this.cur.gender||'', phone:document.getElementById('ic-phone').value||this.cur.phone||'', blood_group:document.getElementById('ic-blood').value||'', type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
     if(this.kind==='staff'){ base.staff_no=document.getElementById('ic-id').value||this.cur.staff_no||sample.staff_no; base.staff_type=document.getElementById('ic-class').value||this.cur.staff_type||sample.staff_type; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role||sample.role; base.department=this.cur.department||sample.department; }
-    else { base.admission_no=document.getElementById('ic-id').value||this.cur.admission_no||sample.admission_no; base.class=document.getElementById('ic-class').value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
+    else { base.admission_no=document.getElementById('ic-id').value||this.cur.admission_no||sample.admission_no; base.admission_year=this.cur.admission_year||''; base.class=document.getElementById('ic-class').value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
     return base; },
   fallbackHtml(p){ return '<div class="sc-idcard" style="width:340px;border:1px solid #e2e8f0;border-radius:16px;padding:18px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.12);font-family:system-ui"><h3 style="margin:0;color:#0506ae">'+(window.SCHOOL&&SCHOOL.name||'School')+'</h3><p style="font-size:.75rem;color:#64748b">'+(p.type==='staff'?'STAFF IDENTITY CARD':'STUDENT IDENTITY CARD')+'</p><div style="display:flex;gap:12px;align-items:center"><div style="width:76px;height:76px;border-radius:12px;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900">'+(p.full_name||'S').charAt(0).toUpperCase()+'</div><div><b>'+esc(p.full_name||'')+'</b><br><span>'+esc(p.admission_no||p.staff_no||'')+'</span><br><span>'+esc(p.class||p.role||'')+'</span></div></div><p style="font-size:.65rem;color:#94a3b8;margin-bottom:0">If found, please return to the school office.</p></div>'; },
   cardHtml(p){ try{ if(window.Super&&Super.idcard&&Super.idcard.html) return Super.idcard.html(p); }catch(e){ console.error('ID-card render failed:',e); } return this.fallbackHtml(p); },
@@ -613,10 +637,17 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const pair=(pp)=>{ try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) return Super.idcard.pairHtml(pp); }catch(_){ } return ICUI.cardHtml(pp); };
     const cards=source.map(s=> ICUI.kind==='staff'
       ? '<div style="margin:8px 8px 18px;display:inline-block;page-break-inside:avoid">'+pair({full_name:s.full_name,staff_no:s.staff_no||s.id,role:s.role,department:s.department,staff_type:s.staff_type,gender:s.gender,phone:s.phone,photo_url:s.photo_url,type:'staff',template:to.template,pc:to.pc,ac:to.ac})+'</div>'
-      : '<div style="margin:8px 8px 18px;display:inline-block;page-break-inside:avoid">'+pair({full_name:s.full_name,class:s.class,arm:s.arm,admission_no:s.admission_no||s.id,created_at:s.created_at,gender:s.gender,phone:s.phone||s.guardian_phone,photo_url:s.photo_url,date_of_birth:s.date_of_birth,type:'student',template:to.template,pc:to.pc,ac:to.ac})+'</div>').join('');
+      : '<div style="margin:8px 8px 18px;display:inline-block;page-break-inside:avoid">'+pair({full_name:s.full_name,class:s.class,arm:s.arm,admission_no:s.admission_no||s.id,created_at:s.created_at,admission_year:s.admission_year,gender:s.gender,phone:s.phone||s.guardian_phone,photo_url:s.photo_url,date_of_birth:s.date_of_birth,type:'student',template:to.template,pc:to.pc,ac:to.ac})+'</div>').join('');
     this.printHtml(cards, 'ID Cards'); }
 };
-document.addEventListener('DOMContentLoaded',()=>{ if(window.Super)Super.init(window.sb||null,window.SCHOOL); ICUI.load(); ICUI.render(); setTimeout(()=>ICUI.render(),500); }); if(document.readyState!=='loading'){ ICUI.load(); ICUI.render(); }
+document.addEventListener('DOMContentLoaded',()=>{ if(window.Super)Super.init(window.sb||null,window.SCHOOL); 
+  /* V11.7 (#4): staff open the page on THEIR card type automatically. */
+  var tries=0,t=setInterval(function(){ tries++;
+    var r=((window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    if(r){ clearInterval(t); if(['staff','teacher'].includes(r)){ var sel=document.getElementById('ic-type'); if(sel){ sel.value='staff'; ICUI.switchType('staff'); } } }
+    else if(tries>20) clearInterval(t);
+  },500);
+  ICUI.load(); ICUI.render(); setTimeout(()=>ICUI.render(),500); }); if(document.readyState!=='loading'){ ICUI.load(); ICUI.render(); }
 </script><script>
 /* V7.0 #10: deep link — ?student=ADMNO preselects that student's ID card. */
 document.addEventListener('DOMContentLoaded',function(){try{

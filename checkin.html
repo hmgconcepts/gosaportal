@@ -330,7 +330,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
           <span class="app-nav-icon">📄</span>
           <span>Transfer Certificates</span>
-        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
           <span class="app-nav-icon">🪪</span>
           <span>ID Cards</span>
         </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
@@ -486,7 +486,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div class="app-content">
       
       <div class="card" style="margin-bottom:16px"><p style="color:var(--gray-600);margin:0">
-        Students check in by <strong>scanning their ID-card QR with the device camera</strong>, or by typing
+        Students check in/out by <strong>scanning the QR or barcode on their physical ID card</strong> — device camera or a plugged-in USB/Bluetooth barcode scanner — or by typing
         their admission number. Free — uses your phone/laptop camera, no extra hardware, no AI.</p></div>
       <div class="grid grid-2">
         <div class="card">
@@ -553,6 +553,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.CRUD) CRUD.init(sb);
 </script>
 <script>
+/* V11.7: hardware barcode scanners (keyboard-wedge) work page-wide — plug in,
+   scan the card's barcode, the check-in fires with no clicks. */
+document.addEventListener('DOMContentLoaded',function(){ if(window.Super&&Super.scanner) Super.scanner.attach(function(raw){ CK.go(raw,'wedge'); }); });
 const CK={ done:[], stream:null, scanning:false, last:'', lastAt:0,
   async startCam(){
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('Camera not supported on this device — use manual entry.','warning',5000); return; }
@@ -569,8 +572,11 @@ const CK={ done:[], stream:null, scanning:false, last:'', lastAt:0,
     document.getElementById('ck-cam-start').style.display='inline-flex'; document.getElementById('ck-cam-stop').style.display='none';
     document.getElementById('ck-cam-msg').textContent='Camera stopped.'; },
   tick(){
+    /* V11.7: shared scanner engine — BarcodeDetector reads the card's QR AND
+       its Code 39 barcode; jsQR remains the QR fallback (iOS/Safari). */
     if(!CK.scanning) return;
     const v=document.getElementById('ck-video'), c=document.getElementById('ck-canvas');
+    if(window.Super&&Super.scanner){ Super.scanner.loop(v,c,(raw)=>CK.go(raw,'scan'),()=>CK.scanning); return; }
     if(v.readyState===v.HAVE_ENOUGH_DATA && window.jsQR){
       c.width=v.videoWidth; c.height=v.videoHeight; const ctx=c.getContext('2d');
       ctx.drawImage(v,0,0,c.width,c.height);
