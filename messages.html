@@ -9,13 +9,11 @@
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Messaging • God of Seed Academy">
-<meta property="og:description" content="God of Seed Academy — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -60,22 +58,11 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 @media(max-width:900px){.app-sidebar,.app-layout.floating .app-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:min(86vw,310px)!important;height:100vh!important;margin:0!important;border-radius:0!important;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 40px rgba(0,0,0,.22);z-index:100}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{flex-direction:column;align-items:stretch}.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:auto;min-width:0;border-right:none;border-bottom:1px solid #e2e8f0}.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);justify-items:stretch;text-align:left;min-height:42px;font-size:.875rem}.app-content{padding:16px}.app-topbar{padding:12px 14px;gap:10px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}.user-chip{max-width:150px;overflow:hidden}.user-chip strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 @media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
 </style>
-
-    <meta name="description" content="God of Seed Academy — Messaging. Comprehensive school management platform.">
-    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <meta name="author" content="HMG Concepts">
-    <meta name="robots" content="index, follow">
     <link rel="canonical" href="./messages.html">
-    <meta property="og:title" content="Messaging • God of Seed Academy">
-    <meta property="og:description" content="God of Seed Academy — Messaging. Comprehensive school management platform.">
     <meta property="og:url" content="./messages.html">
-    <meta property="og:type" content="website">
-    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Messaging • God of Seed Academy">
-    <meta name="twitter:description" content="God of Seed Academy — Messaging. Comprehensive school management platform.">
-    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
-  </head>
+</head>
 <body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
 
 <div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
@@ -116,10 +103,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
     <div id="modal-footer" class="modal-footer"></div>
   </div>
 </div>
-<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
           <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
@@ -486,7 +473,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
     <div class="app-content">
       
       <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📱 Messaging Centre — WhatsApp / Email / SMS</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Create a message, choose recipients, then send through free device/email links. This avoids paid SMS/WhatsApp APIs. The system stores the message log; your browser opens WhatsApp, email or SMS with the text prefilled for the selected recipient.</p></div>
-      <div class="grid grid-2"><div class="card"><h3>Compose</h3><div class="form-group"><label>Audience</label><select class="form-select" id="msg-aud" onchange="MSG.loadRecipients()"><option value="parents">Parents</option><option value="staff">Staff / Teachers</option><option value="students">Students</option><option value="admin">Admin / Management</option></select></div><div class="form-group"><label>Recipients <span style="color:var(--gray-500);font-weight:400">(smart picker — type to search)</span></label><div style="position:relative"><input type="text" class="form-input" id="msg-search" placeholder="🔍 Type a name, class, email or phone to filter…" oninput="MSG.filterList()" style="margin-bottom:6px"><select class="form-select" id="msg-rec" multiple size="9" onchange="MSG.updateCount()"><option value="">Loading…</option></select></div><div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="MSG.selectAll()">Select all visible</button><button class="btn btn-sm btn-outline" onclick="MSG.selectByClass()">By class</button><button class="btn btn-sm btn-outline" onclick="MSG.clearSelection()">Clear</button><button class="btn btn-sm btn-outline" onclick="MSG.invertSelection()">Invert</button><span id="msg-count" style="color:var(--gray-500);font-size:.85rem;margin-left:auto">0 recipients selected</span></div><div id="msg-quickfilter" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px"><button class="btn btn-xs btn-outline" onclick="MSG.quickFilter('with-email')">📧 Has email</button><button class="btn btn-xs btn-outline" onclick="MSG.quickFilter('with-phone')">📱 Has phone</button><button class="btn btn-xs btn-outline" onclick="MSG.quickFilter('no-account')">⚠️ No account</button><button class="btn btn-xs btn-outline" onclick="MSG.quickFilter('all')">🔄 Reset</button></div></div><div class="form-group"><label>Subject / title</label><input class="form-input" id="msg-title"></div><div class="form-group"><label>Message</label><textarea class="form-input" id="msg-body" rows="6"></textarea></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="MSG.logOnly()">Deliver In-App</button><button class="btn btn-outline" onclick="MSG.send('whatsapp')">WhatsApp + In-App</button><button class="btn btn-outline" onclick="MSG.send('email')">Email + In-App</button><button class="btn btn-outline" onclick="MSG.send('sms')">SMS + In-App</button></div><p style="color:var(--gray-500);font-size:.82rem;margin-top:8px">In-app messages are stored with each recipient's profile ID, so they appear in the recipient's Inbox. WhatsApp/SMS use free device links; no paid API is required.</p></div><div class="card"><h3>In-App Inbox / Message Log</h3><div id="msg-log">Loading…</div></div></div>
+      <div class="grid grid-2"><div class="card"><h3>Compose</h3><div class="form-group"><label>Audience</label><select class="form-select" id="msg-aud" onchange="MSG.loadRecipients()"><option value="parents">Parents</option><option value="staff">Staff / Teachers</option><option value="students">Students</option><option value="admin">Admin / Management</option></select></div><div class="form-group"><label>Recipients <span style="color:var(--gray-500);font-weight:400">(multi-select enabled)</span></label><select class="form-select" id="msg-rec" multiple size="9" onchange="MSG.updateCount()"><option value="">Loading…</option></select><div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="MSG.selectAll()">Select all</button><button class="btn btn-sm btn-outline" onclick="MSG.clearSelection()">Clear</button><span id="msg-count" style="color:var(--gray-500);font-size:.85rem">0 recipients selected</span></div></div><div class="form-group"><label>Subject / title</label><input class="form-input" id="msg-title"></div><div class="form-group"><label>Message</label><textarea class="form-input" id="msg-body" rows="6"></textarea></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="MSG.logOnly()">Deliver In-App</button><button class="btn btn-outline" onclick="MSG.send('whatsapp')">WhatsApp + In-App</button><button class="btn btn-outline" onclick="MSG.send('email')">Email + In-App</button><button class="btn btn-outline" onclick="MSG.send('sms')">SMS + In-App</button></div><p style="color:var(--gray-500);font-size:.82rem;margin-top:8px">In-app messages are stored with each recipient's profile ID, so they appear in the recipient's Inbox. WhatsApp/SMS use free device links; no paid API is required.</p></div><div class="card"><h3>In-App Inbox / Message Log</h3><div id="msg-log">Loading…</div></div></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -506,8 +493,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/crud.js"></script>
-<script src="assets/js/report-engine.js"></script>
-<script src="assets/js/analytics.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
@@ -539,15 +524,8 @@ const MSG={
         rows=(r.data||[]).map(x=>Object.assign({},x,{recipient_id:x.id}));
       }
       if(aud==='students'){
-        // Try students table first (has class, admission_no etc.)
-        const r=await sb.from('students').select('id,user_id,full_name,email,guardian_phone,guardian_email,class,admission_no').limit(4000);
-        rows=(r.data||[]).map(x=>({id:x.id,recipient_id:x.user_id||x.id,full_name:(x.class?x.class+' · ':'')+x.full_name,email:x.email||x.guardian_email,phone:x.guardian_phone,admission_no:x.admission_no}));
-        // Also include student profiles that may not be in the students register yet
-        try{
-          const p=await sb.from('profiles').select('id,full_name,email,phone,role').eq('role','student').limit(2000);
-          const existing=new Set(rows.map(x=>x.recipient_id));
-          (p.data||[]).forEach(x=>{ if(!existing.has(x.id)) rows.push({id:x.id,recipient_id:x.id,full_name:x.full_name,email:x.email,phone:x.phone}); });
-        }catch(_){}
+        const r=await sb.from('students').select('id,user_id,full_name,guardian_phone,guardian_email,class,admission_no').limit(4000); /* V12.0: students.email never existed (42703 emptied the recipient list) */
+        rows=(r.data||[]).map(x=>({id:x.id,recipient_id:x.user_id||'',full_name:(x.class?x.class+' · ':'')+x.full_name,email:x.guardian_email,phone:x.guardian_phone,admission_no:x.admission_no}));
       }
     }catch(e){ console.warn('Recipients load failed', e); }
     this.rows=this.dedupe(rows);
@@ -563,30 +541,8 @@ const MSG={
     const chosen=new Set(vals);
     return this.rows.filter(x=>chosen.has(String(x.recipient_id||x.id)));
   },
-  selectAll(){ const sel=document.getElementById('msg-rec'); [...sel.options].forEach(o=>{if(o.value!=='__filter')o.selected=true;}); this.updateCount(); },
-  selectByClass(){ const cls=prompt('Enter class name (e.g. JSS1, SS2A, Grade 3) to select only that class:')||''; if(!cls)return; const sel=document.getElementById('msg-rec'); [...sel.options].forEach(o=>{if(o.value!=='__filter' && (o.textContent||'').toLowerCase().includes(cls.toLowerCase()))o.selected=true;}); this.updateCount(); },
-  invertSelection(){ const sel=document.getElementById('msg-rec'); [...sel.options].forEach(o=>{if(o.value!=='__filter')o.selected=!o.selected;}); this.updateCount(); },
+  selectAll(){ const sel=document.getElementById('msg-rec'); [...sel.options].forEach(o=>o.selected=true); this.updateCount(); },
   clearSelection(){ const sel=document.getElementById('msg-rec'); [...sel.options].forEach(o=>o.selected=false); this.updateCount(); },
-  filterList(){ this.applyFilter(); },
-  quickFilter(kind){ this._filter=kind; this.applyFilter(); },
-  applyFilter(){
-    const sel=document.getElementById('msg-rec'); if(!sel)return;
-    const q=(document.getElementById('msg-search')?.value||'').toLowerCase().trim();
-    const kind=this._filter||'all';
-    [...sel.options].forEach(o=>{
-      if(o.value==='__filter'||o.value==='__all')return;
-      const txt=(o.textContent||'').toLowerCase();
-      const email=(o.getAttribute('data-email')||'').trim();
-      const phone=(o.getAttribute('data-phone')||'').trim();
-      const noAcct=txt.includes('no login account');
-      let match=true;
-      if(q && !txt.includes(q)) match=false;
-      if(match && kind==='with-email' && !email) match=false;
-      if(match && kind==='with-phone' && !phone) match=false;
-      if(match && kind==='no-account' && !noAcct) match=false;
-      o.hidden=!match;
-    });
-  },
   text(){return (document.getElementById('msg-title').value?document.getElementById('msg-title').value+'\n\n':'')+document.getElementById('msg-body').value;},
   async log(channel){
     if(!sb){toast('Database not configured','warning');return;}

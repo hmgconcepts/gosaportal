@@ -73,7 +73,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   <div id="notif-dropdown" class="notif-dropdown">
     <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
       <strong style="color:var(--dark)">Notifications</strong>
-      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+      <button class="btn btn-sm btn-outline" onclick="if(window.Notifications&&Notifications.markAllRead)Notifications.markAllRead();else if(typeof toast==='function')toast('Sign in to manage notifications.','info')">Mark all read</button>
     </div>
     <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
   </div>

@@ -695,7 +695,9 @@ const AN={
   async renderTopStudents(){
     const box = document.getElementById('an-top-students');
     try{
-      const {data:res}=await sb.from('results').select('student_id,percentage,grade,student_name,class').gte('created_at', new Date(Date.now()-120*86400000).toISOString().slice(0,10));
+      /* V12.0: results has NO percentage column (42703) — compute from real score columns. */
+      const {data:res0}=await sb.from('results').select('student_id,ca1,ca2,ca3,exam,grade,student_name,class,created_at').gte('created_at', new Date(Date.now()-120*86400000).toISOString());
+      const res=(res0||[]).map(r=>({...r,percentage:(Number(r.ca1)||0)+(Number(r.ca2)||0)+(Number(r.ca3)||0)+(Number(r.exam)||0)}));
       if(!res || !res.length){ box.innerHTML = '<p style="color:#94a3b8">No results yet this term.</p>'; return; }
       const by={};
       res.forEach(r => {
