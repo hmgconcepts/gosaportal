@@ -210,19 +210,63 @@ const Voting = {
       const { data } = await supabase.from('polls').select('*').eq('id', String(pollId)).single();
       poll = data;
       if (!poll) return null;
+      /* V11.9 ROOT-CAUSE FIX (the 0% bug): tally SERVER-SIDE via the
+         sc_poll_results RPC. The old client path read poll_votes directly —
+         but pv_read RLS only shows a voter their OWN ballot, so students/
+         parents always tallied ~0, and the results query also selected a
+         non-existent created_at column elsewhere (42703, silently swallowed).
+         The RPC returns aggregates only (counts, %, turnout, my_ballot) —
+         individual ballots are never exposed, so anonymity survives admins. */
+      try {
+        const r = await supabase.rpc('sc_poll_results', { p_poll: String(pollId) });
+        if (!r.error && r.data && r.data.ok) {
+          const agg = r.data;
+          const cands = (poll.candidates ? (typeof poll.candidates === 'string' ? JSON.parse(poll.candidates) : poll.candidates) : []).map((c, i) => {
+            const id = String(c.id || 'c' + (i + 1));
+            const n = Number((agg.tally || {})[id] || (agg.tally || {})[String(i)] || 0);
+            return { ...c, votes: n };
+          });
+          const total = Number(agg.total_ballots || 0);
+          cands.forEach(c => c.percent = total ? Math.round(c.votes / total * 100) : 0);
+          return { poll, candidates: cands, totalVotes: total,
+            uniqueVoters: Number(agg.unique_voters || 0),
+            eligible: Number(agg.eligible || 0),
+            turnoutPct: agg.turnout_pct == null ? null : Number(agg.turnout_pct),
+            byRole: agg.by_role || {}, myBallot: agg.my_ballot || [],
+            serverTallied: true };
+        }
+      } catch (_) { /* fall through to the legacy path below (pre-V11.9 DB) */ }
       const { data: v } = await supabase.from('poll_votes').select('candidate_id').eq('poll_id', String(pollId));
       votes = v || [];
     }
     const tally = {};
     (poll.candidates ? (typeof poll.candidates === 'string' ? JSON.parse(poll.candidates) : poll.candidates) : []).forEach(c => tally[c.id] = 0);
     (votes || []).forEach(v => { tally[v.candidate_id] = (tally[v.candidate_id] || 0) + 1; });
-    const total = Object.values(tally).reduce((a, b) => a + b, 0) || 1;
+    const totalReal = Object.values(tally).reduce((a, b) => a + b, 0);
+    const total = totalReal || 1;
     const candidates = (poll.candidates ? (typeof poll.candidates === 'string' ? JSON.parse(poll.candidates) : poll.candidates) : []).map(c => ({
       ...c,
       votes: tally[c.id] || 0,
       percent: Math.round((tally[c.id] || 0) / total * 100)
     }));
-    return { poll, candidates, totalVotes: total };
+    /* V11.9: report the REAL total (0 stays 0 — the old '|| 1' hid empty polls
+       behind fake percentages); legacy path is marked so the UI can say the
+       tally may be partial on pre-V11.9 databases. */
+    return { poll, candidates, totalVotes: totalReal, serverTallied: false };
+  },
+
+  /* V11.9: can the CURRENT user vote on this poll? (server-truth pre-check so
+     the UI shows an honest "this ballot is for students only" instead of a
+     rejected insert). Falls back to permissive on pre-V11.9 databases —
+     RLS still blocks ineligible inserts there. */
+  async canVote(pollId) {
+    const supabase = this.sb || window.sb || null;
+    if (!supabase) return { ok: true };
+    try {
+      const r = await supabase.rpc('sc_can_vote', { p_poll: String(pollId) });
+      if (!r.error) return { ok: r.data === true };
+    } catch (_) {}
+    return { ok: true, unknown: true };
   },
 
   /* List polls (open + recently closed) */

@@ -1726,7 +1726,7 @@ const App = {
               cnt('leave_requests', q => q.eq('status', 'pending')),
               cnt('helpdesk_tickets', q => q.in('status', ['open', 'in_progress'])),
               cnt('promotions', q => q.in('status', ['draft', 'approved'])),
-              supabase ? supabase.from('birthdays').select('date_of_birth').limit(500).then(r => (r.data || []).filter(b => String(b.date_of_birth || '').slice(5, 10) === mmdd).length, () => 0) : 0
+              supabase ? supabase.from('birthdays').select('date').limit(500).then(r => (r.data || []).filter(b => String(b.date || '').slice(5, 10) === mmdd).length, () => 0) : 0 /* V12.0: column is `date`, not date_of_birth (42703 zeroed the widget) */
             ]);
             const items = [];
             if (pendAcc) items.push('<a class="btn btn-sm btn-outline" href="approvals.html" style="border-color:#f59e0b">👤 ' + pendAcc + ' account approval' + (pendAcc > 1 ? 's' : '') + ' waiting</a>');
