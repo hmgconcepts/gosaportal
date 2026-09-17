@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Voting &amp; Polls • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Voting &amp; Polls. Comprehensive school management platform.">
-<meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -62,13 +62,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Voting &amp; Polls. Comprehensive school management platform.">
-    <meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="https://gosaportal.vercel.app/voting.html">
+    <link rel="canonical" href="https://2gosaportal.pages.dev/voting.html">
     <meta property="og:title" content="Voting &amp; Polls • God of Seed Academy">
     <meta property="og:description" content="God of Seed Academy — Voting &amp; Polls. Comprehensive school management platform.">
-    <meta property="og:url" content="https://gosaportal.vercel.app/voting.html">
+    <meta property="og:url" content="https://2gosaportal.pages.dev/voting.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
     <meta name="twitter:card" content="summary_large_image">
@@ -119,10 +119,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -539,7 +539,18 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 const VT={
   rows:[], current:null,
   esc:s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),
-  canManagePoll(p){ const r=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase(); const admin=['super_admin','admin','administrator','owner','director','principal','proprietor','head_teacher','bursar']; return admin.includes(r) || (['staff','teacher'].includes(r) && p && (!p.created_by || p.created_by === (window.SC_PROFILE&&SC_PROFILE.id))); },
+  /* V11.9 ONE-MANAGER-PER-BALLOT (matches the new RLS): admins manage every
+     poll; a staff member manages ONLY polls they created. The old rule let any
+     staff edit legacy no-creator polls — now those are admin-only too. */
+  canManagePoll(p){ const r=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase(); const admin=['super_admin','admin','administrator','owner','director','principal','proprietor','head_teacher','bursar']; if(admin.includes(r))return true; return ['staff','teacher'].includes(r) && p && !!p.created_by && p.created_by === (window.SC_PROFILE&&SC_PROFILE.id); },
+  /* V11.9: is the CURRENT viewer in this ballot's audience? (UI honesty —
+     RLS + sc_can_vote remain the real gate.) */
+  eligibleFor(p){ const r=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase(); const aud=String(p.audience||'all').toLowerCase();
+    if(['','all','everyone'].includes(aud)) return true;
+    if(aud.startsWith('student')) return r==='student';
+    if(aud.startsWith('parent')) return r==='parent';
+    if(aud.startsWith('staff')||aud.startsWith('teacher')) return ['staff','teacher','super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(r);
+    return true; },
   normalise(p){ let opts=[]; try{ opts=p.candidates ? (typeof p.candidates==='string'?JSON.parse(p.candidates):p.candidates) : (p.options||[]); }catch(_){ opts=[]; } return Object.assign({}, p, { candidates:opts, options:opts, allow_multiple:!!(p.allow_multiple||p.multi_winner), max_votes:Number(p.max_votes||p.maxVotes||(p.allow_multiple||p.multi_winner?opts.length:1))||1, status:p.status||'open' }); },
   async refresh(){ await this.load(); await this.loadStats(); const params=new URLSearchParams(location.search); const q=params.get('poll')||params.get('id'); if(q && !this.current){ const p=this.rows.find(x=>String(x.id)===String(q)); if(p) this.openResults(p.id); } },
   async load(){
@@ -575,7 +586,16 @@ const VT={
   demoPolls(){ try{ const stored=JSON.parse(localStorage.getItem('sc-demo-polls')||'[]'); return stored.length?stored:[{id:'demo-1',title:'Head Boy 2026',description:'Demo election for school head boy',candidates:[{id:'c1',label:'John Doe'},{id:'c2',label:'Jane Doe'}],status:'open',anonymous:true,created_at:new Date().toISOString()}]; }catch(_){ return []; } },
   async attachVoteCounts(){
     if(!window.sb){ const votes=JSON.parse(localStorage.getItem('sc-demo-votes')||'{}'); this.rows.forEach(p=>p.vote_count=(votes[p.id]||[]).length); return; }
-    await Promise.all(this.rows.map(async p=>{ try{ const {data,error}=await sb.from('poll_votes').select('candidate_id,voter_id,voted_at,created_at').eq('poll_id', String(p.id)); if(!error){ p.votes=data||[]; p.vote_count=(data||[]).length; } else p.vote_count=0; }catch(_){ p.vote_count=0; } }));
+    await Promise.all(this.rows.map(async p=>{ try{
+        /* V12.0 (pass 68): same 42703 killed in openResults survived HERE —
+           created_at does not exist on poll_votes (voted_at does), so every
+           card badge read 0 votes. Prefer the aggregate RPC (full count under
+           RLS); fall back to a legal direct select on pre-V11.9 DBs. */
+        const rr=await sb.rpc('sc_poll_results',{p_poll:String(p.id)});
+        if(!rr.error&&rr.data&&rr.data.ok){ p.vote_count=Number(rr.data.total_ballots||0); return; }
+        const {data,error}=await sb.from('poll_votes').select('candidate_id,voter_id,voted_at').eq('poll_id', String(p.id));
+        if(!error){ p.votes=data||[]; p.vote_count=(data||[]).length; } else p.vote_count=0;
+      }catch(_){ p.vote_count=0; } }));
   },
   renderList(){
     const box=document.getElementById('vt-list'); if(!box) return;
@@ -587,7 +607,7 @@ const VT={
       +'<span class="badge-mini" style="background:#eef2ff;color:#3730a3;padding:2px 8px;border-radius:99px;font-size:.7rem;font-weight:800">'+opts.length+' candidates</span>'
       +'<span class="badge-mini" style="background:#f0f9ff;color:#0369a1;padding:2px 8px;border-radius:99px;font-size:.7rem;font-weight:800">'+(p.vote_count||0)+' votes</span>'
       +(p.anonymous?'<span class="badge-mini" style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:.7rem;font-weight:800">anonymous</span>':'')+'</div></div>'
-      +scopeBadge+'<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();VT.vote(\''+p.id+'\')">'+(isOpen?'Vote':'View')+'</button><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();VT.shareLink(\''+p.id+'\')">Share</button>'+(canManage?'<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#b91c1c" onclick="event.stopPropagation();VT.deletePoll(\''+p.id+'\')">🗑</button>':'')
+      +scopeBadge+'<div style="display:flex;gap:6px;flex-wrap:wrap">'+(isOpen&&this.eligibleFor(p)?'<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();VT.vote(\''+p.id+'\')">🗳️ Vote</button>':(isOpen?'<span class="badge" style="background:#f1f5f9;color:#64748b" title="This ballot is for '+this.esc(p.audience||'all')+' only">👁 '+this.esc(p.audience||'all')+' ballot — you view results only</span>':''))+'<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();VT.openResults(\''+p.id+'\')">📊 Results</button><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();VT.shareLink(\''+p.id+'\')">Share</button>'+(canManage?'<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#b91c1c" onclick="event.stopPropagation();VT.deletePoll(\''+p.id+'\')">🗑</button>':'')
       +(canManage?'<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();VT.editPoll(\''+p.id+'\')">Edit</button><button class="btn btn-sm btn-outline" onclick="event.stopPropagation();VT.toggleClose(\''+p.id+'\')">'+(isOpen?'Close':'Re-open')+'</button>':'')+'</div></div></div>'; }).join('');
   },
   async loadStats(){ const rows=this.rows||[]; const active=rows.filter(r=>r.status!=='closed').length; const closed=rows.filter(r=>r.status==='closed').length; const totalVotes=rows.reduce((a,r)=>a+Number(r.vote_count||0),0); const el=(id,v)=>{const e=document.getElementById(id); if(e)e.textContent=v;}; el('vt-stat-active',active); el('vt-stat-closed',closed); el('vt-stat-votes',totalVotes); el('vt-stat-turnout',rows.length?Math.round(totalVotes/Math.max(1,rows.length)*100)+'%':'0%'); },
@@ -597,14 +617,48 @@ const VT={
   async save(){ const opts=this.parseOptions('vt-opts'); const multi=document.getElementById('vt-multi').checked; const clsScope=(document.getElementById('vt-cls')||{}).value||'';const payload={title:document.getElementById('vt-t').value.trim(),description:document.getElementById('vt-d').value.trim(),audience:clsScope?'students':document.getElementById('vt-aud').value,class_scope:clsScope,anonymous:document.getElementById('vt-anon').checked,allow_multiple:multi,multi_winner:multi,max_votes:parseInt(document.getElementById('vt-maxv').value)||1,closes_at:document.getElementById('vt-closes').value||null,candidates:opts,status:'open'}; if(!payload.title){toast('Title required','warning');return;} if(opts.length<2){toast('Add at least 2 candidates','warning');return;} let r; if(window.Voting) r=await Voting.createPoll(payload); else r={error:'Voting module missing'}; if(r&&r.error){toast(r.error.message||r.error,'danger',9000);return;} closeModal(); toast('Poll created','success'); await VT.refresh(); },
   editPoll(id){ const p=this.rows.find(x=>String(x.id)===String(id)); if(!p)return; if(!this.canManagePoll(p)){toast('You can only edit polls you are allowed to manage.','warning');return;} const opts=(p.options||[]).map(o=>(o.label||o.name||'')+(o.desc||o.info?' — '+(o.desc||o.info):'')).join('\n'); openModal('Edit Poll / Election','<div class="form-group"><label>Title *</label><input class="form-input" id="vt-et" value="'+this.esc(p.title||'')+'"></div><div class="form-group"><label>Description</label><input class="form-input" id="vt-ed" value="'+this.esc(p.description||'')+'"></div><div class="form-group"><label>Audience</label><select class="form-select" id="vt-eaud"><option value="all">All</option><option value="parents">Parents</option><option value="students">Students</option><option value="staff">Staff</option></select></div><div class="form-group"><label><input type="checkbox" id="vt-eanon" '+(p.anonymous?'checked':'')+'> Anonymous</label></div><div class="form-group"><label><input type="checkbox" id="vt-emulti" '+(p.allow_multiple?'checked':'')+'> Allow multiple choices</label></div><div class="form-group"><label>Max votes per voter</label><input type="number" class="form-input" id="vt-emaxv" value="'+(p.max_votes||1)+'" min="1" max="10"></div><div class="form-group"><label>Status</label><select class="form-select" id="vt-est"><option value="open">Open</option><option value="closed">Closed</option><option value="draft">Draft</option></select></div><div class="form-group"><label>Candidates</label><textarea class="form-input" id="vt-eopts" rows="6">'+this.esc(opts)+'</textarea></div>','<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="VT.saveEdit(\''+id+'\')">Save changes</button>'); setTimeout(()=>{document.getElementById('vt-eaud').value=p.audience||'all';document.getElementById('vt-est').value=p.status||'open';},50); },
   async saveEdit(id){ const opts=this.parseOptions('vt-eopts'); const patch={title:document.getElementById('vt-et').value.trim(),description:document.getElementById('vt-ed').value.trim(),audience:document.getElementById('vt-eaud').value,anonymous:document.getElementById('vt-eanon').checked,allow_multiple:document.getElementById('vt-emulti').checked,max_votes:parseInt(document.getElementById('vt-emaxv').value)||1,status:document.getElementById('vt-est').value,candidates:opts}; if(!patch.title){toast('Title required','warning');return;} if(opts.length<2){toast('Add at least 2 candidates','warning');return;} const r=await (window.Voting?Voting.updatePoll(id,patch):{error:'Voting module missing'}); if(r&&r.error){toast(r.error.message||r.error,'danger');return;} closeModal(); toast('Poll updated','success'); await VT.refresh(); },
-  vote(id){ const p=this.rows.find(x=>String(x.id)===String(id)); if(!p){toast('Poll not found','warning');return;} if(p.status==='closed'){toast('Poll is closed','warning');return;} const opts=p.options||[]; const html='<p>'+this.esc(p.description||'')+'</p><div style="margin-top:10px">'+opts.map((o,i)=>'<label style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;cursor:pointer"><input type="'+(p.allow_multiple?'checkbox':'radio')+'" name="vt-vote" value="'+(o.id||i)+'" style="margin-top:4px"><div><b>'+this.esc(o.label||o.name||o)+'</b>'+(o.desc?'<div style="font-size:.82rem;color:#64748b">'+this.esc(o.desc)+'</div>':'')+'</div></label>').join('')+'</div>'; openModal('Cast your vote: '+p.title,html,'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="VT.submitVote(\''+id+'\')">Submit</button>'); },
+  async vote(id){ const p=this.rows.find(x=>String(x.id)===String(id)); if(!p){toast('Poll not found','warning');return;} if(p.status==='closed'){toast('Poll is closed','warning');return;}
+    if(!this.eligibleFor(p)){toast('This ballot is for '+(p.audience||'its audience')+' only — your role cannot vote in it.','warning',6000);return;}
+    if(window.Voting&&Voting.canVote&&window.sb){const c=await Voting.canVote(id); if(c&&c.ok===false){toast('The server confirms this ballot is not open to you (audience/class/closing-time rule).','warning',7000);return;}} const opts=p.options||[]; const html='<p>'+this.esc(p.description||'')+'</p><div style="margin-top:10px">'+opts.map((o,i)=>'<label style="display:flex;gap:8px;align-items:flex-start;padding:8px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;cursor:pointer"><input type="'+(p.allow_multiple?'checkbox':'radio')+'" name="vt-vote" value="'+(o.id||i)+'" style="margin-top:4px"><div><b>'+this.esc(o.label||o.name||o)+'</b>'+(o.desc?'<div style="font-size:.82rem;color:#64748b">'+this.esc(o.desc)+'</div>':'')+'</div></label>').join('')+'</div>'; openModal('Cast your vote: '+p.title,html,'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="VT.submitVote(\''+id+'\')">Submit</button>'); },
   async deletePoll(id){ const p=this.rows.find(x=>String(x.id)===String(id)); if(!p)return; if(!this.canManagePoll(p)){toast('Only the creator or an admin can delete this poll.','warning');return;} if(!confirm('Delete "'+(p.title||'this poll')+'" and ALL its votes permanently?'))return; try{ if(window.sb){ await sb.from('poll_votes').delete().eq('poll_id',String(id)); const r=await sb.from('polls').delete().eq('id',id); if(r.error)throw r.error; } toast('Poll deleted.','success'); await VT.refresh(); }catch(e){ toast(e.message||e,'danger'); } },
   async submitVote(id){ const p=this.rows.find(x=>String(x.id)===String(id)); const checks=[...document.querySelectorAll('input[name=vt-vote]:checked')].map(c=>c.value); if(!checks.length){toast('Pick a candidate','warning');return;} if(p&&p.max_votes&&checks.length>Number(p.max_votes)){toast('Select at most '+p.max_votes+' option(s).','warning');return;} const r=await (window.Voting?Voting.vote(id,checks):{error:'Voting module missing'}); if(r&&r.error){toast(r.error.message||r.error,'danger');return;} closeModal(); toast('Vote recorded. Thank you!','success'); await VT.refresh(); },
   shareLink(id){ const url=location.origin+location.pathname.replace(/[^/]*$/,'')+'voting.html?id='+id; navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(url).then(()=>toast('Link copied','success')).catch(()=>prompt('Copy this link:',url)):prompt('Copy this link:',url); },
-  async openResults(id){ const p=this.rows.find(x=>String(x.id)===String(id)); if(!p)return; this.current=p; document.getElementById('vt-results-title').textContent=p.title; document.getElementById('vt-results-card').style.display='block'; document.getElementById('vt-toggle-btn').textContent=p.status==='closed'?'Re-open poll':'Close poll'; if(window.sb){ try{ const {data}=await sb.from('poll_votes').select('candidate_id,voter_id,voted_at,created_at').eq('poll_id',String(id)); p.votes=data||[]; p.vote_count=p.votes.length; }catch(_){} } this.renderResults(); document.getElementById('vt-results-card').scrollIntoView({behavior:'smooth'}); },
+  async openResults(id){ const p=this.rows.find(x=>String(x.id)===String(id)); if(!p)return; this.current=p; document.getElementById('vt-results-title').textContent=p.title+(p.audience&&p.audience!=='all'?' — '+p.audience+' ballot':'')+(p.class_scope?' ('+p.class_scope+')':''); document.getElementById('vt-results-card').style.display='block'; document.getElementById('vt-toggle-btn').style.display=this.canManagePoll(p)?'':'none'; document.getElementById('vt-toggle-btn').textContent=p.status==='closed'?'Re-open poll':'Close poll';
+    /* V11.9: SERVER-SIDE tally via sc_poll_results — correct for every role
+       (the old direct read only saw the viewer's own ballot under RLS and
+       selected a non-existent created_at column → 0% for everyone). */
+    this.agg=null;
+    try{ const res=await (window.Voting?Voting.getResults(p.id):null); if(res){ this.agg=res; } }catch(e){ console.warn('results load:',e); }
+    this.renderResults(); document.getElementById('vt-results-card').scrollIntoView({behavior:'smooth'}); },
   closeResults(){ document.getElementById('vt-results-card').style.display='none'; this.current=null; },
   async toggleClose(id){ const p=id?this.rows.find(x=>String(x.id)===String(id)):this.current; if(!p)return; const newStatus=p.status==='closed'?'open':'closed'; const r=await (window.Voting?Voting.updatePoll(p.id,{status:newStatus}):{error:'Voting module missing'}); if(r&&r.error){toast(r.error.message||r.error,'danger');return;} toast('Poll '+(newStatus==='closed'?'closed':'re-opened')+'.','success'); await VT.refresh(); const again=this.rows.find(x=>String(x.id)===String(p.id)); if(this.current&&again) VT.openResults(again.id); },
-  renderResults(){ const p=this.current;if(!p)return; const v=p.votes||[]; const opts=p.options||[]; const tally=opts.map((o,i)=>({id:o.id||'c'+(i+1),label:o.label||o.name||o,idx:i,count:0})); v.forEach(vote=>{const m=tally.find(t=>String(t.id)===String(vote.candidate_id)||String(t.idx)===String(vote.candidate_id)); if(m)m.count++;}); const totalVotes=v.length; const uniqueVoters=new Set(v.map(x=>x.voter_id||x.id)).size; const sorted=[...tally].sort((a,b)=>b.count-a.count); const winner=sorted[0]; const rows=sorted.map(t=>{const pct=totalVotes?Math.round(t.count/totalVotes*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:3px"><span>'+this.esc(t.label)+(winner&&t.id===winner.id&&t.count>0?' 🏆':'')+'</span><span style="color:var(--primary)">'+t.count+' ('+pct+'%)</span></div><div style="height:14px;background:#f1f5f9;border-radius:7px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#4f46e5,#964eec)"></div></div></div>';}).join(''); document.getElementById('vt-results-body').innerHTML='<div class="stats-grid" style="margin-bottom:14px"><div class="stat-card"><div class="stat-value">'+totalVotes+'</div><div class="stat-label">Ballots</div></div><div class="stat-card"><div class="stat-value">'+uniqueVoters+'</div><div class="stat-label">Voters</div></div><div class="stat-card"><div class="stat-value">'+tally.length+'</div><div class="stat-label">Candidates</div></div><div class="stat-card"><div class="stat-value">'+(p.status==='closed'?'Closed':'Open')+'</div><div class="stat-label">Status</div></div></div>'+(winner&&totalVotes?'<div class="card" style="margin-bottom:14px;background:#fef3c7;border-color:#fcd34d"><h4 style="margin:0">🏆 Current leader: <b>'+this.esc(winner.label)+'</b> with <b>'+winner.count+'</b> votes</h4></div>':'')+'<div class="grid grid-2"><div class="card"><h4 style="margin:0 0 10px">📊 Tally</h4>'+(rows||'<p>No votes yet.</p>')+'</div><div class="card"><h4 style="margin:0 0 10px">Participation</h4><p><b>'+uniqueVoters+'</b> authenticated voter(s), <b>'+totalVotes+'</b> ballot choice(s).</p></div></div>'; },
+  renderResults(){ const p=this.current;if(!p)return; const agg=this.agg||{}; const opts=p.options||[];
+    const cands=(agg.candidates&&agg.candidates.length)?agg.candidates:opts.map((o,i)=>({id:o.id||'c'+(i+1),label:o.label||o.name||o,votes:0,percent:0}));
+    const totalVotes=Number(agg.totalVotes||0); const uniqueVoters=Number(agg.uniqueVoters||totalVotes||0);
+    const eligible=Number(agg.eligible||0); const turnout=agg.turnoutPct;
+    const sorted=[...cands].sort((a,b)=>(b.votes||0)-(a.votes||0)); const winner=sorted[0];
+    const isTie=sorted.length>1&&winner&&sorted[1]&&(winner.votes||0)>0&&winner.votes===sorted[1].votes;
+    const closed=p.status==='closed';
+    const myBallot=agg.myBallot||[];
+    const rows=sorted.map((c,rank)=>{const pct=c.percent||0;const label=this.esc(c.label||c.name||('Candidate '+(rank+1)));const mine=myBallot.includes(String(c.id));
+      return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:3px"><span>'+(rank+1)+'. '+label+(closed&&rank===0&&(c.votes||0)>0&&!isTie?' 🏆 WINNER':(!closed&&rank===0&&(c.votes||0)>0?' 🥇 leading':''))+(mine?' <span style="background:#dbeafe;color:#1d4ed8;border-radius:8px;font-size:.68rem;padding:1px 8px">your vote</span>':'')+'</span><span style="color:var(--primary)">'+(c.votes||0)+' vote'+((c.votes||0)===1?'':'s')+' · '+pct+'%</span></div><div style="height:16px;background:#f1f5f9;border-radius:8px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#4f46e5,#964eec);transition:width .5s"></div></div></div>';}).join('');
+    const roleRows=Object.entries(agg.byRole||{}).map(([r,n])=>'<span class="badge" style="background:#f1f5f9;color:#334155;margin:2px">'+this.esc(r)+': '+n+'</span>').join(' ');
+    const legacyNote=(agg.serverTallied===false&&window.sb)?'<div class="card" style="margin-bottom:12px;background:#fffbeb;border-color:#fde68a;font-size:.85rem">⚠️ This database has not run the V11.9 voting pack yet — the tally below may only include YOUR ballot. Run <code>database/v11.9-voting-integrity.sql</code> once in Supabase for full results.</div>':'';
+    document.getElementById('vt-results-body').innerHTML=legacyNote
+      +'<div class="stats-grid" style="margin-bottom:14px">'
+      +'<div class="stat-card"><div class="stat-value">'+totalVotes+'</div><div class="stat-label">Ballots cast</div></div>'
+      +'<div class="stat-card"><div class="stat-value">'+uniqueVoters+'</div><div class="stat-label">Voters</div></div>'
+      +'<div class="stat-card"><div class="stat-value">'+(eligible||'—')+'</div><div class="stat-label">Eligible voters</div></div>'
+      +'<div class="stat-card"><div class="stat-value">'+(turnout==null?'—':turnout+'%')+'</div><div class="stat-label">Turnout</div></div>'
+      +'</div>'
+      +(winner&&totalVotes?(isTie?'<div class="card" style="margin-bottom:14px;background:#fef9c3;border-color:#fde047"><h4 style="margin:0">🤝 Currently TIED at '+winner.votes+' vote(s) — '+sorted.filter(c=>c.votes===winner.votes).map(c=>this.esc(c.label||c.name)).join(' & ')+'</h4></div>'
+        :'<div class="card" style="margin-bottom:14px;background:'+(closed?'#dcfce7;border-color:#86efac':'#fef3c7;border-color:#fcd34d')+'"><h4 style="margin:0">'+(closed?'🏆 <b>WINNER: '+this.esc(winner.label||winner.name)+'</b> with '+winner.votes+' vote(s) ('+(winner.percent||0)+'%)':'🥇 Current leader: <b>'+this.esc(winner.label||winner.name)+'</b> with '+winner.votes+' vote(s) — results are live until the poll closes')+'</h4></div>')
+        :'<div class="card" style="margin-bottom:14px"><h4 style="margin:0">🗳️ No ballots cast yet'+(eligible?' — '+eligible+' voter(s) are eligible':'')+'.</h4></div>')
+      +'<div class="grid grid-2"><div class="card"><h4 style="margin:0 0 10px">📊 Tally ('+(p.anonymous?'anonymous ballot — identities are never stored with choices':'named ballot')+')</h4>'+(rows||'<p>No votes yet.</p>')+'</div>'
+      +'<div class="card"><h4 style="margin:0 0 10px">🧾 Participation</h4><p style="margin:0 0 8px"><b>'+uniqueVoters+'</b> of <b>'+(eligible||'?')+'</b> eligible voter(s) have voted'+(turnout==null?'':' (<b>'+turnout+'%</b> turnout)')+'.</p>'
+      +(roleRows?'<p style="margin:0 0 4px;font-size:.8rem;color:#64748b">Ballots by role:</p><div>'+roleRows+'</div>':'')
+      +(p.closes_at?'<p style="margin:8px 0 0;font-size:.8rem;color:#64748b">'+(closed?'Closed':'Closes')+': '+new Date(p.closes_at).toLocaleString()+'</p>':'')
+      +'</div></div>'; },
   exportCSV(){ const p=this.current;if(!p){toast('Open a poll first','warning');return;} const opts=p.options||[]; const lines=[['Candidate','Votes']]; opts.forEach(o=>{const count=(p.votes||[]).filter(v=>String(v.candidate_id)===String(o.id)).length; lines.push([o.label||o.name||o,count]);}); const csv=lines.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\n'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='poll-'+p.id+'.csv'; a.click(); },
   exportResults(){ this.exportCSV(); }
 };
