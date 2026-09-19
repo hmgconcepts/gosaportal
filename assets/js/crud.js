@@ -720,10 +720,18 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const key = this.canonicalId(moduleId);
     const allow = this.WRITE_RULES[key];
     const owners=['super_admin','superadmin','admin','administrator','owner','director','proprietor'];if(owners.includes(role)||(window.App&&App.isOwnerRole&&App.isOwnerRole(role)))return true;if(['principal','head_teacher','headteacher','bursar'].includes(role))return !!(window.App&&App.canWriteModule&&App.canWriteModule(key,role));
-    // An explicit empty rule is a hard admin-only boundary and cannot be opened
-    // accidentally by a stale/custom browser access map. Database RLS mirrors it.
-    if (Array.isArray(allow) && allow.length===0) return false;
+    /* V12.4 ORDER FIX (pass 72): the admin's SAVED write map now takes
+       precedence over the default rules. The old order returned false on an
+       empty default rule BEFORE the map was read — so enabling Write for
+       staff in the Page Access Manager could never work for students and 54
+       other modules (and canWriteByAccess didn't even exist — see app.js).
+       An explicit admin decision in the manager is exactly that: explicit.
+       PostgreSQL RLS remains the final enforcement — a module whose policies
+       genuinely forbid staff still refuses at the database, map or no map. */
     if (window.App && App.canWriteByAccess) { const mapped = App.canWriteByAccess(key, role); if (mapped !== null) return mapped; }
+    // No admin decision saved → the shipped defaults apply. An explicit empty rule is a hard admin-only boundary
+    // by default (V12.4: the admin's SAVED map above may open it deliberately; RLS remains the final gate).
+    if (Array.isArray(allow) && allow.length===0) return false;
     if (!allow) return false;
     return allow.includes(role);
   },

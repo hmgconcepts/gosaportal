@@ -815,6 +815,25 @@ const App = {
         if (!g.error && g.data) App._myModuleGrants = new Set(g.data.map(x=>x.module)); }
     } catch(_){}
   },
+  /* V12.4 ROOT CAUSE (pass 72): crud.js has consulted App.canWriteByAccess
+     since V9 — but the function NEVER EXISTED (called behind an existence
+     guard, so it silently never ran). The Page Access Manager saved the
+     write map faithfully; nothing ever read it. Implemented at last:
+     returns true/false when the admin has saved a decision for this module,
+     null when the defaults should apply. staff⇄teacher are interchangeable,
+     and the owner cockpit can never be opened from a browser map. */
+  WRITE_MAP_NEVER: new Set(['site_license','license']),
+  canWriteByAccess(moduleId, role) {
+    const id = this.normalizeModuleId(moduleId);
+    if (App.WRITE_MAP_NEVER.has(id)) return false;
+    const map = this.roleWriteMap || {};
+    if (!(map[id] && Array.isArray(map[id]))) return null;
+    const r = String(role || '').toLowerCase().replace(/\s+/g, '_');
+    return map[id].includes(r)
+      || (r === 'teacher' && map[id].includes('staff'))
+      || (r === 'staff' && map[id].includes('teacher'));
+  },
+
   loadRoleAccessMap() {
     try { App.loadModuleAccess(); } catch(_){}
     try {
@@ -893,6 +912,11 @@ const App = {
       '<div><h2 style="margin:0 0 6px">🔐 Page Access & Permission Manager <span style="font-size:.7rem;background:#dcfce7;color:#166534;padding:2px 8px;border-radius:99px;font-weight:800">v5</span></h2>' +
       '<p style="margin:0;color:var(--gray-600);max-width:920px">Admin controls which portal pages appear in the sidebar for Staff, Parents and Students, and which roles can read/write. <b>Nav</b> = show in sidebar, <b>Read</b> = open the page (also via direct URL), <b>Write</b> = Add/Edit/Delete buttons enabled. Admin/Super Admin always keeps full access to every page.</p></div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="App.saveAccessManager()">💾 Save all</button><button class="btn btn-outline" onclick="App.resetAccessManager()">↺ Reset to defaults</button></div></div>' +
+      /* V12.4 (pass 72 #1b): search pane — find any page instantly. */
+      '<div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+      '<input class="form-input" id="am-search" placeholder="🔍 Search pages… (e.g. students, fees, ID card)" style="max-width:340px" oninput="App.filterAccessManager(this.value)">' +
+      '<span id="am-search-count" style="font-size:.8rem;color:var(--gray-500)"></span>' +
+      '<span style="font-size:.76rem;color:var(--gray-500)">💡 Brand/self-service pages (Profile, ID Cards, Developer…) are always visible to their roles; the manager can add but never remove them.</span></div>' +
       '<div class="table-wrap" style="margin-top:14px;max-height:560px;overflow:auto"><table><thead><tr><th>Page / Module</th><th colspan="3">Staff</th><th colspan="3">Parent</th><th colspan="3">Student</th><th>File</th></tr><tr><th></th><th>Nav</th><th>Read</th><th>Write</th><th>Nav</th><th>Read</th><th>Write</th><th>Nav</th><th>Read</th><th>Write</th><th></th></tr></thead><tbody>' +
       rows.map(r => '<tr data-access-row="'+esc(r.id)+'"><td><strong>'+esc(r.label)+'</strong><br><small>'+esc(r.id)+'</small></td>' +
         // Staff: nav + read + write
@@ -915,6 +939,22 @@ const App = {
        admins always see WHICH page and WHICH role a checkbox belongs to,
        on desktop and mobile alike. */
     try { const t = document.querySelector('#role-access-manager table'); if (t && window.CRUD && CRUD.applyStickyTable) CRUD.applyStickyTable(t); } catch(_) {}
+  },
+
+  /* V12.4: live search filter for the Access Manager rows. */
+  filterAccessManager(q) {
+    q = String(q || '').trim().toLowerCase();
+    let shown = 0, total = 0;
+    document.querySelectorAll('#role-access-manager [data-access-row]').forEach(row => {
+      total++;
+      const id = (row.getAttribute('data-access-row') || '').toLowerCase();
+      const label = (row.querySelector('td strong') ? row.querySelector('td strong').textContent : '').toLowerCase();
+      const hit = !q || id.includes(q) || label.includes(q);
+      row.style.display = hit ? '' : 'none';
+      if (hit) shown++;
+    });
+    const c = document.getElementById('am-search-count');
+    if (c) c.textContent = q ? (shown + ' of ' + total + ' pages match') : '';
   },
 
   async saveAccessManager() {
