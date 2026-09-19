@@ -60,6 +60,7 @@ const CRUD = {
       {key:'guardian_name',label:'Guardian name',type:'text'},
       {key:'guardian_phone',label:'Guardian phone',type:'tel'},
       {key:'guardian_email',label:'Guardian email',type:'email'},
+      {key:'photo_url',label:'Student photo (Google Drive link)',type:'text',help:'V12.3: paste a Drive share link — no upload (saves storage). Shows on the lifetime ID card on EVERY portal; the student can also set it themselves on My Profile (both entry points stay in sync automatically).'},
       {key:'address',label:'Address',type:'textarea'},
       {key:'campus',label:'Campus',type:'text'},
       {key:'status',label:'Status',type:'select',options:['active','inactive','graduated']}
