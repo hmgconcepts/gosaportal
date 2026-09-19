@@ -578,8 +578,15 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         const userId = (window.SC_PROFILE && SC_PROFILE.id) || (window.SCHOOL_USER && SCHOOL_USER.id) || null;
         let query = sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').order('full_name').limit(5000);
         if (role === 'student' && userId) query=query.eq('user_id',userId);
+        /* V12.2: if the student record was never LINKED (user_id null — common
+           on onboarded schools), the eq() above returns nothing and the page
+           fell back to a sample card with no photo. Name-match fallback keeps
+           the real record (and its staff-entered photo) on screen. */
         if (role === 'parent' && userId) { const linked=await sb.from('parent_child').select('student_id').eq('parent_id',userId); const ids=(linked.data||[]).map(x=>x.student_id).filter(Boolean); if(!ids.length){ICUI.all=[];this.loaded=true;this.render();return;} query=query.in('id',ids); }
-        const {data,error}=await query; if(error)throw error;
+        let {data,error}=await query; if(error)throw error;
+        if(role==='student'&&userId&&!(data||[]).length&&window.SC_PROFILE&&SC_PROFILE.full_name){
+          try{ const nm=await sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').ilike('full_name',SC_PROFILE.full_name).limit(1); if((nm.data||[]).length) data=nm.data; }catch(_){ }
+        }
         await ICUI.fillPhotos(data||[]);
         ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
         // Auto-select first student/child for parents or students (role declared above)

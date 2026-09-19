@@ -344,6 +344,11 @@
       showToast('✅ Photo updated. It will appear in the top bar on next page load.', 'success');
       if (window.App && App.currentProfile) { App.currentProfile.photo_url = direct; }
       if (window.SC_PROFILE) window.SC_PROFILE.photo_url = direct;
+      /* V12.2: write-through — the SAME photo lands on the linked students/
+         staff row so the ID card is correct everywhere immediately (the V12.2
+         SQL trigger does this server-side too; this covers pre-pack DBs). */
+      try { await sb.from('students').update({ photo_url: direct || raw || null }).eq('user_id', _currentUser.id); } catch(_) {}
+      try { await sb.from('staff').update({ photo_url: direct || raw || null }).eq('user_id', _currentUser.id); } catch(_) {}
     } catch (e) {
       showToast('Photo save failed: ' + (e.message || e), 'error');
       console.error('savePhoto error:', e);
