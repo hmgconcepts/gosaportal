@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Platform Health Console • God of Seed Academy</title>
+<title>Platform Health Console • School Connect</title>
 <meta name="description" content="Owner cockpit: keep-alive, storage, backups, security lockdown and login audit in one place.">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="assets/img/logo.png">
@@ -22,6 +22,8 @@
   <div class="ph-grid">
     <div class="card"><h3>💓 Keep-Alive (anti-pause)</h3><div id="ph-heartbeat">Loading…</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="PH.pingNow()">💓 Send keep-alive heartbeat NOW</button></div><p class="muted" style="margin-top:6px"><b>Layer 5 — manual heartbeat:</b> press this once a week during long holidays (or any time) to reset Supabase’s 7-day inactivity timer instantly. It performs a real database write and shows the confirmed server timestamp.</p>
       <p class="muted">Layers: site-visit · GitHub Actions · edge ping · pg_cron. Details: <code>SUPABASE_FREE_TIER_PROTECTION.md</code></p></div>
+    <div class="card" style="border:2px solid rgba(79,70,229,.3)"><h3>🩺 Schema Doctor — is every SQL pack installed?</h3><div id="ph-schema">Loading…</div>
+      <p class="muted" style="margin-top:8px"><b>V12.5:</b> the #1 cause of "the fix didn't work" is code deployed while its SQL pack was never run. This card PROBES the live database for each pack's marker (function or column) and lists exactly which <code>database/*.sql</code> files still need one run in the Supabase SQL Editor. Green across = fully installed.</p></div>
     <div class="card"><h3>🗄️ Database Space (500 MB free tier)</h3><div id="ph-storage">Loading…</div>
       <p class="muted">Manage old rows on the <a href="storage.html">Storage Manager</a> (Archive Vault → 1 GB File Storage).</p></div>
     <div class="card"><h3>☁️ Google Drive Backup</h3><div id="ph-drive">Loading…</div>
@@ -59,6 +61,59 @@
 <script src="assets/js/app.js"></script>
 <script>
 const PH={
+  /* V12.5 SCHEMA DOCTOR: one detector per pack, cheapest possible probe.
+     RPC probes send deliberately-invalid args: PGRST202 = missing,
+     anything else = the function exists. Column probes select the column
+     with limit 0: 42703 = missing. */
+  PACKS:[
+    {file:'v10.7-fee-locks-arrears.sql', label:'Fee locks & arrears', kind:'col', table:'students', col:'portal_locked'},
+    {file:'v10.9b-fee-doctor.sql', label:'Fee ledger doctor', kind:'rpc', fn:'sc_fee_ledger_doctor', args:{p_heal:false}},
+    {file:'v11.0-timetable-pro.sql', label:'Timetable engine 11', kind:'rpc', fn:'sc_timetable_capacity', args:{p_classes:[],p_periods_per_day:6,p_day_periods:null}},
+    {file:'v11.7-admission-year.sql', label:'True admission year', kind:'col', table:'students', col:'admission_year'},
+    {file:'v11.9-voting-integrity.sql', label:'Voting integrity', kind:'rpc', fn:'sc_poll_results', args:{p_poll:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.0-audit-columns.sql', label:'Audit columns (staff DOB, dept fees)', kind:'col', table:'staff', col:'date_of_birth'},
+    {file:'v12.2-photo-sync.sql', label:'Two-way photo sync', kind:'rpc', fn:'sc_sync_probe_absent', probeTrigger:'trg_students_photo_sync'},
+    {file:'v12.3-write-columns.sql', label:'Write-direction columns', kind:'col', table:'attendance_checkins', col:'status'}
+  ],
+  async schemaDoctor(){
+    const box=document.getElementById('ph-schema'); if(!box) return;
+    if(!window.sb){ box.textContent='Database not configured.'; return; }
+    const rows=[]; let missing=0;
+    for(const p of this.PACKS){
+      let ok=null;
+      try{
+        if(p.kind==='col'){
+          const r=await sb.from(p.table).select(p.col).limit(0);
+          ok=!(r.error&&/42703|does not exist|could not find/i.test(r.error.message||''));
+        }else if(p.probeTrigger){
+          /* trigger-only pack: verified via the sc_installed_packs marker
+             below (set ok=null here; marker pass resolves it). */
+          ok=null;
+        }else{
+          const r=await sb.rpc(p.fn,p.args||{});
+          ok=!(r.error&&/PGRST202|Could not find the function/i.test(r.error.message||''));
+        }
+      }catch(e){ ok=false; }
+      rows.push({p,ok});
+      if(ok===false) missing++;
+    }
+    /* V12.5 marker check for trigger-only packs: complete-schema + each pack
+       insert a row into sc_install_state (added below); readable via RPC. */
+    try{
+      const mk=await sb.rpc('sc_installed_packs');
+      if(!mk.error&&Array.isArray(mk.data)){
+        const have=new Set(mk.data.map(x=>String(x.key||x)));
+        rows.forEach(r=>{ if(r.ok===null) r.ok=have.has(r.p.file); if(r.ok===false&&have.has(r.p.file)) r.ok=true; });
+      }
+    }catch(_){ rows.forEach(r=>{ if(r.ok===null) r.ok=undefined; }); }
+    missing=rows.filter(r=>r.ok===false).length;
+    box.innerHTML=(missing?this.badge(missing+' pack(s) NOT installed','bad'):this.badge('All verifiable packs installed','ok'))
+      +'<div style="margin-top:8px">'+rows.map(r=>{
+        const s=r.ok===true?'<span class="ph-badge ok">✓ installed</span>':r.ok===false?'<span class="ph-badge bad">✗ RUN THIS</span>':'<span class="ph-badge warn">? unverifiable</span>';
+        return '<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--gray-200);font-size:.85rem"><span><code>database/'+this.esc(r.p.file)+'</code><br><small class="muted">'+this.esc(r.p.label)+'</small></span>'+s+'</div>';
+      }).join('')+'</div>'
+      +(missing?'<p class="muted" style="margin-top:8px"><b>Fix:</b> open Supabase → SQL Editor → paste each red file (from the repo\'s <code>database/</code> folder) → Run. Every pack is idempotent — running twice is safe. Or run <code>complete-schema.sql</code> once (contains everything).</p>':'');
+  },
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
   badge(t,cls){return '<span class="ph-badge '+cls+'">'+this.esc(t)+'</span>';},
   async pingNow(){if(!window.sb){toast('Database not configured','warning');return;}
@@ -107,7 +162,7 @@ const PH={
       if(!data||!data.length){b.innerHTML='<p class="muted">No sign-in events recorded yet. Events appear from the next sign-in after this update is deployed.</p>';return;}
       b.innerHTML='<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Event</th><th>Device</th></tr></thead><tbody>'+data.map(r=>'<tr><td>'+this.esc(new Date(r.created_at).toLocaleString())+'</td><td>'+this.esc(r.email||'—')+'</td><td>'+this.esc(r.event)+'</td><td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+this.esc(r.user_agent||'')+'</td></tr>').join('')+'</tbody></table></div>';
     }catch(e){b.textContent=e.message;}},
-  refresh(){this.heartbeat();this.storage();this.drive();this.license();this.loadSecurity();this.audit();}
+  refresh(){this.heartbeat();this.storage();this.drive();this.license();this.loadSecurity();this.audit();this.schemaDoctor();}
 };
 document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>PH.refresh(),900);});
 </script>
