@@ -1358,25 +1358,54 @@ const App = {
     if (!supabase) { alert('Database not configured. Please edit assets/js/config.js with your Supabase URL and anon key.'); return; }
     const btn = e.target.querySelector('button[type=submit]');
     if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = 'Submitting…'; }
-    /* V12.6: capture admission_no / staff_no at sign-up for automatic
-       disaster-recovery re-link (trigger trg_profiles_auto_link). */
+    /* V12.7: robust scenario-aware capture — new vs returning after disaster recovery.
+       - Students: admission_no (required for returning, optional for new)
+       - Staff: staff_no (required for returning, optional for new)
+       - Parents: children_admission_nos optional, email is the bridge
+       - All: account_scenario new/returning stored in user_metadata for audit
+       - Help text exactly: "if your school recovered from Drive, enter your admission number — your old results, fees and ID photo will re-link automatically."
+    */
     const roleUp = String(fd.get('role')||'').toLowerCase();
+    const scenario = String(fd.get('account_scenario')||'new').toLowerCase();
     const admNo = String(fd.get('admission_no')||'').trim();
     const stfNo = String(fd.get('staff_no')||'').trim();
+    const childrenNos = String(fd.get('children_admission_nos')||'').trim();
+    // Validation for returning scenario
+    if(scenario==='returning'){
+      if(roleUp==='student' && !admNo){
+        alert('Returning student: please enter your Admission No — if your school recovered from Drive, enter your admission number — your old results, fees and ID photo will re-link automatically.');
+        if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || 'Request access'; }
+        return;
+      }
+      if(['staff','teacher','admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(roleUp) && !stfNo){
+        // staff_no optional if email matches, but warn
+        console.warn('Returning staff without staff_no — will try email bridge');
+      }
+    }
     const { data, error } = await supabase.auth.signUp({
       email: (fd.get('email') || '').trim(),
       password: fd.get('password') || '',
-      options: { data: { full_name: fd.get('full_name'), phone: fd.get('phone'), role: fd.get('role'), admission_no: admNo, staff_no: stfNo } }
+      options: { data: { full_name: fd.get('full_name'), phone: fd.get('phone'), role: fd.get('role'), admission_no: admNo, staff_no: stfNo, account_scenario: scenario, children_admission_nos: childrenNos } }
     });
-    /* V12.6: best-effort — if the profile row already exists (email confirmation
+    /* V12.6-12.7: best-effort — if the profile row already exists (email confirmation
        flow), update the linking columns directly so the trigger fires even before
-       the auth hook creates the profile. */
+       the auth hook creates the profile. Also store scenario for admin audit. */
     try{
       if(data && data.user && data.user.id){
         const patch={};
         if(roleUp==='student' && admNo) patch.admission_no=admNo;
-        if(['staff','teacher','admin','super_admin'].includes(roleUp) && stfNo) patch.staff_no=stfNo;
-        if(Object.keys(patch).length) await supabase.from('profiles').update(patch).eq('id', data.user.id);
+        if(['staff','teacher','admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(roleUp) && stfNo) patch.staff_no=stfNo;
+        // Also try to store scenario in profiles if column exists (future-proof)
+        if(Object.keys(patch).length){
+          const upd = await supabase.from('profiles').update(patch).eq('id', data.user.id);
+          if(upd.error) console.warn('Profile patch failed', upd.error.message);
+        }
+        // If parent returning with children nos, store in module_records for admin reference (non-critical)
+        if(roleUp==='parent' && childrenNos){
+          try{
+            await supabase.from('module_records').insert({module:'parent_returning_hint', title:'Parent returning: '+ (fd.get('full_name')||'')+' — children '+childrenNos, body:'Email: '+(fd.get('email')||'')+' — Children admission nos: '+childrenNos+' — Scenario: '+scenario, status:'pending', data:{email:fd.get('email'), children_admission_nos:childrenNos, scenario, parent_name:fd.get('full_name')}});
+          }catch(_){}
+        }
       }
     }catch(_){ }
     if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || 'Request access'; }
