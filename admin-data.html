@@ -567,6 +567,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <p style="font-size:.82rem;color:var(--gray-500);margin:8px 0 0">Prerequisite: run recovery (🚑 Recover to new project) first, then ask everybody to sign up again and approve them on Approvals. Then run this re-link. Safe to run twice — already-linked rows skipped.</p>
       </div>
 
+      <!-- V12.7 Universal Archive & Restore Hub — robust, all-inclusive, self-contained, seamless -->
+      <div id="universal-archive-hub"></div>
+
 <div class="card" style="margin-bottom:16px" data-admin-only>
         <h3>♻️ Portable Data Archive Center</h3>
         <p style="color:var(--gray-600)"><b>Every machine-readable export can come back.</b> Portable JSON preserves UUIDs, dates, arrays and JSON fields for later restoration/analysis; CSV remains available for spreadsheets and can be re-imported into the selected table. Files are processed locally and are never stored in Supabase.</p>
@@ -597,6 +600,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
 <script src="assets/js/data-portability.js"></script>
+<script src="assets/js/drive-sync.js"></script>
+<script src="assets/js/archive-hub.js"></script>
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
@@ -615,6 +620,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   if (window.Super) Super.init(sb, window.SCHOOL);
   if (window.Enterprise) Enterprise.init(sb);
   if (window.CRUD) CRUD.init(sb);
+  // V12.7 Universal Hub mount
+  document.addEventListener('DOMContentLoaded', ()=>{ setTimeout(()=>{ if(window.ArchiveHub){ ArchiveHub.init(sb); ArchiveHub.renderUniversal('universal-archive-hub'); } }, 900); });
 </script>
 <script>
 const DataTools = {

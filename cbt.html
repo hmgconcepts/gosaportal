@@ -492,6 +492,39 @@
           <strong>report-card column</strong>; after submissions, use the explicit bulk-push preview to place verified scores in official reports.
         </p>
       </div>
+      <!-- V12.7 Archive Recovery Center — one-click fix for mistakenly archived exams -->
+      <div class="card" id="cbt-archive-hub" style="border:2px solid #f59e0b;background:#fffbeb;margin-bottom:16px">
+        <h3 style="margin-top:0">🗃️ Archive Recovery Center — Restore Archive Exams (V12.7)</h3>
+        <p style="color:#475569;margin-top:4px">If you mistakenly archived exams, <b>this is the one-click fix</b>. All archived exams are hidden from students but <b>NOT deleted</b> — their questions, results and roster are still safe. Restore them here in one click. Every action is logged, confirm-guarded, and undoable. This button is robust, all-inclusive, self-contained and seamless.</p>
+        <div id="cbt-archive-stats" style="margin:10px 0"><span class="pulse">Loading archive stats…</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-primary" onclick="CBTArchive.restoreAll()">♻️ Restore ALL Archived Exams (One Click — Fixes Mistaken Archive)</button>
+          <button class="btn btn-outline" onclick="CBTArchive.restoreFiltered()">♻️ Restore Filtered (Visible) Archived Exams</button>
+          <button class="btn btn-outline" onclick="CBTArchive.viewArchivedOnly()">👁️ View Archived Only</button>
+          <button class="btn btn-outline" onclick="CBTArchive.viewActiveOnly()">👁️ View Active Only</button>
+          <button class="btn btn-outline" onclick="CBTArchive.undo()">↩️ Undo Last Archive Action</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-outline" onclick="CBTArchive.exportArchived()">📦 Export Archived as Portable Backup</button>
+          <label class="btn btn-outline">📥 Import Archive Backup<input type="file" id="cbt-arch-file" accept=".json" hidden onchange="CBTArchive.importBackup(this.files[0])"></label>
+          <button class="btn btn-outline" onclick="CBTArchive.showAdvanced()">⚙️ Advanced — Restore by Term/Session/Class</button>
+        </div>
+        <div id="cbt-archive-advanced" style="display:none;margin-top:10px;padding:10px;background:#fff;border:1px solid #fcd34d;border-radius:10px">
+          <div class="grid grid-3">
+            <div class="form-group"><label>Term</label><input class="form-input" id="cbt-ar-term" placeholder="e.g. First Term"></div>
+            <div class="form-group"><label>Session</label><input class="form-input" id="cbt-ar-session" placeholder="e.g. 2024/2025"></div>
+            <div class="form-group"><label>Class</label><input class="form-input" id="cbt-ar-class" placeholder="e.g. JSS 1"></div>
+            <div class="form-group"><label>Subject</label><input class="form-input" id="cbt-ar-subject" placeholder="e.g. Mathematics"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <button class="btn btn-primary btn-sm" onclick="CBTArchive.restoreByFilter()">♻️ Restore Matching Archived Exams</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('cbt-archive-advanced').style.display='none'">Close</button>
+          </div>
+          <p style="font-size:.82rem;color:#92400e;margin-top:6px">Leave fields blank to match all. Only archived exams matching ALL filled fields will be restored.</p>
+        </div>
+        <div id="cbt-archive-log" style="margin-top:10px;font-size:.9rem;color:#475569"></div>
+      </div>
+
       <div id="cbt-list"><span class="pulse">Loading exams…</span></div>
     
       <div class="card" style="margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0">
@@ -531,8 +564,12 @@
   if (window.Enterprise) Enterprise.init(sb);
   if (window.CRUD) CRUD.init(sb);
 </script>
+<script src="assets/js/data-portability.js"></script>
+<script src="assets/js/drive-sync.js"></script>
+<script src="assets/js/archive-hub.js"></script>
 <script src="assets/js/cbt-engine.js"></script>
 <script src="assets/js/proctor.js"></script>
+<script src="assets/js/cbt-archive.js"></script>
 <script>
 CBT.init(sb);
 if(window.CBTUI && window.CBTUI.loadPickers) window.CBTUI.loadPickers();

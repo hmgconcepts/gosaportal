@@ -30,6 +30,8 @@
       <p class="muted">Backups & restore: <a href="admin-data.html">Admin Data → Google Drive Backup & Sync</a>.</p></div>
     <div class="card"><h3>📜 Site License</h3><div id="ph-license">Loading…</div>
       <p class="muted">One-time (lifetime) licenses never expire — the HMG Concepts promise.</p></div>
+    <div class="card" style="border:2px solid #f59e0b"><h3>🗃️ Archive Health (V12.7)</h3><div id="ph-archive">Loading…</div>
+      <p class="muted">Restore anything: <a href="admin-data.html">Admin Data → Universal Archive & Restore Hub</a> and <a href="cbt.html">CBT → Archive Recovery Center</a>.</p></div>
   </div>
 
   <div class="card" style="margin-top:16px" id="ph-security-card">
@@ -55,6 +57,7 @@
 <script src="assets/js/demo.js"></script>
 <script src="assets/js/data-portability.js"></script>
 <script src="assets/js/drive-sync.js"></script>
+<script src="assets/js/archive-hub.js"></script>
 <script src="assets/js/security-guard.js"></script>
 <script src="assets/js/site-help.js"></script>
 <script src="assets/js/ai-assistant.js"></script>
@@ -73,7 +76,10 @@ const PH={
     {file:'v11.9-voting-integrity.sql', label:'Voting integrity', kind:'rpc', fn:'sc_poll_results', args:{p_poll:'00000000-0000-0000-0000-000000000000'}},
     {file:'v12.0-audit-columns.sql', label:'Audit columns (staff DOB, dept fees)', kind:'col', table:'staff', col:'date_of_birth'},
     {file:'v12.2-photo-sync.sql', label:'Two-way photo sync', kind:'rpc', fn:'sc_sync_probe_absent', probeTrigger:'trg_students_photo_sync'},
-    {file:'v12.3-write-columns.sql', label:'Write-direction columns', kind:'col', table:'attendance_checkins', col:'status'}
+    {file:'v12.3-write-columns.sql', label:'Write-direction columns', kind:'col', table:'attendance_checkins', col:'status'},
+    {file:'v12.5-schema-doctor.sql', label:'Schema Doctor', kind:'rpc', fn:'sc_installed_packs', args:{}},
+    {file:'v12.6-relink.sql', label:'One-click re-link', kind:'rpc', fn:'sc_relink_all', args:{}},
+    {file:'v12.7-archive-restore.sql', label:'Archive Restore Hub', kind:'rpc', fn:'sc_restore_all_archived_exams', args:{}}
   ],
   async schemaDoctor(){
     const box=document.getElementById('ph-schema'); if(!box) return;
@@ -157,12 +163,33 @@ const PH={
     const{error}=await sb.from('school_settings').upsert(row,{onConflict:'id'});
     if(error){toast('Could not save: '+error.message+' (admin role required; older DBs: run database/security-hardening.sql)','danger',9000);return;}
     toast(lock?'🚨 LOCKDOWN IS ON — non-admin users are now locked out.':'Security settings saved ✓',lock?'warning':'success',7000);this.loadSecurity();},
+  async archive(){
+    const b=document.getElementById('ph-archive'); if(!b) return;
+    if(!window.sb){ b.textContent='Database not configured.'; return; }
+    try{
+      const [cbt, students] = await Promise.all([
+        sb.from('cbt_exams').select('id',{count:'exact', head:true}).eq('is_archived', true).then(r=>r.count||0).catch(()=>0),
+        sb.from('module_records').select('id',{count:'exact', head:true}).eq('module','student_archive').then(r=>r.count||0).catch(()=>0)
+      ]);
+      let vaultCount=0;
+      try{ if(window.DataPortability){ DataPortability.init(sb); const v=await DataPortability.listVault(); vaultCount=v.length; } }catch(_){}
+      const total = (cbt||0)+(students||0)+vaultCount;
+      const cls = total>0 ? (cbt>0?'warn':'ok') : 'ok';
+      b.innerHTML = this.badge(`${cbt} CBT archived · ${students} student archives · ${vaultCount} vault — total ${total} archived`, cls) +
+        `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+          ${cbt>0? `<a class="btn btn-sm btn-primary" href="cbt.html">♻️ Restore ${cbt} CBT in One Click</a>` : ''}
+          <a class="btn btn-sm btn-outline" href="admin-data.html">🗃️ Universal Restore Hub</a>
+          <a class="btn btn-sm btn-outline" href="storage.html">📦 Vault</a>
+        </div>` +
+        (cbt>0? `<p class="muted" style="margin-top:6px;color:#92400e"><b>⚠️ ${cbt} CBT exam(s) are archived and hidden from students.</b> Go to CBT → Archive Recovery Center → Restore ALL.</p>` : `<p class="muted" style="margin-top:6px">✅ No CBT exams archived. Archive system healthy.</p>`);
+    }catch(e){ b.innerHTML=`<p style="color:#b91c1c">${this.esc(e.message||e)}</p>`; }
+  },
   async audit(){const b=document.getElementById('ph-audit');try{const{data,error}=await sb.from('login_audit').select('email,event,user_agent,created_at').order('created_at',{ascending:false}).limit(25);
       if(error){b.innerHTML='<p class="muted">'+this.esc(error.message)+' (admin role required)</p>';return;}
       if(!data||!data.length){b.innerHTML='<p class="muted">No sign-in events recorded yet. Events appear from the next sign-in after this update is deployed.</p>';return;}
       b.innerHTML='<div class="table-wrap"><table><thead><tr><th>When</th><th>Who</th><th>Event</th><th>Device</th></tr></thead><tbody>'+data.map(r=>'<tr><td>'+this.esc(new Date(r.created_at).toLocaleString())+'</td><td>'+this.esc(r.email||'—')+'</td><td>'+this.esc(r.event)+'</td><td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+this.esc(r.user_agent||'')+'</td></tr>').join('')+'</tbody></table></div>';
     }catch(e){b.textContent=e.message;}},
-  refresh(){this.heartbeat();this.storage();this.drive();this.license();this.loadSecurity();this.audit();this.schemaDoctor();}
+  refresh(){this.heartbeat();this.storage();this.drive();this.license();this.loadSecurity();this.audit();this.schemaDoctor();this.archive();}
 };
 document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>PH.refresh(),900);});
 </script>

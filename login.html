@@ -128,19 +128,103 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="form-group"><label>Email</label><input class="form-input" type="email" name="email" required></div>
       <div class="form-group"><label>Phone</label><input class="form-input" name="phone"></div>
       <div class="form-group"><label>Password (min 8 chars)</label><input class="form-input" type="password" name="password" required minlength="8"></div>
-      <div class="form-group"><label>Role</label>
-        <select class="form-select" name="role" id="su-role" onchange="if(this.value==='student'){document.getElementById('su-adm-wrap').style.display='';document.getElementById('su-staff-wrap').style.display='none';}else if(['staff','teacher','admin','super_admin'].includes(this.value)){document.getElementById('su-adm-wrap').style.display='none';document.getElementById('su-staff-wrap').style.display='';}else{document.getElementById('su-adm-wrap').style.display='none';document.getElementById('su-staff-wrap').style.display='none';}">
-          <option value="parent">Parent</option>
-          <option value="student">Student</option>
-          <option value="staff">Staff</option>
-          <option value="admin">Admin</option>
+      <div class="form-group"><label>Role — I am a…</label>
+        <select class="form-select" name="role" id="su-role" onchange="window.SCLogin && SCLogin.updateScenario()">
+          <option value="parent">Parent / Guardian</option>
+          <option value="student">Student / Pupil</option>
+          <option value="staff">Staff / Teacher</option>
+          <option value="admin">Admin / Proprietor</option>
         </select>
       </div>
-      <div class="form-group" id="su-adm-wrap" style="display:none"><label>Admission No (if student — for automatic re-link after disaster recovery)</label><input class="form-input" name="admission_no" placeholder="e.g. GoSA/2024/001"><small style="color:var(--gray-500)">V12.6: if you are an existing student whose school recovered from Drive, enter your admission number — your old results, fees and ID photo will re-link automatically when you sign up.</small></div>
-      <div class="form-group" id="su-staff-wrap" style="display:none"><label>Staff No (if staff — for automatic re-link)</label><input class="form-input" name="staff_no" placeholder="e.g. STF/2024/012"><small style="color:var(--gray-500)">V12.6: existing staff enter staff number for automatic re-link.</small></div>
+      <div class="form-group"><label>Account scenario — choose your scenario</label>
+        <select class="form-select" name="account_scenario" id="su-scenario" onchange="window.SCLogin && SCLogin.updateScenario()">
+          <option value="new">New to this school — create fresh account</option>
+          <option value="returning">Returning — my school recovered from Drive backup, I had an account before (re-link my data)</option>
+        </select>
+        <small style="color:var(--gray-500);display:block;margin-top:4px">If your school recovered from Drive, choose Returning — your old results, fees and ID photo will re-link automatically.</small>
+      </div>
+
+      <!-- Student: Admission No -->
+      <div class="form-group" id="su-adm-wrap" style="display:none;border:1px solid #fcd34d;background:#fffbeb;padding:12px;border-radius:10px">
+        <label>Admission No (students)</label>
+        <input class="form-input" name="admission_no" id="su-admission" placeholder="e.g. GoSA/2024/001">
+        <small style="color:#92400e;display:block;margin-top:6px;font-weight:600">if your school recovered from Drive, enter your admission number — your old results, fees and ID photo will re-link automatically.</small>
+        <small id="su-adm-help-new" style="color:var(--gray-500);display:block;margin-top:4px">New students: if you already know your admission number from the school office, enter it here (optional). It helps link your results and fees faster.</small>
+        <small id="su-adm-help-returning" style="color:#166534;display:none;margin-top:4px;font-weight:600">✅ Returning student: entering your admission number is REQUIRED for automatic re-link. Your old results, fees, attendance, ID photo and report cards will re-link the moment you sign up.</small>
+      </div>
+
+      <!-- Staff: Staff No -->
+      <div class="form-group" id="su-staff-wrap" style="display:none;border:1px solid #93c5fd;background:#eff6ff;padding:12px;border-radius:10px">
+        <label>Staff No (staff / teachers / admin)</label>
+        <input class="form-input" name="staff_no" id="su-staffno" placeholder="e.g. STF/2024/012">
+        <small style="color:#1e40af;display:block;margin-top:6px;font-weight:600">if your school recovered from Drive, enter your staff number — your old classes, timetable and payroll will re-link automatically.</small>
+        <small id="su-staff-help-new" style="color:var(--gray-500);display:block;margin-top:4px">New staff: if you have a staff number, enter it (optional).</small>
+        <small id="su-staff-help-returning" style="color:#166534;display:none;margin-top:4px;font-weight:600">✅ Returning staff: staff number OR same email as before will auto-link you. Entering staff number is recommended for guaranteed match.</small>
+      </div>
+
+      <!-- Parent: Returning scenario help -->
+      <div class="form-group" id="su-parent-wrap" style="display:none;border:1px solid #86efac;background:#f0fdf4;padding:12px;border-radius:10px">
+        <label>Parent / Guardian — Re-linking your children</label>
+        <div style="font-size:.88rem;color:#166534;line-height:1.6">
+          <b>New parent:</b> use your email to sign up. After approval, link your children on Parent–Child page.<br>
+          <b>Returning parent (school recovered from Drive):</b> use the <b>SAME email</b> you used before — your children will re-link automatically when you sign up with that email. Your old messages and fee records will also re-link.
+        </div>
+        <div class="form-group" style="margin-top:10px"><label>Children Admission Numbers (optional — helps matching, comma separated)</label><input class="form-input" name="children_admission_nos" id="su-children" placeholder="e.g. GoSA/2023/010, GoSA/2024/005"><small style="color:var(--gray-500)">If you know your children's admission numbers, enter them — admin can use them for faster verification.</small></div>
+      </div>
+
+      <!-- Admin extra info -->
+      <div class="form-group" id="su-admin-wrap" style="display:none;border:1px solid #c4b5fd;background:#f5f3ff;padding:12px;border-radius:10px">
+        <label>Admin — Disaster Recovery Note</label>
+        <div style="font-size:.88rem;color:#5b21b6;line-height:1.6">If you are the first admin after recovery, sign up with any email, then in Supabase Table Editor set your profile role to <code>super_admin</code> and status to <code>approved</code>. Then run Admin Data → One-Click Re-link. Staff and students should use Returning scenario with their admission/staff numbers.</div>
+      </div>
+
       <button type="submit" class="btn btn-primary" style="width:100%">Request access</button>
-      <p style="margin-top:12px;font-size:0.82rem;color:var(--gray-500);text-align:center">Your account will be reviewed by the school admin before sign-in is enabled.</p>
+      <p style="margin-top:12px;font-size:0.82rem;color:var(--gray-500);text-align:center">Your account will be reviewed by the school admin before sign-in is enabled. Returning users with admission_no / staff_no are auto-linked on sign-up.</p>
     </form>
+    <script>
+    window.SCLogin = {
+      updateScenario(){
+        const role = (document.getElementById('su-role')?.value||'').toLowerCase();
+        const scenario = (document.getElementById('su-scenario')?.value||'new').toLowerCase();
+        const admWrap = document.getElementById('su-adm-wrap');
+        const staffWrap = document.getElementById('su-staff-wrap');
+        const parentWrap = document.getElementById('su-parent-wrap');
+        const adminWrap = document.getElementById('su-admin-wrap');
+        const admHelpNew = document.getElementById('su-adm-help-new');
+        const admHelpRet = document.getElementById('su-adm-help-returning');
+        const staffHelpNew = document.getElementById('su-staff-help-new');
+        const staffHelpRet = document.getElementById('su-staff-help-returning');
+        // Hide all first
+        if(admWrap) admWrap.style.display='none';
+        if(staffWrap) staffWrap.style.display='none';
+        if(parentWrap) parentWrap.style.display='none';
+        if(adminWrap) adminWrap.style.display='none';
+        // Show based on role
+        if(role==='student'){
+          if(admWrap) admWrap.style.display='';
+          if(admHelpNew) admHelpNew.style.display = scenario==='returning' ? 'none' : '';
+          if(admHelpRet) admHelpRet.style.display = scenario==='returning' ? '' : 'none';
+        }else if(['staff','teacher'].includes(role)){
+          if(staffWrap) staffWrap.style.display='';
+          if(staffHelpNew) staffHelpNew.style.display = scenario==='returning' ? 'none' : '';
+          if(staffHelpRet) staffHelpRet.style.display = scenario==='returning' ? '' : 'none';
+        }else if(role==='parent'){
+          if(parentWrap) parentWrap.style.display='';
+        }else if(['admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(role)){
+          if(staffWrap) staffWrap.style.display='';
+          if(adminWrap) adminWrap.style.display='';
+          if(staffHelpNew) staffHelpNew.style.display = scenario==='returning' ? 'none' : '';
+          if(staffHelpRet) staffHelpRet.style.display = scenario==='returning' ? '' : 'none';
+        }
+        // If returning scenario, also show relevant help for all
+        if(scenario==='returning'){
+          if(role==='parent' && parentWrap) parentWrap.style.display='';
+          // For student/staff already shown
+        }
+      }
+    };
+    document.addEventListener('DOMContentLoaded', ()=>{ if(window.SCLogin) SCLogin.updateScenario(); });
+    </script>
     <p style="margin-top:24px;text-align:center;font-size:0.78rem;color:var(--gray-400)">
       Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
     </p>
