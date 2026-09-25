@@ -1358,11 +1358,27 @@ const App = {
     if (!supabase) { alert('Database not configured. Please edit assets/js/config.js with your Supabase URL and anon key.'); return; }
     const btn = e.target.querySelector('button[type=submit]');
     if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = 'Submitting…'; }
+    /* V12.6: capture admission_no / staff_no at sign-up for automatic
+       disaster-recovery re-link (trigger trg_profiles_auto_link). */
+    const roleUp = String(fd.get('role')||'').toLowerCase();
+    const admNo = String(fd.get('admission_no')||'').trim();
+    const stfNo = String(fd.get('staff_no')||'').trim();
     const { data, error } = await supabase.auth.signUp({
       email: (fd.get('email') || '').trim(),
       password: fd.get('password') || '',
-      options: { data: { full_name: fd.get('full_name'), phone: fd.get('phone'), role: fd.get('role') } }
+      options: { data: { full_name: fd.get('full_name'), phone: fd.get('phone'), role: fd.get('role'), admission_no: admNo, staff_no: stfNo } }
     });
+    /* V12.6: best-effort — if the profile row already exists (email confirmation
+       flow), update the linking columns directly so the trigger fires even before
+       the auth hook creates the profile. */
+    try{
+      if(data && data.user && data.user.id){
+        const patch={};
+        if(roleUp==='student' && admNo) patch.admission_no=admNo;
+        if(['staff','teacher','admin','super_admin'].includes(roleUp) && stfNo) patch.staff_no=stfNo;
+        if(Object.keys(patch).length) await supabase.from('profiles').update(patch).eq('id', data.user.id);
+      }
+    }catch(_){ }
     if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || 'Request access'; }
     if (error) { alert('Request failed: ' + (error.message || 'Could not create request.')); return; }
     alert('✅ Request sent! Check your email to confirm, then wait for admin approval.');
