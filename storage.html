@@ -491,6 +491,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         admin <strong>safely purge old, low-value rows</strong> (audit logs, old exam results, read notifications, old check-ins) to make room for new data.
         <strong>Always export first</strong> (CSV/JSON on the <a href="admin-data.html">Admin Data</a> page) so nothing is truly lost.</p>
       </div>
+
+      <!-- V12.7 Universal Archive & Restore Hub -->
+      <div id="universal-archive-hub-storage" style="margin-bottom:16px"></div>
+
       <div class="card" style="margin-bottom:16px" data-admin-only>
         <button class="btn btn-primary" onclick="ST.load()">📊 Show table sizes</button> <a class="btn btn-outline" href="platform-health.html">🛡️ Platform Health Console</a>
         <div id="st-sizes" style="margin-top:12px"></div>
@@ -549,6 +553,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
 <script src="assets/js/data-portability.js"></script>
+<script src="assets/js/drive-sync.js"></script>
+<script src="assets/js/archive-hub.js"></script>
 <script src="assets/js/notifications.js"></script>
 <script src="assets/js/voting.js"></script>
 <script src="assets/js/pwa-install.js"></script>
@@ -594,5 +600,13 @@ const ST={
     if(!confirm('Permanently delete rows in '+t+' older than '+d+' days? Make sure you exported them first.'))return;
     var {data,error}=await sb.rpc('purge_old',{p_table:t,p_days:d}); if(error){toast(error.message,'danger',6000);return;}
     toast('Purged '+(data||0)+' row(s) from '+t+' ✓','success',5000); ST.load(); }
-};document.addEventListener('DOMContentLoaded',()=>{ST.loadPolicy();ST.health();});
+};document.addEventListener('DOMContentLoaded',()=>{
+  ST.loadPolicy();ST.health();
+  setTimeout(()=>{
+    if(window.ArchiveHub){
+      ArchiveHub.init(sb);
+      ArchiveHub.renderUniversal('universal-archive-hub-storage');
+    }
+  }, 800);
+});
 </script></body></html>
