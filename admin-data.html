@@ -546,6 +546,27 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </details>
       </div>
 
+      <div class="card" style="margin-bottom:16px;border:2px solid #10b981" data-admin-only>
+        <h3>🔗 One-Click Re-link after Disaster Recovery (V12.6 — NEW)</h3>
+        <p style="color:var(--gray-600);margin-top:4px">After you recover a school from Google Drive into a FRESH Supabase project, everybody signs up again with NEW accounts. Their old data (students, staff, parent links, results, fees…) is back, but <b>user_id / parent_id</b> are empty — the old auth accounts are gone. <b>Instead of linking one-by-one</b>, this tool re-links EVERYBODY in one click using the SAME backup you recovered.</p>
+        <div class="callout" style="background:#f0fdf4;border-color:#86efac;color:#166534;font-size:.85rem"><b>How it matches (robust, expert-designed):</b>
+          <ul style="margin:6px 0 0 18px;line-height:1.7">
+            <li><b>Staff:</b> matched by <code>staff_no</code> OR <code>email</code> (both preserved). Old user_id → old email → new profile id via email bridge. Last write wins.</li>
+            <li><b>Students:</b> matched by <code>admission_no</code> (unique, preserved) OR <code>id</code>. Old user_id → old email → new profile id. Fallback: full_name + class when never linked before.</li>
+            <li><b>Parent-child:</b> old <code>parent_id</code> → old email → new parent id, student_id preserved (same after recovery) → parent_child upsert.</li>
+            <li>Only <code>user_id / parent_id</code> columns touched — school data never touched. Photos then auto-sync via V12.2 triggers.</li>
+          </ul>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+          <label class="btn btn-outline">📂 Choose backup JSON<input type="file" id="rl-file" accept=".json" hidden onchange="RL.previewFile(this.files[0])"></label>
+          <button class="btn btn-primary" id="rl-go" onclick="RL.relink()" disabled>🔗 One-Click Re-link Everybody</button>
+          <button class="btn btn-outline" onclick="RL.useDriveArchive()">☁️ Use newest Drive backup as source</button>
+        </div>
+        <div id="rl-preview" style="font-size:.85rem;color:var(--gray-600)"></div>
+        <div id="rl-log" style="margin-top:10px;font-size:.85rem;color:var(--gray-600)"></div>
+        <p style="font-size:.82rem;color:var(--gray-500);margin:8px 0 0">Prerequisite: run recovery (🚑 Recover to new project) first, then ask everybody to sign up again and approve them on Approvals. Then run this re-link. Safe to run twice — already-linked rows skipped.</p>
+      </div>
+
 <div class="card" style="margin-bottom:16px" data-admin-only>
         <h3>♻️ Portable Data Archive Center</h3>
         <p style="color:var(--gray-600)"><b>Every machine-readable export can come back.</b> Portable JSON preserves UUIDs, dates, arrays and JSON fields for later restoration/analysis; CSV remains available for spreadsheets and can be re-imported into the selected table. Files are processed locally and are never stored in Supabase.</p>
@@ -653,6 +674,7 @@ const DataTools = {
 };
 document.addEventListener('DOMContentLoaded',()=>DataTools.init());if(document.readyState!=='loading')DataTools.init();
 </script><script src="assets/js/drive-sync.js"></script>
+<script src="assets/js/recovery.js"></script>
 <script>
 const GD={
   fmt(b){b=Number(b)||0;return b>1048576?(b/1048576).toFixed(2)+' MB':b>1024?(b/1024).toFixed(1)+' KB':b+' B';},
@@ -669,6 +691,57 @@ document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>GD.refreshStatu
 </script>
 <script src="assets/js/demo-sample-data.js"></script>
 <script>
+/* V12.6 One-Click Re-link UI controller */
+const RL={
+  _archive:null,
+  async previewFile(file){
+    const pre=document.getElementById('rl-preview'), log=document.getElementById('rl-log'), btn=document.getElementById('rl-go');
+    if(!file){ this._archive=null; pre.textContent=''; btn.disabled=true; return; }
+    pre.textContent='Reading '+file.name+'…';
+    try{
+      const archive = await Recovery.previewArchive(file);
+      this._archive = archive;
+      const s = archive.tables||{};
+      pre.innerHTML='<div class="table-wrap"><table><thead><tr><th>Table</th><th>Rows in backup</th></tr></thead><tbody>'+
+        Object.entries(s).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+(Array.isArray(v)?v.length:'—')+'</td></tr>').join('')+
+        '</tbody></table></div><p style="color:#166534">✅ Archive looks valid — click "One-Click Re-link Everybody".</p>';
+      btn.disabled=false;
+    }catch(e){ pre.innerHTML='<p style="color:#b91c1c">⚠ '+esc(e.message||e)+'</p>'; this._archive=null; btn.disabled=true; }
+  },
+  async useDriveArchive(){
+    const pre=document.getElementById('rl-preview'), btn=document.getElementById('rl-go');
+    pre.textContent='Fetching newest Drive backup…';
+    try{
+      await DriveSync.loadCfg();
+      const files = await DriveSync.listBackups();
+      if(!files.length){ pre.textContent='No Drive backups yet.'; return; }
+      const r = await DriveSync.api('/drive/v3/files/'+files[0].id+'?alt=media');
+      const env = JSON.parse(await r.text());
+      this._archive = env;
+      const s = env.tables||{};
+      pre.innerHTML='<div class="table-wrap"><table><thead><tr><th>Table</th><th>Rows</th></tr></thead><tbody>'+
+        Object.entries(s).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+(Array.isArray(v)?v.length:'—')+'</td></tr>').join('')+
+        '</tbody></table></div><p style="color:#166534">✅ Using Drive backup: '+esc(files[0].name)+' — click re-link.</p>';
+      btn.disabled=false;
+    }catch(e){ pre.innerHTML='<p style="color:#b91c1c">⚠ '+esc(e.message||e)+'</p>'; }
+  },
+  async relink(){
+    if(!this._archive){ toast('Choose a backup first.','warning'); return; }
+    if(!confirm('🔗 One-Click Re-link Everybody?\n\nThis will update user_id on students/staff and parent_id on parent_child using the backup you selected, matched by admission_no/staff_no/email. Only linking columns touched. Continue?')) return;
+    const log=document.getElementById('rl-log'); log.innerHTML='<span class="pulse">Re-linking everybody — this can take a minute…</span>';
+    try{
+      const res = await Recovery.relinkAll(this._archive, (lines)=>{ log.innerHTML=lines.map(x=>'<div>'+esc(x)+'</div>').join(''); });
+      log.innerHTML=res.log.map(x=>'<div>'+esc(x)+'</div>').join('')+
+        '<div class="stats-grid" style="margin-top:10px"><div class="stat-card"><div class="stat-value">'+res.linkedStudents+'</div><div class="stat-label">Students linked</div></div>'+
+        '<div class="stat-card"><div class="stat-value">'+res.linkedStaff+'</div><div class="stat-label">Staff linked</div></div>'+
+        '<div class="stat-card"><div class="stat-value">'+res.linkedParents+'</div><div class="stat-label">Parent links</div></div></div>'+
+        (res.details.students.length?'<details><summary>Students detail</summary><pre style="white-space:pre-wrap;font-size:.75rem">'+res.details.students.map(esc).join('\n')+'</pre></details>':'')+
+        (res.details.staff.length?'<details><summary>Staff detail</summary><pre style="white-space:pre-wrap;font-size:.75rem">'+res.details.staff.map(esc).join('\n')+'</pre></details>':'');
+      toast('🔗 Re-link complete: '+res.linkedStudents+' students, '+res.linkedStaff+' staff, '+res.linkedParents+' parent links restored ✓','success',10000);
+      if(window.App&&App.logActivity) App.logActivity('relink','platform',res.linkedStudents+res.linkedStaff+res.linkedParents+' links');
+    }catch(e){ log.textContent=''; toast(e.message||e,'danger',10000); }
+  }
+};
 const DS={
   async fill(){
     if(!window.DemoSampleData){toast('Sample-data engine still loading — try again in a second.','warning');return;}

@@ -129,13 +129,15 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <div class="form-group"><label>Phone</label><input class="form-input" name="phone"></div>
       <div class="form-group"><label>Password (min 8 chars)</label><input class="form-input" type="password" name="password" required minlength="8"></div>
       <div class="form-group"><label>Role</label>
-        <select class="form-select" name="role">
+        <select class="form-select" name="role" id="su-role" onchange="if(this.value==='student'){document.getElementById('su-adm-wrap').style.display='';document.getElementById('su-staff-wrap').style.display='none';}else if(['staff','teacher','admin','super_admin'].includes(this.value)){document.getElementById('su-adm-wrap').style.display='none';document.getElementById('su-staff-wrap').style.display='';}else{document.getElementById('su-adm-wrap').style.display='none';document.getElementById('su-staff-wrap').style.display='none';}">
           <option value="parent">Parent</option>
           <option value="student">Student</option>
           <option value="staff">Staff</option>
           <option value="admin">Admin</option>
         </select>
       </div>
+      <div class="form-group" id="su-adm-wrap" style="display:none"><label>Admission No (if student — for automatic re-link after disaster recovery)</label><input class="form-input" name="admission_no" placeholder="e.g. GoSA/2024/001"><small style="color:var(--gray-500)">V12.6: if you are an existing student whose school recovered from Drive, enter your admission number — your old results, fees and ID photo will re-link automatically when you sign up.</small></div>
+      <div class="form-group" id="su-staff-wrap" style="display:none"><label>Staff No (if staff — for automatic re-link)</label><input class="form-input" name="staff_no" placeholder="e.g. STF/2024/012"><small style="color:var(--gray-500)">V12.6: existing staff enter staff number for automatic re-link.</small></div>
       <button type="submit" class="btn btn-primary" style="width:100%">Request access</button>
       <p style="margin-top:12px;font-size:0.82rem;color:var(--gray-500);text-align:center">Your account will be reviewed by the school admin before sign-in is enabled.</p>
     </form>
