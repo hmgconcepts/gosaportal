@@ -227,17 +227,19 @@ tbody tr:hover { background: var(--gray-100); }
 .footer-bottom { border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px; text-align: center; font-size: 0.85rem; opacity: 0.7; }
 
 /* ===== Notification Bell ===== */
-.notif-bell { position: fixed; top: 14px; right: 18px; z-index: 35; background: var(--gray-100); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition); box-shadow: 0 2px 8px rgba(15,23,42,.12); }
-.notif-bell:hover { background: var(--gray-200); }
-.notif-bell svg { width: 20px; height: 20px; color: var(--gray-700); }
-.notif-badge { position: absolute; top: -2px; right: -2px; background: var(--danger); color: white; font-size: 0.65rem; font-weight: 700; border-radius: 50%; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid white; }
-.notif-dropdown { position: fixed; top: 60px; right: 14px; left: auto; background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); width: min(420px, calc(100vw - 32px)); max-height: min(560px, calc(100vh - 80px)); overflow-y: auto; border: 1px solid var(--gray-200); display: none; z-index: 20000; text-align:left; }
+/* ===== Notifications Bell — Robust Legible (V12.26) — single definition, WCAG AA ===== */
+.notif-bell { position: fixed; top: 14px; right: 18px; z-index: 35; background: var(--gray-100, #f1f5f9); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition); box-shadow: 0 2px 8px rgba(15,23,42,.12); border:1px solid var(--gray-200, #e2e8f0); }
+.notif-bell:hover { background: var(--gray-200, #e2e8f0); }
+.notif-bell svg { width: 20px; height: 20px; color: var(--gray-700, #475569); }
+.notif-badge { position: absolute; top: -2px; right: -2px; background: var(--danger, #ef4444); color: white; font-size: 0.65rem; font-weight: 800; border-radius: 50%; min-width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0 4px; border: 2px solid white; }
+.notif-dropdown { position: fixed; top: 60px; right: 14px; left: auto; background: #ffffff; color:#0f172a; border-radius: var(--radius-lg, 16px); box-shadow: 0 20px 40px rgba(15,23,42,.18); width: min(420px, calc(100vw - 32px)); max-height: min(560px, calc(100vh - 80px)); overflow-y: auto; border: 1px solid var(--gray-200, #e2e8f0); display: none; z-index: 20000; text-align:left; }
 .notif-dropdown.show { display: block; }
-.notif-item { padding: 16px 20px; border-bottom: 1px solid var(--gray-200); cursor: pointer; transition: var(--transition); }
-.notif-item:hover { background: var(--gray-100); }
-.notif-item-title { font-weight: 700; color: var(--dark); font-size: 0.92rem; margin-bottom: 4px; }
-.notif-item-msg { font-size: 0.85rem; color: var(--gray-700); }
-.notif-item-time { font-size: 0.75rem; color: var(--gray-500); margin-top: 6px; }
+.notif-item { position:relative; padding:14px 18px; border-bottom:1px solid var(--gray-200, #e2e8f0); cursor:pointer; transition:background .15s; background:#ffffff; color:#0f172a; }
+.notif-item:hover { background: var(--gray-100, #f8fafc); }
+.notif-item.notif-unread{ background:rgba(79,70,229,.06); border-left:4px solid var(--primary, #4f46e5); }
+.notif-item-title { font-weight: 800; color: #0f172a; font-size: 0.92rem; margin-bottom: 4px; line-height:1.35; }
+.notif-item-msg { font-size: 0.88rem; color: #334155; line-height:1.45; }
+.notif-item-time { font-size: 0.75rem; color: #64748b; margin-top: 6px; }
 
 /* ===== PWA Install Banner ===== */
 .pwa-install { position: fixed; bottom: 20px; left: 20px; right: 20px; max-width: 480px; background: white; border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); padding: 20px; z-index: 2500; border: 2px solid var(--primary); display: none; animation: slideUp 0.4s ease; }
@@ -550,21 +552,15 @@ html[data-theme="dark"] body, body[data-theme="dark"]{
 #sc-drive-progress{position:fixed;bottom:14px;right:14px;z-index:2147481000;background:#0f172a;color:#fff;font:600 12.5px/1.5 system-ui;padding:10px 14px;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);max-width:320px}
 #sc-drive-progress-bar{height:100%;background:#31c48d;border-radius:3px;transition:width .25s}
 
-/* Notifications — clear + auto-popup (V12.22) */
-.notif-item{position:relative;padding:12px 16px;border-bottom:1px solid var(--gray-200);cursor:pointer;transition:background .15s}
-.notif-item:hover{background:var(--gray-100)}
-.notif-item.notif-unread{background:rgba(79,70,229,.04);border-left:3px solid var(--primary)}
-.notif-item-title{font-weight:700;color:var(--dark);font-size:.9rem;margin-bottom:2px}
-.notif-item-msg{font-size:.85rem;color:var(--gray-600);line-height:1.4}
-.notif-item-time{font-size:.72rem;color:var(--gray-500);margin-top:4px}
-.notif-entry{padding:14px 16px;border:1px solid var(--gray-200);border-radius:12px;margin-bottom:10px;background:#fff;cursor:pointer;transition:border-color .15s}
-.notif-entry:hover{border-color:var(--primary)}
-.notif-entry.unread{border-left:4px solid var(--primary);background:rgba(79,70,229,.03)}
+/* Notifications — clear + auto-popup (V12.22) — robust legible (V12.26) — single definition above, no duplicate */
+.notif-entry{padding:14px 16px;border:1px solid var(--gray-200, #e2e8f0);border-radius:12px;margin-bottom:10px;background:#ffffff;color:#0f172a;cursor:pointer;transition:border-color .15s}
+.notif-entry:hover{border-color:var(--primary, #4f46e5)}
+.notif-entry.unread{border-left:4px solid var(--primary, #4f46e5);background:rgba(79,70,229,.06)}
 .notif-entry-icon{font-size:1.2rem;margin-bottom:6px}
-.notif-entry-title{font-weight:800;color:var(--dark);margin-bottom:4px}
-.notif-entry-msg{color:var(--gray-600);font-size:.9rem;line-height:1.5}
-.notif-entry-time{font-size:.75rem;color:var(--gray-500);margin-top:6px}
-.channel-pill{display:inline-block;background:rgba(79,70,229,.1);color:var(--primary);border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:700;margin:2px}
+.notif-entry-title{font-weight:800;color:#0f172a;margin-bottom:4px;line-height:1.35}
+.notif-entry-msg{color:#334155;font-size:.9rem;line-height:1.5}
+.notif-entry-time{font-size:.75rem;color:#64748b;margin-top:6px}
+.channel-pill{display:inline-block;background:rgba(79,70,229,.1);color:var(--primary, #4f46e5);border-radius:6px;padding:2px 8px;font-size:.68rem;font-weight:700;margin:2px}
 #sc-live-notification-tray{position:fixed;right:18px;bottom:18px;z-index:2147482500;display:flex;flex-direction:column;gap:10px;max-width:min(420px,calc(100vw - 36px));pointer-events:none}
 
 /* Messages — ensure WhatsApp replica styles also available as static fallback */
@@ -605,7 +601,14 @@ html[data-theme="dark"] body, body[data-theme="dark"]{
 [data-theme="dark"] .notif-item{ background:#1e293b !important; border-color:#334155 !important; color:#e2e8f0 !important; }
 [data-theme="dark"] .notif-item-title{ color:#f8fafc !important; }
 [data-theme="dark"] .notif-item-msg{ color:#cbd5e1 !important; }
+[data-theme="dark"] .notif-item-time{ color:#94a3b8 !important; }
 [data-theme="dark"] .notif-entry{ background:#1e293b !important; border-color:#334155 !important; color:#e2e8f0 !important; }
+[data-theme="dark"] .notif-entry-title{ color:#f8fafc !important; }
+[data-theme="dark"] .notif-entry-msg{ color:#cbd5e1 !important; }
+[data-theme="dark"] .notif-entry-time{ color:#94a3b8 !important; }
+[data-theme="dark"] .notif-entry-icon{ color:#e2e8f0 !important; }
+[data-theme="dark"] .channel-pill{ background:rgba(129,140,248,.2) !important; color:#a5b4fc !important; }
+[data-theme="dark"] .mc-side{ background:#1e293b !important; border-color:#334155 !important; }
 [data-theme="dark"] .mc-side{ background:#1e293b !important; border-color:#334155 !important; }
 [data-theme="dark"] .mc-side-head{ background:#0f172a !important; border-color:#334155 !important; }
 [data-theme="dark"] .mc-search{ background:#0f172a !important; }
@@ -631,4 +634,62 @@ body.sc-high-contrast .table-wrap{ border:2px solid #000 !important; }
 
 /* Reduced motion */
 .sc-reduced-motion *{ animation:none !important; transition:none !important; }
+
+
+/* V12.26 — Legibility for ALL light gradient cards (popup + notification page) — robust */
+.card[style*="linear-gradient(135deg,#dbeafe"],
+.card[style*="linear-gradient(135deg,#dcfce7"],
+.card[style*="linear-gradient(135deg,#fef3c7"],
+.card[style*="linear-gradient(135deg,#fee2e2"],
+.card[style*="linear-gradient(135deg,#f0fdf4"],
+.card[style*="linear-gradient(135deg,#f0f9ff"],
+.card[style*="linear-gradient(135deg,#fff7ed"],
+.card[style*="linear-gradient(135deg,#ecfdf5"]{ color:#0f172a !important; }
+.card[style*="linear-gradient(135deg,#dbeafe"] h3,
+.card[style*="linear-gradient(135deg,#dcfce7"] h3,
+.card[style*="linear-gradient(135deg,#fef3c7"] h3,
+.card[style*="linear-gradient(135deg,#fee2e2"] h3,
+.card[style*="linear-gradient(135deg,#f0fdf4"] h3,
+.card[style*="linear-gradient(135deg,#f0f9ff"] h3,
+.card[style*="linear-gradient(135deg,#fff7ed"] h3,
+.card[style*="linear-gradient(135deg,#ecfdf5"] h3,
+.card[style*="linear-gradient(135deg,#dbeafe"] p,
+.card[style*="linear-gradient(135deg,#dcfce7"] p,
+.card[style*="linear-gradient(135deg,#fef3c7"] p,
+.card[style*="linear-gradient(135deg,#fee2e2"] p,
+.card[style*="linear-gradient(135deg,#f0fdf4"] p,
+.card[style*="linear-gradient(135deg,#f0f9ff"] p{ color:#0f172a !important; }
+
+/* Dark mode for light gradient cards — keep dark text? Actually in dark mode, light gradient cards should still have dark text for legibility, OR adapt to dark bg light text? For robustness, keep dark text on light gradient even in dark mode, OR override gradient to dark in dark mode. We choose to keep dark text on light gradient even in dark mode for legibility, plus add dark mode override for gradient itself to be darker if needed. */
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#dbeafe"],
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#dcfce7"],
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#fef3c7"],
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#fee2e2"],
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#f0fdf4"],
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#f0f9ff"]{ background:linear-gradient(135deg,#1e293b,#334155) !important; color:#f8fafc !important; }
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#dbeafe"] h3,
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#dcfce7"] h3,
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#fef3c7"] h3,
+[data-theme="dark"] .card[style*="linear-gradient(135deg,#fee2e2"] h3{ color:#f8fafc !important; }
+
+/* Notification bell dropdown — ensure ALWAYS legible, even without JS guard, in both light and dark */
+#notif-dropdown{ background:#ffffff !important; color:#0f172a !important; }
+#notif-dropdown .notif-item-title{ color:#0f172a !important; }
+#notif-dropdown .notif-item-msg{ color:#334155 !important; }
+#notif-dropdown .notif-item-time{ color:#64748b !important; }
+[data-theme="dark"] #notif-dropdown{ background:#1e293b !important; color:#f8fafc !important; }
+[data-theme="dark"] #notif-dropdown .notif-item{ background:#1e293b !important; color:#e2e8f0 !important; }
+[data-theme="dark"] #notif-dropdown .notif-item-title{ color:#f8fafc !important; }
+[data-theme="dark"] #notif-dropdown .notif-item-msg{ color:#cbd5e1 !important; }
+[data-theme="dark"] #notif-dropdown .notif-item-time{ color:#94a3b8 !important; }
+
+/* Notification page list — ALWAYS legible */
+#notif-page-list .notif-entry{ background:#ffffff !important; color:#0f172a !important; }
+#notif-page-list .notif-entry-title{ color:#0f172a !important; }
+#notif-page-list .notif-entry-msg{ color:#334155 !important; }
+#notif-page-list .notif-entry-time{ color:#64748b !important; }
+[data-theme="dark"] #notif-page-list .notif-entry{ background:#1e293b !important; color:#f8fafc !important; }
+[data-theme="dark"] #notif-page-list .notif-entry-title{ color:#f8fafc !important; }
+[data-theme="dark"] #notif-page-list .notif-entry-msg{ color:#cbd5e1 !important; }
+[data-theme="dark"] #notif-page-list .notif-entry-time{ color:#94a3b8 !important; }
 
