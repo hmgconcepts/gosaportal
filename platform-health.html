@@ -298,7 +298,8 @@ const PH={
     {file:'v12.23-fix-notif-mark-read-and-theme.sql', label:'Fix 42P13 + theme robust', kind:'rpc', fn:'sc_message_directory', args:{}},
     {file:'v12.24-fix-notif-clear-42883.sql', label:'Fix 42883 notif_clear + theme final', kind:'rpc', fn:'sc_message_directory', args:{}},
     {file:'v12.25-fix-messages-sender-42703.sql', label:'Fix 42703 m.sender + messages robust', kind:'rpc', fn:'sc_message_directory', args:{}},
-    {file:'v12.26-theme-legibility-final.sql', label:'Theme legibility + popup legibility', kind:'rpc', fn:'sc_message_directory', args:{}}
+    {file:'v12.26-theme-legibility-final.sql', label:'Theme legibility + popup legibility', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.27-notification-legibility-fix.sql', label:'Notification legibility fix', kind:'rpc', fn:'sc_message_directory', args:{}}
   ],
 
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
