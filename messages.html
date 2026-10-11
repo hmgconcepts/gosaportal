@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Messaging • God of Seed Academy</title>
@@ -466,14 +467,19 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         
         <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
         <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
-        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle theme">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle dark/light — robust like Fleet Console">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="if(window.ThemeManager)ThemeManager.openPalette()" title="Theme palette — colour themes + dark/light + reset (Ctrl+K)">🎨</button>
         <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
       </div>
     </header>
     <div class="app-content">
-      
-      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📱 Messaging Centre — WhatsApp / Email / SMS</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Create a message, choose recipients, then send through free device/email links. This avoids paid SMS/WhatsApp APIs. The system stores the message log; your browser opens WhatsApp, email or SMS with the text prefilled for the selected recipient.</p></div>
-      <div class="grid grid-2"><div class="card"><h3>Compose</h3><div class="form-group"><label>Audience</label><select class="form-select" id="msg-aud" onchange="MSG.loadRecipients()"><option value="parents">Parents</option><option value="staff">Staff / Teachers</option><option value="students">Students</option><option value="admin">Admin / Management</option></select></div><div class="form-group"><label>Recipients <span style="color:var(--gray-500);font-weight:400">(multi-select enabled)</span></label><select class="form-select" id="msg-rec" multiple size="9" onchange="MSG.updateCount()"><option value="">Loading…</option></select><div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="MSG.selectAll()">Select all</button><button class="btn btn-sm btn-outline" onclick="MSG.clearSelection()">Clear</button><span id="msg-count" style="color:var(--gray-500);font-size:.85rem">0 recipients selected</span></div></div><div class="form-group"><label>Subject / title</label><input class="form-input" id="msg-title"></div><div class="form-group"><label>Message</label><textarea class="form-input" id="msg-body" rows="6"></textarea></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="MSG.logOnly()">Deliver In-App</button><button class="btn btn-outline" onclick="MSG.send('whatsapp')">WhatsApp + In-App</button><button class="btn btn-outline" onclick="MSG.send('email')">Email + In-App</button><button class="btn btn-outline" onclick="MSG.send('sms')">SMS + In-App</button></div><p style="color:var(--gray-500);font-size:.82rem;margin-top:8px">In-app messages are stored with each recipient's profile ID, so they appear in the recipient's Inbox. WhatsApp/SMS use free device links; no paid API is required.</p></div><div class="card"><h3>In-App Inbox / Message Log</h3><div id="msg-log">Loading…</div></div></div>
+      <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#dcfce7,#f0fdf4);border:2px solid #86efac"><h3 style="margin-top:0">💬 WhatsApp-Style Messaging — Real-time Chat (V12.22)</h3><p style="color:#166534;line-height:1.7;margin:0">Real two-way conversations inside the portal, in a chat that works like WhatsApp — bubbles, ticks (✓ sent, ✓✓ read), date separators TODAY/YESTERDAY, emoji bar, search, and live refresh every 30s. Students and parents can message tutors and admins; tutors can message staff and families of their own classes; admins can reach everyone. Nothing leaves the platform, works without airtime, and every message raises a bell notification that opens this chat directly. Replica of Adewale Classroom / Tutoring Connect messaging.</p></div>
+
+      <div id="messages-root"></div>
+
+      <div class="card" style="margin-top:18px;background:#eef2ff;border-color:#c7d2fe"><h3 style="margin-top:0">📢 Broadcast Messaging Centre — WhatsApp / Email / SMS (Legacy)</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">Create a broadcast message, choose recipients, then send through free device/email links. This avoids paid APIs. The system stores the message log; your browser opens WhatsApp, email or SMS with the text prefilled. For 1:1 chat, use the WhatsApp replica above.</p></div>
+      <div class="grid grid-2"><div class="card"><h3>Compose Broadcast</h3><div class="form-group"><label>Audience</label><select class="form-select" id="msg-aud" onchange="MSG.loadRecipients()"><option value="parents">Parents</option><option value="staff">Staff / Teachers</option><option value="students">Students</option><option value="admin">Admin / Management</option></select></div><div class="form-group"><label>Recipients <span style="color:var(--gray-500);font-weight:400">(multi-select enabled)</span></label><select class="form-select" id="msg-rec" multiple size="9" onchange="MSG.updateCount()"><option value="">Loading…</option></select><div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="MSG.selectAll()">Select all</button><button class="btn btn-sm btn-outline" onclick="MSG.clearSelection()">Clear</button><span id="msg-count" style="color:var(--gray-500);font-size:.85rem">0 recipients selected</span></div></div><div class="form-group"><label>Subject / title</label><input class="form-input" id="msg-title"></div><div class="form-group"><label>Message</label><textarea class="form-input" id="msg-body" rows="6"></textarea></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="MSG.logOnly()">Deliver In-App</button><button class="btn btn-outline" onclick="MSG.send('whatsapp')">WhatsApp + In-App</button><button class="btn btn-outline" onclick="MSG.send('email')">Email + In-App</button><button class="btn btn-outline" onclick="MSG.send('sms')">SMS + In-App</button></div><p style="color:var(--gray-500);font-size:.82rem;margin-top:8px">In-app messages are stored with each recipient's profile ID, so they appear in the recipient's Inbox. WhatsApp/SMS use free device links; no paid API is required.</p></div><div class="card"><h3>In-App Inbox / Message Log</h3><div id="msg-log">Loading…</div></div></div>
+    
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
       © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
@@ -492,6 +498,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 <script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/messages-center.js"></script>
 <script src="assets/js/crud.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
@@ -501,6 +510,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
   if (window.Super) Super.init(sb, window.SCHOOL);
   if (window.Enterprise) Enterprise.init(sb);
   if (window.CRUD) CRUD.init(sb);
+  if (window.MessagesCenter) { document.addEventListener('DOMContentLoaded',()=>{ MessagesCenter.render('messages-root'); }); }
 </script>
 <script>
 const MSG={

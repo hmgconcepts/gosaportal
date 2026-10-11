@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Site License &amp; Subscription</title><meta name="description" content="View and manage this portal's School Connect license: ownership model, subscription status, expiry, grace period and renewal."><meta name="robots" content="noindex"><link rel="stylesheet" href="assets/css/style.css"></head><body>
+<!DOCTYPE html><html lang="en"><head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Site License &amp; Subscription</title><meta name="description" content="View and manage this portal's School Connect license: ownership model, subscription status, expiry, grace period and renewal."><meta name="robots" content="noindex"><link rel="stylesheet" href="assets/css/style.css"></head><body>
 <main style="max-width:960px;margin:30px auto;padding:20px" id="page">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
     <h1 style="margin:0;font-size:1.5rem">🔑 Site License &amp; Subscription</h1>
@@ -227,4 +228,6 @@ async function loadKeyState(){
   }catch(e){}
 }
 load().then(loadKeyState).catch(function(){setTimeout(loadKeyState,1200);});
-</script></body></html>
+</script><script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+</body></html>

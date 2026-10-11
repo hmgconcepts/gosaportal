@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Platform Health Console • School Connect V12.17</title>
@@ -221,6 +222,8 @@
 <script src="assets/js/security-guard.js"></script>
 <script src="assets/js/site-help.js"></script>
 <script src="assets/js/ai-assistant.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/keepalive-layers.js"></script>
 <script src="assets/js/cbt-practice.js"></script>
@@ -290,7 +293,12 @@ const PH={
     {file:'v12.19-platform-health-robust.sql', label:'Heartbeat health V12.19', kind:'rpc', fn:'sc_heartbeat_health', args:{}},
     {file:'v12.19-platform-health-robust.sql', label:'Report allow global V12.19', kind:'rpc', fn:'sc_set_report_generation_global', args:{p_allowed:true}},
     {file:'v12.20-cbt-full-edit-and-proctor.sql', label:'CBT full edit + proctoring', kind:'rpc', fn:'sc_photo_sync_status', args:{}},
-    {file:'v12.21-schema-doctor-v12.2-fix.sql', label:'Schema doctor v12.2 false-alarm fix', kind:'rpc', fn:'sc_photo_sync_status', args:{}}
+    {file:'v12.21-schema-doctor-v12.2-fix.sql', label:'Schema doctor v12.2 false-alarm fix', kind:'rpc', fn:'sc_photo_sync_status', args:{}},
+    {file:'v12.22-theme-messages-notifications-drive-progress.sql', label:'Theme + WhatsApp messages + notifications clear + Drive progress', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.23-fix-notif-mark-read-and-theme.sql', label:'Fix 42P13 + theme robust', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.24-fix-notif-clear-42883.sql', label:'Fix 42883 notif_clear + theme final', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.25-fix-messages-sender-42703.sql', label:'Fix 42703 m.sender + messages robust', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.26-theme-legibility-final.sql', label:'Theme legibility + popup legibility', kind:'rpc', fn:'sc_message_directory', args:{}}
   ],
 
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
