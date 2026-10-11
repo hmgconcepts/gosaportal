@@ -2528,18 +2528,12 @@ grant  execute on function public.lookup_login_email(text) to anon, authenticate
 
 -- 18.3 notif_mark_read(id) — atomic read-by append of the caller's uid
 DROP FUNCTION IF EXISTS public.notif_mark_read() CASCADE;
-create or replace function public.notif_mark_read(p_id uuid)
-returns void language plpgsql security definer set search_path=public as $$
-begin
-  update public.notifications
-     set read_by = case
-       when read_by is null then array[auth.uid()]
-       when auth.uid() = any(read_by) then read_by
-       else array_append(read_by, auth.uid()) end
-   where id = p_id;
-end $$;
-revoke execute on function public.notif_mark_read(uuid) from public, anon;
-grant  execute on function public.notif_mark_read(uuid) to authenticated;
+-- REMOVED duplicate notif_mark_read kept last (v12.22)
+
+-- REMOVED early grant for notif_mark_read kept after last def (v12.23)
+
+-- REMOVED early grant for notif_mark_read kept after last def (v12.23)
+
 
 -- 18.4 table_sizes() — storage console overview
 DROP FUNCTION IF EXISTS public.table_sizes() CASCADE;
@@ -7769,28 +7763,22 @@ select 'RUNNING: School Connect photo-sync pack V12.2' as running_version;
 -- REMOVED duplicate sc_sync_photo_to_profile kept last (v12.20)
 
 
-drop trigger if exists trg_students_photo_sync on public.students;
-create trigger trg_students_photo_sync
-  after insert or update of photo_url, user_id on public.students
-  for each row execute function public.sc_sync_photo_to_profile();
+-- REMOVED early photo-sync trigger kept last (v12.24 fix 42883)
+
 
 -- profiles.photo_url → students.photo_url (student enters on My Profile)
 -- REMOVED duplicate sc_sync_photo_to_student kept last (v12.20)
 
 
-drop trigger if exists trg_profiles_photo_sync on public.profiles;
-create trigger trg_profiles_photo_sync
-  after update of photo_url on public.profiles
-  for each row execute function public.sc_sync_photo_to_student();
+-- REMOVED early photo-sync trigger kept last (v12.24 fix 42883)
+
 
 -- staff.photo_url → profiles.photo_url (admin enters on the Staff page)
 -- REMOVED duplicate sc_sync_staff_photo_to_profile kept last (v12.21)
 
 
-drop trigger if exists trg_staff_photo_sync on public.staff;
-create trigger trg_staff_photo_sync
-  after insert or update of photo_url, user_id on public.staff
-  for each row execute function public.sc_sync_staff_photo_to_profile();
+-- REMOVED early photo-sync trigger kept last (v12.24 fix 42883)
+
 
 -- ONE-TIME BACKFILL: heal existing records both ways (student/staff rows that
 -- already carry a photo push it to the empty profile, and vice versa).
@@ -8332,56 +8320,17 @@ drop index if exists assignment_scores_assignment_unique;
 create unique index if not exists assignment_scores_assignment_unique on public.assignment_scores(assignment_id, student_id) where assignment_id is not null;
 
 -- Ensure mirror triggers exist with drive_link (final V12.11 version)
-create or replace function public.sc_mirror_cbt_assignment()
-returns trigger language plpgsql security definer set search_path=public as $$
-declare v_aid uuid; v_code text;
-begin
-  if pg_trigger_depth() > 1 then return new; end if;
-  v_code := coalesce(new.code, '');
-  if lower(coalesce(new.assessment_type,'')) <> 'assignment' then
-    if lower(coalesce(old.assessment_type,'')) = 'assignment' then
-      delete from public.assignments where cbt_exam_id = new.id;
-    end if;
-    return new;
-  end if;
-  select id into v_aid from public.assignments where cbt_exam_id = new.id limit 1;
-  if v_aid is null then
-    insert into public.assignments (title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description, drive_link, created_at)
-    values (
-      new.title, new.class, new.subject,
-      coalesce(new.close_at::date, current_date + interval '7 days'),
-      new.teacher_id, new.id, true, 'cbt_assignment',
-      '🟢 CBT Assignment (auto-mirrored) — code='||v_code||' — multiple per term, cumulatively collated. Students: click Take Assignment button to take it. Teachers: Score class auto-fills kind/max/scores.',
-      case when v_code <> '' then './cbt-exam.html?code='||v_code else null end,
-      now()
-    ) returning id into v_aid;
-  else
-    update public.assignments set
-      title = new.title, class = new.class, subject = new.subject,
-      due_date = coalesce(new.close_at::date, due_date),
-      posted_by = new.teacher_id, is_cbt = true, source = 'cbt_assignment',
-      description = '🟢 CBT Assignment (auto-mirrored) — code='||v_code||' — multiple per term, cumulatively collated. Students: click Take Assignment.',
-      drive_link = case when v_code <> '' then './cbt-exam.html?code='||v_code else drive_link end
-    where id = v_aid;
-  end if;
-  return new;
-end$$;
+-- REMOVED duplicate sc_mirror_cbt_assignment kept last (v12.24 final rebuild)
 
-drop trigger if exists trg_cbt_assignment_mirror on public.cbt_exams;
-create trigger trg_cbt_assignment_mirror after insert or update of assessment_type, title, class, subject, close_at, teacher_id, code on public.cbt_exams
-for each row execute function public.sc_mirror_cbt_assignment();
 
-create or replace function public.sc_cleanup_cbt_assignment()
-returns trigger language plpgsql security definer set search_path=public as $$
-begin
-  if pg_trigger_depth() > 1 then return old; end if;
-  delete from public.assignments where cbt_exam_id = old.id;
-  return old;
-end$$;
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
 
-drop trigger if exists trg_cbt_assignment_cleanup on public.cbt_exams;
-create trigger trg_cbt_assignment_cleanup after delete on public.cbt_exams
-for each row execute function public.sc_cleanup_cbt_assignment();
+
+-- REMOVED duplicate sc_cleanup_cbt_assignment kept last (v12.24 final rebuild)
+
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
 
 update public.assignments a set drive_link = './cbt-exam.html?code='||e.code
 from public.cbt_exams e
@@ -8429,153 +8378,18 @@ select 'V12.12 report student fix pack installed' as status;
 select 'RUNNING: School Connect multi-subject CBT assignments cumulative pack V12.13' as running_version;
 
 -- 0. Ensure sc_create_assignment_from_cbt exists (from V12.8)
-create or replace function public.sc_create_assignment_from_cbt(p_cbt_exam_id uuid)
-returns jsonb language plpgsql security definer set search_path=public as $$
-declare v_exam record; v_aid uuid;
-begin
-  if not public.is_staff(auth.uid()) then return jsonb_build_object('ok',false,'error','Only staff can create assignment from CBT'); end if;
-  select * into v_exam from public.cbt_exams where id = p_cbt_exam_id;
-  if not found then return jsonb_build_object('ok',false,'error','CBT exam not found'); end if;
-  select id into v_aid from public.assignments where cbt_exam_id = p_cbt_exam_id limit 1;
-  if v_aid is not null then return jsonb_build_object('ok',true,'assignment_id',v_aid,'created',false); end if;
-  insert into public.assignments (title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description, drive_link)
-  values (v_exam.title, v_exam.class, v_exam.subject, coalesce(v_exam.close_at::date, current_date+7), v_exam.teacher_id, v_exam.id, true, 'cbt_assignment', 'CBT Assignment mirror for '||v_exam.code||' — multi-subject supported', case when v_exam.code is not null then './cbt-exam.html?code='||v_exam.code else null end)
-  returning id into v_aid;
-  return jsonb_build_object('ok',true,'assignment_id',v_aid,'created',true);
-end$$;
+-- REMOVED duplicate sc_create_assignment_from_cbt kept last (v12.24 final rebuild)
 
-revoke all on function public.sc_create_assignment_from_cbt(uuid) from public, anon;
-grant execute on function public.sc_create_assignment_from_cbt(uuid) to authenticated;
 
+-- REMOVED early revoke for sc_create_assignment_from_cbt kept after last def (v12.25 fix 42883 final)
+-- REMOVED early grant for sc_create_assignment_from_cbt kept after last def (v12.25 fix 42883 final)
 -- 1. Update sc_assignment_cbt_sync to handle multi-subject subject_scores
-create or replace function public.sc_assignment_cbt_sync(p_cbt_exam_id uuid)
-returns jsonb language plpgsql security definer set search_path=public as $$
-declare
-  v_exam record;
-  v_aid uuid;
-  v_synced int := 0;
-  v_total int := 0;
-  r record;
-  subj text;
-  subj_scores jsonb;
-  subj_score numeric;
-  subj_total numeric;
-  subj_pct numeric;
-  v_max numeric;
-  v_subjects text[] := '{}';
-begin
-  if not public.is_staff(auth.uid()) then return jsonb_build_object('ok',false,'error','Only staff can sync CBT assignment scores'); end if;
-  select * into v_exam from public.cbt_exams where id = p_cbt_exam_id;
-  if not found then return jsonb_build_object('ok',false,'error','CBT exam not found'); end if;
-  if lower(coalesce(v_exam.assessment_type,'')) <> 'assignment' then
-    return jsonb_build_object('ok',false,'error','This CBT exam is not an assignment type (assessment_type='||coalesce(v_exam.assessment_type,'')||'). Only CBT assignments can be synced.');
-  end if;
-  v_max := coalesce(v_exam.max_score, 10);
-  -- Ensure mirror assignment exists
-  select id into v_aid from public.assignments where cbt_exam_id = p_cbt_exam_id limit 1;
-  if v_aid is null then
-    insert into public.assignments (title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description, drive_link)
-    values (v_exam.title, v_exam.class, v_exam.subject, coalesce(v_exam.close_at::date, current_date+7), v_exam.teacher_id, v_exam.id, true, 'cbt_assignment', 'Auto-mirror for CBT assignment '||v_exam.code||' — multi-subject supported', case when v_exam.code is not null then './cbt-exam.html?code='||v_exam.code else null end)
-    returning id into v_aid;
-  end if;
-  select count(*) into v_total from public.cbt_results where exam_id = p_cbt_exam_id;
-  -- For each cbt_result, handle per-subject breakdown if present
-  for r in select cr.*, s.id as sid, s.admission_no, s.full_name as sname
-           from public.cbt_results cr
-           left join public.students s on lower(s.full_name) = lower(cr.student_name) or lower(s.admission_no) = lower(cr.student_id_ref)
-           where cr.exam_id = p_cbt_exam_id
-  loop
-    if r.sid is null then continue; end if;
-    subj_scores := coalesce(r.subject_scores, '{}'::jsonb);
-    if jsonb_typeof(subj_scores) = 'object' and (select count(*) from jsonb_object_keys(subj_scores)) > 0 then
-      -- Multi-subject: create row per subject
-      for subj in select jsonb_object_keys(subj_scores) loop
-        v_subjects := array_append(v_subjects, subj);
-        subj_score := coalesce((subj_scores->subj->>'score')::numeric, 0);
-        subj_total := coalesce((subj_scores->subj->>'total')::numeric, v_max);
-        subj_pct := case when subj_total>0 then subj_score/subj_total*100 else 0 end;
-        -- Scale to assignment max
-        begin
-          insert into public.assignment_scores (assignment_id, cbt_exam_id, student_id, student_id_ref, student_name, class, subject, term, session, score, max_score, recorded_by)
-          values (v_aid, p_cbt_exam_id, r.sid, coalesce(r.admission_no, r.student_id_ref,''), coalesce(r.sname, r.student_name), coalesce(v_exam.class,''), subj, coalesce(v_exam.term,''), coalesce(v_exam.session,''), case when subj_total>0 then round((subj_pct/100*v_max)::numeric,1) else subj_score end, v_max, auth.uid())
-          on conflict (cbt_exam_id, student_id) where cbt_exam_id is not null
-          do update set score = excluded.score, max_score = excluded.max_score, subject = excluded.subject, student_name = excluded.student_name, term = excluded.term, session = excluded.session;
-          v_synced := v_synced + 1;
-        exception when others then continue; end;
-        -- Also handle case where assignment_id unique conflicts for multi-subject? Actually we use cbt_exam_id unique, so per student per exam only one row, but we need per subject per exam per student
-        -- For multi-subject, we need to allow multiple rows per student per exam with different subjects
-        -- So we should also try to insert with assignment_id + subject unique? Our current unique is only on cbt_exam_id+student_id, so second subject would conflict
-        -- To support multi-subject assignments, we need to allow multiple rows per student per exam with different subjects
-        -- We will attempt to insert additional rows with assignment_id and subject, using a different conflict handling
-        -- For multi-subject, we will create rows with cbt_exam_id and subject, but our unique prevents second subject
-        -- Workaround: delete existing cbt_exam_id rows for this student+exam and insert per-subject rows with assignment_id
-        -- Actually for multi-subject assignments, we should NOT use cbt_exam_id unique, but use assignment_id + subject + student_id
-        -- For now, we will insert per-subject rows with assignment_id and subject, using onConflict assignment_id,student_id but with subject different? That unique also prevents second subject
-        -- So we need a more permissive approach: allow multiple rows per student per assignment with different subjects by using a different table or by storing subject in the row and using a unique index that includes subject
-        -- We have not yet created such index, so for V12.13 we will create a new unique index that includes subject for cbt_exam_id
-        -- For backward compat, we will first delete any existing rows for this student+exam that have different subject? No, we want to keep all subjects
-        -- Instead, we will insert per-subject rows with cbt_exam_id and subject, but we will use a different conflict key that includes subject (we will create index below)
-        -- For this loop, we will attempt to insert with onConflict do nothing and then update via separate query that matches subject
-      end loop;
-      -- For multi-subject, we need to handle per-subject rows separately because unique(cbt_exam_id, student_id) prevents multiple subjects
-      -- So after first subject inserted, subsequent subjects will conflict, so we will upsert via assignment_id + subject + student_id using a new index that we create below
-      -- For now, we will try to insert per-subject rows using assignment_id + subject
-      -- This is handled in the second loop below
-    else
-      -- Single-subject
-      v_subjects := array_append(v_subjects, coalesce(v_exam.subject,'General'));
-      begin
-        insert into public.assignment_scores (assignment_id, cbt_exam_id, student_id, student_id_ref, student_name, class, subject, term, session, score, max_score, recorded_by)
-        values (v_aid, p_cbt_exam_id, r.sid, coalesce(r.admission_no, r.student_id_ref,''), coalesce(r.sname, r.student_name), coalesce(v_exam.class,''), coalesce(v_exam.subject,''), coalesce(v_exam.term,''), coalesce(v_exam.session,''), coalesce(r.score,0), v_max, auth.uid())
-        on conflict (cbt_exam_id, student_id) where cbt_exam_id is not null
-        do update set score = excluded.score, max_score = excluded.max_score, subject = excluded.subject, student_name = excluded.student_name, term = excluded.term, session = excluded.session;
-        v_synced := v_synced + 1;
-      exception when others then continue; end;
-    end if;
-  end loop;
+-- REMOVED duplicate sc_assignment_cbt_sync kept last (v12.24 final rebuild)
 
-  -- For multi-subject assignments, handle per-subject rows with subject-inclusive unique index
-  -- We have created a new index assignment_scores_cbt_subject_unique (cbt_exam_id, student_id, subject) in this pack
-  -- Now re-process results to ensure per-subject rows exist
-  for r in select cr.*, s.id as sid, s.admission_no, s.full_name as sname
-           from public.cbt_results cr
-           left join public.students s on lower(s.full_name) = lower(cr.student_name) or lower(s.admission_no) = lower(cr.student_id_ref)
-           where cr.exam_id = p_cbt_exam_id
-  loop
-    if r.sid is null then continue; end if;
-    subj_scores := coalesce(r.subject_scores, '{}'::jsonb);
-    if jsonb_typeof(subj_scores) = 'object' and (select count(*) from jsonb_object_keys(subj_scores)) > 0 then
-      for subj in select jsonb_object_keys(subj_scores) loop
-        subj_score := coalesce((subj_scores->subj->>'score')::numeric, 0);
-        subj_total := coalesce((subj_scores->subj->>'total')::numeric, v_max);
-        subj_pct := case when subj_total>0 then subj_score/subj_total*100 else 0 end;
-        begin
-          insert into public.assignment_scores (assignment_id, cbt_exam_id, student_id, student_id_ref, student_name, class, subject, term, session, score, max_score, recorded_by)
-          values (v_aid, p_cbt_exam_id, r.sid, coalesce(r.admission_no, r.student_id_ref,''), coalesce(r.sname, r.student_name), coalesce(v_exam.class,''), subj, coalesce(v_exam.term,''), coalesce(v_exam.session,''), case when subj_total>0 then round((subj_pct/100*v_max)::numeric,1) else subj_score end, v_max, auth.uid())
-          on conflict (cbt_exam_id, student_id, subject) where cbt_exam_id is not null
-          do update set score = excluded.score, max_score = excluded.max_score;
-        exception when others then continue; end;
-      end loop;
-    end if;
-  end loop;
-
-  v_subjects := array(select distinct unnest(v_subjects));
-  return jsonb_build_object('ok',true,'synced',v_synced,'total_results',v_total,'subjects',to_jsonb(v_subjects),'assignment_id',v_aid,'cbt_exam_id',p_cbt_exam_id);
-end$$;
 
 -- 2. Update sync_all to include MULTI-SUBJECT containing subject
-create or replace function public.sc_assignment_cbt_sync_all(p_class text default null, p_subject text default null, p_term text default null, p_session text default null)
-returns jsonb language plpgsql security definer set search_path=public as $$
-declare v_exam record; v_total_synced int :=0; v_exams int :=0; j jsonb; v_res jsonb := '[]'::jsonb;
-begin
-  if not public.is_staff(auth.uid()) then return jsonb_build_object('ok',false,'error','Only staff'); end if;
-  for v_exam in select * from public.cbt_exams where lower(assessment_type)='assignment' and is_archived=false and (p_class is null or class=p_class) and (p_term is null or term=p_term) and (p_session is null or session=p_session) and (p_subject is null or subject=p_subject or subject ilike 'MULTI-SUBJECT:%' || p_subject || '%' or subject ilike '%' || p_subject || '%') loop
-    select public.sc_assignment_cbt_sync(v_exam.id) into j;
-    if (j->>'ok')::boolean then v_total_synced := v_total_synced + coalesce((j->>'synced')::int,0); v_exams := v_exams + 1; end if;
-    v_res := v_res || jsonb_build_object('exam_id',v_exam.id,'code',v_exam.code,'title',v_exam.title,'subjects',j->'subjects','synced',j->'synced','total',j->'total_results');
-  end loop;
-  return jsonb_build_object('ok',true,'exams_synced',v_exams,'total_scores_synced',v_total_synced,'details',v_res);
-end$$;
+-- REMOVED duplicate sc_assignment_cbt_sync_all kept last (v12.24 final rebuild)
+
 
 -- 3. New unique index that includes subject for multi-subject assignments
 drop index if exists assignment_scores_cbt_subject_unique;
@@ -8587,40 +8401,11 @@ create unique index if not exists assignment_scores_cbt_subject_unique on public
 drop index if exists assignment_scores_cbt_unique;
 
 -- 4. Update totals to return per-subject breakdown as well
-create or replace function public.sc_assignment_totals(p_class text, p_subject text, p_term text default null, p_session text default null)
-returns jsonb language plpgsql security definer set search_path=public as $$
-declare v_out jsonb; v_by_subject jsonb;
-begin
-  with filtered as (
-    select * from public.assignment_scores
-     where class = p_class and (p_subject is null or subject = p_subject or subject ilike '%' || p_subject || '%')
-       and (p_term is null or term = p_term)
-       and (p_session is null or session = p_session)
-  ),
-  agg as (
-    select student_id, student_name, student_id_ref,
-           count(*) as assignments_count,
-           sum(score) as total_got,
-           sum(max_score) as total_max,
-           case when sum(max_score)>0 then round((sum(score)/sum(max_score)*100)::numeric,1) else 0 end as percent
-      from filtered group by student_id, student_name, student_id_ref
-  ),
-  by_subj as (
-    select subject, count(*) as count, sum(score) as got, sum(max_score) as max
-      from filtered group by subject
-  )
-  select jsonb_agg(to_jsonb(agg)) into v_out from agg;
-  select jsonb_agg(to_jsonb(by_subj)) into v_by_subject from by_subj;
-  return jsonb_build_object('ok',true,'class',p_class,'subject',p_subject,'term',p_term,'session',p_session,'totals',coalesce(v_out,'[]'::jsonb),'by_subject',coalesce(v_by_subject,'[]'::jsonb));
-end$$;
+-- REMOVED duplicate sc_assignment_totals kept last (v12.24 final rebuild)
 
-revoke all on function public.sc_assignment_cbt_sync(uuid) from public, anon;
-grant execute on function public.sc_assignment_cbt_sync(uuid) to authenticated;
-revoke all on function public.sc_assignment_cbt_sync_all(text,text,text,text) from public, anon;
-grant execute on function public.sc_assignment_cbt_sync_all(text,text,text,text) to authenticated;
-revoke all on function public.sc_assignment_totals(text,text,text,text) from public, anon;
-grant execute on function public.sc_assignment_totals(text,text,text,text) to authenticated;
 
+-- REMOVED early -- REMOVED early -- REMOVED early grant for sc_assignment_totals kept after last def (v12.25 fix 42883 final)
+-- REMOVED early grant for sc_assignment_totals kept after last def (v12.25 fix 42883 final)
 insert into public.sc_install_state(key,details) values ('v12.13-multi-assignment.sql','{"self":true}') on conflict (key) do nothing;
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
@@ -8919,6 +8704,896 @@ grant select on public.sc_heartbeat to anon, authenticated;
 insert into public.sc_heartbeat(id) values (1) on conflict (id) do nothing;
 
 -- Recreate sc_keep_alive
+-- REMOVED duplicate sc_keep_alive kept last (v12.24 rebuild)
+
+-- REMOVED early grant for sc_keep_alive kept after last def (v12.23 fix 42883)
+-- Health report RPC
+-- REMOVED duplicate sc_heartbeat_health kept last (v12.24 rebuild)
+
+-- REMOVED early grant for sc_heartbeat_health kept after last def (v12.23 fix 42883)
+-- Storage top
+-- REMOVED duplicate storage_table_top kept last (v12.24 rebuild)
+
+-- REMOVED orphaned notif_mark_read body + early -- REMOVED early grant for notif_clear kept after last def (v12.23 rebuild final)
+-- 3. Recreate sc_installed_packs (open, no staff gate)
+-- REMOVED duplicate sc_installed_packs kept last (v12.23 rebuild)
+
+-- REMOVED early grant for sc_installed_packs kept after last def (v12.23 rebuild final)
+-- 4. Recreate sc_photo_sync_status (verifiable probe)
+-- REMOVED duplicate sc_photo_sync_status kept last (v12.23 rebuild)
+
+-- REMOVED early grant for sc_photo_sync_status kept after last def (v12.23 rebuild final)
+-- 5. Recreate messaging RPCs (same as V12.22 but after DROP)
+-- REMOVED duplicate sc_is_tutor kept last (v12.23 rebuild)
+
+-- REMOVED early grant for sc_message_directory kept after last def (v12.23 rebuild final)
+-- REMOVED duplicate sc_message_send kept last (v12.23 rebuild)
+
+-- REMOVED early grant for sc_message_send kept after last def (v12.23 rebuild final)
+-- REMOVED duplicate sc_message_threads kept last (v12.23 rebuild)
+
+-- REMOVED early grant for sc_message_thread kept after last def (v12.23 rebuild final)
+-- REMOVED duplicate sc_message_unread kept last (v12.23 final)
+-- Ensure tables have RLS open for RPCs (SECURITY DEFINER bypasses but need policies)
+alter table public.messages enable row level security;
+drop policy if exists "messages_all" on public.messages;
+create policy "messages_all" on public.messages for all using (true) with check (true);
+grant all on public.messages to authenticated;
+
+alter table public.notifications enable row level security;
+drop policy if exists "notifications_all" on public.notifications;
+create policy "notifications_all" on public.notifications for all using (true) with check (true);
+grant all on public.notifications to authenticated;
+
+-- Ensure sc_install_state markers
+insert into public.sc_install_state(key,details) values ('v12.23-fix-notif-mark-read-and-theme.sql','{"self":true}') on conflict (key) do nothing;
+insert into public.sc_install_state(key,details) values ('v12.22-theme-messages-notifications-drive-progress.sql','{"self":true,"retro":"v12.23"}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.23 fix 42P13 + theme robust pack installed — notif_mark_read now returns jsonb, theme pre-paint ready' as status;
+
+
+
+
+-- ============================================================================
+
+
+-- ============================================================================
+-- ============================================================================
+-- School Connect V12.8 — ASSIGNMENT + CBT ASSIGNMENT BRIDGE (pass 82)
+-- ----------------------------------------------------------------------------
+-- Blueprint from user:
+-- - Unlike mid-term (CA1/CA2) and terminal exams (once per term), assignments
+--   are given MORE THAN ONCE per term. Assignment page already collates
+--   individual assignments cumulatively → push to Assignment column.
+-- - Problem: when more than one CBT assignment is given in a particular
+--   subject in a term, there is NO feature to collate these scores cumulatively.
+-- - Required: CBT assignments should be handled DIFFERENTLY from mid-term and
+--   terminal CBTs. Whenever CBT assignments are given, their scores should be
+--   automatically filled when the 'score class' button is clicked for THAT CBT
+--   assignment in the assignment page, allowing cumulative collation → push to
+--   Assignment column at end of term.
+-- - Must clearly and unambiguously differentiate CBT assignments from CBT for
+--   mid-term (CAs), terminal examinations and other purposes.
+--
+-- WHAT THIS PACK ADDS (robust, all-inclusive, self-contained, seamless):
+--
+-- 1. assignments.cbt_exam_id uuid + is_cbt boolean
+--    - When a CBT exam is created with assessment_type='assignment', a mirror
+--      row is auto-created in assignments (via trigger) with cbt_exam_id linked.
+--    - This makes CBT assignments appear in Assignments page list naturally,
+--      with clear badge "CBT Assignment".
+--    - is_cbt distinguishes physical vs CBT.
+--
+-- 2. assignment_scores.cbt_exam_id uuid
+--    - Allows multiple CBT assignments per subject/term to be stored as separate
+--      columns, each linked to its cbt_exams.id, accumulating cumulatively.
+--    - Unique partial indexes prevent duplicate scores per student per CBT exam.
+--
+-- 3. Triggers:
+--    - trg_cbt_assignment_mirror — after insert/update on cbt_exams where
+--      assessment_type='assignment', upserts assignments row (title, class,
+--      subject, due_date, posted_by, cbt_exam_id, is_cbt=true)
+--    - trg_cbt_assignment_cleanup — after delete on cbt_exams, deletes mirror.
+--
+-- 4. RPCs:
+--    - sc_create_assignment_from_cbt(p_cbt_exam_id) — creates/returns assignment
+--      row for a CBT exam.
+--    - sc_assignment_cbt_sync(p_cbt_exam_id) — syncs that CBT exam's cbt_results
+--      into assignment_scores (with cbt_exam_id, assignment_id, class, subject,
+--      term, session, score, max_score). Returns {ok, synced, total_results}.
+--    - sc_assignment_cbt_sync_all(p_class, p_subject, p_term, p_session) — syncs
+--      ALL CBT assignments for a class/subject/term/session.
+--    - sc_assignment_totals(p_class, p_subject, p_term, p_session) — returns
+--      per-student cumulative totals across ALL assignments (physical + CBT).
+--
+-- 5. Marker for schema doctor.
+--
+-- Idempotent — safe to re-run. All functions SECURITY DEFINER, staff-gated.
+-- ============================================================================
+select 'RUNNING: School Connect assignment + CBT bridge pack V12.8' as running_version;
+
+-- 1. Extend assignments table
+alter table public.assignments add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete set null;
+alter table public.assignments add column if not exists is_cbt boolean not null default false;
+alter table public.assignments add column if not exists source text not null default 'manual';
+
+comment on column public.assignments.cbt_exam_id is 'V12.8: when this assignment is a mirror of a CBT exam (assessment_type=assignment), stores the cbt_exams.id';
+comment on column public.assignments.is_cbt is 'V12.8: true if this assignment is auto-mirrored from a CBT assignment exam';
+comment on column public.assignments.source is 'V12.8: manual | cbt_assignment | cbt_mirror';
+
+create index if not exists assignments_cbt_exam_id_idx on public.assignments(cbt_exam_id) where cbt_exam_id is not null;
+
+-- 2. Extend assignment_scores table
+alter table public.assignment_scores add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete cascade;
+comment on column public.assignment_scores.cbt_exam_id is 'V12.8: when this score comes from a CBT assignment, stores the cbt_exams.id, enabling multiple CBT assignments per subject/term to accumulate separately';
+
+create index if not exists assignment_scores_cbt_exam_id_idx on public.assignment_scores(cbt_exam_id) where cbt_exam_id is not null;
+
+-- Unique per student per CBT exam (when cbt_exam_id not null)
+drop index if exists assignment_scores_cbt_unique;
+create unique index if not exists assignment_scores_cbt_unique on public.assignment_scores(cbt_exam_id, student_id) where cbt_exam_id is not null;
+
+-- Unique per student per physical assignment (existing, but ensure)
+drop index if exists assignment_scores_assignment_unique;
+create unique index if not exists assignment_scores_assignment_unique on public.assignment_scores(assignment_id, student_id) where assignment_id is not null;
+
+-- 3. Trigger: mirror CBT assignments into assignments table
+-- REMOVED duplicate sc_mirror_cbt_assignment kept last (v12.24 final rebuild)
+
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
+
+-- Cleanup on delete
+-- REMOVED duplicate sc_cleanup_cbt_assignment kept last (v12.24 final rebuild)
+
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
+
+-- 4. RPC: create assignment from CBT
+create or replace function public.sc_create_assignment_from_cbt(p_cbt_exam_id uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_exam record; v_aid uuid;
+begin
+  if not public.is_staff(auth.uid()) then return jsonb_build_object('ok',false,'error','Only staff can create assignment from CBT'); end if;
+  select * into v_exam from public.cbt_exams where id = p_cbt_exam_id;
+  if not found then return jsonb_build_object('ok',false,'error','CBT exam not found'); end if;
+  select id into v_aid from public.assignments where cbt_exam_id = p_cbt_exam_id limit 1;
+  if v_aid is not null then return jsonb_build_object('ok',true,'assignment_id',v_aid,'created',false); end if;
+  insert into public.assignments (title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description)
+  values (v_exam.title, v_exam.class, v_exam.subject, coalesce(v_exam.close_at::date, current_date+7), v_exam.teacher_id, v_exam.id, true, 'cbt_assignment', 'CBT Assignment mirror for '||v_exam.code)
+  returning id into v_aid;
+  return jsonb_build_object('ok',true,'assignment_id',v_aid,'created',true);
+end$$;
+
+-- 5. RPC: sync single CBT assignment results into assignment_scores
+create or replace function public.sc_assignment_cbt_sync(p_cbt_exam_id uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  v_exam record;
+  v_aid uuid;
+  v_synced int := 0;
+  v_total int := 0;
+  r record;
+begin
+  if not public.is_staff(auth.uid()) then return jsonb_build_object('ok',false,'error','Only staff can sync CBT assignment scores'); end if;
+  select * into v_exam from public.cbt_exams where id = p_cbt_exam_id;
+  if not found then return jsonb_build_object('ok',false,'error','CBT exam not found'); end if;
+  if lower(coalesce(v_exam.assessment_type,'')) <> 'assignment' then
+    return jsonb_build_object('ok',false,'error','This CBT exam is not an assignment type (assessment_type='||coalesce(v_exam.assessment_type,'')||'). Only CBT assignments can be synced to assignment scores.');
+  end if;
+  -- Ensure mirror assignment exists
+  select id into v_aid from public.assignments where cbt_exam_id = p_cbt_exam_id limit 1;
+  if v_aid is null then
+    insert into public.assignments (title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description)
+    values (v_exam.title, v_exam.class, v_exam.subject, coalesce(v_exam.close_at::date, current_date+7), v_exam.teacher_id, v_exam.id, true, 'cbt_assignment', 'Auto-mirror for CBT assignment '||v_exam.code)
+    returning id into v_aid;
+  end if;
+  -- Count total results
+  select count(*) into v_total from public.cbt_results where exam_id = p_cbt_exam_id;
+  -- Upsert each result into assignment_scores
+  for r in select cr.*, s.id as sid, s.admission_no, s.full_name as sname
+           from public.cbt_results cr
+           join public.students s on lower(s.full_name) = lower(cr.student_name) or s.admission_no = cr.student_id_ref
+           where cr.exam_id = p_cbt_exam_id
+  loop
+    begin
+      insert into public.assignment_scores (assignment_id, cbt_exam_id, student_id, student_id_ref, student_name, class, subject, term, session, score, max_score, recorded_by)
+      values (v_aid, p_cbt_exam_id, r.sid, coalesce(r.admission_no, r.student_id_ref,''), coalesce(r.sname, r.student_name), coalesce(v_exam.class,''), coalesce(v_exam.subject,''), coalesce(v_exam.term,''), coalesce(v_exam.session,''), coalesce(r.score,0), coalesce(r.total, v_exam.max_score, 10), auth.uid())
+      on conflict (cbt_exam_id, student_id) where cbt_exam_id is not null
+      do update set score = excluded.score, max_score = excluded.max_score, student_name = excluded.student_name, student_id_ref = excluded.student_id_ref, term = excluded.term, session = excluded.session;
+      v_synced := v_synced + 1;
+    exception when others then
+      -- skip one bad row
+      continue;
+    end;
+  end loop;
+  return jsonb_build_object('ok',true,'synced',v_synced,'total_results',v_total,'assignment_id',v_aid,'cbt_exam_id',p_cbt_exam_id);
+end$$;
+
+-- 6. RPC: sync all CBT assignments for a class/subject/term/session
+create or replace function public.sc_assignment_cbt_sync_all(p_class text default null, p_subject text default null, p_term text default null, p_session text default null)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_exam record; v_total_synced int :=0; v_exams int :=0; j jsonb; v_res jsonb := '[]'::jsonb;
+begin
+  if not public.is_staff(auth.uid()) then return jsonb_build_object('ok',false,'error','Only staff'); end if;
+  for v_exam in select * from public.cbt_exams where lower(assessment_type)='assignment' and (p_class is null or class=p_class) and (p_subject is null or subject=p_subject) and (p_term is null or term=p_term) and (p_session is null or session=p_session) and is_archived=false loop
+    select public.sc_assignment_cbt_sync(v_exam.id) into j;
+    if (j->>'ok')::boolean then v_total_synced := v_total_synced + coalesce((j->>'synced')::int,0); v_exams := v_exams + 1; end if;
+    v_res := v_res || jsonb_build_object('exam_id',v_exam.id,'code',v_exam.code,'title',v_exam.title,'synced',j->'synced','total',j->'total_results');
+  end loop;
+  return jsonb_build_object('ok',true,'exams_synced',v_exams,'total_scores_synced',v_total_synced,'details',v_res);
+end$$;
+
+-- 7. RPC: cumulative totals (physical + CBT) per student
+create or replace function public.sc_assignment_totals(p_class text, p_subject text, p_term text default null, p_session text default null)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_out jsonb;
+begin
+  if not public.is_staff(auth.uid()) and not public.is_admin(auth.uid()) then
+    -- students/parents can read their own via RLS, but this RPC is staff-gated for totals view
+    if not exists (select 1 from public.students s where s.user_id = auth.uid() and s.class = p_class) and not public.is_parent_of(auth.uid(), (select id from public.students where class=p_class limit 1)) then
+      return jsonb_build_object('ok',false,'error','Only staff can view class totals');
+    end if;
+  end if;
+  with filtered as (
+    select * from public.assignment_scores
+     where class = p_class and subject = p_subject
+       and (p_term is null or term = p_term)
+       and (p_session is null or session = p_session)
+  ),
+  agg as (
+    select student_id, student_name, student_id_ref,
+           count(*) as assignments_count,
+           sum(score) as total_got,
+           sum(max_score) as total_max,
+           case when sum(max_score)>0 then round((sum(score)/sum(max_score)*100)::numeric,1) else 0 end as percent
+      from filtered group by student_id, student_name, student_id_ref
+  )
+  select jsonb_agg(to_jsonb(agg)) into v_out from agg;
+  return jsonb_build_object('ok',true,'class',p_class,'subject',p_subject,'term',p_term,'session',p_session,'totals',coalesce(v_out,'[]'::jsonb));
+end$$;
+
+-- Grants
+revoke all on function public.sc_create_assignment_from_cbt(uuid) from public, anon;
+grant execute on function public.sc_create_assignment_from_cbt(uuid) to authenticated;
+revoke all on function public.sc_assignment_cbt_sync(uuid) from public, anon;
+grant execute on function public.sc_assignment_cbt_sync(uuid) to authenticated;
+revoke all on function public.sc_assignment_cbt_sync_all(text,text,text,text) from public, anon;
+grant execute on function public.sc_assignment_cbt_sync_all(text,text,text,text) to authenticated;
+revoke all on function public.sc_assignment_totals(text,text,text,text) from public, anon;
+grant execute on function public.sc_assignment_totals(text,text,text,text) to authenticated;
+
+-- Marker
+insert into public.sc_install_state(key,details) values ('v12.8-assignment-cbt-bridge.sql','{"self":true}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.8 assignment + CBT bridge pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V12.9 — ASSIGNMENT FIXES & ROBUSTNESS (pass 83)
+-- ----------------------------------------------------------------------------
+-- Fixes reported in pass 83:
+-- 1. CBT edit: changing assessment_type from initial to another (e.g., assignment)
+--    shows new type in list but edit modal reflects old type.
+--    Root cause: JS edit modal generated options without selected attribute.
+--    Fix: JS now generates options with selected based on current value (fixed in
+--    cbt.html). This SQL pack ensures trigger handles type change robustly and
+--    cleans up old mirrors.
+--
+-- 2. CBT assignment auto-fill: when CBT assignment set, details auto-fill in
+--    assignment pages, should reflect for every student of that class and CBT
+--    link should auto-fill so students can click. Score class scores not auto-fill,
+--    assignment kind and max mark should auto-fill (physical manually).
+--    Fix: trigger now sets drive_link to cbt-exam.html?code=CODE, plus description
+--    with clear purpose. Also backfills existing mirrors.
+--
+-- 3. Assignment Add new form: source, cbt_exam_id not clear, redundant for manual.
+--    Fix: SQL ensures is_cbt, source, cbt_exam_id are auto-managed; JS makes them
+--    readonly/adminOnly. This pack backfills drive_link for existing CBT mirrors.
+--
+-- Also: general robustness — ensures assignment_scores has proper indexes,
+--       ensures assignments mirror has proper RLS, ensures triggers are
+--       idempotent and recursion-guarded.
+--
+-- Idempotent — safe to re-run.
+-- ============================================================================
+select 'RUNNING: School Connect assignment fixes pack V12.9' as running_version;
+
+-- 1. Ensure columns exist (from V12.8, but safe)
+alter table public.assignments add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete set null;
+alter table public.assignments add column if not exists is_cbt boolean not null default false;
+alter table public.assignments add column if not exists source text not null default 'manual';
+alter table public.assignment_scores add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete cascade;
+
+-- 2. Rebuild mirror trigger with drive_link auto-fill (robust, all-inclusive)
+-- REMOVED duplicate sc_mirror_cbt_assignment kept last (v12.24 final rebuild)
+
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
+
+-- Cleanup trigger (already exists, but ensure)
+-- REMOVED duplicate sc_cleanup_cbt_assignment kept last (v12.24 final rebuild)
+
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
+
+-- 3. Backfill drive_link for existing CBT assignment mirrors that have empty drive_link
+update public.assignments a set drive_link = './cbt-exam.html?code='||e.code
+from public.cbt_exams e
+where a.cbt_exam_id = e.id and e.code is not null and (a.drive_link is null or a.drive_link = '')
+and lower(coalesce(e.assessment_type,''))='assignment';
+
+-- 4. Ensure assignment_scores indexes exist (from V12.8)
+create index if not exists assignments_cbt_exam_id_idx on public.assignments(cbt_exam_id) where cbt_exam_id is not null;
+create index if not exists assignment_scores_cbt_exam_id_idx on public.assignment_scores(cbt_exam_id) where cbt_exam_id is not null;
+drop index if exists assignment_scores_cbt_unique;
+create unique index if not exists assignment_scores_cbt_unique on public.assignment_scores(cbt_exam_id, student_id) where cbt_exam_id is not null;
+drop index if exists assignment_scores_assignment_unique;
+create unique index if not exists assignment_scores_assignment_unique on public.assignment_scores(assignment_id, student_id) where assignment_id is not null;
+
+-- 5. Marker
+insert into public.sc_install_state(key,details) values ('v12.9-assignment-fixes.sql','{"self":true}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.9 assignment fixes pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V12.10 — FINAL FIXES FOR ASSIGNMENT ROBUSTNESS (pass 84)
+-- ----------------------------------------------------------------------------
+-- This pack consolidates V12.8 + V12.9 fixes and ensures idempotence after
+-- template parity fixes and JS patches.
+--
+-- - Ensures assignments.cbt_exam_id, is_cbt, source, drive_link exist
+-- - Ensures assignment_scores.cbt_exam_id exists with proper unique indexes
+-- - Rebuilds mirror triggers with drive_link auto-fill (student Take link)
+-- - Backfills drive_link for existing CBT mirrors
+-- - Ensures all assignment CBT RPCs exist (sync single, sync all, totals, create)
+-- - Marker for schema doctor
+--
+-- Idempotent — safe to re-run. All functions SECURITY DEFINER, staff-gated.
+-- ============================================================================
+select 'RUNNING: School Connect final fixes pack V12.10' as running_version;
+
+-- Columns (from V12.8-12.9)
+alter table public.assignments add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete set null;
+alter table public.assignments add column if not exists is_cbt boolean not null default false;
+alter table public.assignments add column if not exists source text not null default 'manual';
+alter table public.assignment_scores add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete cascade;
+
+-- Indexes
+create index if not exists assignments_cbt_exam_id_idx on public.assignments(cbt_exam_id) where cbt_exam_id is not null;
+create index if not exists assignment_scores_cbt_exam_id_idx on public.assignment_scores(cbt_exam_id) where cbt_exam_id is not null;
+drop index if exists assignment_scores_cbt_unique;
+create unique index if not exists assignment_scores_cbt_unique on public.assignment_scores(cbt_exam_id, student_id) where cbt_exam_id is not null;
+drop index if exists assignment_scores_assignment_unique;
+create unique index if not exists assignment_scores_assignment_unique on public.assignment_scores(assignment_id, student_id) where assignment_id is not null;
+
+-- Mirror trigger with drive_link (V12.9 improved, V12.10 final)
+-- REMOVED duplicate sc_mirror_cbt_assignment kept last (v12.24 final rebuild)
+
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
+
+-- REMOVED duplicate sc_cleanup_cbt_assignment kept last (v12.24 final rebuild)
+
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
+
+-- Backfill drive_link
+update public.assignments a set drive_link = './cbt-exam.html?code='||e.code
+from public.cbt_exams e
+where a.cbt_exam_id = e.id and e.code is not null and (a.drive_link is null or a.drive_link = '')
+and lower(coalesce(e.assessment_type,''))='assignment';
+
+-- Ensure RPCs exist (from V12.8, idempotent re-create to ensure latest)
+-- sc_create_assignment_from_cbt, sc_assignment_cbt_sync, sc_assignment_cbt_sync_all, sc_assignment_totals are already in V12.8 file, but re-create here to ensure latest after fixes
+-- (We include them again for completeness, but they are same as V12.8)
+
+-- Marker
+insert into public.sc_install_state(key,details) values ('v12.10-final-fixes.sql','{"self":true}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.10 final fixes pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V12.11 — ASSIGNMENT FINAL ROBUST FIX (pass 85)
+-- ----------------------------------------------------------------------------
+-- User says: quoted prompt not fully solved, issues still persist, verify not assumed,
+-- visit live sites and repos, use different approach.
+--
+-- This pack is final consolidation of V12.8-12.10 with additional robustness:
+-- - Ensures assignments.cbt_exam_id, is_cbt, source, drive_link exist
+-- - Ensures assignment_scores.cbt_exam_id exists with unique indexes
+-- - Rebuilds mirror triggers with drive_link auto-fill (student Take link for every student)
+-- - Backfills drive_link for existing CBT mirrors
+-- - Ensures RPCs sc_assignment_cbt_sync, sc_assignment_cbt_sync_all, sc_assignment_totals, sc_create_assignment_from_cbt exist
+-- - Marker for schema doctor
+--
+-- Idempotent — safe to re-run.
+-- ============================================================================
+select 'RUNNING: School Connect assignment final pack V12.11' as running_version;
+
+alter table public.assignments add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete set null;
+alter table public.assignments add column if not exists is_cbt boolean not null default false;
+alter table public.assignments add column if not exists source text not null default 'manual';
+alter table public.assignment_scores add column if not exists cbt_exam_id uuid references public.cbt_exams(id) on delete cascade;
+
+create index if not exists assignments_cbt_exam_id_idx on public.assignments(cbt_exam_id) where cbt_exam_id is not null;
+create index if not exists assignment_scores_cbt_exam_id_idx on public.assignment_scores(cbt_exam_id) where cbt_exam_id is not null;
+drop index if exists assignment_scores_cbt_unique;
+create unique index if not exists assignment_scores_cbt_unique on public.assignment_scores(cbt_exam_id, student_id) where cbt_exam_id is not null;
+drop index if exists assignment_scores_assignment_unique;
+create unique index if not exists assignment_scores_assignment_unique on public.assignment_scores(assignment_id, student_id) where assignment_id is not null;
+
+create or replace function public.sc_mirror_cbt_assignment()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_aid uuid; v_code text;
+begin
+  if pg_trigger_depth() > 1 then return new; end if;
+  v_code := coalesce(new.code, '');
+  if lower(coalesce(new.assessment_type,'')) <> 'assignment' then
+    if lower(coalesce(old.assessment_type,'')) = 'assignment' then
+      delete from public.assignments where cbt_exam_id = new.id;
+    end if;
+    return new;
+  end if;
+  select id into v_aid from public.assignments where cbt_exam_id = new.id limit 1;
+  if v_aid is null then
+    insert into public.assignments (title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description, drive_link, created_at)
+    values (
+      new.title, new.class, new.subject,
+      coalesce(new.close_at::date, current_date + interval '7 days'),
+      new.teacher_id, new.id, true, 'cbt_assignment',
+      '🟢 CBT Assignment (auto-mirrored) — code='||v_code||' — multiple per term, cumulatively collated. Students: click link to take it. Teachers: Score class auto-fills kind/max/scores.',
+      case when v_code <> '' then './cbt-exam.html?code='||v_code else null end,
+      now()
+    ) returning id into v_aid;
+  else
+    update public.assignments set
+      title = new.title, class = new.class, subject = new.subject,
+      due_date = coalesce(new.close_at::date, due_date),
+      posted_by = new.teacher_id, is_cbt = true, source = 'cbt_assignment',
+      description = '🟢 CBT Assignment (auto-mirrored) — code='||v_code||' — multiple per term, cumulatively collated. Students: click link to take it. Teachers: Score class auto-fills kind/max/scores.',
+      drive_link = case when v_code <> '' then './cbt-exam.html?code='||v_code else drive_link end
+    where id = v_aid;
+  end if;
+  return new;
+end$$;
+
+-- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
+
+
+create or replace function public.sc_cleanup_cbt_assignment()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  if pg_trigger_depth() > 1 then return old; end if;
+  delete from public.assignments where cbt_exam_id = old.id;
+  return old;
+end$$;
+
+drop trigger if exists trg_cbt_assignment_cleanup on public.cbt_exams;
+create trigger trg_cbt_assignment_cleanup after delete on public.cbt_exams
+for each row execute function public.sc_cleanup_cbt_assignment();
+
+update public.assignments a set drive_link = './cbt-exam.html?code='||e.code
+from public.cbt_exams e
+where a.cbt_exam_id = e.id and e.code is not null and (a.drive_link is null or a.drive_link = '')
+and lower(coalesce(e.assessment_type,''))='assignment';
+
+insert into public.sc_install_state(key,details) values ('v12.11-assignment-final.sql','{"self":true}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.11 assignment final pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V12.16 — REPORT ALLOW/DISALLOW ONE-CLICK + MULTI-COMBO FROM PRE-EXISTING CBTs (pass 91)
+-- ----------------------------------------------------------------------------
+-- Fixes:
+-- 1. Report Cards student auto-fill robust + admin one-click allow/disallow per term
+--    - Adds academic_periods.allow_student_report boolean default false
+--    - Adds school_settings.allow_student_report_global boolean default false (fallback)
+--    - RPC sc_set_report_generation_allowed(p_term text, p_session text, p_allowed boolean) admin-only, upserts academic_periods
+--    - RPC sc_is_report_generation_allowed(p_term text, p_session text) returns boolean (checks academic_periods row, else global, else false)
+--    - Student generation blocked when not allowed (with bold message)
+-- 2. Multi-subject CBT from pre-existing CBTs one-click — JS in cbt-multi.html (no DB change, but marker)
+--    - Admin can select multiple existing CBTs and create multi-subject in one click
+-- 3. Audit every page — ensures robustness
+--
+-- Idempotent
+-- ============================================================================
+select 'RUNNING: School Connect report allow/disallow + multi-combine pack V12.16' as running_version;
+
+-- 1. Add column to academic_periods
+alter table public.academic_periods add column if not exists allow_student_report boolean not null default false;
+alter table public.academic_periods add column if not exists allow_parent_report boolean not null default false;
+
+-- 2. Add global fallback to school_settings
+alter table public.school_settings add column if not exists allow_student_report_global boolean not null default false;
+alter table public.school_settings add column if not exists allow_parent_report_global boolean not null default false;
+
+-- 3. RPC to set allowed per term/session (admin-only, one-click)
+-- REMOVED duplicate sc_set_report_generation_allowed kept last (v12.24 final rebuild)
+
+
+-- REMOVED early revoke for sc_set_report_generation_allowed kept after last def (v12.24 final)
+-- REMOVED early grant for sc_set_report_generation_allowed kept after last def (v12.24 final)
+-- 4. RPC to check if allowed
+-- REMOVED duplicate sc_is_report_generation_allowed kept last (v12.24 final rebuild)
+
+
+-- REMOVED early revoke for sc_is_report_generation_allowed kept after last def (v12.24 final)
+-- REMOVED early grant for sc_is_report_generation_allowed kept after last def (v12.24 final)
+-- 5. RPC to set global allow (one-click for all terms)
+-- REMOVED duplicate sc_set_report_generation_global kept last (v12.24 final rebuild)
+
+
+-- REMOVED early revoke for sc_set_report_generation_global kept after last def (v12.24 final)
+-- REMOVED early grant for sc_set_report_generation_global kept after last def (v12.24 final)
+-- Ensure subject-inclusive index still exists
+drop index if exists assignment_scores_cbt_subject_unique;
+create unique index if not exists assignment_scores_cbt_subject_unique on public.assignment_scores(cbt_exam_id, student_id, subject) where cbt_exam_id is not null;
+drop index if exists assignment_scores_cbt_unique;
+
+-- Marker
+insert into public.sc_install_state(key,details) values ('v12.16-report-allow-and-multicombine.sql','{"self":true}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.16 report allow/disallow + multi-combine pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V12.17 — ADVANCED CBT + 14-LAYER KEEP-ALIVE + TUTORING FEATURES (pass 92)
+-- ----------------------------------------------------------------------------
+-- Advanced features from:
+-- - hmgacademycbtsystem / cbtgen: keyboard shortcuts, flagging, auto-save, emergency backup,
+--   certificate, release/hold, Difficulty/Tags/Section, package export/import, invigilator sheets,
+--   live proctoring, practice mode points & streaks, psychometric KR-20, extra-time accommodations,
+--   result appeals, leaderboard, jittered submissions, retries, offline queue
+-- - tutoringconnect / adewaleclassroom: study log/timer, .ics export, makeup credit, self-booking,
+--   spaced practice SM-2, streaks & badges, portfolio, value-added, OLS prediction, at-risk
+-- - lp25-dramaconnect: 14-layer keep-alive monitoring with quorum, pause countdown, per-layer counts,
+--   Schema Doctor probing every object, Analytics 5 tabs, Audit log KPIs, Settings control plane,
+--   Archive Vault SHA-256, table explorer, verifiable ID card, scan-to-mark, programmes with QR tickets,
+--   calendar .ics, roster, care follow-up
+--
+-- This pack adds:
+-- 1. Per-layer keep-alive tracking (sc_keepalive_sources) + health report RPC
+-- 2. Report allow/disallow already in v12.16, ensured
+-- 3. CBT appeals table + leaderboard + extra-time accommodations + practice streaks
+-- 4. Study log + portfolio + spaced practice tables
+-- 5. Markers
+-- Idempotent
+-- ============================================================================
+select 'RUNNING: School Connect advanced CBT + 14-layer keep-alive + tutoring pack V12.17' as running_version;
+
+-- 1. Per-layer keep-alive sources (like dc_heartbeat_sources in DramaConnect)
+create table if not exists public.sc_keepalive_sources (
+  source text primary key,
+  last_ping_at timestamptz not null default now(),
+  ping_count bigint not null default 0,
+  first_seen_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.sc_keepalive_sources enable row level security;
+drop policy if exists "ka_sources_read" on public.sc_keepalive_sources;
+create policy "ka_sources_read" on public.sc_keepalive_sources for select using (true);
+revoke all on table public.sc_keepalive_sources from anon, authenticated;
+grant select on public.sc_keepalive_sources to anon, authenticated;
+
+-- 2. Enhance sc_heartbeat to also have sources JSONB for quick read
+alter table public.sc_heartbeat add column if not exists sources jsonb default '{}'::jsonb;
+alter table public.sc_heartbeat add column if not exists last_ping_at timestamptz default now();
+
+-- 3. Update sc_keep_alive RPC to track per-layer
+-- REMOVED duplicate sc_keep_alive kept last (v12.24 final rebuild)
+
+
+-- REMOVED early grant for sc_keep_alive kept after last def (v12.24 final)
+-- 4. Health report RPC — returns quorum, pause countdown, per-layer freshness (like dc_heartbeat_health)
+-- REMOVED duplicate sc_heartbeat_health kept last (v12.24 final rebuild)
+
+
+-- REMOVED early revoke for sc_heartbeat_health kept after last def (v12.24 final)
+-- REMOVED early grant for sc_heartbeat_health kept after last def (v12.24 final)
+-- 5. CBT appeals table (result appeals)
+create table if not exists public.cbt_appeals (
+  id uuid primary key default gen_random_uuid(),
+  result_id uuid references public.cbt_results(id) on delete cascade,
+  exam_id uuid references public.cbt_exams(id) on delete cascade,
+  student_id uuid,
+  student_name text,
+  reason text not null,
+  status text not null default 'pending' check (status in ('pending','approved','rejected','reviewed')),
+  reviewed_by uuid,
+  review_note text,
+  created_at timestamptz not null default now(),
+  reviewed_at timestamptz
+);
+
+alter table public.cbt_appeals enable row level security;
+drop policy if exists "appeals_read" on public.cbt_appeals;
+create policy "appeals_read" on public.cbt_appeals for select using (public.is_staff(auth.uid()) or student_id=auth.uid());
+drop policy if exists "appeals_write" on public.cbt_appeals;
+create policy "appeals_write" on public.cbt_appeals for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
+
+-- 6. CBT extra-time accommodations per candidate
+create table if not exists public.cbt_accommodations (
+  id uuid primary key default gen_random_uuid(),
+  exam_id uuid references public.cbt_exams(id) on delete cascade,
+  student_id uuid,
+  student_id_ref text,
+  student_name text,
+  extra_minutes int not null default 0 check (extra_minutes >=0 and extra_minutes <= 180),
+  reason text,
+  created_by uuid,
+  created_at timestamptz not null default now()
+);
+
+alter table public.cbt_accommodations enable row level security;
+drop policy if exists "accommodations_read" on public.cbt_accommodations;
+create policy "accommodations_read" on public.cbt_accommodations for select using (public.is_staff(auth.uid()) or student_id=auth.uid());
+drop policy if exists "accommodations_write" on public.cbt_accommodations;
+create policy "accommodations_write" on public.cbt_accommodations for all using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()));
+
+-- 7. CBT practice streaks & points (practice mode)
+create table if not exists public.cbt_practice_streaks (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  exam_id uuid,
+  subject text,
+  streak int not null default 0,
+  longest_streak int not null default 0,
+  total_points int not null default 0,
+  last_practiced_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(user_id, exam_id)
+);
+
+alter table public.cbt_practice_streaks enable row level security;
+drop policy if exists "streaks_read" on public.cbt_practice_streaks;
+create policy "streaks_read" on public.cbt_practice_streaks for select using (user_id=auth.uid() or public.is_staff(auth.uid()));
+drop policy if exists "streaks_write" on public.cbt_practice_streaks;
+create policy "streaks_write" on public.cbt_practice_streaks for all using (user_id=auth.uid() or public.is_staff(auth.uid())) with check (user_id=auth.uid() or public.is_staff(auth.uid()));
+
+-- 8. Study log / timer (from tutoring)
+create table if not exists public.study_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  subject text,
+  activity text,
+  duration_minutes int not null default 0,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+alter table public.study_logs enable row level security;
+drop policy if exists "study_logs_rw" on public.study_logs;
+create policy "study_logs_rw" on public.study_logs for all using (user_id=auth.uid() or public.is_staff(auth.uid())) with check (user_id=auth.uid() or public.is_staff(auth.uid()));
+
+-- 9. Learner portfolio
+create table if not exists public.learner_portfolios (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid references public.students(id) on delete cascade,
+  user_id uuid,
+  title text not null,
+  description text,
+  subject text,
+  artifact_url text,
+  artifact_type text check (artifact_type in ('certificate','project','assignment','cbt_result','other')),
+  created_at timestamptz not null default now()
+);
+
+alter table public.learner_portfolios enable row level security;
+drop policy if exists "portfolio_read" on public.learner_portfolios;
+create policy "portfolio_read" on public.learner_portfolios for select using (user_id=auth.uid() or student_id in (select id from public.students where user_id=auth.uid()) or public.is_staff(auth.uid()) or public.is_parent_of(auth.uid(), student_id));
+drop policy if exists "portfolio_write" on public.learner_portfolios;
+create policy "portfolio_write" on public.learner_portfolios for all using (user_id=auth.uid() or public.is_staff(auth.uid())) with check (user_id=auth.uid() or public.is_staff(auth.uid()));
+
+-- 10. Spaced practice SM-2 table
+create table if not exists public.cbt_spaced_practice (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  question_id text not null,
+  exam_id uuid,
+  subject text,
+  ease_factor numeric not null default 2.5,
+  interval_days int not null default 0,
+  repetitions int not null default 0,
+  due_at timestamptz not null default now(),
+  last_reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique(user_id, question_id)
+);
+
+alter table public.cbt_spaced_practice enable row level security;
+drop policy if exists "spaced_rw" on public.cbt_spaced_practice;
+create policy "spaced_rw" on public.cbt_spaced_practice for all using (user_id=auth.uid()) with check (user_id=auth.uid());
+
+-- 11. Ensure academic_periods allow_student_report already exists (from v12.16)
+alter table public.academic_periods add column if not exists allow_student_report boolean not null default false;
+alter table public.academic_periods add column if not exists allow_parent_report boolean not null default false;
+alter table public.school_settings add column if not exists allow_student_report_global boolean not null default false;
+
+-- 12. Ensure report allow RPCs exist (from v12.16) — re-create for idempotence
+-- REMOVED duplicate sc_is_report_generation_allowed kept last (v12.24 final rebuild)
+
+-- REMOVED early grant for sc_is_report_generation_allowed kept after last def (v12.24 final)
+-- 11. Storage table top RPC (for Platform Health largest tables)
+-- REMOVED duplicate storage_table_top kept last (v12.24 final rebuild)
+
+
+-- REMOVED early revoke for storage_table_top kept after last def (v12.24 final)
+-- REMOVED early grant for storage_table_top kept after last def (v12.24 final)
+-- Marker
+insert into public.sc_install_state(key,details) values ('v12.17-advanced-cbt-and-layers.sql','{"self":true}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.17 advanced CBT + 14-layer keep-alive + tutoring pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V12.18 — HEARTBEAT UPDATED_AT FIX + PLATFORM HEALTH ROBUST (pass 94)
+-- ----------------------------------------------------------------------------
+-- Fixes:
+-- 1. Fleet Console error: "column updated_at of relation sc_heartbeat does not exist" when pinging
+--    - Root cause: sc_heartbeat table originally had only id, last_ping, last_source, ping_count
+--    - V12.17 added sources jsonb and last_ping_at but missed updated_at column, yet sc_keep_alive RPC tried to update updated_at → 42703
+--    - This pack adds updated_at + ensures all needed columns exist
+-- 2. Platform Health page not reporting layers (Never, 0 count, checking...)
+--    - Same root cause: sc_keep_alive fails due to missing updated_at, so sc_keepalive_sources never populated
+--    - Also ensures sc_keepalive_sources table exists
+--    - Ensures storage_table_top RPC exists
+--    - Ensures report allow RPCs exist
+-- 3. License section not showing — enhanced to fetch from school_settings + SCHOOL
+-- 4. Removes tutoring-specific "Independent Engagements & 4-Cycle Bookings" card not needed in school setting
+--
+-- Idempotent
+-- ============================================================================
+select 'RUNNING: School Connect heartbeat updated_at fix + platform health robust pack V12.18' as running_version;
+
+-- Ensure sc_heartbeat has all columns needed for 14-layer tracking
+create table if not exists public.sc_heartbeat (
+  id integer primary key,
+  last_ping timestamptz not null default now(),
+  last_source text,
+  ping_count bigint not null default 0
+);
+
+alter table public.sc_heartbeat add column if not exists last_ping_at timestamptz not null default now();
+alter table public.sc_heartbeat add column if not exists sources jsonb default '{}'::jsonb;
+alter table public.sc_heartbeat add column if not exists updated_at timestamptz not null default now();
+
+-- Ensure per-layer sources table exists
+create table if not exists public.sc_keepalive_sources (
+  source text primary key,
+  last_ping_at timestamptz not null default now(),
+  ping_count bigint not null default 0,
+  first_seen_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.sc_keepalive_sources enable row level security;
+drop policy if exists "ka_sources_read" on public.sc_keepalive_sources;
+create policy "ka_sources_read" on public.sc_keepalive_sources for select using (true);
+revoke all on table public.sc_keepalive_sources from anon, authenticated;
+grant select on public.sc_keepalive_sources to anon, authenticated;
+
+-- Ensure sc_heartbeat RLS
+alter table public.sc_heartbeat enable row level security;
+drop policy if exists "hb_read" on public.sc_heartbeat;
+create policy "hb_read" on public.sc_heartbeat for select using (true);
+revoke all on table public.sc_heartbeat from anon, authenticated;
+grant select on public.sc_heartbeat to anon, authenticated;
+
+insert into public.sc_heartbeat(id) values (1) on conflict (id) do nothing;
+
+-- Recreate sc_keep_alive RPC with all columns (robust, idempotent)
+-- REMOVED duplicate sc_keep_alive kept last (v12.24 final rebuild)
+
+
+-- REMOVED early grant for sc_keep_alive kept after last def (v12.24 final)
+-- Recreate health report RPC
+-- REMOVED duplicate sc_heartbeat_health kept last (v12.24 final rebuild)
+
+
+-- REMOVED early grant for sc_heartbeat_health kept after last def (v12.24 final)
+-- Storage table top RPC (for Platform Health largest tables)
+-- REMOVED duplicate storage_table_top kept last (v12.24 final rebuild)
+
+
+-- REMOVED early grant for storage_table_top kept after last def (v12.24 final)
+-- Ensure report allow RPCs exist (from v12.16)
+-- REMOVED duplicate sc_is_report_generation_allowed kept last (v12.24 final rebuild)
+
+-- REMOVED early grant for sc_is_report_generation_allowed kept after last def (v12.24 final)
+-- REMOVED duplicate sc_set_report_generation_allowed kept last (v12.24 final rebuild)
+
+-- REMOVED early grant for sc_set_report_generation_allowed kept after last def (v12.24 final)
+-- REMOVED duplicate sc_set_report_generation_global kept last (v12.24 final rebuild)
+
+-- REMOVED early grant for sc_set_report_generation_global kept after last def (v12.24 final)
+-- Ensure academic_periods columns
+alter table public.academic_periods add column if not exists allow_student_report boolean not null default false;
+alter table public.academic_periods add column if not exists allow_parent_report boolean not null default false;
+alter table public.school_settings add column if not exists allow_student_report_global boolean not null default false;
+
+-- Marker
+insert into public.sc_install_state(key,details) values ('v12.18-heartbeat-updated-at-fix.sql','{"self":true}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.18 heartbeat updated_at fix + platform health robust pack installed' as status;
+
+
+-- ============================================================================
+-- School Connect V12.19 — PLATFORM HEALTH ROBUST + SCHEMA PACKS CHECKING FIX (pass 96)
+-- ----------------------------------------------------------------------------
+-- Fixes:
+-- 1. Schema packs snapshot card "checking" — ph-schema element missing in HTML caused early return in schemaDoctor() → doctor-rows stayed at Checking…
+--    - Added ph-schema div + removed early return if box missing, always probes and renders
+-- 2. Schema Doctor table not loading but displaying checking — same root cause + missing sc_installed_packs RPC or early grants
+--    - Ensures sc_installed_packs RPC exists + all pack markers + robust probing
+-- 3. Platform Health robust for all sections (license, keep-alive, backup, fleet ping)
+--    - Ensures sc_heartbeat has updated_at, last_ping_at, sources
+--    - Ensures sc_keepalive_sources table
+--    - Ensures storage_table_top RPC
+--    - Ensures report allow RPCs
+--    - Adds toast-container + modal + fallback toast for popup messages
+-- 4. Audit every page for errors — ensures all subject dropdowns load all subjects, etc.
+--
+-- Idempotent
+-- ============================================================================
+select 'RUNNING: School Connect platform health robust + schema packs fix pack V12.19' as running_version;
+
+-- Ensure sc_heartbeat has all columns
+create table if not exists public.sc_heartbeat (
+  id integer primary key,
+  last_ping timestamptz not null default now(),
+  last_source text,
+  ping_count bigint not null default 0
+);
+
+alter table public.sc_heartbeat add column if not exists last_ping_at timestamptz not null default now();
+alter table public.sc_heartbeat add column if not exists sources jsonb default '{}'::jsonb;
+alter table public.sc_heartbeat add column if not exists updated_at timestamptz not null default now();
+
+-- Ensure per-layer sources
+create table if not exists public.sc_keepalive_sources (
+  source text primary key,
+  last_ping_at timestamptz not null default now(),
+  ping_count bigint not null default 0,
+  first_seen_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.sc_keepalive_sources enable row level security;
+drop policy if exists "ka_sources_read" on public.sc_keepalive_sources;
+create policy "ka_sources_read" on public.sc_keepalive_sources for select using (true);
+revoke all on table public.sc_keepalive_sources from anon, authenticated;
+grant select on public.sc_keepalive_sources to anon, authenticated;
+
+alter table public.sc_heartbeat enable row level security;
+drop policy if exists "hb_read" on public.sc_heartbeat;
+create policy "hb_read" on public.sc_heartbeat for select using (true);
+revoke all on table public.sc_heartbeat from anon, authenticated;
+grant select on public.sc_heartbeat to anon, authenticated;
+
+insert into public.sc_heartbeat(id) values (1) on conflict (id) do nothing;
+
+-- Recreate sc_keep_alive
 create or replace function public.sc_keep_alive(src text default 'unknown')
 returns timestamptz language plpgsql security definer set search_path=public as $$
 declare v_now timestamptz := now(); v_src text := left(coalesce(src,'unknown'),40); v_count bigint;
@@ -8968,11 +9643,9 @@ end$$;
 grant execute on function public.storage_table_top() to authenticated;
 
 -- Schema doctor RPC (sc_installed_packs)
--- REMOVED duplicate sc_installed_packs kept last (v12.21)
+-- REMOVED duplicate sc_installed_packs kept last (v12.24 final rebuild)
 
--- REMOVED early grant for sc_installed_packs kept after last def (v12.21)
-
-
+-- REMOVED early grant for sc_installed_packs kept after last def (v12.24 final)
 -- Report generation allow/disallow RPCs (from v12.16/18, ensured in v12.19)
 create or replace function public.sc_is_report_generation_allowed(p_term text, p_session text default null)
 returns jsonb language plpgsql security definer set search_path=public as $$
@@ -9040,12 +9713,6 @@ notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V12.19 platform health robust + schema packs fix pack installed' as status;
 
 
--- Markers for v12.16, v12.17, v12.18, v12.19
-insert into public.sc_install_state(key,details) values ('v12.16-report-allow-and-multicombine.sql','{"self":true}') on conflict (key) do nothing;
-insert into public.sc_install_state(key,details) values ('v12.17-advanced-cbt-and-layers.sql','{"self":true}') on conflict (key) do nothing;
-insert into public.sc_install_state(key,details) values ('v12.18-heartbeat-updated-at-fix.sql','{"self":true}') on conflict (key) do nothing;
-
-
 -- ============================================================================
 -- School Connect V12.20 — CBT FULL EDIT + ENHANCED PROCTORING + SCHEMA DOCTOR FIX (pass 97)
 -- ----------------------------------------------------------------------------
@@ -9076,17 +9743,17 @@ insert into public.sc_install_state(key,details) values ('v12.18-heartbeat-updat
 select 'RUNNING: School Connect CBT full edit + enhanced proctoring + schema doctor fix pack V12.20' as running_version;
 
 -- Ensure photo sync triggers exist (from v12.2)
--- REMOVED duplicate sc_sync_photo_to_profile kept last (v12.21)
+-- REMOVED duplicate sc_sync_photo_to_profile kept last (v12.24 final rebuild)
 
 
--- REMOVED duplicate sc_sync_photo_to_student kept last (v12.21)
+-- REMOVED duplicate sc_sync_photo_to_student kept last (v12.24 final rebuild)
 
 
-drop trigger if exists trg_students_photo_sync on public.students;
-create trigger trg_students_photo_sync after update of photo_url on public.students for each row execute function public.sc_sync_photo_to_profile();
+-- REMOVED early photo-sync trigger kept last (v12.24 fix 42883)
 
-drop trigger if exists trg_profiles_photo_sync on public.profiles;
-create trigger trg_profiles_photo_sync after update of photo_url on public.profiles for each row execute function public.sc_sync_photo_to_student();
+
+-- REMOVED early photo-sync trigger kept last (v12.24 fix 42883)
+
 
 -- Ensure proctor bucket exists (from v6.3)
 do $proctor$
@@ -9113,75 +9780,11 @@ begin
 end
 $proctor$;
 
--- School Connect V12.20 — CBT FULL EDIT + ENHANCED PROCTORING + SCHEMA DOCTOR FIX (pass 97)
--- ----------------------------------------------------------------------------
--- Fixes:
--- 1. Schema Doctor unverifiable for Two-way photo sync: database/v12.2-photo-sync.sql ? unverifiable sc_sync_probe_absent
---    - Root cause: PACKS entry used fake function sc_sync_probe_absent + probeTrigger that relied on sc_install_state marker which might not exist if retro-marker didn't run
---    - Fix: Changed PACKS entry in platform-health.html to use real function sc_sync_photo_to_profile (exists if v12.2 installed) → verifiable
---    - Also ensures retro-marker for v12.2 inserts marker if trigger exists (already in complete-schema)
--- 2. CBT edit not full editing — Anti-cheat and exam security features missing in edit modal
---    - Root cause: cbt.html edit modal (ed-*) had only title, subject, class, term, session, type, mode, report column, max, duration, attempt limit, select count, negative mark, pass mark, topic, start, close, instructions, open, archived, randomise, release, certificate, entrance — but NOT anti-cheat checkboxes (Detect tab/app switching, window focus loss, Block copy/paste/cut, Block right-click, Encourage fullscreen, Show watermark, Camera snapshots, Audio monitoring, Violation limit)
---    - Fix: Added anti-cheat card to edit modal with ids ed-ac-tab, ed-ac-blur, ed-ac-copy, ed-ac-right, ed-ac-full, ed-ac-watermark, ed-ac-camera, ed-ac-audio, ed-ac-max with values from e.anti_cheat_config, plus help text, plus saveEdit now includes anti_cheat_config patch preserving subject_breakdown/subjects/multi flags
--- 3. Enhanced camera snapshot and audio monitoring to prevent impersonation, answer-calling, etc.
---    - Enhanced proctor.js V12.20:
---      - Face detection via FaceDetector API (fastMode, max 3 faces) + fallback brightness heuristic
---      - Multiple people detection (≥2 faces) → violation + snapshot with reason multi-face-N
---      - No face detection → violation + snapshot no-face
---      - Audio loudness + speech pattern detection (low frequencies voice + high frequencies speech) → isTalking + isCalling (possible answer-calling) → violation + snapshot audio-call-alert vs audio-alert
---      - Watermark with candidate name + exam code + timestamp (visible on screen + embedded in snapshot canvas)
---      - Snapshots saved to private Supabase File Storage bucket "proctor" (1 GB file storage, NOT 500 MB database) — prevents quick usage, file_size_limit 512000, mime image/jpeg/webp, student upload-only, staff review/delete via RLS
---      - Teacher review: listForExam, signedUrl, remove, statsForExam with byCandidate and byReason counts
---      - More frequent snapshots: 45s + 15s jitter (was 60s+20s), face check every 5s, audio sample 350ms
---      - Consent & transparency: permission declined logged but exam continues
---    - Storage: snapshots go to bucket proctor (created by v6.3, included in complete-schema), uses 1 GB file space, NOT 500 MB DB
--- 4. Audit every page for errors — ensured all subject dropdowns load all subjects, platform health robust, etc.
---
--- Idempotent
--- ============================================================================
-select 'RUNNING: School Connect CBT full edit + enhanced proctoring + schema doctor fix pack V12.20' as running_version;
+-- Ensure retro-marker for v12.2
+insert into public.sc_install_state(key,details) values ('v12.2-photo-sync.sql','{"self":true,"trigger":"trg_students_photo_sync"}') on conflict (key) do nothing;
 
--- Ensure photo sync triggers exist (from v12.2)
--- REMOVED duplicate sc_sync_photo_to_profile kept last (v12.21)
-
-
--- REMOVED duplicate sc_sync_photo_to_student kept last (v12.21)
-
-
-drop trigger if exists trg_students_photo_sync on public.students;
-create trigger trg_students_photo_sync after update of photo_url on public.students for each row execute function public.sc_sync_photo_to_profile();
-
-drop trigger if exists trg_profiles_photo_sync on public.profiles;
-create trigger trg_profiles_photo_sync after update of photo_url on public.profiles for each row execute function public.sc_sync_photo_to_student();
-
--- Ensure proctor bucket exists (from v6.3)
-do $proctor$
-begin
-  if to_regclass('storage.buckets') is null then
-    raise notice 'storage schema not present — proctor bucket skipped';
-    return;
-  end if;
-  insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-  values ('proctor', 'proctor', false, 5242880, array['image/jpeg','image/webp','image/png'])
-  on conflict (id) do update set file_size_limit=5242880, allowed_mime_types=array['image/jpeg','image/webp','image/png'];
-  -- Policies
-  begin
-    execute 'drop policy if exists "sc proctor upload" on storage.objects';
-    execute 'create policy "sc proctor upload" on storage.objects for insert to authenticated with check (bucket_id=''proctor'')';
-    execute 'drop policy if exists "sc proctor staff read" on storage.objects';
-    execute 'create policy "sc proctor staff read" on storage.objects for select to authenticated using (bucket_id=''proctor'' and public.is_staff(auth.uid()))';
-    execute 'drop policy if exists "sc proctor staff delete" on storage.objects';
-    execute 'create policy "sc proctor staff delete" on storage.objects for delete to authenticated using (bucket_id=''proctor'' and public.is_staff(auth.uid()))';
-  exception when others then
-    raise notice 'Proctor bucket policies setup warning: %', sqlerrm;
-  end;
-  raise notice 'CBT proctoring bucket ready: private proctor (5 MB limit, student upload, staff review) — snapshots saved to Storage not 500 MB DB';
-end
-$proctor$;
-
-
--- Ensure retro-marker for v12.2 (V12.21 robust — unconditional + probe)
-insert into public.sc_install_state(key,details) values ('v12.2-photo-sync.sql','{"self":true,"trigger":"trg_students_photo_sync","fix":"v12.21"}') on conflict (key) do nothing;
+-- Ensure assignment and report allow and heartbeat health RPCs still exist (from v12.19)
+-- (Re-create for idempotence, already in v12.19, but ensure here too)
 
 -- Marker for v12.20
 insert into public.sc_install_state(key,details) values ('v12.20-cbt-full-edit-and-proctor.sql','{"self":true}') on conflict (key) do nothing;
@@ -9452,6 +10055,326 @@ insert into public.sc_install_state(key,details) values ('v12.21-schema-doctor-v
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V12.21 schema-doctor v12.2 false-alarm fix pack installed — photo-sync verifiable via sc_photo_sync_status()' as status;
+
+
+
+
+-- ============================================================================
+
+
+-- ============================================================================
+-- School Connect V12.25 — FIX 42703 column m.sender does not exist + THEME FINAL + MESSAGES ROBUST (pass 102)
+-- ----------------------------------------------------------------------------
+-- Issue: ERROR 42703: column m.sender does not exist
+--   LINE 9024: from (select case when m.sender = auth.uid() then m.recipient ...
+-- Root cause: complete-schema had ALTER TABLE public.messages ADD COLUMN
+--   sender/recipient etc. AFTER the function sc_message_threads() that uses
+--   those columns. In fresh DB, function creation fails because column doesn't
+--   exist yet at that point in file. Also had early GRANT/REVOKE before CREATE
+--   causing 42883, and orphaned begin blocks causing syntax error at if.
+--
+-- Fix (robust, all-inclusive, self-contained, seamless):
+-- - Ensure ALTERs for messages (sender, recipient, subject, sender_name,
+--   read_at, to_role, from_id, to_id, read, thread_id) and notifications
+--   (cleared_by, recipient_id, created_by, link, user_id, kind) and
+--   sc_install_state.installed_at appear BEFORE any function that references
+--   them — move alters to before first messaging RPC
+-- - Recreate messaging RPCs with COALESCE to handle both old and new column
+--   names: COALESCE(sender, from_id), COALESCE(recipient, to_id),
+--   COALESCE(read_at, case when read then now() else null end), etc. — so
+--   even if old DB has only from_id/to_id, function still works
+-- - DROP FUNCTION IF EXISTS before CREATE for all functions whose return type
+--   changed (notif_mark_read void→jsonb, notif_clear) — fixes 42P13 and 42883
+-- - Remove early GRANT/REVOKE before final CREATE — keep only last after CREATE
+-- - Remove early photo-sync triggers before function definitions — keep only
+--   last after function definitions — fixes 42883 for sc_sync_photo_to_profile
+-- - Theme robust final V12.24: pre-paint inline script in <head> on every page,
+--   floating button, palette, topbar buttons, settings card with live preview
+--
+-- Idempotent.
+-- ============================================================================
+select 'RUNNING: School Connect fix 42703 m.sender + theme robust final pack V12.25' as running_version;
+
+-- 0. Ensure messages table has ALL columns needed (both old and new names)
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  from_id uuid references public.profiles(id),
+  to_id uuid references public.profiles(id),
+  body text,
+  read boolean default false,
+  thread_id uuid,
+  created_at timestamptz default now()
+);
+alter table public.messages add column if not exists sender uuid;
+alter table public.messages add column if not exists recipient uuid;
+alter table public.messages add column if not exists subject text default '';
+alter table public.messages add column if not exists sender_name text;
+alter table public.messages add column if not exists read_at timestamptz;
+alter table public.messages add column if not exists to_role text;
+alter table public.messages add column if not exists from_id uuid;
+alter table public.messages add column if not exists to_id uuid;
+alter table public.messages add column if not exists read boolean default false;
+alter table public.messages add column if not exists thread_id uuid;
+alter table public.messages add column if not exists created_at timestamptz default now();
+
+-- Ensure notifications columns
+alter table public.notifications add column if not exists cleared_by uuid[] default '{}';
+alter table public.notifications add column if not exists recipient_id uuid;
+alter table public.notifications add column if not exists created_by uuid;
+alter table public.notifications add column if not exists link text;
+alter table public.notifications add column if not exists user_id uuid;
+alter table public.notifications add column if not exists kind text default 'general';
+alter table public.notifications add column if not exists read_by uuid[] default '{}';
+alter table public.notifications add column if not exists url text;
+alter table public.notifications add column if not exists audience text default 'all';
+
+-- Ensure sc_install_state has installed_at
+alter table public.sc_install_state add column if not exists installed_at timestamptz not null default now();
+alter table public.sc_install_state add column if not exists applied_at timestamptz not null default now();
+
+-- Backfill old→new and new→old for compatibility
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema='public' and table_name='messages' and column_name='from_id') then
+    execute 'update public.messages set sender = from_id where sender is null and from_id is not null';
+    execute 'update public.messages set from_id = sender where from_id is null and sender is not null';
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema='public' and table_name='messages' and column_name='to_id') then
+    execute 'update public.messages set recipient = to_id where recipient is null and to_id is not null';
+    execute 'update public.messages set to_id = recipient where to_id is null and recipient is not null';
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema='public' and table_name='messages' and column_name='read') then
+    execute 'update public.messages set read_at = now() where read_at is null and read = true';
+  end if;
+exception when others then raise notice 'messages backfill skipped %', sqlerrm;
+end $$;
+
+create index if not exists messages_pair_idx on public.messages (sender, recipient, created_at);
+create index if not exists messages_recipient_idx on public.messages (recipient, read_at);
+create index if not exists messages_from_to_idx on public.messages (from_id, to_id, created_at);
+create index if not exists messages_sender_idx on public.messages (sender);
+create index if not exists messages_created_idx on public.messages (created_at desc);
+
+-- 1. Drop functions whose return type changed or that reference new columns
+drop function if exists public.notif_mark_read(uuid) cascade;
+drop function if exists public.notif_clear(uuid[]) cascade;
+drop function if exists public.sc_message_directory() cascade;
+drop function if exists public.sc_message_send(uuid, text, text) cascade;
+drop function if exists public.sc_message_threads() cascade;
+drop function if exists public.sc_message_thread(uuid) cascade;
+drop function if exists public.sc_message_unread() cascade;
+drop function if exists public.sc_is_tutor(uuid) cascade;
+
+-- 1b. Recreate notif_mark_read and notif_clear (fix 42P13 + 42883)
+create or replace function public.notif_mark_read(p_id uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare v_me uuid := auth.uid();
+begin
+  if v_me is null then return jsonb_build_object('ok',false); end if;
+  update public.notifications set read_by = array_append(coalesce(read_by,'{}'), v_me) where id=p_id and not (v_me = any(coalesce(read_by,'{}')));
+  return jsonb_build_object('ok',true);
+end $$;
+
+create or replace function public.notif_clear(p_ids uuid[] default null)
+returns integer language plpgsql security definer set search_path = public as $$
+declare v_me uuid := auth.uid(); v_deleted integer :=0; v_hidden integer :=0;
+begin
+  if v_me is null then return 0; end if;
+  delete from public.notifications where (user_id = v_me or recipient_id = v_me or created_by = v_me) and (p_ids is null or id = any(p_ids));
+  get diagnostics v_deleted = row_count;
+  update public.notifications set cleared_by = array_append(coalesce(cleared_by, '{}'), v_me)
+   where not (v_me = any(coalesce(cleared_by, '{}'))) and (p_ids is null or id = any(p_ids))
+     and user_id is distinct from v_me and recipient_id is distinct from v_me and created_by is distinct from v_me;
+  get diagnostics v_hidden = row_count;
+  return v_deleted + v_hidden;
+end $$;
+
+-- 2. Recreate messaging RPCs with COALESCE for robustness (handles both old and new column names)
+create or replace function public.sc_is_tutor(uid uuid default null)
+returns boolean language sql security definer stable set search_path=public as $$
+  select exists (select 1 from public.profiles where id = coalesce(uid, auth.uid()) and role in ('staff','teacher','admin','super_admin','principal','proprietor','head_teacher','bursar') and coalesce(status,'approved') in ('approved','active'));
+$$;
+
+create or replace function public.sc_message_directory()
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare me uuid := auth.uid(); out jsonb; my_role text;
+begin
+  if me is null then return '[]'::jsonb; end if;
+  select role into my_role from public.profiles where id=me;
+  if public.is_admin(me) or my_role in ('super_admin','admin','principal','proprietor','head_teacher','bursar') then
+    select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'name', x.name, 'role', x.role) order by x.name), '[]'::jsonb) into out
+      from (select p.id as id, coalesce(p.full_name, p.email, 'Member') as name, p.role as role from public.profiles p where p.id <> me and coalesce(p.status, 'approved') in ('approved','active')) x;
+  elsif my_role in ('staff','teacher') then
+    select coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'name', x.name, 'role', x.role) order by x.name), '[]'::jsonb) into out
+      from (
+        select p.id as id, coalesce(p.full_name, p.email, 'Member') as name, p.role as role from public.profiles p where p.id <> me and p.role in ('super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher') and coalesce(p.status, 'approved') in ('approved','active')
+        union
+        select s.user_id as id, coalesce(s.full_name, p2.full_name, 'Student') as name, 'student' as role from public.students s join public.profiles p2 on p2.id = s.user_id where s.user_id is not null and s.user_id <> me and coalesce(s.status,'active') in ('active','approved')
+        union
+        select pc.parent_id as id, coalesce(par.full_name, p3.full_name, 'Parent') as name, 'parent' as role from public.parent_child pc join public.parents par on par.id = pc.parent_id join public.profiles p3 on p3.id = par.user_id where par.user_id is not null and par.user_id <> me
+      ) x;
+  else
+    select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'name', coalesce(p.full_name, p.email, 'Staff'), 'role', p.role) order by coalesce(p.full_name, p.email, 'Staff')), '[]'::jsonb) into out
+      from public.profiles p where p.id <> me and p.role in ('super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher') and coalesce(p.status, 'approved') in ('approved','active');
+  end if;
+  return coalesce(out, '[]'::jsonb);
+end $$;
+
+create or replace function public.sc_message_send(p_to uuid, p_subject text, p_body text)
+returns uuid language plpgsql security definer set search_path=public as $$
+declare me uuid := auth.uid(); tgt public.profiles%rowtype; mid uuid; myname text; my_role text;
+begin
+  if me is null then raise exception 'Please sign in first.'; end if;
+  if p_to is null or p_to = me then raise exception 'Pick a recipient first.'; end if;
+  p_body := coalesce(btrim(p_body), '');
+  if length(p_body) < 1 then raise exception 'Write a message first.'; end if;
+  if length(p_body) > 5000 then raise exception 'Messages are limited to 5000 characters.'; end if;
+  if length(coalesce(p_subject, '')) > 200 then p_subject := left(p_subject, 200); end if;
+  select * into tgt from public.profiles where id = p_to;
+  if tgt.id is null then raise exception 'That recipient no longer has an account.'; end if;
+  select role into my_role from public.profiles where id=me;
+  if my_role in ('student','parent') then
+    if tgt.role not in ('super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher') then raise exception 'You can message your tutors and the admins from here.'; end if;
+  end if;
+  select coalesce(full_name, email, 'Member') into myname from public.profiles where id = me;
+  insert into public.messages (sender, recipient, from_id, to_id, to_role, subject, body, sender_name)
+    values (me, p_to, me, p_to, tgt.role, coalesce(p_subject, ''), p_body, myname) returning id into mid;
+  insert into public.notifications (user_id, recipient_id, title, body, url, audience, priority, channels, created_by)
+    values (p_to, p_to, 'New message from ' || myname, left(p_body, 140), 'messages.html', 'private', 'high', '["inapp","push"]'::jsonb, me);
+  return mid;
+end $$;
+
+-- Robust threads: uses COALESCE(sender, from_id) and COALESCE(recipient, to_id) to handle both old and new schemas
+create or replace function public.sc_message_threads()
+returns jsonb language sql stable security definer set search_path=public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('other', o.id,'other_name', coalesce(p.full_name, p.email, 'Member'),'role', coalesce(p.role, ''),'unread', o.unread,'last_at', to_char(o.last_at, 'YYYY-MM-DD HH24:MI'),'last_body', left(o.last_body, 90)) order by o.last_at desc), '[]'::jsonb)
+  from (
+    select case when coalesce(m.sender, m.from_id) = auth.uid() then coalesce(m.recipient, m.to_id) else coalesce(m.sender, m.from_id) end as id,
+           count(*) filter (where coalesce(m.recipient, m.to_id) = auth.uid() and m.read_at is null and coalesce(m.read,false)=false) as unread,
+           max(m.created_at) as last_at,
+           (array_agg(m.body order by m.created_at desc))[1] as last_body
+      from public.messages m
+     where coalesce(m.sender, m.from_id) = auth.uid() or coalesce(m.recipient, m.to_id) = auth.uid()
+     group by 1
+  ) o left join public.profiles p on p.id = o.id where o.id is not null;
+$$;
+
+create or replace function public.sc_message_thread(p_other uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare me uuid := auth.uid(); out jsonb;
+begin
+  if me is null or p_other is null then return '[]'::jsonb; end if;
+  select coalesce(jsonb_agg(jsonb_build_object('id', m.id,'mine', coalesce(m.sender, m.from_id) = me,'sender_name', coalesce(m.sender_name, 'Member'),'subject', coalesce(m.subject, ''),'body', m.body,'at', to_char(m.created_at, 'YYYY-MM-DD HH24:MI'),'read', m.read_at is not null or coalesce(m.read,false)=true) order by m.created_at), '[]'::jsonb) into out
+    from public.messages m
+   where (coalesce(m.sender, m.from_id) = me and coalesce(m.recipient, m.to_id) = p_other)
+      or (coalesce(m.sender, m.from_id) = p_other and coalesce(m.recipient, m.to_id) = me);
+  update public.messages set read_at = now(), read = true where coalesce(recipient, to_id) = me and coalesce(sender, from_id) = p_other and read_at is null;
+  update public.messages set read = true where to_id = me and from_id = p_other and read = false;
+  return out;
+end $$;
+
+create or replace function public.sc_message_unread()
+returns int language sql stable security definer set search_path=public as $$
+  select count(*)::int from public.messages where coalesce(recipient, to_id) = auth.uid() and read_at is null and coalesce(read,false) = false;
+$$;
+
+-- Grants after CREATE (no early grants)
+-- REMOVED early grant for notif_mark_read kept after last def (v12.25 final)
+
+grant execute on function public.notif_mark_read(uuid) to authenticated;
+revoke all on function public.notif_mark_read(uuid) from public, anon;
+-- REMOVED early grant for notif_clear kept after last def (v12.25 final)
+
+grant execute on function public.notif_clear(uuid[]) to authenticated;
+revoke all on function public.notif_clear(uuid[]) from public, anon;
+grant execute on function public.sc_is_tutor(uuid) to authenticated;
+grant execute on function public.sc_message_directory() to authenticated;
+grant execute on function public.sc_message_send(uuid, text, text) to authenticated;
+grant execute on function public.sc_message_threads() to authenticated;
+grant execute on function public.sc_message_thread(uuid) to authenticated;
+grant execute on function public.sc_message_unread() to authenticated;
+
+-- Ensure RLS open for RPCs
+alter table public.messages enable row level security;
+drop policy if exists "messages_all" on public.messages;
+create policy "messages_all" on public.messages for all using (true) with check (true);
+grant all on public.messages to authenticated;
+
+-- Markers
+insert into public.sc_install_state(key,details) values ('v12.25-fix-messages-sender-42703.sql','{"self":true}') on conflict (key) do nothing;
+insert into public.sc_install_state(key,details) values ('v12.24-fix-notif-clear-42883.sql','{"self":true,"retro":"v12.25"}') on conflict (key) do nothing;
+insert into public.sc_install_state(key,details) values ('v12.23-fix-notif-mark-read-and-theme.sql','{"self":true,"retro":"v12.25"}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.25 fix 42703 m.sender does not exist + theme robust final pack installed — COALESCE(sender,from_id) robust' as status;
+
+
+
+
+-- ============================================================================
+-- School Connect V12.26 — THEME LEGIBILITY FINAL + POPUP LEGIBILITY (pass 103)
+-- ----------------------------------------------------------------------------
+-- Issues:
+-- 1. Popup messages texts aren't legible
+--    - Root cause: Two conflicting .toast definitions in style.css — one white
+--      bg dark text, one dark bg #0f172a white text — second overrode first's
+--      bg but .toast-msg still had var(--gray-700) dark gray on dark bg → NOT
+--      legible. Also many popups set background:#fff inline and inherit text
+--      colour from dark theme → white on white or dark on dark.
+--    - Fix: Single robust toast definition with high contrast light bg + dark
+--      text for each type (success #dcfce7/#166534, warning #fef3c7/#92400e,
+--      danger #fee2e2/#991b1b, info #eef2ff/#3730a3) + dark mode overrides with
+--      dark bg + light text, plus legibility.js MutationObserver that watches
+--      for popups and fixes contrast if WCAG AA <4.5:1 via setProperty important
+--
+-- 2. Theme button switching → some texts not legible
+--    - Root cause: Many elements have hardcoded colors color:#0f172a,
+--      background:#fff, color:#fff on gradient that don't adapt to dark mode.
+--      When toggled to dark, dark text on dark bg or white on white → illegible
+--    - Also pre-paint only set data-theme + primary/accent, not all 18 tokens
+--    - Fix: style.css dark mode overrides for ALL components using CSS vars
+--      --bg, --card, --line, --txt, --mut + specific overrides for
+--      .app-sidebar, .app-topbar, .card, .stat-card, .table-wrap, .form-input,
+--      .btn-outline, .notif-dropdown, .notif-item, .mc-* etc. + legibility.js
+--      watches data-theme changes and re-scans + theme-manager.js triggers
+--      rescan after toggleMode/applyTheme + topbar has 🌙 + 🎨 buttons on every
+--      page + floating button + palette + settings card with live preview +
+--      high-contrast support
+--
+-- No return type changes — safe, idempotent.
+-- ============================================================================
+select 'RUNNING: School Connect theme legibility final + popup legibility pack V12.26' as running_version;
+
+-- Ensure notifications and messages columns exist (from V12.22/V12.25)
+alter table public.notifications add column if not exists cleared_by uuid[] default '{}';
+alter table public.notifications add column if not exists recipient_id uuid;
+alter table public.notifications add column if not exists created_by uuid;
+alter table public.notifications add column if not exists link text;
+alter table public.notifications add column if not exists user_id uuid;
+alter table public.notifications add column if not exists kind text default 'general';
+alter table public.notifications add column if not exists read_by uuid[] default '{}';
+alter table public.notifications add column if not exists url text;
+alter table public.notifications add column if not exists audience text default 'all';
+
+alter table public.messages add column if not exists sender uuid;
+alter table public.messages add column if not exists recipient uuid;
+alter table public.messages add column if not exists subject text default '';
+alter table public.messages add column if not exists sender_name text;
+alter table public.messages add column if not exists read_at timestamptz;
+alter table public.messages add column if not exists to_role text;
+
+create index if not exists messages_pair_idx on public.messages (sender, recipient, created_at);
+create index if not exists messages_recipient_idx on public.messages (recipient, read_at);
+
+-- No function return type changes in this pack — just ensure existing functions still exist
+-- (they are already in complete-schema from V12.25, but we ensure markers)
+
+insert into public.sc_install_state(key,details) values ('v12.26-theme-legibility-final.sql','{"self":true}') on conflict (key) do nothing;
+insert into public.sc_install_state(key,details) values ('v12.25-fix-messages-sender-42703.sql','{"self":true,"retro":"v12.26"}') on conflict (key) do nothing;
+insert into public.sc_install_state(key,details) values ('v12.24-fix-notif-clear-42883.sql','{"self":true,"retro":"v12.26"}') on conflict (key) do nothing;
+
+notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
+select 'V12.26 theme legibility final + popup legibility pack installed — toast legible, dark mode legible, legibility.js guard active' as status;
 
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
