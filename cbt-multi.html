@@ -47,6 +47,7 @@
       <div class="form-group"><label>Term</label><select class="form-select" id="mm-term"><option value="">— select term —</option></select></div>
       <div class="form-group"><label>Session</label><select class="form-select" id="mm-session"><option value="">— select session —</option></select></div>
       <div class="form-group"><label>Total duration (minutes) *</label><input class="form-input" type="number" id="mm-dur" value="120"></div>
+      <div class="form-group"><label>Number of attempts (0 = unlimited) *</label><input class="form-input" type="number" id="mm-attempt" value="1" min="0"><small>How many times a student can submit. 1 = once, 0 = unlimited.</small></div>
       <div class="form-group"><label>Questions per subject (0 = all)</label><input class="form-input" type="number" id="mm-sel" value="0"></div>
       <div class="form-group"><label>Negative mark per wrong answer</label><input class="form-input" type="number" step="0.25" id="mm-neg" value="0"></div>
       <div class="form-group"><label>Purpose — clear differentiation (V12.11)</label><select class="form-select" id="mm-type"><option value="exam">🔴 Terminal Exam (once per term → Exam column)</option><option value="ca">🔵 Mid-term CA (CA1/CA2, once)</option><option value="test">🔵 Mid-term Test (once)</option><option value="assignment">🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)</option><option value="project">🟣 Project</option><option value="quiz">🟡 Quiz</option><option value="practical">🟠 Practical</option></select><small style="color:#475569">🟢 Assignment = multiple per term, cumulative → Assignments page auto-fills with Take link for every student, Score auto-fills kind/max/scores. 🔵/🔴 = once per term → CA/Exam columns.</small></div>
@@ -313,7 +314,7 @@ const MM = {
     try{
       const ids=selected.map(ch=>ch.value);
       // Fetch full rows with csv_data
-      const {data:exams, error}=await sb.from('cbt_exams').select('id,code,title,subject,class,term,session,assessment_type,report_column,csv_data,anti_cheat_config').in('id', ids);
+      const {data:exams, error}=await sb.from('cbt_exams').select('id,code,title,subject,class,term,session,assessment_type,report_column,csv_data,questions,anti_cheat_config').in('id', ids);
       if(error) throw error;
       if(!exams||exams.length<2) throw Error('Could not fetch selected exams');
       // Validate class consistency
@@ -329,17 +330,39 @@ const MM = {
       for(const ex of exams){
         let qs=[];
         try{
+          // V12.33 robust: handle csv_data AND questions, string or array, all CBT types
           let raw=ex.csv_data;
-          if(typeof raw==='string'){
-            try{ raw=JSON.parse(raw); }catch(_){ raw=null; }
+          let alt=ex.questions;
+          // Prefer csv_data if it has content
+          let candidate=null;
+          if(Array.isArray(raw) && raw.length) candidate=raw;
+          else if(typeof raw==='string' && raw.trim()){
+            try{ candidate=JSON.parse(raw); }catch(_){ candidate=null; }
+            if(!candidate || !candidate.length) candidate=null;
+          }else if(raw && typeof raw==='object' && !Array.isArray(raw)){
+            // object with questions inside or numeric keys
+            if(Array.isArray(raw.questions) && raw.questions.length) candidate=raw.questions;
+            else {
+              const vals=Object.values(raw);
+              if(vals.length && typeof vals[0]==='object' && vals[0].question) candidate=vals;
+            }
           }
-          if(Array.isArray(raw)) qs=raw;
-          else if(raw && typeof raw==='object' && Array.isArray(raw.questions)) qs=raw.questions;
-          else if(raw && typeof raw==='object') {
-            // If stored as object with numeric keys? try values
-            const vals=Object.values(raw);
-            if(vals.length && typeof vals[0]==='object' && vals[0].question) qs=vals;
+          // Fallback to questions column
+          if(!candidate || !candidate.length){
+            if(Array.isArray(alt) && alt.length) candidate=alt;
+            else if(typeof alt==='string' && alt.trim()){
+              try{ candidate=JSON.parse(alt); }catch(_){ candidate=null; }
+            }else if(alt && typeof alt==='object' && !Array.isArray(alt)){
+              if(Array.isArray(alt.questions) && alt.questions.length) candidate=alt.questions;
+              else {
+                const vals=Object.values(alt);
+                if(vals.length && typeof vals[0]==='object' && vals[0].question) candidate=vals;
+              }
+            }
           }
+          if(Array.isArray(candidate)) qs=candidate.map((qq,ii)=>CBT.normalizeQuestion?CBT.normalizeQuestion(qq,ii):qq);
+          else qs=[];
+          // If still empty but exam is multi with subject_breakdown, try to infer from anti_cheat_config? Already handled outside
         }catch(_){ qs=[]; }
         if(!qs.length){
           // If exam is already multi-subject, try to split its breakdown
@@ -419,6 +442,7 @@ const MM = {
         report_column: v('mm-col') || first.report_column || 'Exam',
         duration: parseInt(v('mm-dur'))||120,
         duration_min: parseInt(v('mm-dur'))||120,
+        attempt_limit: parseInt(v('mm-attempt')||'1')||1,
         negative_mark: parseFloat(v('mm-neg'))||0,
         select_count: parseInt(v('mm-sel'))||0,
         instructions: v('mm-instr') || `Combined from ${exams.length} exams: ${exams.map(e=>e.code).join(', ')}. Answer all subjects via tabs.`,
@@ -474,7 +498,7 @@ const MM = {
     const exam = {
       title, subject: 'MULTI-SUBJECT: ' + subjects.join(', '), class: v('mm-class'), term: v('mm-term'), session: v('mm-session'),
       assessment_type: (document.getElementById('mm-type')||{}).value||'exam', topic: subjects.join(', '), report_column: v('mm-col'),
-      duration: parseInt(v('mm-dur')) || 120, duration_min: parseInt(v('mm-dur')) || 120, /* V10.4: getter prefers duration_min */ negative_mark: parseFloat(v('mm-neg')) || 0,
+      duration: parseInt(v('mm-dur')) || 120, duration_min: parseInt(v('mm-dur')) || 120, attempt_limit: parseInt(v('mm-attempt')||'1')||1, /* V10.4: getter prefers duration_min */ negative_mark: parseFloat(v('mm-neg')) || 0,
       select_count: parseInt(v('mm-sel')) || 0, instructions: v('mm-instr'),
       randomise: document.getElementById('mm-rand').checked,
       release_results: document.getElementById('mm-rel').checked,

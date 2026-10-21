@@ -714,6 +714,7 @@ window.CBTUI = {
         <div class="form-group"><label>Duration (minutes)</label><input class="form-input" type="number" id="ex-dur" value="45"></div>
         <div class="form-group"><label>Negative mark / wrong</label><input class="form-input" type="number" step="0.01" id="ex-neg" value="0"></div>
         <div class="form-group"><label>Questions to deliver (0 = all)</label><input class="form-input" type="number" id="ex-sel" value="0"></div>
+        <div class="form-group"><label>Number of attempts (0 = unlimited)</label><input class="form-input" type="number" id="ex-attempt" value="1" min="0"><small>How many times a student can submit this exam. 1 = once, 2 = twice, 0 = unlimited retakes.</small></div>
       </div>
 
       <div class="card" style="background:#fff7ed;border-color:#fed7aa;margin:12px 0">
@@ -825,7 +826,51 @@ window.CBTUI = {
     closeModal(); toast('✅ Exam created. Code: '+(data&&data.code),'success',6000); CBTUI.refresh();
   },
   async toggle(id,open){ if(!sb)return; const {data,error}=await sb.from('cbt_exams').update({is_open:open,updated_at:new Date().toISOString()}).eq('id',id).select('id,code,is_open').maybeSingle(); if(error){toast('Could not '+(open?'open':'close')+' exam: '+error.message,'danger',9000);return;} if(!data||data.is_open!==open){toast('Exam status was not confirmed. Check your role/RLS permissions.','danger',9000);return;} try{localStorage.removeItem('cbt-exam-cache-'+String(data.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''));}catch(_){} toast('Exam '+(open?'opened':'closed')+' successfully.','success'); CBTUI.refresh(); },
-  async preview(id){ const {data:e}=await sb.from('cbt_exams').select('*').eq('id',id).maybeSingle(); const bank=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]); const qs=bank.map((q,i)=>CBT.normalizeQuestion(q,i)); openModal('Preview Questions — '+esc(e&&e.title||''), '<p><b>'+qs.length+'</b> question(s). First 20 shown.</p><div class="table-wrap"><table><thead><tr><th>#</th><th>Section</th><th>Type</th><th>Question</th><th>Recognised answer</th></tr></thead><tbody>'+qs.slice(0,20).map((q,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(q.section||q.subject||'')+'</td><td>'+esc(q.type||'mcq')+'</td><td>'+esc(q.question||'')+'</td><td>'+(q.answer==null||String(q.answer)===''?'<span style="color:#dc2626;font-weight:800">MISSING</span>':esc(Array.isArray(q.answer)?q.answer.join(', '):q.answer))+'</td></tr>').join('')+'</tbody></table></div>'); },
+  async preview(id){
+    // V12.33 full student-like preview — teacher sees exactly what students see
+    const {data:e}=await sb.from('cbt_exams').select('*').eq('id',id).maybeSingle();
+    if(!e){ toast('Exam not found','warning'); return; }
+    let bank=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]);
+    if(typeof bank==='string'){ try{bank=JSON.parse(bank);}catch(_){bank=[];} }
+    let qs=bank.map((q,i)=>CBT.normalizeQuestion(q,i));
+    // Prepare like cbt-exam.html does: group by subject, handle breakdown
+    const cfg=e.anti_cheat_config||{};
+    const isMulti=String(e.subject||'').toUpperCase().startsWith('MULTI-SUBJECT')||!!cfg.multi_subject;
+    const sections=[...new Set(qs.map(q=>q.section||q.subject||'General'))];
+    const breakdown=Array.isArray(cfg.subject_breakdown)?cfg.subject_breakdown:[];
+    // Build preview HTML that mirrors cbt-exam.html Exam.render
+    const escPreview=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    let html='<div style="max-height:72vh;overflow:auto;padding:4px">';
+    html+='<div style="background:linear-gradient(135deg,#0506ae,#964eec);color:#fff;padding:16px;border-radius:12px;margin-bottom:12px;text-align:center"><h2 style="margin:0;color:#fff">📝 '+escPreview(e.title||'Preview')+'</h2><p style="margin:6px 0 0;opacity:.95">'+escPreview(e.subject||'')+' · '+escPreview(e.class||'')+' · Code: <b>'+escPreview(e.code||'')+'</b> · '+qs.length+' Qs · '+Number(e.duration_min||e.duration||45)+' min · '+Number(e.attempt_limit||1)+' attempt(s)'+(e.negative_mark?' · <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:6px">⚠ Negative marking: -'+e.negative_mark+' per wrong</span>':'')+'</p></div>';
+    if(e.instructions) html+='<div class="notice" style="background:#eff6ff;border-color:#93c5fd;color:#1e3a8a">'+escPreview(e.instructions)+'</div>';
+    if(isMulti && sections.length>1){
+      html+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;padding:10px;background:#eef2ff;border:1px solid #a5b4fc;border-radius:10px"><b>Subject tabs (as student sees):</b> '+sections.map(s=>'<span class="badge" style="background:#fff;color:#0506ae;border:1px solid #a5b4fc">'+escPreview(s)+'</span>').join(' ')+'</div>';
+    }
+    // Render each question as student sees it
+    qs.forEach((q, idx)=>{
+      const qType=String(q.type||'mcq').toLowerCase();
+      const isAdvanced=window.CBTTypes && CBTTypes.handles && CBTTypes.handles(q);
+      let body='';
+      if(isAdvanced){
+        try{ body=CBTTypes.render(q, 'preview-'+idx); }catch(_){ body='<p style="color:#b91c1c">Could not render advanced type '+escPreview(qType)+'</p>'; }
+      }else if((q.options||[]).length){
+        const isMultiSel=qType==='multi_select';
+        body='<div style="margin:8px 0">'+(q.options||[]).map((o,i)=>'<label class="option-label" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;margin:6px 0;background:#fff"><input type="'+(isMultiSel?'checkbox':'radio')+'" disabled><span class="option-letter" style="width:28px;height:28px;border-radius:50%;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800">'+String.fromCharCode(65+i)+'</span><span>'+escPreview(o)+'</span></label>').join('')+'</div>';
+        if(isMultiSel) body='<p style="font-size:.78rem;color:#475569;margin:-4px 0 8px">Select every correct option.</p>'+body;
+      }else if(['short_answer','short','fill_blank','numeric','essay','code','cloze'].includes(qType)){
+        const ph=qType==='numeric'?'Enter a number':qType==='essay'?'Write in full sentences (teacher marks later)':'Type your answer';
+        body='<textarea class="form-input" rows="3" disabled placeholder="'+ph+'"></textarea>';
+      }else{
+        body='<textarea class="form-input" rows="3" disabled placeholder="Type your answer"></textarea>';
+      }
+      const media=q.media_url?('<img src="'+escPreview(q.media_url)+'" style="max-width:100%;max-height:200px;display:block;margin:8px auto;border-radius:8px;border:1px solid #e2e8f0">'):'';
+      const passage=q.passage?('<div class="notice" style="background:#f8fafc;border-color:#cbd5e1;color:#334155"><b>Passage:</b> '+escPreview(q.passage)+'</div>'):'';
+      const ans=q.answer!=null&&String(q.answer).trim()!==''?'<div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:8px 10px;border-radius:8px;margin-top:8px"><b>✓ Correct:</b> '+escPreview(Array.isArray(q.answer)?q.answer.join(', '):q.answer)+(q.explanation?' <span style="color:#475569">— '+escPreview(q.explanation)+'</span>':'')+'</div>':'<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:6px 10px;border-radius:8px;margin-top:8px">⚠ Missing answer key</div>';
+      html+='<div class="card" style="margin:10px 0;border:1px solid #e2e8f0"><div style="display:flex;justify-content:space-between;align-items:center"><b>Q'+(idx+1)+' · '+escPreview(q.section||q.subject||'General')+' · '+escPreview(q.type||'mcq')+' · '+Number(q.mark||1)+' mark(s)</b><span style="font-size:.75rem;color:#64748b">'+(idx+1)+'/'+qs.length+'</span></div>'+passage+media+'<p style="font-size:1.02rem;margin:8px 0;line-height:1.5">'+escPreview(q.question||'(no question text)')+'</p>'+body+ans+'</div>';
+    });
+    html+='</div><p style="text-align:center;color:#64748b;font-size:.85rem">This is exactly how students see the exam (tabs, option cards, passage, media, advanced controls). Check spelling, options, correct answers, and subject tabs before sharing the code.</p>';
+    openModal('👁️ Full Student Preview — '+esc(e.title||'')+' ('+qs.length+' Qs)', html, '<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="CBTUI.editQuestions(\''+e.id+'\')">Edit Questions</button>');
+  },
   /* ENTERPRISE V8 (issue 8): import an offline exam backup JSON downloaded by a
      candidate whose submission failed. Saves via cbt_import_backup RPC with
      duplicate protection. */
@@ -848,7 +893,34 @@ window.CBTUI = {
     inp.click();
   },
   async exportPackage(id){if(!sb)return;if(!window.DataPortability){toast('Portable archive engine is loading; try again.','info');return;}DataPortability.init(sb);try{const [exam,results,roster]=await Promise.all([sb.from('cbt_exams').select('*').eq('id',id).maybeSingle(),DataPortability.fetchAll('cbt_results',{column:'exam_id',value:id}),DataPortability.fetchAll('cbt_roster',{column:'exam_id',value:id})]);if(exam.error||!exam.data)throw Error(exam.error&&exam.error.message||'Exam not found');const env=DataPortability.envelope({cbt_exams:[exam.data],cbt_roster:roster,cbt_results:results},{kind:'cbt-package',exam_id:id,code:exam.data.code,title:exam.data.title,row_count:1+roster.length+results.length,sensitive:'Contains private question answer keys; store securely.'});DataPortability.download('cbt-'+String(exam.data.code||id).replace(/[^a-z0-9_-]/gi,'-')+'-portable.json',JSON.stringify(env,null,2));toast('✅ Exam, question bank, roster and '+results.length+' result(s) exported. Re-import from Admin Data.','success',9000);return true;}catch(e){toast(e.message||e,'danger');return false;}},
-  async clearResults(id,code){if(!sb)return;const exported=await this.exportPackage(id);if(!exported){toast('Results were not cleared because the backup export failed.','danger');return;}const typed=prompt('A portable backup has been downloaded. To permanently clear all saved attempts for reuse, type the exam code exactly:',code||'');if(typed==null)return;if(String(typed).trim().toUpperCase()!==String(code||'').trim().toUpperCase()){toast('Code did not match. Nothing was deleted.','warning');return;}if(!confirm('Final confirmation: delete every CBT result for '+code+'? Official report_scores already pushed are not deleted.'))return;const r=await sb.rpc('cbt_clear_exam_results',{p_exam_id:id,p_confirm_code:typed});if(r.error||!r.data||r.data.ok===false){toast((r.data&&r.data.error)||(r.error&&r.error.message)||'Clear failed','danger',10000);return;}if(App&&App.logActivity)App.logActivity('clear-results','cbt_exam',code+' deleted '+r.data.deleted);toast('✅ Deleted '+Number(r.data.deleted||0)+' result(s). The exam is ready for new attempts. Audit old pushed report scores separately if needed.','success',12000);this.refresh();},
+  async clearResults(id,code){
+    if(!sb)return;
+    // V12.33 robust: export is best-effort, clear is authoritative with server permission check
+    let exported=false;
+    try{ exported=await this.exportPackage(id); }catch(_){ exported=false; }
+    if(!exported){
+      if(!confirm('⚠️ Backup export did not complete (maybe DataPortability not loaded or no results).\n\nA backup is RECOMMENDED but not required for clearing.\n\nDo you still want to clear '+Number((this._resultsCache&&this._resultsCache.rows&&this._resultsCache.rows.length)||0)+' result(s) for '+code+'? You will be asked to type the code to confirm.')) return;
+    }
+    // Normalize code comparison (handles spaces/dashes like server does)
+    const norm=(s)=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    let typed=prompt('A portable backup has been downloaded'+(exported?'':' (or skipped)')+'. To permanently clear all saved attempts for reuse, type the exam code exactly:',code||'');
+    if(typed==null) return;
+    if(norm(typed)!==norm(code)){ toast('Code did not match. You typed "'+typed+'" but code is "'+code+'". Nothing deleted.','warning',7000); return; }
+    if(!confirm('Final confirmation: delete every CBT result for '+code+'?\n\nThis cannot be undone. Official report_scores already pushed are NOT deleted — audit them separately if needed.')) return;
+    const btn=document.querySelector('#modal-backdrop .btn-primary'); let orig='';
+    if(btn){ orig=btn.textContent; btn.textContent='⏳ Clearing…'; btn.disabled=true; }
+    toast('⏳ Clearing results for '+code+'…','info',2000);
+    const r=await sb.rpc('cbt_clear_exam_results',{p_exam_id:id,p_confirm_code:typed});
+    if(btn){ btn.textContent=orig; btn.disabled=false; }
+    if(r.error||!r.data||r.data.ok===false){
+      let msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Clear failed';
+      if(/row-level security|42501/i.test(msg)) msg='Database refused: not owner or subject teacher. Ask admin to assign you to this exam\'s subject/class.';
+      toast(msg,'danger',10000); return;
+    }
+    if(App&&App.logActivity)App.logActivity('clear-results','cbt_exam',code+' deleted '+r.data.deleted);
+    toast('✅ Deleted '+Number(r.data.deleted||0)+' result(s) for '+code+'. The exam is ready for new attempts.','success',12000);
+    this.refresh();
+  },
   appendCSV(id){ openModal('Attach / Append CSV', '<p>Paste an additional CSV question bank. The questions will be appended to the existing exam.</p><textarea id="append-cbt-csv" class="form-input" rows="8" style="font-family:monospace"></textarea>', '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CBTUI.saveAppendCSV(\''+id+'\')">Append questions</button>'); },
   /* ============================================================
      ENTERPRISE V6 (issue 4): FULL EXAM EDITING AFTER CREATION.
@@ -902,7 +974,8 @@ window.CBTUI = {
         </div>
         <div class="form-group" style="margin-top:10px;max-width:220px"><label>Violation limit before auto-submit</label><input class="form-input" type="number" id="ed-ac-max" value="${Number((e.anti_cheat_config||{}).max_violations||5)}" min="0" max="10"><small>0 disables auto-submit. Enhanced monitoring prevents impersonation, calling answers, etc.</small></div>
         <p style="font-size:.82rem;color:#475569;margin-top:8px"><b>Full editing:</b> All anti-cheat and security settings can now be edited for pre-existing CBTs — previously missing, now restored. Camera snapshots saved to Storage (not 500 MB DB) to prevent quick usage, audio monitoring detects talking/calls.</p>
-      </div>`,
+      </div>
+      <div class="card" style="background:#eff6ff;border-color:#93c5fd;margin-top:12px"><h3 style="margin-top:0">📝 Need to edit questions, options or correct answers?</h3><p style="font-size:.85rem;color:#334155">Questions are managed separately for safety. Click <b>Questions</b> on the exam row to edit individual questions, delete, or attach CSV — your changes save with scoring keys validated and are visible on next load.</p><button type="button" class="btn btn-sm btn-primary" onclick="closeModal(); setTimeout(()=>CBTUI.editQuestions('${id}'), 200)">Open Question Editor →</button></div>`,
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CBTUI.saveEdit(\''+id+'\')">Save all changes</button>');
     this.refreshEditReportColumns();
   },
@@ -976,13 +1049,51 @@ window.CBTUI = {
   delQ(i){ if(!confirm('Delete question '+(i+1)+'?'))return; CBTUI._eq.qs.splice(i,1); CBTUI.editQuestions(CBTUI._eq.id); },
   async saveQuestions(){
     const {id,qs}=CBTUI._eq||{}; if(!id)return;
+    const saveBtn=document.querySelector('#modal-backdrop .btn-primary');
+    let origText='';
+    if(saveBtn){ origText=saveBtn.textContent; saveBtn.textContent='⏳ Saving…'; saveBtn.disabled=true; }
+    toast('⏳ Saving question bank — validating scoring keys…','info',2500);
     const bank=(qs||[]).map((q,i)=>CBT.normalizeQuestion(q,i));
-    const check=CBT.validateQuestionBank(bank); if(!check.ok){toast('Cannot save: '+check.errors.slice(0,6).join(' | '),'danger',12000);return;}
-    const {error}=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id);
-    if(error){ toast(error.message,'danger'); return; }
-    toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions).','success'); closeModal(); CBTUI.refresh();
+    const check=CBT.validateQuestionBank(bank); if(!check.ok){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Cannot save: '+check.errors.slice(0,6).join(' | '),'danger',12000);return;}
+    // V12.32 robust: try RPC first (bypasses RLS with internal teacher check), fallback to direct update with verification
+    let rpcError=null, rpcData=null, fallback=false;
+    try{
+      const rpc=await sb.rpc('cbt_set_question_bank',{p_exam_id:id,p_bank:bank});
+      if(rpc.error){ rpcError=rpc.error; fallback=true; }
+      else if(rpc.data && rpc.data.ok===false){ rpcError=new Error(rpc.data.message||rpc.data.error||'Update rejected'); fallback=true; }
+      else { rpcData=rpc.data; }
+    }catch(e){ rpcError=e; fallback=true; }
+    if(!fallback){
+      if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+      toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions) — visible on next load.','success',7000); closeModal(); CBTUI.refresh(); return;
+    }
+    // Fallback: direct table update with row verification (for DB not yet migrated or RPC missing)
+    const upd=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
+    if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+    if(upd.error){
+      let msg=upd.error.message||'';
+      if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or subject teacher. Ask admin to assign you to '+((CBTUI._eq&&CBTUI._eq.qs&&CBTUI._eq.qs[0]&&CBTUI._eq.qs[0].subject)||'this subject')+' / class. Original: '+upd.error.message;
+      else if(/cbt_set_question_bank|schema cache|function/i.test(msg)) msg='Question-bank RPC not installed — run database/complete-schema.sql on Supabase, then retry. Original: '+upd.error.message;
+      toast('Could not save questions: '+msg,'danger',10000); return;
+    }
+    if(!upd.data){
+      toast('Question update was not confirmed — RLS blocked. Ensure you are the exam owner or teacher of its subject/class, or run V12.32 SQL which allows any subject teacher to edit.','danger',9000); return;
+    }
+    toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions) — visible on next load.','success',7000); closeModal(); CBTUI.refresh();
   },
-  async saveAppendCSV(id){ const txt=document.getElementById('append-cbt-csv').value.trim(); const qs=CBT.parseCSV(txt); if(!qs.length){toast('No valid questions found','warning');return;} const check=CBT.validateQuestionBank(qs);if(!check.ok){toast('Cannot append: '+check.errors.slice(0,5).join(' | '),'danger',12000);return;} const {data:e}=await sb.from('cbt_exams').select('csv_data,questions').eq('id',id).maybeSingle(); const old=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]); const bank=old.concat(qs); const {error}=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id); if(error){toast(error.message,'danger');return;} closeModal(); toast('Questions appended and scoring keys validated.','success'); CBTUI.refresh(); },
+  async saveAppendCSV(id){
+    const txt=document.getElementById('append-cbt-csv').value.trim(); const qs=CBT.parseCSV(txt); if(!qs.length){toast('No valid questions found','warning');return;}
+    const check=CBT.validateQuestionBank(qs);if(!check.ok){toast('Cannot append: '+check.errors.slice(0,5).join(' | '),'danger',12000);return;}
+    const {data:e}=await sb.from('cbt_exams').select('csv_data,questions').eq('id',id).maybeSingle();
+    const old=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]);
+    const bank=old.concat(qs);
+    // V12.32: use RPC for append too (same permission model)
+    try{ const rpc=await sb.rpc('cbt_set_question_bank',{p_exam_id:id,p_bank:bank}); if(!rpc.error && rpc.data && rpc.data.ok!==false){ toast('✅ Questions appended and scoring keys validated ('+bank.length+' total).','success',6000); closeModal(); CBTUI.refresh(); return; } }catch(_){}
+    const upd=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
+    if(upd.error){ let msg=upd.error.message||''; if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or subject teacher. '+msg; toast('Could not append: '+msg,'danger',10000); return; }
+    if(!upd.data){ toast('Append not confirmed — RLS blocked. Check ownership or run V12.32 SQL.','danger',8000); return; }
+    closeModal(); toast('✅ Questions appended and scoring keys validated ('+bank.length+' total).','success',6000); CBTUI.refresh();
+  },
   async del(id){if(!sb||!confirm('Delete this exam and all its results?'))return;const r=await SCDelete.byId(sb,'cbt_exams',id);if(!r.ok){toast(r.error,'danger');return;}if(App)App.logActivity('delete','cbt_exam',id);toast('Exam deleted permanently.','success');CBTUI.refresh();},
   async proctorReview(code){
     if(!window.Proctor){toast('Proctor engine still loading — try again in a second.','warning');return;}
@@ -1019,15 +1130,76 @@ window.CBTUI = {
     const { data } = await sb.from('cbt_results').select('*').eq('exam_id',id).order('score',{ascending:false});
     CBTUI._resultsCache={examId:id,code:code,rows:data||[]};
     const pending=(data||[]).filter(r=>Number(r.ungraded_count||0)>0||String(r.grading_status||'')==='manual_review').length;
-    /* V10.6 (#1): TEACHER REVIEW — results with essay/code/oral questions need
-       the teacher to award those marks. Each such row gets a ✍️ Review button
-       opening the per-question marking panel (student's answer + model answer
-       + award box), saved via the auditable cbt_review_result RPC. */
     const rows=(data||[]).map((r,i)=>{
       const needs=Number(r.ungraded_count||0)>0||String(r.grading_status||'')==='manual_review';
-      return '<tr><td>'+(i+1)+'</td><td>'+esc(r.student_name)+'</td><td>'+esc(r.student_id_ref||'-')+'</td><td><b>'+r.score+'/'+r.total+'</b></td><td>'+(r.percent||0)+'%</td><td>'+Number(r.correct_count||0)+' / '+Number(r.wrong_count||0)+' / '+Number(r.skipped_count||0)+'</td><td><span class="badge" style="background:'+(String(r.engine_version||'').startsWith('v5.1')?'#dcfce7':'#fee2e2')+'">'+esc(r.engine_version||'legacy')+'</span><br><small>'+(needs?'<span style="color:#b45309;font-weight:800">✍️ awaiting review'+(Number(r.ungraded_count||0)?' ('+r.ungraded_count+' Q)':'')+'</span>':esc(r.grading_status||'unknown'))+(r.reviewed_at?'<br>reviewed':'')+'</small></td><td>'+esc(r.cert_code||'-')+'</td><td>'+(needs?'<button class="btn btn-sm btn-primary" onclick="CBTUI.reviewResult(\''+r.id+'\')">✍️ Review</button>':(r.manual_awards&&Object.keys(r.manual_awards||{}).length?'<button class="btn btn-sm btn-outline" onclick="CBTUI.reviewResult(\''+r.id+'\')">✏️ Re-review</button>':''))+'</td></tr>';
+      return '<tr><td>'+(i+1)+'</td><td>'+esc(r.student_name)+'</td><td>'+esc(r.student_id_ref||'-')+'</td><td><b>'+r.score+'/'+r.total+'</b></td><td>'+(r.percent||0)+'%</td><td>'+Number(r.correct_count||0)+' / '+Number(r.wrong_count||0)+' / '+Number(r.skipped_count||0)+'</td><td><span class="badge" style="background:'+(String(r.engine_version||'').startsWith('v5.1')?'#dcfce7':'#fee2e2')+'">'+esc(r.engine_version||'legacy')+'</span><br><small>'+(needs?'<span style="color:#b45309;font-weight:800">✍️ awaiting review'+(Number(r.ungraded_count||0)?' ('+r.ungraded_count+' Q)':'')+'</span>':esc(r.grading_status||'unknown'))+(r.reviewed_at?'<br>reviewed':'')+'</small></td><td>'+esc(r.cert_code||'-')+'</td><td>'+(needs?'<button class="btn btn-sm btn-primary" onclick="CBTUI.reviewResult(\''+r.id+'\')">✍️ Review</button>':(r.manual_awards&&Object.keys(r.manual_awards||{}).length?'<button class="btn btn-sm btn-outline" onclick="CBTUI.reviewResult(\''+r.id+'\')">✏️ Re-review</button>':''))+' <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fca5a5;margin-top:4px" onclick="CBTUI.allowRetake(\''+id+'\',\''+esc(r.student_id_ref||'')+'\',\''+esc(r.student_name||'')+'\')" title="Allow this ONE student to rewrite — deletes previous attempt, keeps others. For system malfunction, power loss, network failure, auto-submit, etc.">↩️ Allow retake</button></td></tr>';
     }).join('');
-    openModal('Results — '+code, '<div style="margin-bottom:10px">'+(pending?'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-bottom:8px"><b>✍️ '+pending+' result(s) contain teacher-marked questions (essay / code / oral) awaiting your review.</b> Their percentages exclude those marks until you award them — click Review on each row.</div>':'')+'<button class="btn btn-sm btn-outline" onclick="CBTUI.exportCSV(\''+id+'\')">⬇ Export CSV</button> <button class="btn btn-sm btn-primary" onclick="closeModal();CBTUI.regradeResults(\''+id+'\')">Regrade Saved Results with V5.1</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="closeModal();CBTUI.clearResults(\''+id+'\',\''+esc(code)+'\')">Export then clear results</button></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>%</th><th>Correct/Wrong/Skipped</th><th>Engine / Status</th><th>Cert</th><th>Review</th></tr></thead><tbody>'+(rows||'<tr><td colspan=9>No submissions yet.</td></tr>')+'</tbody></table></div>');
+    openModal('Results — '+code, '<div style="margin-bottom:10px">'+(pending?'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-bottom:8px"><b>✍️ '+pending+' result(s) contain teacher-marked questions (essay / code / oral) awaiting your review.</b> Their percentages exclude those marks until you award them — click Review on each row.</div>':'')+'<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534;margin-bottom:8px">🔄 <b>Retake for malfunction?</b> If a registered student\'s device switched off, network failed, or system auto-submitted incomplete, click <b>↩️ Allow retake</b> for that student — it deletes ONLY that student\'s previous attempt for this exam (others kept). Student can then rewrite immediately. Also handles: power loss, browser crash, violation false positive, time expiry, roster not found, duplicate submit. See Guide below.</div>'+'<button class="btn btn-sm btn-outline" onclick="CBTUI.exportCSV(\''+id+'\')">⬇ Export CSV</button> <button class="btn btn-sm btn-primary" onclick="closeModal();CBTUI.regradeResults(\''+id+'\')">Regrade Saved Results with V5.1</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="closeModal();CBTUI.clearResults(\''+id+'\',\''+esc(code)+'\')">Export then clear results (ALL)</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.manageRetakes(\''+id+'\')">📋 View retake allowances</button><br><div style="margin-top:10px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px"><b>📤 Push to Report Card — Individual Teacher</b><p style="font-size:.82rem;color:#1e40af;margin:4px 0 6px">Push <b>only your subject\'s</b> scores to the official report card (uses your current subject filter). Works per-subject even inside multi-subject exams.</p><button class="btn btn-sm btn-primary" onclick="CBTUI.pushMySubject(\''+id+'\')">🚀 Push My Subject\'s Scores</button> <button class="btn btn-sm btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">📊 Bulk Push (All Subjects)</button> <span style="font-size:.78rem;color:#475569">Teacher can push his/her subject even inside bulk — subject teacher RLS enforced.</span></div></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>%</th><th>Correct/Wrong/Skipped</th><th>Engine / Status</th><th>Cert</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan=9>No submissions yet.</td></tr>')+'</tbody></table></div><div style="margin-top:12px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.85rem;color:#1e40af"><b>💡 10 scenarios where student needs retake (expert):</b><ol style="margin:6px 0 0 16px;line-height:1.6"><li><b>Power/system off</b> during exam, could not submit — allow retake deletes old, student rewrites</li><li><b>Auto-submitted incomplete</b> due to malfunction — same</li><li><b>Network loss</b> during submit — payload in pending queue with jittered retries, flushes on next online; if failed, allow retake</li><li><b>Browser crash</b> — draft auto-saved in localStorage cbt-draft-CODE, resume on return, or retake if lost</li><li><b>Violation auto-submit false positive</b> (tab switch) — teacher reviews violation_log, allows retake</li><li><b>Time expiry</b> with unfinished — teacher gives extra time via accommodations or retake</li><li><b>Not on roster</b> — teacher adds to cbt_roster or uses offline_override</li><li><b>Duplicate client_ref</b> — idempotency via unique index, teacher clears duplicate via retake</li><li><b>Attempt limit reached</b> but needs practice retake — same</li><li><b>Exam closed/archived mid-exam</b> — teacher reopens (is_open, is_archived) and allows retake</li></ol><p style="margin:6px 0 0">All handled robustly, self-contained, seamless — offline draft + pending queue + localStorage recovery + server idempotency + teacher-controlled retake.</p></div>');
+  },
+  async allowRetake(examId, studentRef, studentName){
+    if(!sb) return;
+    if(!studentRef){ toast('Student admission number missing — cannot allow retake.','warning'); return; }
+    const reason = prompt('Allow retake for '+studentName+' ('+studentRef+')?\n\nEnter reason (e.g. system malfunction, power loss, network failure, auto-submit):\nThis will DELETE ONLY this student\'s previous attempt(s) for this exam (others kept). Student can then rewrite immediately.', 'system malfunction — switched off, could not submit');
+    if(reason === null) return;
+    if(!confirm('Confirm: delete '+studentName+' ('+studentRef+') previous attempt(s) for this exam and allow retake?\n\nPrevious pushed report_scores are NOT deleted — audit separately if needed.')) return;
+    const r = await sb.rpc('cbt_allow_retake', {p_exam_id: examId, p_student_ref: studentRef, p_reason: reason||''});
+    if(r.error || !r.data || r.data.ok === false){
+      const msg = (r.data&&r.data.error) || (r.error&&r.error.message) || 'Allow retake failed';
+      if(/cbt_allow_retake|schema cache|function/i.test(String(msg))) toast('Retake engine not installed — admin must run database/v12.31-cbt-retake-robust.sql once.','warning',10000);
+      else toast(msg,'danger',8000);
+      return;
+    }
+    if(App&&App.logActivity) App.logActivity('allow-retake','cbt_exam', examId+' '+studentRef+' deleted '+r.data.deleted);
+    toast('✅ Retake allowed: deleted '+Number(r.data.deleted||0)+' previous attempt(s) for '+studentName+' ('+studentRef+'). Student can now rewrite.','success',8000);
+    try{ localStorage.removeItem('cbt-draft-'+String(r.data.exam_id||examId).toUpperCase().replace(/[^A-Z0-9]/g,'')); }catch(_){}
+    this.results(examId, (this._resultsCache&&this._resultsCache.code)||'');
+  },
+  async manageRetakes(examId){
+    if(!sb) return;
+    const r = await sb.rpc('cbt_list_retakes', {p_exam_id: examId});
+    if(r.error){ toast('Could not load retake list: '+r.error.message,'danger'); return; }
+    const rows = Array.isArray(r.data)?r.data:[];
+    const html = rows.length ? '<div class="table-wrap"><table><thead><tr><th>Student</th><th>Reason</th><th>Allowed by</th><th>When</th><th>Used</th></tr></thead><tbody>'+rows.map(a=>'<tr><td>'+esc(a.student_ref||'')+'</td><td>'+esc(a.reason||'')+'</td><td>'+esc(a.allowed_by_name||a.allowed_by||'')+'</td><td>'+(a.allowed_at||'').slice(0,16).replace('T',' ')+'</td><td>'+(a.used?'Yes':'No')+'</td></tr>').join('')+'</tbody></table></div>' : '<p>No retake allowances for this exam yet. Use Allow retake on a student row to create one.</p>';
+    openModal('Retake allowances — '+esc(examId), html, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+  },
+  async pushMySubject(examId){
+    // V12.33 individual teacher push — per-subject, uses ReportEngine bulk pipeline but filters to my subject
+    if(!window.ReportEngine||!window.ReportEngine.pushCBTToResults){ toast('Report engine not loaded','warning'); return; }
+    if(!sb){ toast('Database not configured','warning'); return; }
+    // Determine my subject from profile or prompt
+    let mySub='';
+    try{
+      const {data:cols}=await sb.from('assessment_columns').select('subject').eq('class','').limit(1);
+      // Try staff subjects
+      if(window.SC_PROFILE&&SC_PROFILE.id){
+        const {data:staff}=await sb.from('staff').select('subjects').eq('user_id',SC_PROFILE.id).maybeSingle();
+        if(staff&&Array.isArray(staff.subjects)&&staff.subjects.length) mySub=staff.subjects[0];
+      }
+    }catch(_){}
+    if(!mySub){
+      mySub=prompt('Enter the subject you teach to push (e.g. Mathematics).\nLeave blank to push ALL subjects of this exam:','')||'';
+      mySub=mySub.trim();
+    }
+    const examIdSafe=examId;
+    // If multi-subject and subject specified, push only that subject
+    if(mySub){
+      if(!confirm('Push '+mySub+' scores from this exam to report card?\n\nThis will create/update report_scores for '+mySub+' only (your subject).')) return;
+      try{
+        const {data:ex}=await sb.from('cbt_exams').select('*').eq('id',examIdSafe).maybeSingle();
+        if(!ex) throw Error('Exam not found');
+        // Use ReportEngine's per-exam push but with subjectFilter
+        const dest=ex.report_column||'CBT / Online Exam';
+        // Need columns
+        const {data:cols}=await sb.from('assessment_columns').select('*').limit(2000);
+        ReportEngine._bulkCBT={exams:[ex],columns:cols||[],counts:{},filtered:[ex]};
+        const col=await ReportEngine.ensureCBTDestination(ex, dest, Number(ex.max_score)||10, true);
+        const out=await ReportEngine.pushOneCBTExam(ex, dest, {column:col, verifiedOnly:true, subjectFilter:mySub});
+        toast('✅ Pushed '+out.saved+' row(s) for '+mySub+' to report card. Open Report Cards to verify.','success',9000);
+      }catch(e){ toast('Push failed: '+(e.message||e),'danger',10000); }
+    }else{
+      if(!confirm('Push ALL subjects from this exam to report card?')) return;
+      ReportEngine.pushCBTToResults(examIdSafe);
+    }
   },
   /* V10.6 (#1): per-question marking panel for manual-review types. */
   async reviewResult(resultId){
@@ -1275,7 +1447,7 @@ document.addEventListener('DOMContentLoaded', CBTUI.refresh); CBTUI.refresh();
     if(!reportCol){
       toast('⚠️ Report column not selected — exam will be created but report-card push will need manual column. Tip: create report columns in Report Cards first for class '+klass+' / '+subj+' / '+term+' / '+session,'warning',7000);
     }
-    const exam={ title, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(subj||multiSubjects[0]||'General'), class:klass, term, session, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:reportCol, max_score:parseFloat(document.getElementById('ex-max').value)||100, duration:parseInt(document.getElementById('ex-dur').value)||45, duration_min:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions:document.getElementById('ex-instr').value, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
+    const exam={ title, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(subj||multiSubjects[0]||'General'), class:klass, term, session, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:reportCol, max_score:parseFloat(document.getElementById('ex-max').value)||100, duration:parseInt(document.getElementById('ex-dur').value)||45, duration_min:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions: document.getElementById('ex-instr').value, attempt_limit: parseInt(document.getElementById('ex-attempt')?.value||'1')||1, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
 
     try{
       const {data,error}=await CBT.createExam(exam);

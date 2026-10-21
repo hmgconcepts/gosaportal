@@ -375,6 +375,7 @@ textarea.form-input{min-height:80px;resize:vertical}
         '<span>Term / Session<b>'+esc([this.data&&this.data.term,this.data&&this.data.session].filter(Boolean).join(' · ')||'—')+'</b></span>' +
       '</div>' +
       this.renderTabs(current) +
+      (Number(this.data&&this.data.negative_mark)>0 ? '<div class="notice" style="background:#fff7ed;border-color:#fed7aa;color:#92400e;margin-bottom:10px"><b>⚠️ Negative marking:</b> -'+Number(this.data.negative_mark)+' per wrong answer — unanswered counts as 0, not negative. Choose carefully.</div>' : '') +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap">' +
         '<strong>' + esc(current) + ' · Q ' + localNo + ' / ' + subjectIndexes.length + ' <span style="color:#64748b;font-weight:600">(overall ' + (this.idx + 1) + ' / ' + this.qs().length + ')</span></strong>' +
         '<div><span class="clock' + (urgent ? ' urgent' : '') + '" id="clock">' + m + ':' + String(ss).padStart(2, '0') + '</span> <span id="viol" class="viol"></span></div>' +
@@ -563,7 +564,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     $('e-start').addEventListener('click',()=>Exam.load(false));
   };
   Exam.identityEntry=function(data,code,message){this._pendingCode=code;this._identityReady=true;applySchoolIdentity(data&&data.school||null);const registered=String(data&&data.exam_mode||data&&data.identity_mode||'').toLowerCase()==='registered';
-    this.root().innerHTML='<div class="card"><h2>'+(registered?'🪪 Registered student verification':'🌐 Open examination identity')+'</h2><p><b>'+esc(data&&data.title||'Examination')+'</b> · '+esc(data&&data.class||'')+' · '+esc(data&&data.term||'')+' '+esc(data&&data.session||'')+'</p>'+(message?'<div class="notice notice-error">'+esc(message)+'</div>':'')+(registered?'<div class="notice" style="background:#eff6ff;border-color:#93c5fd;color:#1e3a8a">Enter only your admission number. Your official name and class will be loaded from the school register; there is no editable name field.</div><div class="form-group"><label>Admission number *</label><input class="form-input" id="e-admission" placeholder="e.g. GoSA/2024/001" autofocus></div><button class="btn btn-primary" id="e-identity-start">Verify and start exam</button>':'<p>Registered students may enter an admission number to load their official identity. Other candidates can enter a display name.</p><div class="form-group"><label>Admission number (optional)</label><input class="form-input" id="e-admission" placeholder="Registered students only"></div><div class="form-group"><label>Candidate name *</label><input class="form-input" id="e-open-name" placeholder="Your full name"></div><div class="form-group"><label>Class / category (optional)</label><input class="form-input" id="e-open-class" placeholder="e.g. JSS 1A or External"></div><button class="btn btn-primary" id="e-identity-start">Start open exam</button> <button class="btn btn-outline" id="e-guest">Continue anonymously</button>')+' <button class="btn btn-outline" id="e-back-code">Change code</button></div>';
+    this.root().innerHTML='<div class="card"><h2>'+(registered?'🪪 Registered student verification':'🌐 Open examination identity')+'</h2><p><b>'+esc(data&&data.title||'Examination')+'</b> · '+esc(data&&data.class||'')+' · '+esc(data&&data.term||'')+' '+esc(data&&data.session||'')+'</p>'+(message?'<div class="notice notice-error">'+esc(message)+(data.error==='wrong_class'?' <br><small>Your class: '+esc(data.student_class||'')+' · Exam class: '+esc(data.exam_class||'')+'</small>':'')+'</div>':'')+(data.error==='wrong_class'?'<div class="notice" style="background:#fef3c7;border-color:#fcd34d;color:#92400e;margin-top:8px"><b>🚫 Class-restricted exam:</b> Registered CBTs can only be taken by students in the assigned class. This attempt is blocked on the server — roster, retake or resitting will not bypass it. Contact your teacher if your class is incorrect.</div>':'')+(registered?'<div class="notice" style="background:#eff6ff;border-color:#93c5fd;color:#1e3a8a">Enter only your admission number. Your official name and class will be loaded from the school register; there is no editable name field.</div><div class="form-group"><label>Admission number *</label><input class="form-input" id="e-admission" placeholder="e.g. GoSA/2024/001" autofocus></div><button class="btn btn-primary" id="e-identity-start">Verify and start exam</button>':'<p>Registered students may enter an admission number to load their official identity. Other candidates can enter a display name.</p><div class="form-group"><label>Admission number (optional)</label><input class="form-input" id="e-admission" placeholder="Registered students only"></div><div class="form-group"><label>Candidate name *</label><input class="form-input" id="e-open-name" placeholder="Your full name"></div><div class="form-group"><label>Class / category (optional)</label><input class="form-input" id="e-open-class" placeholder="e.g. JSS 1A or External"></div><button class="btn btn-primary" id="e-identity-start">Start open exam</button> <button class="btn btn-outline" id="e-guest">Continue anonymously</button>')+' <button class="btn btn-outline" id="e-back-code">Change code</button></div>';
     $('e-identity-start').addEventListener('click',()=>Exam.load(false));if($('e-guest'))$('e-guest').addEventListener('click',()=>Exam.load(true));$('e-back-code').addEventListener('click',()=>Exam.codeEntry(code));
   };
 
@@ -610,10 +611,10 @@ textarea.form-input{min-height:80px;resize:vertical}
       this.root().innerHTML = '<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">❌ Exam service unavailable</h2><p>'+msg+'</p><p><b>Code entered:</b> '+esc(code)+'</p></div>' + this.codeEntryHTML(code) + '</div>';
       return;
     }
-    if(data&&['admission_required','invalid_admission','not_on_roster'].includes(data.error)){this.identityEntry(data,code,data.error==='admission_required'?'':data.message);return;}
+    if(data&&['admission_required','invalid_admission','not_on_roster','wrong_class'].includes(data.error)){this.identityEntry(data,code,data.error==='admission_required'?'':data.message);return;}
     if(data&&data.ok===true&&String(data.exam_mode||'').toLowerCase()==='open'&&!this._identityReady){this.identityEntry(data,code,'');return;}
     if(data.ok===false && !data.wait && !data.closed){
-      const hints={exam_not_found:'Confirm the code in CBT Manager and use Share to copy it.',not_open:'CBT Manager → locate the exam → click Open. Refresh the candidate page afterward.',archived:'Unarchive or recreate this exam.',not_started:'Wait until the configured start time.',closed:'The exam officer must extend the close time or reopen a new attempt.'};
+      const hints={exam_not_found:'Confirm the code in CBT Manager and use Share to copy it.',not_open:'CBT Manager → locate the exam → click Open. Refresh the candidate page afterward.',archived:'Unarchive or recreate this exam.',not_started:'Wait until the configured start time.',closed:'The exam officer must extend the close time or reopen a new attempt.',wrong_class:'This exam is for a different class. Only students in '+esc(data.exam_class||data.class||'the assigned class')+' can take it. Check your class or contact the exam officer.',not_on_roster:'You are not on this exam\'s roster — the exam officer must add your admission number to the roster in CBT Manager.'};
       this.root().innerHTML='<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">❌ '+esc(data.message||'Exam unavailable')+'</h2><p><b>Code entered:</b> '+esc(code)+' &nbsp; <b>Matched code:</b> '+esc(data.code||'—')+'</p><p>'+esc(hints[data.error]||'Ask the exam officer to check the exam status and schedule.')+'</p><small>Diagnostic: '+esc(data.error||'unknown')+' · Engine '+esc(data.engine_version||'unknown')+'</small></div>'+this.codeEntryHTML(code)+'</div>';
       return;
     }
@@ -659,8 +660,18 @@ textarea.form-input{min-height:80px;resize:vertical}
       }
     } catch(_) {}
     this.startTs = Date.now();
-    this.deadline = Date.now() + ((data.duration || 45) * 60 * 1000);
+    // V12.33 timer persistence — survive refresh (expert fix 4a)
+    const _deadlineKey='cbt-deadline-'+(data.code||canonicalCode)+'-'+(this.student&&this.student.id_ref||'anon');
+    const _savedDeadline=Number(localStorage.getItem(_deadlineKey)||0);
+    if(_savedDeadline && _savedDeadline>Date.now() && _savedDeadline - Date.now() < (data.duration||45)*60*1000*2){
+      this.deadline=_savedDeadline;
+      this.startTs=Date.now()-(((data.duration||45)*60*1000)-(this.deadline-Date.now()));
+    }else{
+      this.deadline = Date.now() + ((data.duration || 45) * 60 * 1000);
+      try{ localStorage.setItem(_deadlineKey, String(this.deadline)); }catch(_){}
+    }
     this.remaining = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
+    // Clear deadline on submit (handled in submit) and on timeup via beforeunload save
 
     if (data.instructions) {
       if (!confirm('Instructions:\n\n' + data.instructions + '\n\nClick OK to begin. You cannot pause the timer once started.')) {
@@ -758,14 +769,14 @@ textarea.form-input{min-height:80px;resize:vertical}
     for (let attempt = 0; attempt < 6; attempt++) {
       try { resp = await window.sb.rpc('cbt_submit_v6', { p_payload: payload }); } catch (e) { resp = { error: e }; }
       if (resp && !resp.error && resp.data && resp.data.saved && String(resp.data.engine_version||'').startsWith('v5.1')) break;
-      if (resp && !resp.error && resp.data && ['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty'].includes(resp.data.error)) break;
+      if (resp && !resp.error && resp.data && ['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty','wrong_class','not_on_roster','invalid_admission','admission_required'].includes(resp.data.error)) break;
       if(resp && resp.error && /cbt_submit_v6|schema cache|function/i.test(String(resp.error.message||resp.error))) break;
       const wait = Math.min(8000, (500 * Math.pow(2, attempt))) + Math.floor(Math.random() * 600);
       this.root().insertAdjacentHTML('beforeend', '<p style="text-align:center;color:#64748b">Submitting… retry ' + (attempt + 1) + ' of 6</p>');
       await new Promise(r => setTimeout(r, wait));
     }
     const confirmed=!!(resp&&!resp.error&&resp.data&&resp.data.saved&&String(resp.data.engine_version||'').startsWith('v5.1'));
-    const terminalError=resp&&resp.data&&['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty'].includes(resp.data.error);
+    const terminalError=resp&&resp.data&&['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty','wrong_class','not_on_roster','invalid_admission','admission_required'].includes(resp.data.error);
     if (!confirmed && !terminalError) {
       try { const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]'); q.push(payload); localStorage.setItem('cbt-pending-queue', JSON.stringify(q.slice(-10))); } catch (_) {}
     } else if (confirmed) {
@@ -835,6 +846,9 @@ textarea.form-input{min-height:80px;resize:vertical}
       }
     } catch (_) {}
   })();
+
+  // V12.33 draft persistence on browser close (expert fix 4g)
+  window.addEventListener('beforeunload', ()=>{ try{ Exam.saveDraft(); if(Exam.deadline) try{ localStorage.setItem('cbt-deadline-'+(Exam.data&&Exam.data.code||'')+'-'+(Exam.student&&Exam.student.id_ref||'anon'), String(Exam.deadline)); }catch(_){} }catch(_){} });
 
   // Exposed for accessibility tooling, automated regression tests and the
   // manager's safe preview—not for grading (grading remains server-authoritative).
