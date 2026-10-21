@@ -499,7 +499,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         <div class="grid grid-2">
           <div class="form-group"><label>Pick a <span id="ic-pick-label">student</span></label><select class="form-select" id="ic-student" onchange="ICUI.pick(this.value)"><option value="">— choose —</option></select></div>
           <div class="form-group"><label>…or enter manually</label><input class="form-input" id="ic-name" placeholder="Full name" oninput="ICUI.render()"></div>
-          <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><input class="form-input" id="ic-class" placeholder="JSS1 (filters 🖨 Print ALL)" oninput="ICUI.render()"></div>
+          <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><select class="form-select" id="ic-class" onchange="ICUI.render()"><option value="">— All classes — whole school —</option></select><small style="color:var(--gray-500)">Select a class to filter bulk print — NOT printed on card (lifetime card). Choose "All classes" for whole school.</small></div>
           <div class="form-group"><label>ID / Admission / Staff no</label><input class="form-input" id="ic-id" placeholder="(auto)" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Gender</label><input class="form-input" id="ic-gender" placeholder="male/female" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Phone</label><input class="form-input" id="ic-phone" placeholder="0803..." oninput="ICUI.render()"></div>
@@ -510,7 +510,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         <div class="notice" style="margin-bottom:10px;font-size:.82rem">🪪 <b>Lifetime card design (V11.6):</b> student cards no longer print Class or Valid-Thru (and staff cards have no Valid-Thru) — one physical card serves the holder's entire studentship/employment. Printing now produces the <b>front AND a matching back side</b> (rules, if-found notice, emergency line, blood-group ribbon, verify QR, signature) laid side-by-side for cutting or duplex printing.</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
-          <button class="btn btn-outline" onclick="ICUI.printAll()" title="Type a class in the Class box to print only that class">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
+          <button class="btn btn-outline" onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
         </div>
       </div>
       <div id="ic-preview" style="display:flex;justify-content:center"></div>
@@ -573,7 +573,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         if(!adminTier&&sUid) sq=sq.eq('user_id',sUid);
         const {data,error}=await sq; if(error)throw error;
         await ICUI.fillPhotos(data||[]);
-        ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
+        ICUI.all=data||[]; ICUI.loadClasses(); const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
         if(!adminTier&&ICUI.all.length){ setTimeout(()=>{ sel.value=JSON.stringify(ICUI.all[0]); ICUI.pick(sel.value); },100); }
       } else {
         /* V11.6: role-scoped like the field-proven template — parents see only
@@ -592,7 +592,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
           try{ const nm=await sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').ilike('full_name',SC_PROFILE.full_name).limit(1); if((nm.data||[]).length) data=nm.data; }catch(_){ }
         }
         await ICUI.fillPhotos(data||[]);
-        ICUI.all=data||[]; const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
+        ICUI.all=data||[]; ICUI.loadClasses(); const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
         // Auto-select first student/child for parents or students (role declared above)
         if (ICUI.all.length > 0 && (role === 'parent' || role === 'student')) {
           setTimeout(() => {
@@ -618,6 +618,50 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       need.forEach(row=>{ if(map[row.user_id]) row.photo_url=map[row.user_id]; });
     }catch(e){ console.warn('profile photo enrichment skipped:', e.message||e); }
   },
+  async loadClasses(){
+    const sel=document.getElementById('ic-class');
+    if(!sel) return;
+    const isStaff=this.kind==='staff';
+    const firstOpt=isStaff?'<option value="">— All staff — whole school —</option>':'<option value="">— All classes — whole school —</option>';
+    // Preserve current selection if any
+    const curVal=sel.value;
+    try{
+      if(!window.sb){ return; }
+      if(isStaff){
+        // For staff: load departments + staff types + roles as filter options
+        const [deptData, staffData]=await Promise.all([
+          sb.from('departments').select('name').order('name').limit(100),
+          sb.from('staff').select('department,staff_type,role').limit(1000)
+        ]);
+        const depts=[...new Set((deptData.data||[]).map(x=>String(x.name||'').trim()).filter(Boolean))];
+        const staffDepts=[...new Set((staffData.data||[]).map(x=>String(x.department||'').trim()).filter(Boolean))];
+        const staffTypes=[...new Set((staffData.data||[]).map(x=>String(x.staff_type||'').trim()).filter(Boolean))];
+        const roles=[...new Set((staffData.data||[]).map(x=>String(x.role||'').trim()).filter(Boolean))];
+        const allOpts=[...new Set([...depts, ...staffDepts, ...staffTypes, ...roles])].sort().filter(Boolean);
+        sel.innerHTML=firstOpt + allOpts.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('');
+      }else{
+        const {data,error}=await sb.from('classes').select('name').order('name').limit(100);
+        if(error) throw error;
+        const classes=[...new Set((data||[]).map(x=>String(x.name||'').trim()).filter(Boolean))];
+        sel.innerHTML=firstOpt + classes.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('');
+        if(!classes.length){
+          const {data:studData}=await sb.from('students').select('class').limit(1000);
+          const fallback=[...new Set((studData||[]).map(x=>String(x.class||'').trim()).filter(Boolean))].sort();
+          if(fallback.length){
+            sel.innerHTML=firstOpt + fallback.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('');
+          }
+        }
+      }
+      // Restore previous selection if still valid
+      if(curVal){
+        const hasOpt=[...sel.options].some(o=>o.value===curVal);
+        if(hasOpt) sel.value=curVal;
+      }
+    }catch(e){
+      console.warn('ID-card class dropdown load failed', e);
+    }
+  },
+
   pick(v){ if(!v){this.cur={}; this.render(); return;} let s={}; try{s=JSON.parse(v);}catch(_){s={};} if(!s.phone&&s.guardian_phone)s.phone=s.guardian_phone; this.cur=s;
     document.getElementById('ic-name').value=s.full_name||'';
     document.getElementById('ic-class').value=(this.kind==='staff'?(s.staff_type||s.role||''):(s.class||''));
@@ -639,11 +683,23 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   print(){ const p=this.person(); if(window.Super&&Super.idcard&&Super.idcard.print) Super.idcard.print(p); else this.printHtml(this.cardHtml(p),'ID Card'); },
   printHtml(cards,title){ const w=window.open('','_blank'); if(!w){toast('Popup blocked. Please allow popups.','warning');return;} const base=document.baseURI.replace(/[^/]*$/,''); w.document.open(); w.document.write('<!DOCTYPE html><html><head><title>'+esc(title||'ID Cards')+'</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:10px;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sc-idcard{break-inside:avoid;page-break-inside:avoid}</style></head><body>'+cards+'<script>window.onload=function(){var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.focus();window.print()},250)};var i=[].slice.call(document.images),n=i.length;if(!n)return go();var d=function(){if(--n<=0)go()};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}});setTimeout(go,2400)};<\/script></body></html>'); w.document.close(); },
   printAll(){ var to=this.tplOpts();
-    // V6.3 #13: per-class bulk printing — when a class is typed in the Class box,
-    // only that class's students print; empty box = whole school as before.
-    const cls=(document.getElementById('ic-class')?document.getElementById('ic-class').value:'').trim().toLowerCase();
+    // V12.28 robust: class is now dropdown, not typing — admin can print each student, whole class, whole school
+    // - Each student: pick student from dropdown + Print ID Card (front+back)
+    // - Whole class: select class from dropdown (bulk-print filter) + Print ALL
+    // - Whole school: select "All classes" (empty) + Print ALL
+    const clsRaw=(document.getElementById('ic-class')?document.getElementById('ic-class').value:'').trim();
+    const cls=clsRaw.toLowerCase();
     let source=(ICUI.all&&ICUI.all.length)?ICUI.all:[this.person()];
-    if(cls&&ICUI.kind!=='staff'){const filtered=source.filter(s=>String(s.class||'').trim().toLowerCase()===cls||String(s.class||'').trim().toLowerCase().startsWith(cls));if(filtered.length)source=filtered;else{toast('No students found for class "'+cls+'" — printing every student instead.','warning',6000);}}
+    if(cls){
+      if(ICUI.kind!=='staff'){
+        const filtered=source.filter(s=>String(s.class||'').trim().toLowerCase()===cls||String(s.class||'').trim().toLowerCase().startsWith(cls)||String(s.class||'').trim().toLowerCase().includes(cls));
+        if(filtered.length)source=filtered;
+        else{toast('No students found for class "'+clsRaw+'" — printing every student instead.','warning',6000);}
+      }else{
+        const filtered=source.filter(s=>String(s.department||'').trim().toLowerCase()===cls||String(s.staff_type||'').trim().toLowerCase()===cls||String(s.role||'').trim().toLowerCase()===cls||String(s.department||'').toLowerCase().includes(cls));
+        if(filtered.length)source=filtered;
+      }
+    }
     if(source.length>1&&typeof toast==='function')toast('🖨️ Printing '+source.length+' ID card(s)'+(cls?' for class '+cls.toUpperCase():'')+' in one job.','info',5000);
     const pair=(pp)=>{ try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) return Super.idcard.pairHtml(pp); }catch(_){ } return ICUI.cardHtml(pp); };
     const cards=source.map(s=> ICUI.kind==='staff'

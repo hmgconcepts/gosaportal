@@ -1237,15 +1237,70 @@ document.addEventListener('DOMContentLoaded', CBTUI.refresh); CBTUI.refresh();
   };
   CBTUI.save = async function(){
     if(!sb){ toast('Database not configured.','warning'); return; }
+    // V12.28 robust validation with legible toasts
+    const titleEl=document.getElementById('ex-title');
+    const classEl=document.getElementById('ex-class');
+    const subjEl=document.getElementById('ex-subject');
+    const termEl=document.getElementById('ex-term');
+    const sessEl=document.getElementById('ex-session');
+    const title=titleEl?.value?.trim()||'';
+    const klass=classEl?.value?.trim()||'';
+    const subj=subjEl?.value?.trim()||'';
+    const term=termEl?.value?.trim()||'';
+    const session=sessEl?.value?.trim()||'';
+    if(!title){ toast('Enter exam title — e.g. First Term Maths Test','warning',5000); titleEl?.focus(); return; }
+    if(!klass){ toast('Select class — e.g. JSS 1, SSS 2 — required for teacher to create CBT','warning',5000); classEl?.focus(); return; }
+    if(!subj){ toast('Select subject — required','warning',5000); subjEl?.focus(); return; }
+    if(!term){ toast('Select term — First/Second/Third Term','warning',5000); termEl?.focus(); return; }
+    if(!session){ toast('Select session — e.g. 2024/2025','warning',5000); sessEl?.focus(); return; }
+
+    // Show progress
+    const saveBtn=document.querySelector('#modal-backdrop .btn-primary');
+    let origBtnText='';
+    if(saveBtn){ origBtnText=saveBtn.textContent; saveBtn.textContent='⏳ Creating…'; saveBtn.disabled=true; }
+    toast('⏳ Creating CBT exam — collecting questions…','info',3000);
+
     let questions=[]; const subject_breakdown=[]; const blocks=[...document.querySelectorAll('#ex-ms-subjects .card')];
     blocks.forEach((b,idx)=>{ const sub=b.querySelector('.ms-subject')?.value || ('Subject '+(idx+1)); const csv=b.querySelector('.ms-csv')?.value.trim()||''; if(csv){ const qs=CBT.parseCSV(csv); qs.forEach(q=>{q.section=sub;q.subject=sub;q.subject_section=sub;q.exam_subject=sub;}); subject_breakdown.push({name:sub,start:questions.length,count:qs.length,end:questions.length+qs.length-1}); questions=questions.concat(qs); } });
     if(!questions.length){ const csv=document.getElementById('ex-csv').value.trim(); questions=csv?CBT.parseCSV(csv):[]; const sub=document.getElementById('ex-subject').value; questions.forEach(q=>{ if(!q.section) q.section=sub; }); }
-    if(!questions.length){ toast('Add at least one question CSV.','warning'); return; }
+    if(!questions.length){ if(saveBtn){ saveBtn.textContent=origBtnText; saveBtn.disabled=false; } toast('Add at least one question (CSV paste or manual builder) — required','warning',6000); return; }
     const bankCheck=CBT.validateQuestionBank(questions);
-    if(!bankCheck.ok){toast('Cannot publish this exam: '+bankCheck.errors.slice(0,5).join(' | '),'danger',12000);return;}
+    if(!bankCheck.ok){ if(saveBtn){ saveBtn.textContent=origBtnText; saveBtn.disabled=false; } toast('Cannot publish this exam: '+bankCheck.errors.slice(0,5).join(' | '),'danger',12000); return; }
+
+    toast('⏳ Validated '+questions.length+' questions — saving to database…','info',3000);
+
     const multiSubjects=[...new Set(questions.map(q=>q.section).filter(Boolean))];
-    const exam={ title:document.getElementById('ex-title').value, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(document.getElementById('ex-subject').value||multiSubjects[0]||'General'), class:document.getElementById('ex-class').value, term:document.getElementById('ex-term').value, session:document.getElementById('ex-session').value, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:document.getElementById('ex-col').value, max_score:parseFloat(document.getElementById('ex-max').value)||0, duration:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions:document.getElementById('ex-instr').value, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
-    const {data,error}=await CBT.createExam(exam); if(error){toast('Could not create: '+error.message,'danger');return;} if(typeof App!=='undefined'&&App.logActivity)App.logActivity('create','cbt_exam',data&&data.code); closeModal(); toast('✅ Exam created. Code: '+(data&&data.code),'success',6000); CBTUI.refresh();
+    const reportColEl=document.getElementById('ex-col');
+    const reportCol=reportColEl?.value?.trim()||'';
+    if(!reportCol){
+      toast('⚠️ Report column not selected — exam will be created but report-card push will need manual column. Tip: create report columns in Report Cards first for class '+klass+' / '+subj+' / '+term+' / '+session,'warning',7000);
+    }
+    const exam={ title, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(subj||multiSubjects[0]||'General'), class:klass, term, session, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:reportCol, max_score:parseFloat(document.getElementById('ex-max').value)||100, duration:parseInt(document.getElementById('ex-dur').value)||45, duration_min:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions:document.getElementById('ex-instr').value, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
+
+    try{
+      const {data,error}=await CBT.createExam(exam);
+      if(saveBtn){ saveBtn.textContent=origBtnText; saveBtn.disabled=false; }
+      if(error){
+        // Robust error handling with legible toasts
+        let msg=error.message||'';
+        if(/row-level security|42501/i.test(msg)){
+          msg='Database refused: You are not assigned to subject '+subj+' / class '+klass+'. Fix: Admin → Subjects → assign teacher, or run v12.28 SQL which allows any teacher to create. Original: '+error.message;
+        }
+        toast('Could not create: '+msg,'danger',10000);
+        return;
+      }
+      if(!data){
+        toast('Exam creation not confirmed — check role/RLS. Try as admin or run v12.28 SQL.','danger',8000);
+        return;
+      }
+      if(typeof App!=='undefined'&&App.logActivity)App.logActivity('create','cbt_exam',data&&data.code);
+      closeModal();
+      toast('✅ Exam created! Code: '+(data&&data.code)+' — '+questions.length+' questions — now open for candidates.','success',8000);
+      CBTUI.refresh();
+    }catch(e){
+      if(saveBtn){ saveBtn.textContent=origBtnText; saveBtn.disabled=false; }
+      toast('Create failed: '+(e.message||e),'danger',10000);
+    }
   };
 })();
 </script>
