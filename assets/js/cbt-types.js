@@ -264,6 +264,21 @@
           var t = (typeof c === 'object') ? (c.text || c.item) : c;
           return '<button type="button" class="scq-chip" data-val="' + esc(t) + '">' + esc(t) + '</button>';
         }).join('') + '</div><input type="hidden" name="' + esc(name) + '">';
+    },
+    dropdown: function (q, name) {
+      // V12.33 dropdown fix — question shows as a single <select>, not option cards or blank textarea
+      var opts = (q.options||[]).slice();
+      if(!opts.length){
+        var raw = q.items || q.pairs || q.pool;
+        opts = parseList(raw);
+      }
+      if(!opts.length) opts = parseList(q.choices || q.alternatives);
+      if(!opts.length && q.a) opts=[q.a,q.b,q.c,q.d].filter(Boolean);
+      if(!opts.length) return '<p class="scq-warn">⚠️ No options defined for this dropdown question.</p>';
+      return '<div class="scq-hint">Choose one answer from the dropdown.</div>' +
+        '<select class="scq-select" name="' + esc(name) + '" style="width:100%;max-width:420px;padding:10px 12px;border:2px solid #cbd5e1;border-radius:10px;font-size:1rem;background:#fff"><option value="">— choose —</option>' +
+        opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o)+'</option>'; }).join('') +
+        '</select>';
     }
   };
 
@@ -303,6 +318,7 @@
     categorization: 'Decide which category each item belongs to and pick it from the dropdown beside it.',
     matrix: 'Answer every row. All rows share the same set of choices across the top.',
     hot_text: 'Tap every part that is correct. Tap it again to unselect. Wrong picks cost you, so choose carefully.',
+    dropdown: 'Open the dropdown and pick the ONE answer you think is right.',
     essay: 'Write in full sentences. Your teacher reads and marks it after you submit.',
     code: 'Write your code in the box. Indentation is kept exactly as you type it.',
     assertion_reason: 'Read the Assertion and the Reason. Decide whether each is true, and whether the Reason actually EXPLAINS the Assertion. Then pick the option that describes both.',
@@ -325,6 +341,7 @@
     graph_read: 'Read values off a graph or chart, then answer.',
     math_equation: 'Type the expression or value. The math keyboard has the symbols you need.',
     oral_prompt: 'Speak your answer and submit a recording LINK (Drive or YouTube). Never a file upload.',
+    dropdown: 'Open the list and pick one.',
     peer_review: 'Write a short, constructive comment on the work shown.',
     true_false_justify: 'Choose True or False, then justify it in the box.',
     classification: 'Behaves like Sort into groups.',
@@ -343,10 +360,11 @@
   /* The full legend, for the "❓ How do I answer these?" button. */
   function legendHTML() {
     var order = ['mcq','multi_select','true_false','short_answer','numeric','multi_numeric',
-                 'cloze','matching','ordering','categorization','matrix','hot_text',
+                 'cloze','matching','ordering','categorization','matrix','hot_text','dropdown',
                  'assertion_reason','case_study','image_based','essay','code'];
     var LABEL = {
       mcq: 'Multiple choice', multi_select: 'Multiple response', true_false: 'True / False',
+      dropdown: 'Dropdown',
       short_answer: 'Short answer', numeric: 'Numeric', multi_numeric: 'Multi-part numeric',
       cloze: 'Fill the gaps', matching: 'Matching', ordering: 'Put in order',
       categorization: 'Sort into groups', matrix: 'Grid', hot_text: 'Tap the right parts',
@@ -375,7 +393,7 @@
      multi_select, case_study, assertion_reason with options…) STAY on the
      original letter-based path so existing papers and drafts keep behaving
      identically. */
-  var STRUCTURED = ['matching','ordering','categorization','matrix','hot_text',
+  var STRUCTURED = ['matching','ordering','categorization','matrix','hot_text','dropdown',
                     'multi_numeric','cloze','numeric','short_answer','essay','code'];
 
   var CBTTypes = {
