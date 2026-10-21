@@ -51,8 +51,8 @@
 
   const SEL = [
     '.modal', '.modal-content', '.modal-backdrop > div',
-    '.toast', '.toast-container > div', '#toast-container > div', '#toast > div',
-    '.notif-dropdown', '#notif-dropdown', '.notif-item', '.notif-entry',
+    '.toast', '.toast-container > div', '#toast-container > div', '#toast > div', '.toast-msg',
+    '.notif-bell', '.notif-dropdown', '#notif-dropdown', '#notif-dropdown *', '.notif-item', '.notif-item *', '.notif-entry', '.notif-entry *', '#notif-list', '#notif-list *', '#notif-page-list', '#notif-page-list *',
     '.mc-app', '.mc-bubble', '.mc-row', '.mc-head',
     '#sc-drive-progress', '#sc-drive-overdue',
     '#sc-theme-float', '#sc-cmdk', '.sc-cmdk-item',
@@ -116,9 +116,7 @@
     const muted=pick==='#0f172a' ? '#475569' : '#cbd5e1';
     const link=pick==='#0f172a' ? '#4f46e5' : '#a5b4fc';
 
-    // Only fix if contrast is failing and background is not transparent and not already fixed
-    // For toast, we want to ensure high contrast
-    if(el.classList.contains('toast') || el.classList.contains('toast-msg') || el.classList.contains('notif-item') || el.classList.contains('notif-entry') || el.classList.contains('mc-bubble') || el.closest('.toast') || el.closest('.notif-dropdown') || el.closest('.modal')){
+    if(el.classList.contains('toast') || el.classList.contains('toast-msg') || el.classList.contains('notif-item') || el.classList.contains('notif-entry') || el.classList.contains('notif-item-title') || el.classList.contains('notif-item-msg') || el.classList.contains('notif-entry-title') || el.classList.contains('notif-entry-msg') || el.classList.contains('mc-bubble') || el.closest('.toast') || el.closest('.notif-dropdown') || el.closest('#notif-dropdown') || el.closest('#notif-list') || el.closest('#notif-page-list') || el.closest('.modal')){
       el.style.setProperty('color', pick, 'important');
       el.dataset.scLegible='1';
       el.dataset.scLegibleFixed=String(Math.round(ratio*10)/10);
@@ -143,8 +141,7 @@
       if(contrast(kfg,kbg) < 4.5){
         const isMuted=/muted|help|hint|small|caption|gray-500|gray-600/i.test(k.className||'') || k.tagName==='SMALL';
         const isLink=k.tagName==='A';
-        // Only fix if inside popup or if contrast very low
-        if(k.closest('.toast') || k.closest('.notif-dropdown') || k.closest('.modal') || k.closest('.mc-app') || k.closest('#sc-drive-progress') || contrast(kfg,kbg) < 3.0){
+        if(k.closest('.toast') || k.closest('.notif-dropdown') || k.closest('#notif-dropdown') || k.closest('#notif-list') || k.closest('#notif-page-list') || k.closest('.modal') || k.closest('.mc-app') || k.closest('#sc-drive-progress') || contrast(kfg,kbg) < 3.0){
           k.style.setProperty('color', isLink ? link : (isMuted ? muted : pick), 'important');
         }
       }
