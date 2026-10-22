@@ -1166,15 +1166,51 @@ window.CBTUI = {
     openModal('Retake allowances — '+esc(examId), html, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
   },
   async pushMySubject(examId){
-    // V12.34 robust: push ONLY this particular CBT (no subject typing prompt)
-    // For single-subject: pushes that subject's scores. For multi-subject: pushes all subjects of this exam, split per subject.
-    if(!window.ReportEngine||!window.ReportEngine.pushCBTToResults){ toast('Report engine not loaded','warning'); return; }
+    // V12.35 robust: push ONLY this particular CBT with detailed progress report (no typing prompt)
+    if(!window.ReportEngine){ toast('Report engine not loaded','warning'); return; }
     if(!sb){ toast('Database not configured','warning'); return; }
-    if(!confirm('Push scores from this CBT to report card?\n\nThis will create/update report_scores for this exam only.\nMulti-subject exams will split per subject automatically.')) return;
+    // Pre-check via new RPC for detailed progress (optional, fallback to direct push)
+    let exam=null, colInfo=null;
     try{
-      // Use the canonical single-exam push which handles multi-subject splitting correctly
+      const er=await sb.from('cbt_exams').select('id,code,title,subject,class,term,session,report_column,max_score').eq('id',examId).maybeSingle();
+      if(er.error||!er.data) throw new Error(er.error?.message||'Exam not found');
+      exam=er.data;
+      // Try new RPC for pre-flight check (shows column, results count)
+      const chk=await sb.rpc('cbt_push_exam_to_reports',{p_exam_id:examId, p_column: exam.report_column||null});
+      if(chk.data && chk.data.ok===false){
+        // Show error in modal, not just toast, so teacher sees why push failed
+        openModal('⚠️ Cannot push — '+esc(exam.code||''), '<div class="notice notice-error"><b>'+esc(chk.data.error||'Push blocked')+'</b><br>'+esc(chk.data.message||'Check report column exists.')+'</div><p>Fix: Create report column "'+esc(chk.data.message?.match(/"(.*)"/)?.[1]||exam.report_column||'CBT / Online Exam')+'" in Report Cards for '+esc(exam.class||'')+' / '+esc(exam.term||'')+' / '+esc(exam.session||'')+'</p>', '<button class="btn btn-outline" onclick="closeModal()">Close</button><a class="btn btn-primary" href="report-cards.html">Open Report Cards</a>');
+        return;
+      }
+      colInfo=chk.data;
+    }catch(e){
+      // Fallback: still try push, ReportEngine will handle missing column via ensureCBTDestination
+      console.warn('Pre-check failed, continuing:', e.message||e);
+    }
+    // Show progress modal
+    openModal('🚀 Pushing '+esc(exam?.code||examId)+' — '+esc(exam?.title||'')+'', '<div style="text-align:center;padding:20px"><span class="pulse">Preparing to push verified scores…</span><br><small>Destination: '+(colInfo?esc(colInfo.column||exam.report_column||'CBT / Online Exam')+' (max '+Number(colInfo.max_mark||exam.max_score||10)+') · '+Number(colInfo.results||'?')+' result(s)':'Checking…')+'</small></div>', '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+    try{
       await ReportEngine.pushCBTToResults(examId);
-    }catch(e){ toast('Push failed: '+(e.message||e),'danger',10000); }
+      // ReportEngine.pushCBTToResults shows its own toast; we also update modal with success details
+      const successMsg = '<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534"><b>✅ Push complete for '+esc(exam.code||'')+' — '+esc(exam.title||'')+'</b><br>'+(colInfo?'Pushed '+Number(colInfo.results||0)+' result(s) for '+esc(exam.subject||'')+' to column <b>'+esc(colInfo.column||'')+'</b> (max '+Number(colInfo.max_mark||0)+')':'Scores pushed to report card')+'<br><small>Re-pushing updates existing rows (report_scores_uq), not duplicates. Check Report Cards → Generate.</small></div><p style="text-align:center"><a class="btn btn-primary" href="report-cards.html">Open Report Cards</a> <button class="btn btn-outline" onclick="closeModal()">Close</button></p>';
+      // If modal still open (push didn't close it), update it; else show new
+      const body=document.getElementById('modal-body');
+      if(body && body.innerHTML.includes('Preparing to push')){
+        body.innerHTML=successMsg;
+        document.getElementById('modal-footer').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Close</button><a class="btn btn-primary" href="report-cards.html">Open Report Cards</a>';
+      }else{
+        closeModal();
+        openModal('✅ Push complete — '+esc(exam.code||''), successMsg, '<button class="btn btn-outline" onclick="closeModal()">Close</button><a class="btn btn-primary" href="report-cards.html">Open Report Cards</a>');
+      }
+    }catch(e){
+      const body=document.getElementById('modal-body');
+      const errMsg='<div class="notice notice-error"><b>Push failed:</b> '+esc(e.message||e)+'</div>';
+      if(body && body.innerHTML.includes('Preparing to push')){
+        body.innerHTML=errMsg;
+      }else{
+        toast('Push failed: '+(e.message||e),'danger',10000);
+      }
+    }
   },
   /* V10.6 (#1): per-question marking panel for manual-review types. */
   async reviewResult(resultId){

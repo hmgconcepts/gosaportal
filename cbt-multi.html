@@ -428,6 +428,7 @@ const MM = {
       // Validate question bank
       const bankCheck=CBT.validateQuestionBank(allQuestions);
       if(!bankCheck.ok){ alert('Cannot create combined exam — question bank errors:\\n\\n'+bankCheck.errors.slice(0,8).join('\\n')); if(msgEl) msgEl.textContent='Validation failed'; return; }
+      // V12.35: Use Step 1 Purpose (mm-type) for new multi-subject's assessment_type — works for all CBT types (exam/test/ca/assignment/project/quiz/practical), not just exam
       // Use Step 1 settings if available, else from first exam
       const v=(id)=> (document.getElementById(id)||{}).value||'';
       const first=exams[0]||{};
