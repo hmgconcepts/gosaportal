@@ -49,17 +49,82 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   };
 
-  /* Parse a field that may arrive as JSON text, an array, or a pipe list. */
+  function repairQuotes(str) {
+    var out = '', i = 0, inStr = false, esc = false, n = str.length;
+    while (i < n) {
+      var c = str.charAt(i);
+      if (!inStr) {
+        out += c;
+        if (c === '"') inStr = true;
+        i++; continue;
+      }
+      if (esc) { out += c; esc = false; i++; continue; }
+      if (c === '\\') { out += c; esc = true; i++; continue; }
+      if (c === '"') {
+        var j = i + 1;
+        while (j < n && /\s/.test(str.charAt(j))) j++;
+        var nx = j < n ? str.charAt(j) : '';
+        if (nx === ',' || nx === '}' || nx === ']' || nx === ':' || nx === '') {
+          out += c; inStr = false; i++;
+        } else { out += '\\"'; i++; }
+        continue;
+      }
+      out += c; i++;
+    }
+    return out;
+  }
+
+  function lenientJSON(str) {
+    var s = String(str).trim();
+    if (!s) return null;
+    // 1. Straight JSON first — the common, correct case.
+    try { return JSON.parse(s); } catch (e) {}
+
+    // 2. Smart quotes, which arrive when a prompt is pasted through a word
+    //    processor or a chat UI.
+    var t = s.replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    try { return JSON.parse(t); } catch (e) {}
+
+    // 3. Unescaped content quotes — see repairQuotes() above. This is the
+    //    fix for the missing case-study passage in the report: the Items cell
+    //    contained ""People think..."" and JSON.parse dropped the whole cell.
+    try { return JSON.parse(repairQuotes(t)); } catch (e) {}
+
+    // 4. Python literals: True/False/None, and single-quoted strings.
+    try {
+      var out = '', i = 0, ch, q = null, body;
+      while (i < t.length) {
+        ch = t.charAt(i);
+        if (q) {
+          // inside a string
+          if (ch === '\\') { out += ch + t.charAt(i + 1); i += 2; continue; }
+          if (ch === q) { out += '"'; q = null; i++; continue; }
+          // a double quote inside a single-quoted string must be escaped
+          if (ch === '"') { out += '\\"'; i++; continue; }
+          out += ch; i++; continue;
+        }
+        if (ch === "'" || ch === '"') { q = ch; out += '"'; i++; continue; }
+        out += ch; i++;
+      }
+      body = out
+        .replace(/\bTrue\b/g, 'true')
+        .replace(/\bFalse\b/g, 'false')
+        .replace(/\bNone\b/g, 'null')
+        .replace(/,\s*([\]}])/g, '$1');          // trailing commas
+      return JSON.parse(body);
+    } catch (e) {}
+
+    return null;
+  }
+
   function parseList(v) {
     if (v == null || v === '') return [];
     if (Array.isArray(v)) return v;
     if (typeof v === 'object') return Object.values(v);
     var s = String(v).trim();
     if (s.charAt(0) === '[' || s.charAt(0) === '{') {
-      try {
-        var p = JSON.parse(s);
-        return Array.isArray(p) ? p : [p];
-      } catch (e) { /* fall through to delimiter parsing */ }
+      var p = lenientJSON(s);
+      if (p != null) return Array.isArray(p) ? p : [p];
     }
     return s.split(/\s*[|;]\s*/).filter(Boolean);
   }
@@ -67,14 +132,16 @@
   function parseObj(v) {
     if (!v) return {};
     if (typeof v === 'object' && !Array.isArray(v)) return v;
-    try { var p = JSON.parse(String(v)); return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {}; }
-    catch (e) { return {}; }
+    var p = lenientJSON(v);                       // tolerates Python dicts
+    return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
   }
 
   /* A deterministic shuffle seeded by the question id, so the right-hand pool
-     of a matching question is the same every time the student returns to it.
+     of a matching question is the same every time the learner returns to it.
      A fresh Math.random() shuffle on each repaint would move the options
-     under the student's finger. */
+     under the learner's finger. */
+  /* exported below as CBTTypes.parseList / .parseObj / .lenientJSON so the
+     CSV importer in cbt.js uses exactly the same leniency. */
   function seededShuffle(arr, seed) {
     var a = arr.slice(), s = 0, i, j, t;
     String(seed || '').split('').forEach(function (c) { s = (s * 31 + c.charCodeAt(0)) & 0x7fffffff; });
