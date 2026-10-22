@@ -309,6 +309,7 @@ const PH={
     {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT comprehensive — attempt+clear+dropdown+preview+per-subject push', kind:'rpc', fn:'cbt_clear_exam_results', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_confirm_code:'TEST01'}},
     {file:'v12.34-cbt-attempt-and-robust-fixes.sql', label:'CBT attempt limit enforcement + robust fixes', kind:'rpc', fn:'cbt_get_public_exam_v6', args:{p_code:'TEST01', p_admission_no:'TEST001'}},
     {file:'v12.35-cbt-edit-push-categorisation-fix.sql', label:'CBT edit/push/categorisation fix', kind:'rpc', fn:'cbt_set_question_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_bank:[]}},
+    {file:'v12.36-cbt-missing-results-and-robust-fixes.sql', label:'CBT missing results retrieval + robust fixes', kind:'rpc', fn:'cbt_list_all_results', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}},
     {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'}
   ],
 
