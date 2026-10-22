@@ -287,14 +287,14 @@
       if (!rows.length) return '<p class="scq-warn">⚠️ No items defined for this question.</p>';
       var cats = [];
       rows.forEach(function (r) {
-        var c = (typeof r === 'object') ? r.category : null;
+        var c = (typeof r === 'object') ? (r.category || r.cat || r.group || r.value) : null;
         if (c && cats.indexOf(c) === -1) cats.push(c);
       });
       parseList(q.accept).forEach(function (c) { if (cats.indexOf(c) === -1) cats.push(c); });
       cats.sort();
       return '<div class="scq-hint">Put each item into the category it belongs to.</div>' +
         '<table class="scq-match">' + rows.map(function (r, i) {
-          var item = (typeof r === 'object') ? (r.item || r.label) : r;
+          var item = (typeof r === 'object') ? (r.item || r.label || r.text || r.value) : r;
           return '<tr><td class="scq-match-left">' + esc(item) + '</td>' +
             '<td class="scq-match-arrow">→</td>' +
             '<td><select class="scq-select" name="' + esc(name) + '__' + i + '">' +
