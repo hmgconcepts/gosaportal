@@ -1014,7 +1014,7 @@ window.CBTUI = {
     if(!e){ toast('Exam not found','warning'); return; }
     let qs=(Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:(Array.isArray(e.questions)?e.questions:[]); if(typeof qs==='string'){ try{qs=JSON.parse(qs);}catch(_){qs=[];} }
     qs=qs.map((q,i)=>CBT.normalizeQuestion(q,i));
-    CBTUI._eq={id, qs};
+    CBTUI._eq={id, qs, code:e.code, title:e.title};
     const rows=qs.map((q,i)=>'<tr><td>'+(i+1)+'</td><td style="max-width:340px">'+esc((q.question||'').slice(0,90))+'</td><td>'+esc(q.type||'mcq')+'</td><td>'+(q.answer==null||String(q.answer)===''?'<span style="color:#dc2626;font-weight:800">MISSING</span>':esc(Array.isArray(q.answer)?q.answer.join(', '):q.answer))+'</td>'+
       '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="CBTUI.editQ('+i+')">Edit</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.delQ('+i+')">Delete</button></td></tr>').join('');
     openModal('🛠️ Edit Questions — '+esc(e.title||'')+' ('+qs.length+')',
@@ -1035,7 +1035,7 @@ window.CBTUI = {
         <div class="form-group"><label>Correct answer (text or letter)</label><input class="form-input" id="eq-ans" value="${esc(String(q.answer||q.correct||''))}"></div>
         <div class="form-group"><label>Subject/Section (multi-subject)</label><input class="form-input" id="eq-sec" value="${esc(q.section||q.subject||'')}"></div>
       </div>
-      <div class="form-group"><label>Explanation (shown after grading)</label><input class="form-input" id="eq-exp" value="${esc(q.explanation||'')}"></div>`,
+      <div class="form-group"><label>Explanation (shown after grading)</label><input class="form-input" id="eq-exp" value="${esc(q.explanation||'')}"></div><div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-top:8px;font-size:.82rem">💡 For advanced types (matching, ordering, categorization, matrix, hot_text, dropdown, etc.), editing A-D may not capture all data (pairs/items). For those, use <b>Attach another CSV</b> with full 17-col format to preserve structured data.</div>`,
       '<button class="btn btn-outline" onclick="CBTUI.editQuestions(\''+CBTUI._eq.id+'\')">← Back</button><button class="btn btn-primary" onclick="CBTUI.saveQ('+i+')">Apply</button>');
   },
   saveQ(i){
@@ -1079,7 +1079,9 @@ window.CBTUI = {
     if(!upd.data){
       toast('Question update was not confirmed — RLS blocked. Ensure you are the exam owner or teacher of its subject/class, or run V12.32 SQL which allows any subject teacher to edit.','danger',9000); return;
     }
-    toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions) — visible on next load.','success',7000); closeModal(); CBTUI.refresh();
+    toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions) — visible on next load.','success',7000);
+    try{ const _code = String((CBTUI._eq&&CBTUI._eq.code)||e?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(_code){ localStorage.removeItem('cbt-exam-cache-'+_code); localStorage.removeItem('cbt-draft-'+_code); localStorage.removeItem('cbt-draft-'+_code.toLowerCase()); } }catch(_){}
+    closeModal(); CBTUI.refresh();
   },
   async saveAppendCSV(id){
     const txt=document.getElementById('append-cbt-csv').value.trim(); const qs=CBT.parseCSV(txt); if(!qs.length){toast('No valid questions found','warning');return;}
@@ -1092,6 +1094,7 @@ window.CBTUI = {
     const upd=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
     if(upd.error){ let msg=upd.error.message||''; if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or subject teacher. '+msg; toast('Could not append: '+msg,'danger',10000); return; }
     if(!upd.data){ toast('Append not confirmed — RLS blocked. Check ownership or run V12.32 SQL.','danger',8000); return; }
+    try{ const _code2 = String(e?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(_code2){ localStorage.removeItem('cbt-exam-cache-'+_code2); } }catch(_){}
     closeModal(); toast('✅ Questions appended and scoring keys validated ('+bank.length+' total).','success',6000); CBTUI.refresh();
   },
   async del(id){if(!sb||!confirm('Delete this exam and all its results?'))return;const r=await SCDelete.byId(sb,'cbt_exams',id);if(!r.ok){toast(r.error,'danger');return;}if(App)App.logActivity('delete','cbt_exam',id);toast('Exam deleted permanently.','success');CBTUI.refresh();},
@@ -1163,43 +1166,15 @@ window.CBTUI = {
     openModal('Retake allowances — '+esc(examId), html, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
   },
   async pushMySubject(examId){
-    // V12.33 individual teacher push — per-subject, uses ReportEngine bulk pipeline but filters to my subject
+    // V12.34 robust: push ONLY this particular CBT (no subject typing prompt)
+    // For single-subject: pushes that subject's scores. For multi-subject: pushes all subjects of this exam, split per subject.
     if(!window.ReportEngine||!window.ReportEngine.pushCBTToResults){ toast('Report engine not loaded','warning'); return; }
     if(!sb){ toast('Database not configured','warning'); return; }
-    // Determine my subject from profile or prompt
-    let mySub='';
+    if(!confirm('Push scores from this CBT to report card?\n\nThis will create/update report_scores for this exam only.\nMulti-subject exams will split per subject automatically.')) return;
     try{
-      const {data:cols}=await sb.from('assessment_columns').select('subject').eq('class','').limit(1);
-      // Try staff subjects
-      if(window.SC_PROFILE&&SC_PROFILE.id){
-        const {data:staff}=await sb.from('staff').select('subjects').eq('user_id',SC_PROFILE.id).maybeSingle();
-        if(staff&&Array.isArray(staff.subjects)&&staff.subjects.length) mySub=staff.subjects[0];
-      }
-    }catch(_){}
-    if(!mySub){
-      mySub=prompt('Enter the subject you teach to push (e.g. Mathematics).\nLeave blank to push ALL subjects of this exam:','')||'';
-      mySub=mySub.trim();
-    }
-    const examIdSafe=examId;
-    // If multi-subject and subject specified, push only that subject
-    if(mySub){
-      if(!confirm('Push '+mySub+' scores from this exam to report card?\n\nThis will create/update report_scores for '+mySub+' only (your subject).')) return;
-      try{
-        const {data:ex}=await sb.from('cbt_exams').select('*').eq('id',examIdSafe).maybeSingle();
-        if(!ex) throw Error('Exam not found');
-        // Use ReportEngine's per-exam push but with subjectFilter
-        const dest=ex.report_column||'CBT / Online Exam';
-        // Need columns
-        const {data:cols}=await sb.from('assessment_columns').select('*').limit(2000);
-        ReportEngine._bulkCBT={exams:[ex],columns:cols||[],counts:{},filtered:[ex]};
-        const col=await ReportEngine.ensureCBTDestination(ex, dest, Number(ex.max_score)||10, true);
-        const out=await ReportEngine.pushOneCBTExam(ex, dest, {column:col, verifiedOnly:true, subjectFilter:mySub});
-        toast('✅ Pushed '+out.saved+' row(s) for '+mySub+' to report card. Open Report Cards to verify.','success',9000);
-      }catch(e){ toast('Push failed: '+(e.message||e),'danger',10000); }
-    }else{
-      if(!confirm('Push ALL subjects from this exam to report card?')) return;
-      ReportEngine.pushCBTToResults(examIdSafe);
-    }
+      // Use the canonical single-exam push which handles multi-subject splitting correctly
+      await ReportEngine.pushCBTToResults(examId);
+    }catch(e){ toast('Push failed: '+(e.message||e),'danger',10000); }
   },
   /* V10.6 (#1): per-question marking panel for manual-review types. */
   async reviewResult(resultId){
