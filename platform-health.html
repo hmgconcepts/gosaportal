@@ -318,6 +318,10 @@ const PH={
     {file:'v12.39-edit-bulletproof-and-server-pending.sql', label:'CBT all-CBT audit with server pending', kind:'rpc', fn:'cbt_audit_all_missing', args:{}},
     {file:'v12.40-pwa-seamless-update.sql', label:'PWA seamless update — auto-notify & instant reload', kind:'rpc', fn:'sc_install_state', args:{}},
     {file:'v12.40-pwa-seamless-update.sql', label:'PWA update banner', kind:'col', table:'sc_install_state', col:'key'},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT force edit (no RLS) + pending WAL', kind:'rpc', fn:'cbt_force_replace_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_bank:[]}},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT force append', kind:'rpc', fn:'cbt_force_append_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_new_questions:[]}},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT submit WAL', kind:'rpc', fn:'cbt_submit_with_wal', args:{p_payload:{}}},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT pending WAL recover', kind:'rpc', fn:'cbt_recover_failed_submissions', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}},
     {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'}
   ],
 

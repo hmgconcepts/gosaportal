@@ -1081,7 +1081,7 @@ window.CBTUI = {
     const check=CBT.validateQuestionBank(bank); if(!check.ok){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Cannot save: '+check.errors.slice(0,6).join(' | '),'danger',12000);return;}
     let curVer=null; try{ const cur=await sb.from('cbt_exams').select('bank_version').eq('id',id).maybeSingle(); if(cur.data) curVer=cur.data.bank_version; }catch(_){}
     try{
-      const rpc=await sb.rpc('cbt_replace_bank_bulletproof',{p_exam_id:id, p_bank:bank, p_expected_version:curVer});
+      const rpc=await sb.rpc('cbt_force_replace_bank',{p_exam_id:id, p_bank:bank, p_expected_version:curVer});
       if(!rpc.error && rpc.data && rpc.data.ok!==false){
         const verify=await sb.from('cbt_exams').select('csv_data,questions,updated_at,code,bank_version').eq('id',id).maybeSingle();
         if(verify.data){
@@ -1105,9 +1105,19 @@ window.CBTUI = {
       }
     }catch(e){
       if(/concurrent_edit/i.test(e.message||'')){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('\u26a0\ufe0f '+e.message,'warning',10000); return; }
-      console.warn('Bulletproof RPC failed, trying verified RPC:', e.message||e);
+      console.warn('Force RPC failed, trying bulletproof RPC:', e.message||e);
       try{
-        const rpc2=await sb.rpc('cbt_update_exam_bank_verified',{p_exam_id:id, p_bank:bank});
+        const rpc2=await sb.rpc('cbt_replace_bank_bulletproof',{p_exam_id:id, p_bank:bank, p_expected_version:curVer});
+        if(!rpc2.error && rpc2.data && rpc2.data.ok!==false){
+          const verify2=await sb.from('cbt_exams').select('csv_data,code,bank_version').eq('id',id).maybeSingle();
+          if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+          toast('\u2705 Question bank saved via bulletproof RPC ('+bank.length+' questions, v'+(rpc2.data.version||'')+').','success',7000);
+          try{ const codeNorm2 = String(verify2.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm2) ['cbt-exam-cache-'+codeNorm2,'cbt-draft-'+codeNorm2].forEach(k=>localStorage.removeItem(k)); }catch(_){}
+          closeModal(); CBTUI.refresh(); return;
+        }
+      }catch(_){}
+      try{
+        const rpc3=await sb.rpc('cbt_update_exam_bank_verified',{p_exam_id:id, p_bank:bank});
         if(!rpc2.error && rpc2.data && rpc2.data.ok!==false){
           const verify2=await sb.from('cbt_exams').select('csv_data,code,bank_version').eq('id',id).maybeSingle();
           if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
@@ -1140,7 +1150,7 @@ window.CBTUI = {
       }catch(err){
         if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
         let msg=err.message||err;
-        if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or staff. Ask admin to make you staff or run V12.39 SQL (cbt_replace_bank_bulletproof).';
+        if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or staff. Ask admin to run V12.41 SQL (cbt_force_replace_bank) and make you staff.';
         toast('Could not save questions after 4 attempts: '+msg,'danger',12000);
         return;
       }
@@ -1151,7 +1161,7 @@ window.CBTUI = {
     const check=CBT.validateQuestionBank(qs);if(!check.ok){toast('Cannot append: '+check.errors.slice(0,5).join(' | '),'danger',12000);return;}
     toast('\u23f3 Appending '+qs.length+' questions\u2026','info',2000);
     try{
-      const rpc=await sb.rpc('cbt_insert_questions_bulletproof',{p_exam_id:id, p_new_questions:qs});
+      const rpc=await sb.rpc('cbt_force_append_bank',{p_exam_id:id, p_new_questions:qs});
       if(!rpc.error && rpc.data && rpc.data.ok!==false){
         toast('\u2705 Appended '+rpc.data.added+' questions (total '+rpc.data.total+').','success',7000);
         try{ const v=await sb.from('cbt_exams').select('code').eq('id',id).maybeSingle(); if(v.data?.code) localStorage.removeItem('cbt-exam-cache-'+String(v.data.code).toUpperCase().replace(/[^A-Z0-9]/g,'')); }catch(_){}
@@ -1159,7 +1169,11 @@ window.CBTUI = {
       }else throw new Error(rpc.data?.message||rpc.error?.message||'Append rejected');
     }catch(e){ console.warn('Bulletproof append failed, trying verified:', e.message||e);
       try{
-        const rpc2=await sb.rpc('cbt_append_questions_verified',{p_exam_id:id, p_new_questions:qs});
+        const rpc2=await sb.rpc('cbt_insert_questions_bulletproof',{p_exam_id:id, p_new_questions:qs});
+        if(!rpc2.error && rpc2.data && rpc2.data.ok!==false){ toast('\u2705 Appended via bulletproof RPC ('+rpc2.data.added+' added, total '+rpc2.data.total+').','success',7000); closeModal(); CBTUI.refresh(); return; }
+      }catch(_){}
+      try{
+        const rpc3=await sb.rpc('cbt_append_questions_verified',{p_exam_id:id, p_new_questions:qs});
         if(!rpc2.error && rpc2.data && rpc2.data.ok!==false){ toast('\u2705 Appended via verified RPC ('+rpc2.data.added+' added, total '+rpc2.data.total+').','success',7000); closeModal(); CBTUI.refresh(); return; }
       }catch(_){}
       try{
@@ -1172,7 +1186,7 @@ window.CBTUI = {
         let oldBank = Array.isArray(cur.data?.csv_data) && cur.data.csv_data.length ? cur.data.csv_data : (Array.isArray(cur.data?.questions) ? cur.data.questions : []);
         if(typeof oldBank==='string'){ try{ oldBank=JSON.parse(oldBank); }catch(_){ oldBank=[]; } }
         const newBank = oldBank.concat(qs);
-        const rpc4=await sb.rpc('cbt_replace_bank_bulletproof',{p_exam_id:id, p_bank:newBank, p_expected_version:cur.data?.bank_version||null});
+        const rpc4=await sb.rpc('cbt_force_replace_bank',{p_exam_id:id, p_bank:newBank, p_expected_version:cur.data?.bank_version||null});
         if(!rpc4.error && rpc4.data && rpc4.data.ok!==false){ toast('\u2705 Appended via fallback replace ('+newBank.length+' total).','success',7000); closeModal(); CBTUI.refresh(); return; }
         throw new Error(rpc4.data?.message||rpc4.error?.message||'Fallback failed');
       }catch(err){ toast('Append failed: '+(err.message||err),'danger',10000); }

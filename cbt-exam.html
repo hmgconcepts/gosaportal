@@ -791,7 +791,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     };
     let resp = null;
     for (let attempt = 0; attempt < 6; attempt++) {
-      try { resp = await window.sb.rpc('cbt_submit_v6', { p_payload: payload }); } catch (e) { resp = { error: e }; }
+      try { resp = await window.sb.rpc('cbt_submit_with_wal', { p_payload: payload }); if(resp.error) throw resp.error; } catch (e) { try{ resp = await window.sb.rpc('cbt_submit_v6', { p_payload: payload }); } catch(e2){ resp = { error: e2 }; } }
       if (resp && !resp.error && resp.data && resp.data.saved && String(resp.data.engine_version||'').startsWith('v5.1')) break;
       if (resp && !resp.error && resp.data && ['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty','wrong_class','not_on_roster','invalid_admission','admission_required'].includes(resp.data.error)) break;
       if(resp && resp.error && /cbt_submit_v6|schema cache|function/i.test(String(resp.error.message||resp.error))) break;
@@ -871,7 +871,7 @@ textarea.form-input{min-height:80px;resize:vertical}
         const rest = [];
         for (const p of q) {
           try {
-            const r = await window.sb.rpc('cbt_submit_v6', { p_payload: Object.assign({client_engine:'v5.5'},p) });
+            let r=null; try{ r = await window.sb.rpc('cbt_submit_with_wal', { p_payload: Object.assign({client_engine:'v5.5'},p) }); if(r.error) throw r.error; }catch(_){ r = await window.sb.rpc('cbt_submit_v6', { p_payload: Object.assign({client_engine:'v5.5'},p) }); }
             if (!(r && !r.error && r.data && r.data.saved && String(r.data.engine_version||'').startsWith('v5.1'))) rest.push(p);
           } catch (_) { rest.push(p); }
         }
