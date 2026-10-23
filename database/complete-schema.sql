@@ -3192,6 +3192,20 @@ create policy lesson_scope_write on public.lesson_plans for all using(public.is_
 -- REMOVED early cbt_exam_scope_insert kept last (v12.28)
 -- REMOVED early cbt_exam_scope_update_simple kept last (v12.28 final)
 -- REMOVED early cbt_exam_scope_delete kept last (v12.28)
+create table if not exists public.cbt_edit_log (
+  id uuid primary key default gen_random_uuid(),
+  exam_id uuid references public.cbt_exams(id) on delete cascade,
+  editor_id uuid references public.profiles(id) on delete set null,
+  old_count int, new_count int, old_hash text, new_hash text,
+  created_at timestamptz default now()
+);
+
+create or replace function public.sc_normalize_name(p_text text)
+returns text language sql immutable set search_path=public as $$
+  select regexp_replace(lower(trim(coalesce(p_text,''))), '[^a-z0-9]', '', 'g');
+$$;
+grant execute on function public.sc_normalize_name(text) to anon, authenticated, public;
+
 drop policy if exists cbt_result_scope_select on public.cbt_results;
 create policy cbt_result_scope_select on public.cbt_results for select using(public.is_admin(auth.uid())or public.is_staff(auth.uid())or exists(select 1 from public.cbt_exams e where e.id=cbt_results.exam_id      and(e.teacher_id=auth.uid()or public.teacher_can_manage_subject_class(auth.uid(),e.subject,e.class) or public.sc_cbt_subject_allowed(auth.uid(),e.subject,e.class)))or exists(select 1 from public.students s where s.id=cbt_results.student_id      and(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))      and not public.sc_report_hidden_for(auth.uid(), s.id)));
 create policy cbt_result_no_direct_insert on public.cbt_results for insert with check(false);
@@ -11597,6 +11611,74 @@ insert into public.sc_install_state(key,details) values ('v12.36-cbt-missing-res
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'V12.36 CBT missing results and robust fixes installed — allow any staff to view/delete results, recovery RPCs, edit with any staff, audit view' as status;
 
+
+drop function if exists public.cbt_update_exam_bank_verified(uuid, jsonb) cascade;
+create or replace function public.cbt_update_exam_bank_verified(p_exam_id uuid, p_bank jsonb)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare e record; me uuid:=auth.uid(); bank jsonb:=coalesce(p_bank,'[]'::jsonb); old jsonb; old_count int:=0; new_count int:=0; old_hash text; new_hash text;
+begin
+  if me is null then return jsonb_build_object('ok',false,'error','Not authenticated'); end if;
+  if p_exam_id is null then return jsonb_build_object('ok',false,'error','Exam id required'); end if;
+  if jsonb_typeof(bank)<>'array' then
+    if jsonb_typeof(bank)='string' then
+      begin bank:= (bank #>> '{}')::jsonb; exception when others then return jsonb_build_object('ok',false,'error','Bank must be array'); end;
+      if jsonb_typeof(bank)<>'array' then return jsonb_build_object('ok',false,'error','Bank must be array after parse'); end if;
+    else return jsonb_build_object('ok',false,'error','Bank must be array'); end if;
+  end if;
+  if jsonb_array_length(bank)=0 then return jsonb_build_object('ok',false,'error','Bank empty'); end if;
+  select * into e from public.cbt_exams where id=p_exam_id;
+  if not found then return jsonb_build_object('ok',false,'error','Exam not found'); end if;
+  -- V12.37: Any authenticated who can select the exam can edit (any staff, owner, admin, or can_manage)
+  if not (public.is_admin(me) or e.teacher_id=me or public.is_staff(me) or public.teacher_can_manage_subject_class(me,e.subject,e.class) or exists(select 1 from public.cbt_exams ex where ex.id=p_exam_id)) then
+    return jsonb_build_object('ok',false,'error','Permission denied','message','Only staff or exam owner can edit.');
+  end if;
+  select coalesce(e.csv_data,'[]'::jsonb) into old;
+  if jsonb_typeof(old)<>'array' then
+    if jsonb_typeof(old)='string' then begin old:= (old #>> '{}')::jsonb; exception when others then old:='[]'::jsonb; end; end if;
+    if jsonb_typeof(old)<>'array' then old:='[]'::jsonb; end if;
+  end if;
+  old_count:=jsonb_array_length(old);
+  new_count:=jsonb_array_length(bank);
+  old_hash:=md5(old::text);
+  new_hash:=md5(bank::text);
+  update public.cbt_exams set csv_data=bank, questions=bank, updated_at=now() where id=p_exam_id;
+  insert into public.cbt_edit_log (exam_id, editor_id, old_count, new_count, old_hash, new_hash) values (p_exam_id, me, old_count, new_count, old_hash, new_hash);
+  -- Return updated exam for verification
+  select * into e from public.cbt_exams where id=p_exam_id;
+  return jsonb_build_object('ok',true,'message','Question bank updated','exam_id',p_exam_id,'old_count',old_count,'new_count',new_count,'old_hash',old_hash,'new_hash',new_hash,'verified',old_hash<>new_hash,'exam_code',e.code,'engine_version','v12.37');
+end$$;
+revoke execute on function public.cbt_update_exam_bank_verified(uuid,jsonb) from public, anon;
+grant execute on function public.cbt_update_exam_bank_verified(uuid,jsonb) to authenticated, anon;
+
+create index if not exists cbt_exams_subject_class_idx on public.cbt_exams(subject, class);
+drop function if exists public.cbt_append_questions_verified(uuid, jsonb) cascade;
+create or replace function public.cbt_append_questions_verified(p_exam_id uuid, p_new_questions jsonb)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare e record; me uuid:=auth.uid(); old_bank jsonb; new_bank jsonb; added int:=0;
+begin
+  if me is null then return jsonb_build_object('ok',false,'error','Not authenticated'); end if;
+  select * into e from public.cbt_exams where id=p_exam_id;
+  if not found then return jsonb_build_object('ok',false,'error','Exam not found'); end if;
+  if not (public.is_admin(me) or e.teacher_id=me or public.is_staff(me) or public.teacher_can_manage_subject_class(me,e.subject,e.class) or exists(select 1 from public.cbt_exams ex where ex.id=p_exam_id)) then
+    return jsonb_build_object('ok',false,'error','Permission denied');
+  end if;
+  old_bank:=coalesce(e.csv_data,'[]'::jsonb);
+  if jsonb_typeof(old_bank)<>'array' then
+    if jsonb_typeof(old_bank)='string' then begin old_bank:= (old_bank #>> '{}')::jsonb; exception when others then old_bank:='[]'::jsonb; end; end if;
+    if jsonb_typeof(old_bank)<>'array' then old_bank:='[]'::jsonb; end if;
+  end if;
+  if jsonb_typeof(p_new_questions)<>'array' then
+    if jsonb_typeof(p_new_questions)='string' then begin p_new_questions:= (p_new_questions #>> '{}')::jsonb; exception when others then return jsonb_build_object('ok',false,'error','New questions must be array'); end; end if;
+    if jsonb_typeof(p_new_questions)<>'array' then return jsonb_build_object('ok',false,'error','New questions must be array'); end if;
+  end if;
+  new_bank:=old_bank || p_new_questions;
+  update public.cbt_exams set csv_data=new_bank, questions=new_bank, updated_at=now() where id=p_exam_id;
+  added:=jsonb_array_length(p_new_questions);
+  insert into public.cbt_edit_log (exam_id, editor_id, old_count, new_count, old_hash, new_hash) values (p_exam_id, me, jsonb_array_length(old_bank), jsonb_array_length(new_bank), md5(old_bank::text), md5(new_bank::text));
+  return jsonb_build_object('ok',true,'message','Added '||added||' questions','total',jsonb_array_length(new_bank),'added',added,'old_count',jsonb_array_length(old_bank));
+end$$;
+revoke execute on function public.cbt_append_questions_verified(uuid,jsonb) from public, anon;
+grant execute on function public.cbt_append_questions_verified(uuid,jsonb) to authenticated;
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
 
