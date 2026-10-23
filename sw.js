@@ -1,6 +1,6 @@
 // School Connect Service Worker — V5 cumulative release (offline + push + timeout)
 // Literal cache version intentionally changes with every runtime deployment.
-const CACHE = 'sc-client-v12.36-20261007-43';
+const CACHE = 'sc-client-v12.37-20261007-44';
 const CORE = ['./','./index.html','./login.html','./dashboard.html','./offline.html','./assets/css/style.css','./assets/js/config.js','./assets/js/app.js','./assets/js/crud.js','./assets/js/security-guard.js','./assets/js/cbt-engine.js','./assets/js/cbt-types.js','./assets/js/report-engine.js','./assets/js/notifications.js','./assets/js/voting.js','./assets/js/pwa-install.js','./assets/js/super.js','./assets/js/site-help.js','./assets/js/archive-hub.js','./assets/js/cbt-archive.js','./assets/js/assignment-cbt.js','./assets/js/recovery.js','./assets/js/data-portability.js','./assets/js/drive-sync.js','./assets/js/enterprise.js','./assets/js/analytics.js','./assets/img/logo.png','./manifest.json','./assets/js/theme-manager.js','./assets/js/messages-center.js','./assets/js/keepalive-layers.js','./assets/js/cbt-practice.js','./assets/js/study-log.js','./assets/js/ics-export.js','./assets/js/learner-portfolio.js'];
 
 self.addEventListener('install', e => {
