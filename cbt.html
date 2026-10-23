@@ -527,6 +527,20 @@
         <div id="cbt-archive-log" style="margin-top:10px;font-size:.9rem;color:#475569"></div>
       </div>
 
+      <!-- V12.38 All-CBT Missing Results Auditor — finds missing/uncompleted for ANY CBT, not just civic SSS1-3 -->
+      <div class="card" id="cbt-missing-audit" style="border:2px solid #3b82f6;background:#eff6ff;margin-bottom:16px">
+        <h3 style="margin-top:0">🔍 All-CBT Missing Results Auditor (V12.38) — Any Subject, Any Class</h3>
+        <p style="color:#1e40af;margin-top:4px">If students submitted successfully but you see <b>no results or incomplete results</b> for <b>ANY CBT</b> (not just Civic Education SSS1-3, but Mathematics, English, Physics, any subject/class), this one-click audit checks <b>every exam</b> via secure server RPC (bypasses RLS, includes archived). It shows total in DB, roster vs results gap, pending-review, and per-device pending queue hint — robust, all-inclusive, self-contained.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
+          <button class="btn btn-primary" onclick="CBTUI.auditAllMissing()">🔍 Audit All CBTs — Find Missing Results</button>
+          <button class="btn btn-outline" onclick="CBTUI.auditAllMissing(true)">🔄 Re-check (refresh counts)</button>
+        </div>
+        <div id="cbt-audit-stats" style="margin:10px 0;font-size:.9rem;color:#475569">Click "Audit All CBTs" to scan every exam for missing/uncompleted results.</div>
+        <div style="font-size:.82rem;color:#374151;background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:8px;margin-top:8px">
+          <b>💡 Covers all 10 missing causes:</b> RLS narrow (any role), class/subject mismatch, archived hidden, pending queue device-bound, shared-laptop duplicate, attempt-limit block, empty bank, manual-review ungraded, exam-select narrow, total type — this auditor flags each exam where results < roster or graded ≠ total.
+        </div>
+      </div>
+
       <div id="cbt-list"><span class="pulse">Loading exams…</span></div>
     
       <div class="card" style="margin-top:16px;background:#f0fdf4;border:1px solid #bbf7d0">
@@ -699,7 +713,7 @@ window.CBTUI = {
     }
     const action=e=>'<button class="btn btn-sm btn-outline" onclick="CBTUI.toggle(\''+e.id+'\','+(!e.is_open)+')">'+(e.is_open?'Close':'Open')+'</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.share(\''+esc(e.code)+'\')">Share</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.results(\''+e.id+'\',\''+esc(e.code)+'\')">Results</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.preview(\''+e.id+'\')">Preview</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.proctorReview(\''+esc(e.code)+'\')" title="Review proctoring snapshots">📸</button> '+(CBTUI.canManageExam(e)?'<button class="btn btn-sm btn-primary" onclick="CBTUI.edit(\''+e.id+'\')">Edit</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.editQuestions(\''+e.id+'\')">Questions</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.setArchived(\''+e.id+'\','+(!e.is_archived)+')">'+(e.is_archived?'Restore':'Archive')+'</button> <details style="display:inline-block"><summary class="btn btn-sm btn-outline" style="list-style:none">More</summary><div class="card" style="position:absolute;z-index:20;min-width:220px"><button class="btn btn-sm btn-outline" onclick="CBTUI.exportPackage(\''+e.id+'\')">Export package</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.appendCSV(\''+e.id+'\')">Attach CSV</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.diagnoseScoring(\''+e.id+'\')">Diagnose</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairScoring(\''+e.id+'\')">Repair scoring</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.regradeResults(\''+e.id+'\')">Regrade</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairTabs(\''+e.id+'\')">Repair tabs</button> <button class="btn btn-sm btn-outline" data-admin-only onclick="CBTUI.del(\''+e.id+'\')">Delete</button></div></details>':'<span class="badge">Read-only</span>');
     const groups={};rows.forEach(e=>{const key=(e.session||'No session')+'|||'+(e.term||'No term');(groups[key]||(groups[key]=[])).push(e);});
-    const groupHtml=Object.entries(groups).map(([key,list])=>{const [session,term]=key.split('|||');return '<section class="card" style="margin:14px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">'+esc(session)+' · '+esc(term)+'</h3><span class="badge">'+list.length+' exam(s)</span></div><div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject & Class</th><th>Purpose</th><th>Mode</th><th>Report</th><th>Status</th><th>Owner</th><th>Actions</th></tr></thead><tbody>'+list.map(e=>'<tr><td><b>'+esc(e.code)+'</b><br>'+esc(e.title||'Untitled')+'<br><small>'+(CBTUI._purposeBadge?CBTUI._purposeBadge(e.assessment_type):esc(e.assessment_type||'exam'))+' · '+(isMulti(e)?'Multi-subject':'Single-subject')+'</small></td><td>'+esc(e.subject||'—')+'<br><small>'+esc(e.class||'—')+'</small></td><td>'+(CBTUI._purposeBadge?CBTUI._purposeBadge(e.assessment_type):esc(e.assessment_type||''))+'</td><td>'+(isAnon(e)?'Open / anonymous':'Registered')+'</td><td>'+esc(e.report_column||'Not mapped')+(e.max_score?'<br><small>max '+Number(e.max_score)+'</small>':'')+'</td><td>'+(e.is_archived?'<span class="badge">Archived</span>':(e.is_open?'<span class="badge badge-success">Open</span>':'<span class="badge">Closed</span>'))+'</td><td>'+esc(e.teacher_name||'—')+'</td><td style="min-width:320px">'+action(e)+'</td></tr>').join('')+'</tbody></table></div></section>';}).join('');
+    const groupHtml=Object.entries(groups).map(([key,list])=>{const [session,term]=key.split('|||');return '<section class="card" style="margin:14px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">'+esc(session)+' · '+esc(term)+'</h3><span class="badge">'+list.length+' exam(s)</span></div><div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject & Class</th><th>Purpose</th><th>Mode</th><th>Report</th><th>Status</th><th>Owner</th><th>Actions</th></tr></thead><tbody>'+list.map(e=>'<tr><td><b>'+esc(e.code)+'</b><br>'+esc(e.title||'Untitled')+'<br><small>'+(CBTUI._purposeBadge?CBTUI._purposeBadge(e.assessment_type):esc(e.assessment_type||'exam'))+' · '+(isMulti(e)?'Multi-subject':'Single-subject')+'</small></td><td>'+esc(e.subject||'—')+'<br><small>'+esc(e.class||'—')+'</small></td><td>'+(CBTUI._purposeBadge?CBTUI._purposeBadge(e.assessment_type):esc(e.assessment_type))+'</td><td>'+(isAnon(e)?'Open / anonymous':'Registered')+'</td><td>'+esc(e.report_column||'Not mapped')+(e.max_score?'<br><small>max '+Number(e.max_score)+'</small>':'')+'</td><td>'+(e.is_archived?'<span class="badge">Archived</span>':(e.is_open?'<span class="badge badge-success">Open</span>':'<span class="badge">Closed</span>'))+'</td><td>'+esc(e.teacher_name||'—')+'</td><td style="min-width:320px">'+action(e)+'</td></tr>').join('')+'</tbody></table></div></section>';}).join('');
     const totals='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+exams.filter(e=>!e.is_archived).length+'</div><div class="stat-label">Active exams</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>e.is_archived).length+'</div><div class="stat-label">Archived</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>String(e.assessment_type||'').toLowerCase()==='assignment').length+'</div><div class="stat-label">🟢 Assignments (CBT)</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>['ca','test'].includes(String(e.assessment_type||'').toLowerCase())).length+'</div><div class="stat-label">🔵 Mid-term CAs</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>String(e.assessment_type||'').toLowerCase()==='exam').length+'</div><div class="stat-label">🔴 Terminal Exams</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Visible after filters</div></div></div>';
     box.innerHTML=totals+controls+(groupHtml||'<div class="card">No CBT exams match these filters.</div>');
   },
@@ -1301,6 +1315,40 @@ window.CBTUI = {
     const remaining=pending.filter(p=> !toReplay.some(q=> String(q.client_ref)===String(p.client_ref)));
     localStorage.setItem('cbt-pending-queue', JSON.stringify(remaining));
     this.results(examId, '');
+  },
+  // V12.38: Global audit for ANY CBT's missing/uncompleted (not just civic SSS1-3) — robust, all-inclusive
+  async auditAllMissing(forceRefresh){
+    const box=document.getElementById('cbt-audit-stats');
+    if(box) box.innerHTML='<span class="pulse">Auditing every CBT via secure RPC (bypasses RLS, includes archived)…</span>';
+    if(!sb){ if(box) box.innerHTML='<span style="color:#b91c1c">Database not configured</span>'; return; }
+    try{
+      const r=await sb.rpc('cbt_audit_all_missing');
+      if(r.error) throw new Error(r.error.message);
+      const d=r.data||{};
+      if(!d.ok) throw new Error(d.error||d.message||'Audit failed');
+      const exams=Array.isArray(d.exams)?d.exams:[];
+      if(!exams.length){
+        if(box) box.innerHTML='<div class="notice">No CBT exams yet. Create one with + New Exam / Test.</div>';
+        return;
+      }
+      let pendingCnt=0; try{ pendingCnt=JSON.parse(localStorage.getItem('cbt-pending-queue')||'[]').length; }catch(_){}
+      const missingExams=exams.filter(e=> Number(e.total_results||0)===0 || Number(e.has_missing));
+      const pendingReviewExams=exams.filter(e=> Number(e.pending_review||0)>0);
+      let html='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+d.total_exams+'</div><div class="stat-label">Total CBTs</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>!e.is_archived).length+'</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>e.is_archived).length+'</div><div class="stat-label">Archived</div></div><div class="stat-card"><div class="stat-value">'+missingExams.length+'</div><div class="stat-label" style="color:'+(missingExams.length?'#b91c1c':'#16a34a')+'">'+(missingExams.length?'⚠️ Potential missing':'No missing')+'</div></div><div class="stat-card"><div class="stat-value">'+pendingCnt+'</div><div class="stat-label">Pending in THIS browser</div></div></div>';
+      html+='<div class="table-wrap" style="max-height:400px;overflow:auto;margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject / Class</th><th>Status</th><th>Results (total / graded / pending)</th><th>Roster</th><th>Alert</th><th>Action</th></tr></thead><tbody>'+exams.slice(0,100).map(e=>{
+        const total=Number(e.total_results||0), graded=Number(e.graded||0), rev=Number(e.pending_review||0), roster=Number(e.roster_count||0);
+        const hasMissing = e.has_missing || (roster>0 && total<roster) || (total===0 && !e.is_archived);
+        const alert = hasMissing ? (total===0 ? '<span style="color:#dc2626;font-weight:800">Empty — no results</span>' : '<span style="color:#d97706;font-weight:700">Roster '+roster+' → Results '+total+'</span>') : (rev>0?'<span style="color:#92400e">✍️ '+rev+' pending review</span>':'<span style="color:#16a34a">✅ OK</span>');
+        return `<tr style="`+(hasMissing?'background:#fef2f2':'')+`"><td><b>`+esc(e.code)+`</b><br><small>`+esc(e.title)+`</small></td><td>`+esc(e.subject)+`<br><small>`+esc(e.class)+`</small></td><td>`+(e.is_archived?'<span class="badge">Archived</span>':'<span class="badge badge-success">'+(e.is_open?'Open':'Closed')+'</span>')+`<br><small>`+esc(e.assessment_type)+`</small></td><td>`+total+` / `+graded+` / `+(rev||0)+`</td><td>`+(roster||"—")+`</td><td>`+alert+`</td><td><button class="btn btn-sm btn-outline" onclick="CBTUI.results('`+e.id+`','`+esc(e.code)+`')">Results</button> <button class="btn btn-sm btn-outline" style="background:#fff7ed" onclick="CBTUI.recoverMissing('`+e.id+`','`+esc(e.code)+`')">Recover</button></td></tr>`;
+      }).join('')+'</tbody></table></div>';
+      if(exams.length>100) html+='<p style="font-size:.8rem;color:#64748b">Showing first 100 of '+exams.length+'.</p>';
+      if(pendingCnt) html+='<div class="notice\" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-top:10px">📦 This browser has '+pendingCnt+' pending submission(s) in localStorage cbt-pending-queue (from any CBT with failed network). Click Recover on the affected exam, or ask each student to open cbt-exam.html while online to auto-flush.</div>';
+      html+='<p style="font-size:.82rem;color:#475569;margin-top:8px">Hint: Archived exams hide from default "Active" filter but still hold results — switch to "Archived only" or "All" to see them. Roster > Results suggests students submitted but results not recovered — use per-exam Recover Missing. Uncompleted (manual_review) means essay/code awaiting your grading — open Results → Review.</p>';
+      if(box) box.innerHTML=html;
+      toast('Audited '+exams.length+' CBTs — '+(missingExams.length? missingExams.length+' with potential missing':'all complete'),'info',7000);
+    }catch(e){
+      if(box) box.innerHTML='<div class="notice notice-error"><b>Audit failed:</b> '+esc(e.message||e)+'<br><small>Ensure you ran V12.38 SQL and are logged in as staff/admin.</small></div>';
+    }
   },
   /* V10.6 (#1): per-question marking panel for manual-review types. */
   async reviewResult(resultId){
