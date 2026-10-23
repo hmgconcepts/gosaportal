@@ -803,6 +803,8 @@ textarea.form-input{min-height:80px;resize:vertical}
     const terminalError=resp&&resp.data&&['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty','wrong_class','not_on_roster','invalid_admission','admission_required'].includes(resp.data.error);
     if (!confirmed && !terminalError) {
       try { const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]'); q.push(payload); localStorage.setItem('cbt-pending-queue', JSON.stringify(q.slice(-10))); } catch (_) {}
+      // V12.39: also store to server pending (device-independent, tutor can flush via cbt_flush_pending_server)
+      try { if(window.sb) window.sb.rpc('cbt_store_pending',{p_payload: payload}).then(()=>console.log('[CBT] Stored to server pending')).catch(()=>{}); } catch(_){}
     } else if (confirmed) {
       try {
         // V12.37: clear per-student draft and deadline, plus global, to prevent next student on same laptop getting previous score/timer

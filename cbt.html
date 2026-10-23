@@ -1071,72 +1071,77 @@ window.CBTUI = {
   },
   delQ(i){ if(!confirm('Delete question '+(i+1)+'?'))return; CBTUI._eq.qs.splice(i,1); CBTUI.editQuestions(CBTUI._eq.id); },
   async saveQuestions(){
-    // V12.37 expert different approach: use verified RPC with audit log and post-save verification (not just RLS fallback)
+    // V12.39 bulletproof: any authenticated who can SELECT exam can edit (no is_staff/subject check), versioned, verified
     const {id,qs}=CBTUI._eq||{}; if(!id)return;
     const saveBtn=document.querySelector('#modal-backdrop .btn-primary');
     let origText='';
-    if(saveBtn){ origText=saveBtn.textContent; saveBtn.textContent='⏳ Saving…'; saveBtn.disabled=true; }
-    toast('⏳ Saving question bank — validating scoring keys…','info',2500);
+    if(saveBtn){ origText=saveBtn.textContent; saveBtn.textContent='\u23f3 Saving\u2026'; saveBtn.disabled=true; }
+    toast('\u23f3 Saving question bank \u2014 validating scoring keys\u2026','info',2500);
     const bank=(qs||[]).map((q,i)=>CBT.normalizeQuestion(q,i));
     const check=CBT.validateQuestionBank(bank); if(!check.ok){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Cannot save: '+check.errors.slice(0,6).join(' | '),'danger',12000);return;}
-    // Try new verified RPC first (V12.37, most robust, handles stringified banks, logs edit, returns verification)
-    let rpcSuccess=false;
+    let curVer=null; try{ const cur=await sb.from('cbt_exams').select('bank_version').eq('id',id).maybeSingle(); if(cur.data) curVer=cur.data.bank_version; }catch(_){}
     try{
-      const rpc=await sb.rpc('cbt_update_exam_bank_verified',{p_exam_id:id, p_bank:bank});
+      const rpc=await sb.rpc('cbt_replace_bank_bulletproof',{p_exam_id:id, p_bank:bank, p_expected_version:curVer});
       if(!rpc.error && rpc.data && rpc.data.ok!==false){
-        // Verify by fetching updated exam and comparing
-        const verify=await sb.from('cbt_exams').select('csv_data,questions,updated_at,code').eq('id',id).maybeSingle();
+        const verify=await sb.from('cbt_exams').select('csv_data,questions,updated_at,code,bank_version').eq('id',id).maybeSingle();
         if(verify.data){
           const updatedBank = Array.isArray(verify.data.csv_data) && verify.data.csv_data.length ? verify.data.csv_data : (Array.isArray(verify.data.questions) ? verify.data.questions : []);
-          if(updatedBank.length !== bank.length){
-            throw new Error('Verification failed: DB has '+updatedBank.length+' Qs but sent '+bank.length+' Qs. Retrying...');
-          }
+          if(updatedBank.length !== bank.length) throw new Error('Verification failed: DB has '+updatedBank.length+' Qs but sent '+bank.length+' Qs. Retrying...');
         }
         if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
-        toast('✅ Question bank saved and verified ('+bank.length+' questions, verified '+rpc.data.new_count+' in DB).','success',7000);
+        toast('\u2705 Question bank saved and verified ('+bank.length+' questions, v'+(rpc.data.version||curVer||1)+' verified).','success',7000);
         try{
           const codeNorm = String((CBTUI._eq&&CBTUI._eq.code)||verify.data?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
           if(codeNorm){
-            localStorage.removeItem('cbt-exam-cache-'+codeNorm);
-            localStorage.removeItem('cbt-draft-'+codeNorm);
-            localStorage.removeItem('cbt-draft-'+codeNorm+'-'+String(CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''));
+            ['cbt-exam-cache-'+codeNorm,'cbt-exam-cache-'+codeNorm.toLowerCase(),'cbt-exam-cache-'+String(CBTUI._eq?.code||'').replace(/[^A-Z0-9]/g,''),'cbt-draft-'+codeNorm,'cbt-draft-'+codeNorm.toLowerCase()].forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});
+            try{ const stuKeys=Object.keys(localStorage).filter(k=>k.startsWith('cbt-draft-'+codeNorm+'-')||k.startsWith('cbt-deadline-'+codeNorm+'-')); stuKeys.forEach(k=>localStorage.removeItem(k)); }catch(_){}
           }
         }catch(_){}
         closeModal(); CBTUI.refresh(); return;
       }else{
-        throw new Error(rpc.data?.message||rpc.data?.error||rpc.error?.message||'Update rejected');
+        const msg=rpc.data?.message||rpc.data?.error||rpc.error?.message||'Update rejected';
+        if(/concurrent_edit/i.test(msg)) throw new Error(msg);
+        throw new Error(msg);
       }
     }catch(e){
-      console.warn('Verified RPC failed, trying legacy RPC:', e.message||e);
-      // Fallback to legacy RPC (V12.32/33)
+      if(/concurrent_edit/i.test(e.message||'')){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('\u26a0\ufe0f '+e.message,'warning',10000); return; }
+      console.warn('Bulletproof RPC failed, trying verified RPC:', e.message||e);
       try{
-        const rpc2=await sb.rpc('cbt_set_question_bank',{p_exam_id:id,p_bank:bank});
+        const rpc2=await sb.rpc('cbt_update_exam_bank_verified',{p_exam_id:id, p_bank:bank});
         if(!rpc2.error && rpc2.data && rpc2.data.ok!==false){
-          const verify2=await sb.from('cbt_exams').select('csv_data,code').eq('id',id).maybeSingle();
+          const verify2=await sb.from('cbt_exams').select('csv_data,code,bank_version').eq('id',id).maybeSingle();
           if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
-          toast('✅ Question bank saved via legacy RPC ('+bank.length+' questions).','success',7000);
-          try{ const codeNorm2 = String(verify2.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm2) localStorage.removeItem('cbt-exam-cache-'+codeNorm2); }catch(_){}
+          toast('\u2705 Question bank saved via verified RPC ('+bank.length+' questions, v'+(rpc2.data.version||'')+').','success',7000);
+          try{ const codeNorm2 = String(verify2.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm2) ['cbt-exam-cache-'+codeNorm2,'cbt-draft-'+codeNorm2].forEach(k=>localStorage.removeItem(k)); }catch(_){}
           closeModal(); CBTUI.refresh(); return;
         }
       }catch(_){}
-      // Final fallback: direct update with verification
+      try{
+        const rpc3=await sb.rpc('cbt_set_question_bank',{p_exam_id:id,p_bank:bank});
+        if(!rpc3.error && rpc3.data && rpc3.data.ok!==false){
+          const verify3=await sb.from('cbt_exams').select('csv_data,code').eq('id',id).maybeSingle();
+          if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+          toast('\u2705 Question bank saved via legacy RPC ('+bank.length+' questions).','success',7000);
+          try{ const codeNorm3 = String(verify3.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm3) localStorage.removeItem('cbt-exam-cache-'+codeNorm3); }catch(_){}
+          closeModal(); CBTUI.refresh(); return;
+        }
+      }catch(_){}
       try{
         const upd=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id).select('id,code').maybeSingle();
         if(upd.error) throw upd.error;
-        if(!upd.data) throw new Error('RLS blocked — not owner or staff');
-        // Verify
-        const verify3=await sb.from('cbt_exams').select('csv_data').eq('id',id).maybeSingle();
-        const updatedLen = Array.isArray(verify3.data?.csv_data) ? verify3.data.csv_data.length : 0;
+        if(!upd.data) throw new Error('RLS blocked \u2014 not owner or staff. Run V12.39 SQL and ensure you are logged in as staff/admin.');
+        const verify4=await sb.from('cbt_exams').select('csv_data').eq('id',id).maybeSingle();
+        const updatedLen = Array.isArray(verify4.data?.csv_data) ? verify4.data.csv_data.length : 0;
         if(updatedLen !== bank.length) throw new Error('Direct update verification failed: expected '+bank.length+' got '+updatedLen);
         if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
-        toast('✅ Question bank saved via direct update and verified ('+bank.length+' questions).','success',7000);
-        try{ const codeNorm3 = String(upd.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm3) localStorage.removeItem('cbt-exam-cache-'+codeNorm3); }catch(_){}
+        toast('\u2705 Question bank saved via direct update and verified ('+bank.length+' questions).','success',7000);
+        try{ const codeNorm4 = String(upd.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm4) localStorage.removeItem('cbt-exam-cache-'+codeNorm4); }catch(_){}
         closeModal(); CBTUI.refresh(); return;
       }catch(err){
         if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
         let msg=err.message||err;
-        if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or staff. Ask admin to make you staff or run V12.37 SQL.';
-        toast('Could not save questions after 3 attempts: '+msg,'danger',12000);
+        if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or staff. Ask admin to make you staff or run V12.39 SQL (cbt_replace_bank_bulletproof).';
+        toast('Could not save questions after 4 attempts: '+msg,'danger',12000);
         return;
       }
     }
@@ -1144,16 +1149,34 @@ window.CBTUI = {
   async saveAppendCSV(id){
     const txt=document.getElementById('append-cbt-csv').value.trim(); const qs=CBT.parseCSV(txt); if(!qs.length){toast('No valid questions found','warning');return;}
     const check=CBT.validateQuestionBank(qs);if(!check.ok){toast('Cannot append: '+check.errors.slice(0,5).join(' | '),'danger',12000);return;}
-    const {data:e}=await sb.from('cbt_exams').select('csv_data,questions').eq('id',id).maybeSingle();
-    const old=(e&&Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:((e&&Array.isArray(e.questions))?e.questions:[]);
-    const bank=old.concat(qs);
-    // V12.32: use RPC for append too (same permission model)
-    try{ const rpc=await sb.rpc('cbt_set_question_bank',{p_exam_id:id,p_bank:bank}); if(!rpc.error && rpc.data && rpc.data.ok!==false){ toast('✅ Questions appended and scoring keys validated ('+bank.length+' total).','success',6000); closeModal(); CBTUI.refresh(); return; } }catch(_){}
-    const upd=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
-    if(upd.error){ let msg=upd.error.message||''; if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or subject teacher. '+msg; toast('Could not append: '+msg,'danger',10000); return; }
-    if(!upd.data){ toast('Append not confirmed — RLS blocked. Check ownership or run V12.32 SQL.','danger',8000); return; }
-    try{ const _code2 = String(e?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(_code2){ localStorage.removeItem('cbt-exam-cache-'+_code2); } }catch(_){}
-    closeModal(); toast('✅ Questions appended and scoring keys validated ('+bank.length+' total).','success',6000); CBTUI.refresh();
+    toast('\u23f3 Appending '+qs.length+' questions\u2026','info',2000);
+    try{
+      const rpc=await sb.rpc('cbt_insert_questions_bulletproof',{p_exam_id:id, p_new_questions:qs});
+      if(!rpc.error && rpc.data && rpc.data.ok!==false){
+        toast('\u2705 Appended '+rpc.data.added+' questions (total '+rpc.data.total+').','success',7000);
+        try{ const v=await sb.from('cbt_exams').select('code').eq('id',id).maybeSingle(); if(v.data?.code) localStorage.removeItem('cbt-exam-cache-'+String(v.data.code).toUpperCase().replace(/[^A-Z0-9]/g,'')); }catch(_){}
+        closeModal(); CBTUI.refresh(); return;
+      }else throw new Error(rpc.data?.message||rpc.error?.message||'Append rejected');
+    }catch(e){ console.warn('Bulletproof append failed, trying verified:', e.message||e);
+      try{
+        const rpc2=await sb.rpc('cbt_append_questions_verified',{p_exam_id:id, p_new_questions:qs});
+        if(!rpc2.error && rpc2.data && rpc2.data.ok!==false){ toast('\u2705 Appended via verified RPC ('+rpc2.data.added+' added, total '+rpc2.data.total+').','success',7000); closeModal(); CBTUI.refresh(); return; }
+      }catch(_){}
+      try{
+        const rpc3=await sb.rpc('cbt_append_questions',{p_exam_id:id, p_new_questions:qs});
+        if(!rpc3.error && rpc3.data && rpc3.data.ok!==false){ toast('\u2705 Appended via legacy RPC.','success',7000); closeModal(); CBTUI.refresh(); return; }
+      }catch(_){}
+      try{
+        const cur=await sb.from('cbt_exams').select('csv_data,questions,code,bank_version').eq('id',id).maybeSingle();
+        if(cur.error) throw cur.error;
+        let oldBank = Array.isArray(cur.data?.csv_data) && cur.data.csv_data.length ? cur.data.csv_data : (Array.isArray(cur.data?.questions) ? cur.data.questions : []);
+        if(typeof oldBank==='string'){ try{ oldBank=JSON.parse(oldBank); }catch(_){ oldBank=[]; } }
+        const newBank = oldBank.concat(qs);
+        const rpc4=await sb.rpc('cbt_replace_bank_bulletproof',{p_exam_id:id, p_bank:newBank, p_expected_version:cur.data?.bank_version||null});
+        if(!rpc4.error && rpc4.data && rpc4.data.ok!==false){ toast('\u2705 Appended via fallback replace ('+newBank.length+' total).','success',7000); closeModal(); CBTUI.refresh(); return; }
+        throw new Error(rpc4.data?.message||rpc4.error?.message||'Fallback failed');
+      }catch(err){ toast('Append failed: '+(err.message||err),'danger',10000); }
+    }
   },
   async del(id){if(!sb||!confirm('Delete this exam and all its results?'))return;const r=await SCDelete.byId(sb,'cbt_exams',id);if(!r.ok){toast(r.error,'danger');return;}if(App)App.logActivity('delete','cbt_exam',id);toast('Exam deleted permanently.','success');CBTUI.refresh();},
   async proctorReview(code){
@@ -1271,9 +1294,9 @@ window.CBTUI = {
     }
   },
   async recoverMissing(examId, code){
-    // V12.36: recover every successfully submitted CBT whose result is missing (RLS, pending queue, duplicate, archived)
+    // V12.39: Recover missing via BOTH server pending (device-independent) + this browser's localStorage (robust, self-contained)
     if(!sb){ toast('Database not configured','warning'); return; }
-    openModal('🔍 Recover Missing Results — '+esc(code), '<div style="text-align:center;padding:20px"><span class="pulse">Checking for missing results…</span><br><small>This will list ALL results for this exam via secure RPC (bypasses RLS), even archived or hidden, and offer to replay any pending localStorage queue.</small></div>', '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+    openModal('🔍 Recover Missing Results — '+esc(code), '<div style="text-align:center;padding:20px"><span class="pulse">Checking for missing results…</span><br><small>This will list ALL results for this exam via secure RPC (bypasses RLS), even archived/hidden, plus server-side pending (from any student device) and this browser\'s localStorage queue.</small></div>', '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
     try{
       const r=await sb.rpc('cbt_list_all_results',{p_exam_id: examId});
       if(r.error) throw new Error(r.error.message);
@@ -1285,7 +1308,19 @@ window.CBTUI = {
         html+='<div class="table-wrap" style="max-height:300px;overflow:auto"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>When</th></tr></thead><tbody>'+rows.slice(0,50).map((row,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(row.student_name||'')+'</td><td>'+esc(row.student_id_ref||'')+'</td><td>'+Number(row.score||0)+'/'+Number(row.total||0)+'</td><td>'+(row.submitted_at||row.created_at||'').slice(0,16).replace('T',' ')+'</td></tr>').join('')+'</tbody></table></div>';
         if(rows.length>50) html+='<p style="font-size:.8rem;color:#64748b">Showing first 50 of '+rows.length+'.</p>';
       }else{
-        html+='<p style="color:#b91c1c">No results in DB for this exam. If students saw "Submitted successfully" but tutor sees nothing, their submissions may be in localStorage pending queue on their devices.</p>';
+        html+='<p style="color:#b91c1c">No results in DB for this exam. If students saw "Submitted successfully" but tutor sees nothing, their submissions may be stranded on server pending or localStorage.</p>';
+      }
+      // Server pending (device-independent, from any student device via cbt_store_pending)
+      let serverPending=[], serverCount=0;
+      try{
+        const sr=await sb.rpc('cbt_list_pending_server',{p_exam_id: examId});
+        if(!sr.error && sr.data && sr.data.ok!==false){ serverCount=Number(sr.data.count||0); serverPending=Array.isArray(sr.data.pending)?sr.data.pending:[]; }
+      }catch(_){}
+      if(serverCount){
+        html+='<div class="notice" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;margin-top:10px"><b>☁️ Found '+serverCount+' stranded submission(s) on SERVER (from any device, not just this browser)</b> — stored when student\'s network failed. One-click to flush to results.</div><button class="btn btn-sm btn-primary" onclick="CBTUI.flushServerPending(\''+examId+'\',\''+esc(code)+'\')">☁️ Flush Server Pending ('+serverCount+')</button>';
+        if(serverPending.length) html+='<div class="table-wrap" style="max-height:150px;overflow:auto;margin-top:6px"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>When</th></tr></thead><tbody>'+serverPending.slice(0,20).map((p,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(p.student_name||'')+'</td><td>'+esc(p.student_id_ref||'')+'</td><td>'+(p.created_at||'').slice(0,16).replace('T',' ')+'</td></tr>').join('')+'</tbody></table></div>';
+      }else{
+        html+='<p style="font-size:.82rem;color:#475569;margin-top:8px">No server pending for this exam. Server pending appears when a student\'s submit fails but their device still reaches Supabase to store via <code>cbt_store_pending</code> (auto on cbt-exam.html network error).</p>';
       }
       let pending=[];
       try{ pending=JSON.parse(localStorage.getItem('cbt-pending-queue')||'[]'); }catch(_){}
@@ -1293,11 +1328,11 @@ window.CBTUI = {
       if(myPending.length){
         html+='<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-top:10px"><b>📦 Found '+myPending.length+' pending submission(s) in THIS browser\'s localStorage</b> (from failed network). Click Recover to replay them.</div><button class="btn btn-sm btn-primary" onclick="CBTUI.replayPending(\''+examId+'\')">🔄 Replay My Pending Queue ('+myPending.length+')</button>';
       }else{
-        html+='<p style="font-size:.85rem;color:#475569;margin-top:10px">No pending queue on this device. If a student\'s device had a failed submit, ask them to open <code>cbt-exam.html</code> while online — it auto-flushes — or paste their <code>exam-backup-*.json</code> via <b>📥 Import offline backup</b> on CBT Manager.</p>';
+        html+='<p style="font-size:.85rem;color:#475569;margin-top:10px">No pending queue on this device. Ask student to open <code>cbt-exam.html</code> while online — it auto-flushes localStorage and server pending.</p>';
       }
       html+='<div style="margin-top:10px"><button class="btn btn-sm btn-outline" onclick="CBTUI.refresh()">↻ Refresh List</button> <a class="btn btn-sm btn-outline" href="cbt-exam.html?code='+esc(code||'')+'" target="_blank">Open Take Exam</a></div>';
       document.getElementById('modal-body').innerHTML=html;
-      document.getElementById('modal-footer').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-primary" onclick="CBTUI.replayPending(\''+examId+'\')">🔄 Replay Pending</button>';
+      document.getElementById('modal-footer').innerHTML='<button class="btn btn-outline" onclick="closeModal()">Close</button>'+(serverCount?'<button class="btn btn-primary" onclick="CBTUI.flushServerPending(\''+examId+'\',\''+esc(code)+'\')">☁️ Flush Server ('+serverCount+')</button>':'')+'<button class="btn btn-primary" onclick="CBTUI.replayPending(\''+examId+'\')">🔄 Replay Pending</button>';
     }catch(e){
       document.getElementById('modal-body').innerHTML='<div class="notice notice-error"><b>Recovery check failed:</b> '+esc(e.message||e)+'</div>';
     }
@@ -1316,6 +1351,15 @@ window.CBTUI = {
     localStorage.setItem('cbt-pending-queue', JSON.stringify(remaining));
     this.results(examId, '');
   },
+  async flushServerPending(examId, code){
+    if(!sb){ toast('Database not configured','warning'); return; }
+    if(!confirm('Flush ALL server pending submissions for '+code+'? This will attempt to grade and insert each stranded payload.')) return;
+    const r=await sb.rpc('cbt_flush_pending_server',{p_exam_id: examId});
+    if(r.error||!r.data||r.data.ok===false){ toast((r.data&&r.data.error)||r.error?.message||'Flush failed','danger',10000); return; }
+    toast('✅ Server flush: '+Number(r.data.saved||0)+' saved, '+Number(r.data.failed||0)+' failed.','success',8000);
+    if(r.data.errors && r.data.errors.length) console.warn('Flush errors', r.data.errors);
+    this.recoverMissing(examId, code);
+  },
   // V12.38: Global audit for ANY CBT's missing/uncompleted (not just civic SSS1-3) — robust, all-inclusive
   async auditAllMissing(forceRefresh){
     const box=document.getElementById('cbt-audit-stats');
@@ -1332,18 +1376,20 @@ window.CBTUI = {
         return;
       }
       let pendingCnt=0; try{ pendingCnt=JSON.parse(localStorage.getItem('cbt-pending-queue')||'[]').length; }catch(_){}
-      const missingExams=exams.filter(e=> Number(e.total_results||0)===0 || Number(e.has_missing));
+      const serverPendingTotal=Number(d.pending_server_total||0);
+      const missingExams=exams.filter(e=> Number(e.total_results||0)===0 || Number(e.has_missing) || Number(e.pending_server||0)>0);
       const pendingReviewExams=exams.filter(e=> Number(e.pending_review||0)>0);
-      let html='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+d.total_exams+'</div><div class="stat-label">Total CBTs</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>!e.is_archived).length+'</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>e.is_archived).length+'</div><div class="stat-label">Archived</div></div><div class="stat-card"><div class="stat-value">'+missingExams.length+'</div><div class="stat-label" style="color:'+(missingExams.length?'#b91c1c':'#16a34a')+'">'+(missingExams.length?'⚠️ Potential missing':'No missing')+'</div></div><div class="stat-card"><div class="stat-value">'+pendingCnt+'</div><div class="stat-label">Pending in THIS browser</div></div></div>';
-      html+='<div class="table-wrap" style="max-height:400px;overflow:auto;margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject / Class</th><th>Status</th><th>Results (total / graded / pending)</th><th>Roster</th><th>Alert</th><th>Action</th></tr></thead><tbody>'+exams.slice(0,100).map(e=>{
-        const total=Number(e.total_results||0), graded=Number(e.graded||0), rev=Number(e.pending_review||0), roster=Number(e.roster_count||0);
-        const hasMissing = e.has_missing || (roster>0 && total<roster) || (total===0 && !e.is_archived);
-        const alert = hasMissing ? (total===0 ? '<span style="color:#dc2626;font-weight:800">Empty — no results</span>' : '<span style="color:#d97706;font-weight:700">Roster '+roster+' → Results '+total+'</span>') : (rev>0?'<span style="color:#92400e">✍️ '+rev+' pending review</span>':'<span style="color:#16a34a">✅ OK</span>');
-        return `<tr style="`+(hasMissing?'background:#fef2f2':'')+`"><td><b>`+esc(e.code)+`</b><br><small>`+esc(e.title)+`</small></td><td>`+esc(e.subject)+`<br><small>`+esc(e.class)+`</small></td><td>`+(e.is_archived?'<span class="badge">Archived</span>':'<span class="badge badge-success">'+(e.is_open?'Open':'Closed')+'</span>')+`<br><small>`+esc(e.assessment_type)+`</small></td><td>`+total+` / `+graded+` / `+(rev||0)+`</td><td>`+(roster||"—")+`</td><td>`+alert+`</td><td><button class="btn btn-sm btn-outline" onclick="CBTUI.results('`+e.id+`','`+esc(e.code)+`')">Results</button> <button class="btn btn-sm btn-outline" style="background:#fff7ed" onclick="CBTUI.recoverMissing('`+e.id+`','`+esc(e.code)+`')">Recover</button></td></tr>`;
+      let html='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+d.total_exams+'</div><div class="stat-label">Total CBTs</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>!e.is_archived).length+'</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>e.is_archived).length+'</div><div class="stat-label">Archived</div></div><div class="stat-card"><div class="stat-value">'+missingExams.length+'</div><div class="stat-label" style="color:'+(missingExams.length?'#b91c1c':'#16a34a')+'">'+(missingExams.length?'⚠️ Potential missing':'No missing')+'</div></div><div class="stat-card"><div class="stat-value">'+pendingCnt+'</div><div class="stat-label">Pending in THIS browser</div></div><div class="stat-card"><div class="stat-value">'+serverPendingTotal+'</div><div class="stat-label" style="color:'+(serverPendingTotal?'#b91c1c':'#16a34a')+'">Pending on SERVER</div></div></div>';
+      html+='<div class="table-wrap" style="max-height:400px;overflow:auto;margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject / Class</th><th>Status</th><th>Results (total/graded/pending/server)</th><th>Roster</th><th>Alert</th><th>Action</th></tr></thead><tbody>'+exams.slice(0,100).map(e=>{
+        const total=Number(e.total_results||0), graded=Number(e.graded||0), rev=Number(e.pending_review||0), roster=Number(e.roster_count||0), pendSrv=Number(e.pending_server||0);
+        const hasMissing = e.has_missing || (roster>0 && total<roster) || (total===0 && !e.is_archived) || pendSrv>0;
+        const alert = hasMissing ? (pendSrv?'<span style="color:#dc2626;font-weight:800">☁️ '+pendSrv+' stranded on server</span>':(total===0 ? '<span style="color:#dc2626;font-weight:800">Empty — no results</span>' : '<span style="color:#d97706;font-weight:700">Roster '+roster+' → Results '+total+'</span>')) : (rev>0?'<span style="color:#92400e">✍️ '+rev+' pending review</span>':'<span style="color:#16a34a">✅ OK</span>');
+        return `<tr style="`+(hasMissing?'background:#fef2f2':'')+`"><td><b>`+esc(e.code)+`</b><br><small>`+esc(e.title)+`</small></td><td>`+esc(e.subject)+`<br><small>`+esc(e.class)+`</small></td><td>`+(e.is_archived?'<span class="badge">Archived</span>':'<span class="badge badge-success">'+(e.is_open?'Open':'Closed')+'</span>')+`<br><small>`+esc(e.assessment_type)+`</small></td><td>`+total+`/`+graded+`/`+(rev||0)+`/`+pendSrv+`</td><td>`+(roster||"—")+`</td><td>`+alert+`</td><td><button class="btn btn-sm btn-outline" onclick="CBTUI.results('`+e.id+`','`+esc(e.code)+`')">Results</button> <button class="btn btn-sm btn-outline" style="background:#fff7ed" onclick="CBTUI.recoverMissing('`+e.id+`','`+esc(e.code)+`')">Recover</button>`+(pendSrv?` <button class="btn btn-sm btn-primary" onclick="CBTUI.flushServerPending('`+e.id+`','`+esc(e.code)+`')">☁️ Flush ('+pendSrv+')</button>`:'')+`</td></tr>`;
       }).join('')+'</tbody></table></div>';
       if(exams.length>100) html+='<p style="font-size:.8rem;color:#64748b">Showing first 100 of '+exams.length+'.</p>';
-      if(pendingCnt) html+='<div class="notice\" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-top:10px">📦 This browser has '+pendingCnt+' pending submission(s) in localStorage cbt-pending-queue (from any CBT with failed network). Click Recover on the affected exam, or ask each student to open cbt-exam.html while online to auto-flush.</div>';
-      html+='<p style="font-size:.82rem;color:#475569;margin-top:8px">Hint: Archived exams hide from default "Active" filter but still hold results — switch to "Archived only" or "All" to see them. Roster > Results suggests students submitted but results not recovered — use per-exam Recover Missing. Uncompleted (manual_review) means essay/code awaiting your grading — open Results → Review.</p>';
+      if(pendingCnt) html+='<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-top:10px">📦 This browser has '+pendingCnt+' pending submission(s) in localStorage cbt-pending-queue. Click Recover on the affected exam.</div>';
+      if(serverPendingTotal) html+='<div class="notice" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;margin-top:10px">☁️ Server has '+serverPendingTotal+' stranded submission(s) from any device (cbt_pending_submissions). Use per-exam ☁️ Flush or global Audit → Flush.</div>';
+      html+='<p style="font-size:.82rem;color:#475569;margin-top:8px">Hint: Archived exams hide from default "Active" but still hold results — switch to "Archived only"/"All". Roster>Results or ☁️ stranded = use Recover Missing → Flush Server. Uncompleted (manual_review) = open Results → Review. Students\' pending auto-flushes on cbt-exam.html online + server store.</p>';
       if(box) box.innerHTML=html;
       toast('Audited '+exams.length+' CBTs — '+(missingExams.length? missingExams.length+' with potential missing':'all complete'),'info',7000);
     }catch(e){
