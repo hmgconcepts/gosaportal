@@ -91,6 +91,7 @@ update public.staff st set photo_url = p.photo_url
  where st.user_id = p.id and coalesce(st.photo_url,'') = '' and coalesce(p.photo_url,'') <> '';
 
 -- Marker for schema doctor (self-contained — fixes false alarm when only this file run)
+create table if not exists public.sc_install_state(key text primary key,applied_at timestamptz not null default now(),details jsonb default '{}'::jsonb);
 insert into public.sc_install_state(key,details) values ('v12.2-photo-sync.sql','{"self":true}') on conflict (key) do nothing;
 
 -- Verifiable probe RPC for Schema Doctor (normal function, not trigger — callable via PostgREST)
