@@ -14,21 +14,46 @@ const CBT = {
 
   init(supabaseClient) {
     this._sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null);
-    // FIX V2.1 Issue #11: Calculator and math keyboard ONLY on CBT exam taking page (cbt-exam.html), not on manager pages
-    const page = (location.pathname.split('/').pop() || '').toLowerCase();
-    const isExamPage = page === 'cbt-exam.html' || page.startsWith('cbt-exam') || !!document.getElementById('exam-root') || !!document.getElementById('cbt-exam-root') || !!document.querySelector('[data-cbt-exam]');
-    if (this._sb && isExamPage) {
-      try { this.bindFloatingToolbar(); } catch(e) {}
-    }
+    // V12.42: Do NOT bind toolbar here — it will be bound only when exam actually starts (Exam.render)
+    // This prevents toolbar showing on entry page (enter code/ID) when student hasn't started CBT yet
     if (document.getElementById('cbt-list') && window.CBTUI) { try { CBTUI.refresh(); } catch(e) { console.warn('CBTUI.refresh failed:', e); } }
   },
+  destroyFloatingToolbar(){ try{ const t=document.getElementById('cbt-floating-toolbar'); if(t) t.remove(); const c=document.getElementById('cbt-calculator'); if(c) c.remove(); const k=document.getElementById('cbt-math-keyboard'); if(k) k.remove(); }catch(_){} },
 
   bindFloatingToolbar() {
+    // V12.42: Only during actual CBT, not on entry page; respect per-exam toggles
+    try{
+      // Entry page has no Exam.data or no questions — don't show toolbar there (Issue 5)
+      const examData = (typeof Exam !== 'undefined' && Exam.data) ? Exam.data : (window.Exam && window.Exam.data ? window.Exam.data : null);
+      if(!examData || !examData.code) return; // No exam loaded yet (entry page)
+      const qs = (typeof Exam !== 'undefined' && Exam.qs) ? Exam.qs() : [];
+      if(!qs || !qs.length) return; // Exam not started (still on entry)
+      if(typeof Exam !== 'undefined' && Exam._done) return; // Already submitted
+    }catch(_){}
     if (document.getElementById('cbt-floating-toolbar')) return;
+    // Check per-exam toggles (default true for backward compat)
+    let showMath=true, showCalc=true;
+    try{
+      const ed=(typeof Exam!=='undefined'&&Exam.data)?Exam.data:null;
+      if(ed){
+        // New columns enable_math_keyboard / enable_calculator, fallback to anti_cheat_config
+        if(ed.enable_math_keyboard===false) showMath=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.math_keyboard===false) showMath=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.enable_math_keyboard===false) showMath=false;
+        if(ed.enable_calculator===false) showCalc=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.calculator===false) showCalc=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.scientific_calculator===false) showCalc=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.enable_calculator===false) showCalc=false;
+      }
+    }catch(_){}
+    if(!showMath && !showCalc) return; // Both disabled — no toolbar
     const toolbar = document.createElement('div');
     toolbar.id = 'cbt-floating-toolbar';
     toolbar.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;gap:8px;flex-direction:column;align-items:flex-end;';
-    toolbar.innerHTML = '<button onclick="CBT.toggleCalculator()" style="background:linear-gradient(135deg,#0506ae,#964eec);color:white;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(79,70,229,0.4)">🧮 Calculator</button><button onclick="CBT.toggleMathKeyboard()" style="background:linear-gradient(135deg,#059669,#10b981);color:white;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(5,150,105,0.4)">⌨️ Math Keyboard</button>';
+    let html='';
+    if(showCalc) html+='<button onclick="CBT.toggleCalculator()" style="background:linear-gradient(135deg,#0506ae,#964eec);color:white;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(79,70,229,0.4)">🧮 Calculator</button>';
+    if(showMath) html+='<button onclick="CBT.toggleMathKeyboard()" style="background:linear-gradient(135deg,#059669,#10b981);color:white;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(5,150,105,0.4)">⌨️ Math Keyboard</button>';
+    toolbar.innerHTML = html;
     document.body.appendChild(toolbar);
   },
 
@@ -439,7 +464,12 @@ const CBT = {
   },
 
   toggleCalculator() {
-    // FIX #11: Only allow calculator on CBT exam pages
+    // V12.42: Check per-exam toggle first, then page
+    try{
+      const ed=(typeof Exam!=='undefined'&&Exam.data)?Exam.data:null;
+      if(ed && ed.enable_calculator===false){ if(typeof toast==='function') toast('Calculator is disabled for this exam (tutor setting).', 'info', 4000); return; }
+      if(ed && ed.anti_cheat_config && (ed.anti_cheat_config.calculator===false||ed.anti_cheat_config.scientific_calculator===false)) { if(typeof toast==='function') toast('Calculator is disabled for this exam.', 'info', 4000); return; }
+    }catch(_){}
     const page = (location.pathname.split('/').pop() || '').replace('.html','');
     if (!['cbt-exam','cbt_exam','cbt-multi','cbt_multi','cbt'].includes(page)) {
       if (typeof toast === 'function') toast('Calculator is only available during CBT exams.', 'info', 4000);
@@ -563,7 +593,11 @@ const CBT = {
     });
   },
   toggleMathKeyboard(){
-    // FIX #11: Only allow math keyboard on CBT exam pages
+    try{
+      const ed=(typeof Exam!=='undefined'&&Exam.data)?Exam.data:null;
+      if(ed && ed.enable_math_keyboard===false){ if(typeof toast==='function') toast('Math keyboard is disabled for this exam (tutor setting).', 'info', 4000); return; }
+      if(ed && ed.anti_cheat_config && ed.anti_cheat_config.math_keyboard===false){ if(typeof toast==='function') toast('Math keyboard is disabled for this exam.', 'info', 4000); return; }
+    }catch(_){}
     const page = (location.pathname.split('/').pop() || '').replace('.html','');
     if (!['cbt-exam','cbt_exam','cbt-multi','cbt_multi','cbt'].includes(page)) {
       if (typeof toast === 'function') toast('Math keyboard is only available during CBT exams.', 'info', 4000);
