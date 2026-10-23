@@ -543,7 +543,11 @@ textarea.form-input{min-height:80px;resize:vertical}
     try {
       const keyed = this.qs().map((q,i) => ({ index:(q._orig_index != null ? q._orig_index : i), answer:this.answers[i] }));
       const current = this.qs()[this.idx] || {};
-      localStorage.setItem('cbt-draft-' + (this.data && this.data.code), JSON.stringify({ version:2, answers:keyed, index:(current._orig_index != null ? current._orig_index : this.idx), client_ref:this.clientRef, t:Date.now() }));
+      // V12.37: draft per student (CODE + admission) to prevent cross-student leakage on shared laptop
+      const draftKey = 'cbt-draft-' + String(this.data && this.data.code || '').toUpperCase().replace(/[^A-Z0-9]/g,'') + '-' + String(this.student && this.student.id_ref || 'anon').toUpperCase().replace(/[^A-Z0-9]/g,'');
+      localStorage.setItem(draftKey, JSON.stringify({ version:2, answers:keyed, index:(current._orig_index != null ? current._orig_index : this.idx), client_ref:this.clientRef, student_ref: this.student && this.student.id_ref || '', t:Date.now() }));
+      // Also keep legacy key for backward compat (will be cleaned on submit)
+      try{ localStorage.setItem('cbt-draft-' + (this.data && this.data.code), JSON.stringify({ version:2, answers:keyed, index:(current._orig_index != null ? current._orig_index : this.idx), client_ref:this.clientRef, t:Date.now() })); }catch(_){}
     } catch(e) {}
   };
 
@@ -649,19 +653,39 @@ textarea.form-input{min-height:80px;resize:vertical}
     // Restore a recent draft by ORIGINAL question index, so randomisation and
     // multi-subject grouping cannot attach an answer to the wrong question.
     try {
-      const draft = JSON.parse(localStorage.getItem('cbt-draft-' + data.code) || 'null');
+      // V12.37: load draft per student (CODE + admission) first, fallback to legacy CODE only if student matches
+      const draftKey = 'cbt-draft-' + String(data.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'') + '-' + String(this.student && this.student.id_ref || 'anon').toUpperCase().replace(/[^A-Z0-9]/g,'');
+      let draft = JSON.parse(localStorage.getItem(draftKey) || 'null');
+      // Fallback to legacy global draft only if it belongs to same student (check student_ref)
+      if (!draft) {
+        const legacy = JSON.parse(localStorage.getItem('cbt-draft-' + data.code) || 'null');
+        if (legacy && String(legacy.student_ref||'').toUpperCase().replace(/[^A-Z0-9]/g,'') === String(this.student && this.student.id_ref||'').toUpperCase().replace(/[^A-Z0-9]/g,'') && (Date.now() - Number(legacy.t||0)) < 86400000) {
+          draft = legacy;
+        }
+      }
       if (draft && (Date.now() - Number(draft.t||0)) < 86400000) {
-        if (Array.isArray(draft.answers)) {
-          const byIndex = new Map(draft.answers.map(x => [Number(x.index), x.answer]));
-          this.qs().forEach((q,i) => { const oi=Number(q._orig_index != null?q._orig_index:i); if(byIndex.has(oi)) this.answers[i]=byIndex.get(oi); });
-          const wanted=Number(draft.index); const at=this.qs().findIndex((q,i)=>Number(q._orig_index!=null?q._orig_index:i)===wanted); if(at>=0)this.idx=at;
-        } else if (Array.isArray(draft.a) && draft.a.length === this.answers.length) { this.answers=draft.a; this.idx=Math.max(0,Math.min(Number(draft.i)||0,this.answers.length-1)); }
-        if (draft.client_ref) this.clientRef=String(draft.client_ref);
+        // Only restore if draft's student_ref matches current student (prevent cross-student leakage)
+        const draftStudent = String(draft.student_ref||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+        const currStudent = String(this.student && this.student.id_ref||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+        if (draftStudent && currStudent && draftStudent !== currStudent) {
+          // Different student, ignore draft (do not restore answers or client_ref)
+          console.log('[CBT] Ignoring draft for different student:', draftStudent, 'vs', currStudent);
+        } else {
+          if (Array.isArray(draft.answers)) {
+            const byIndex = new Map(draft.answers.map(x => [Number(x.index), x.answer]));
+            this.qs().forEach((q,i) => { const oi=Number(q._orig_index != null?q._orig_index:i); if(byIndex.has(oi)) this.answers[i]=byIndex.get(oi); });
+            const wanted=Number(draft.index); const at=this.qs().findIndex((q,i)=>Number(q._orig_index!=null?q._orig_index:i)===wanted); if(at>=0)this.idx=at;
+          } else if (Array.isArray(draft.a) && draft.a.length === this.answers.length) { this.answers=draft.a; this.idx=Math.max(0,Math.min(Number(draft.i)||0,this.answers.length-1)); }
+          // V12.37: Do NOT restore client_ref from draft of different student (prevents duplicate client_ref score leakage)
+          // Only restore client_ref if draft's student matches current
+          if (draft.client_ref && (!draftStudent || draftStudent===currStudent)) this.clientRef=String(draft.client_ref);
+        }
       }
     } catch(_) {}
     this.startTs = Date.now();
     // V12.33 timer persistence — survive refresh (expert fix 4a)
-    const _deadlineKey='cbt-deadline-'+(data.code||canonicalCode)+'-'+(this.student&&this.student.id_ref||'anon');
+    // V12.37: deadline per student AND per attempt (use client_ref for anon to avoid cross-student leakage)
+    const _deadlineKey='cbt-deadline-'+String(data.code||canonicalCode).toUpperCase().replace(/[^A-Z0-9]/g,'')+'-'+String(this.student&&this.student.id_ref||this.clientRef||'anon').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
     const _savedDeadline=Number(localStorage.getItem(_deadlineKey)||0);
     if(_savedDeadline && _savedDeadline>Date.now() && _savedDeadline - Date.now() < (data.duration||45)*60*1000*2){
       this.deadline=_savedDeadline;
@@ -780,7 +804,18 @@ textarea.form-input{min-height:80px;resize:vertical}
     if (!confirmed && !terminalError) {
       try { const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]'); q.push(payload); localStorage.setItem('cbt-pending-queue', JSON.stringify(q.slice(-10))); } catch (_) {}
     } else if (confirmed) {
-      try { localStorage.removeItem('cbt-pending-queue'); localStorage.removeItem('cbt-draft-' + (this.data && this.data.code)); } catch (_) {}
+      try {
+        // V12.37: clear per-student draft and deadline, plus global, to prevent next student on same laptop getting previous score/timer
+        const codeNorm = String(this.data && this.data.code || '').toUpperCase().replace(/[^A-Z0-9]/g,'');
+        const stuNorm = String(this.student && this.student.id_ref || 'anon').toUpperCase().replace(/[^A-Z0-9]/g,'');
+        localStorage.removeItem('cbt-pending-queue');
+        localStorage.removeItem('cbt-draft-' + (this.data && this.data.code));
+        localStorage.removeItem('cbt-draft-' + codeNorm + '-' + stuNorm);
+        localStorage.removeItem('cbt-draft-' + codeNorm + '-' + String(this.clientRef||'').slice(0,12).toUpperCase().replace(/[^A-Z0-9]/g,''));
+        localStorage.removeItem('cbt-deadline-' + codeNorm + '-' + stuNorm);
+        localStorage.removeItem('cbt-deadline-' + codeNorm + '-' + String(this.clientRef||'').slice(0,12).toUpperCase().replace(/[^A-Z0-9]/g,''));
+        localStorage.removeItem('cbt-exam-cache-' + codeNorm);
+      } catch (_) {}
     }
     if (!confirmed) {
       const blob = new Blob([JSON.stringify({ payload, graded }, null, 2)], { type: 'application/json' });
@@ -848,7 +883,7 @@ textarea.form-input{min-height:80px;resize:vertical}
   })();
 
   // V12.33 draft persistence on browser close (expert fix 4g)
-  window.addEventListener('beforeunload', ()=>{ try{ Exam.saveDraft(); if(Exam.deadline) try{ localStorage.setItem('cbt-deadline-'+(Exam.data&&Exam.data.code||'')+'-'+(Exam.student&&Exam.student.id_ref||'anon'), String(Exam.deadline)); }catch(_){} }catch(_){} });
+  window.addEventListener('beforeunload', ()=>{ try{ Exam.saveDraft(); if(Exam.deadline){ const codeNorm=String(Exam.data&&Exam.data.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); const stuNorm=String(Exam.student&&Exam.student.id_ref||Exam.clientRef||'anon').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12); try{ localStorage.setItem('cbt-deadline-'+codeNorm+'-'+stuNorm, String(Exam.deadline)); }catch(_){} } }catch(_){} });
 
   // Exposed for accessibility tooling, automated regression tests and the
   // manager's safe preview—not for grading (grading remains server-authoritative).

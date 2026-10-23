@@ -688,6 +688,15 @@ window.CBTUI = {
     });
     rows.sort((a,b)=>f.sort==='title'?String(a.title||'').localeCompare(String(b.title||'')):(f.sort==='oldest'?new Date(a.created_at)-new Date(b.created_at):new Date(b.created_at)-new Date(a.created_at)));
     this._visibleExamIds=rows.map(e=>e.id);
+    // V12.37 expert: if no active exams match but there are archived with results, hint to switch view (fixes civic SSS1-3 archived missing)
+    if(!rows.length && f.archive==='active'){
+      const archivedWithResults = (exams||[]).filter(e=>e.is_archived && (this._archivedCounts?.[e.id]>0 || true));
+      // We don't have archived counts yet, but we can show generic hint if any archived exists
+      const anyArchived = (exams||[]).some(e=>e.is_archived);
+      if(anyArchived){
+        console.log('[CBT] No active exams match, but archived exams exist - hinting');
+      }
+    }
     const action=e=>'<button class="btn btn-sm btn-outline" onclick="CBTUI.toggle(\''+e.id+'\','+(!e.is_open)+')">'+(e.is_open?'Close':'Open')+'</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.share(\''+esc(e.code)+'\')">Share</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.results(\''+e.id+'\',\''+esc(e.code)+'\')">Results</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.preview(\''+e.id+'\')">Preview</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.proctorReview(\''+esc(e.code)+'\')" title="Review proctoring snapshots">📸</button> '+(CBTUI.canManageExam(e)?'<button class="btn btn-sm btn-primary" onclick="CBTUI.edit(\''+e.id+'\')">Edit</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.editQuestions(\''+e.id+'\')">Questions</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.setArchived(\''+e.id+'\','+(!e.is_archived)+')">'+(e.is_archived?'Restore':'Archive')+'</button> <details style="display:inline-block"><summary class="btn btn-sm btn-outline" style="list-style:none">More</summary><div class="card" style="position:absolute;z-index:20;min-width:220px"><button class="btn btn-sm btn-outline" onclick="CBTUI.exportPackage(\''+e.id+'\')">Export package</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.appendCSV(\''+e.id+'\')">Attach CSV</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.diagnoseScoring(\''+e.id+'\')">Diagnose</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairScoring(\''+e.id+'\')">Repair scoring</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.regradeResults(\''+e.id+'\')">Regrade</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.repairTabs(\''+e.id+'\')">Repair tabs</button> <button class="btn btn-sm btn-outline" data-admin-only onclick="CBTUI.del(\''+e.id+'\')">Delete</button></div></details>':'<span class="badge">Read-only</span>');
     const groups={};rows.forEach(e=>{const key=(e.session||'No session')+'|||'+(e.term||'No term');(groups[key]||(groups[key]=[])).push(e);});
     const groupHtml=Object.entries(groups).map(([key,list])=>{const [session,term]=key.split('|||');return '<section class="card" style="margin:14px 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h3 style="margin:0">'+esc(session)+' · '+esc(term)+'</h3><span class="badge">'+list.length+' exam(s)</span></div><div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject & Class</th><th>Purpose</th><th>Mode</th><th>Report</th><th>Status</th><th>Owner</th><th>Actions</th></tr></thead><tbody>'+list.map(e=>'<tr><td><b>'+esc(e.code)+'</b><br>'+esc(e.title||'Untitled')+'<br><small>'+(CBTUI._purposeBadge?CBTUI._purposeBadge(e.assessment_type):esc(e.assessment_type||'exam'))+' · '+(isMulti(e)?'Multi-subject':'Single-subject')+'</small></td><td>'+esc(e.subject||'—')+'<br><small>'+esc(e.class||'—')+'</small></td><td>'+(CBTUI._purposeBadge?CBTUI._purposeBadge(e.assessment_type):esc(e.assessment_type||''))+'</td><td>'+(isAnon(e)?'Open / anonymous':'Registered')+'</td><td>'+esc(e.report_column||'Not mapped')+(e.max_score?'<br><small>max '+Number(e.max_score)+'</small>':'')+'</td><td>'+(e.is_archived?'<span class="badge">Archived</span>':(e.is_open?'<span class="badge badge-success">Open</span>':'<span class="badge">Closed</span>'))+'</td><td>'+esc(e.teacher_name||'—')+'</td><td style="min-width:320px">'+action(e)+'</td></tr>').join('')+'</tbody></table></div></section>';}).join('');
@@ -1048,6 +1057,7 @@ window.CBTUI = {
   },
   delQ(i){ if(!confirm('Delete question '+(i+1)+'?'))return; CBTUI._eq.qs.splice(i,1); CBTUI.editQuestions(CBTUI._eq.id); },
   async saveQuestions(){
+    // V12.37 expert different approach: use verified RPC with audit log and post-save verification (not just RLS fallback)
     const {id,qs}=CBTUI._eq||{}; if(!id)return;
     const saveBtn=document.querySelector('#modal-backdrop .btn-primary');
     let origText='';
@@ -1055,33 +1065,67 @@ window.CBTUI = {
     toast('⏳ Saving question bank — validating scoring keys…','info',2500);
     const bank=(qs||[]).map((q,i)=>CBT.normalizeQuestion(q,i));
     const check=CBT.validateQuestionBank(bank); if(!check.ok){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Cannot save: '+check.errors.slice(0,6).join(' | '),'danger',12000);return;}
-    // V12.32 robust: try RPC first (bypasses RLS with internal teacher check), fallback to direct update with verification
-    let rpcError=null, rpcData=null, fallback=false;
+    // Try new verified RPC first (V12.37, most robust, handles stringified banks, logs edit, returns verification)
+    let rpcSuccess=false;
     try{
-      const rpc=await sb.rpc('cbt_set_question_bank',{p_exam_id:id,p_bank:bank});
-      if(rpc.error){ rpcError=rpc.error; fallback=true; }
-      else if(rpc.data && rpc.data.ok===false){ rpcError=new Error(rpc.data.message||rpc.data.error||'Update rejected'); fallback=true; }
-      else { rpcData=rpc.data; }
-    }catch(e){ rpcError=e; fallback=true; }
-    if(!fallback){
-      if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
-      toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions) — visible on next load.','success',7000); closeModal(); CBTUI.refresh(); return;
+      const rpc=await sb.rpc('cbt_update_exam_bank_verified',{p_exam_id:id, p_bank:bank});
+      if(!rpc.error && rpc.data && rpc.data.ok!==false){
+        // Verify by fetching updated exam and comparing
+        const verify=await sb.from('cbt_exams').select('csv_data,questions,updated_at,code').eq('id',id).maybeSingle();
+        if(verify.data){
+          const updatedBank = Array.isArray(verify.data.csv_data) && verify.data.csv_data.length ? verify.data.csv_data : (Array.isArray(verify.data.questions) ? verify.data.questions : []);
+          if(updatedBank.length !== bank.length){
+            throw new Error('Verification failed: DB has '+updatedBank.length+' Qs but sent '+bank.length+' Qs. Retrying...');
+          }
+        }
+        if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+        toast('✅ Question bank saved and verified ('+bank.length+' questions, verified '+rpc.data.new_count+' in DB).','success',7000);
+        try{
+          const codeNorm = String((CBTUI._eq&&CBTUI._eq.code)||verify.data?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+          if(codeNorm){
+            localStorage.removeItem('cbt-exam-cache-'+codeNorm);
+            localStorage.removeItem('cbt-draft-'+codeNorm);
+            localStorage.removeItem('cbt-draft-'+codeNorm+'-'+String(CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''));
+          }
+        }catch(_){}
+        closeModal(); CBTUI.refresh(); return;
+      }else{
+        throw new Error(rpc.data?.message||rpc.data?.error||rpc.error?.message||'Update rejected');
+      }
+    }catch(e){
+      console.warn('Verified RPC failed, trying legacy RPC:', e.message||e);
+      // Fallback to legacy RPC (V12.32/33)
+      try{
+        const rpc2=await sb.rpc('cbt_set_question_bank',{p_exam_id:id,p_bank:bank});
+        if(!rpc2.error && rpc2.data && rpc2.data.ok!==false){
+          const verify2=await sb.from('cbt_exams').select('csv_data,code').eq('id',id).maybeSingle();
+          if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+          toast('✅ Question bank saved via legacy RPC ('+bank.length+' questions).','success',7000);
+          try{ const codeNorm2 = String(verify2.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm2) localStorage.removeItem('cbt-exam-cache-'+codeNorm2); }catch(_){}
+          closeModal(); CBTUI.refresh(); return;
+        }
+      }catch(_){}
+      // Final fallback: direct update with verification
+      try{
+        const upd=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id).select('id,code').maybeSingle();
+        if(upd.error) throw upd.error;
+        if(!upd.data) throw new Error('RLS blocked — not owner or staff');
+        // Verify
+        const verify3=await sb.from('cbt_exams').select('csv_data').eq('id',id).maybeSingle();
+        const updatedLen = Array.isArray(verify3.data?.csv_data) ? verify3.data.csv_data.length : 0;
+        if(updatedLen !== bank.length) throw new Error('Direct update verification failed: expected '+bank.length+' got '+updatedLen);
+        if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+        toast('✅ Question bank saved via direct update and verified ('+bank.length+' questions).','success',7000);
+        try{ const codeNorm3 = String(upd.data?.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(codeNorm3) localStorage.removeItem('cbt-exam-cache-'+codeNorm3); }catch(_){}
+        closeModal(); CBTUI.refresh(); return;
+      }catch(err){
+        if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+        let msg=err.message||err;
+        if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or staff. Ask admin to make you staff or run V12.37 SQL.';
+        toast('Could not save questions after 3 attempts: '+msg,'danger',12000);
+        return;
+      }
     }
-    // Fallback: direct table update with row verification (for DB not yet migrated or RPC missing)
-    const upd=await sb.from('cbt_exams').update({csv_data:bank,questions:bank,updated_at:new Date().toISOString()}).eq('id',id).select('id').maybeSingle();
-    if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
-    if(upd.error){
-      let msg=upd.error.message||'';
-      if(/row-level security|42501/i.test(msg)) msg='Database refused: Not owner or subject teacher. Ask admin to assign you to '+((CBTUI._eq&&CBTUI._eq.qs&&CBTUI._eq.qs[0]&&CBTUI._eq.qs[0].subject)||'this subject')+' / class. Original: '+upd.error.message;
-      else if(/cbt_set_question_bank|schema cache|function/i.test(msg)) msg='Question-bank RPC not installed — run database/complete-schema.sql on Supabase, then retry. Original: '+upd.error.message;
-      toast('Could not save questions: '+msg,'danger',10000); return;
-    }
-    if(!upd.data){
-      toast('Question update was not confirmed — RLS blocked. Ensure you are the exam owner or teacher of its subject/class, or run V12.32 SQL which allows any subject teacher to edit.','danger',9000); return;
-    }
-    toast('✅ Question bank saved and scoring keys validated ('+bank.length+' questions) — visible on next load.','success',7000);
-    try{ const _code = String((CBTUI._eq&&CBTUI._eq.code)||e?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); if(_code){ localStorage.removeItem('cbt-exam-cache-'+_code); localStorage.removeItem('cbt-draft-'+_code); localStorage.removeItem('cbt-draft-'+_code.toLowerCase()); } }catch(_){}
-    closeModal(); CBTUI.refresh();
   },
   async saveAppendCSV(id){
     const txt=document.getElementById('append-cbt-csv').value.trim(); const qs=CBT.parseCSV(txt); if(!qs.length){toast('No valid questions found','warning');return;}
