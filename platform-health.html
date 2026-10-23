@@ -322,6 +322,9 @@ const PH={
     {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT force append', kind:'rpc', fn:'cbt_force_append_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_new_questions:[]}},
     {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT submit WAL', kind:'rpc', fn:'cbt_submit_with_wal', args:{p_payload:{}}},
     {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT pending WAL recover', kind:'rpc', fn:'cbt_recover_failed_submissions', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'Math keyboard + calculator toggle + public link', kind:'col', table:'cbt_exams', col:'enable_math_keyboard'},
+    {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'CBT exam enable_calculator', kind:'col', table:'cbt_exams', col:'enable_calculator'},
+    {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'CBT public link', kind:'rpc', fn:'cbt_get_public_exam_v6', args:{p_code:'TEST01'}},
     {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'}
   ],
 
