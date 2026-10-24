@@ -833,7 +833,9 @@ textarea.form-input{min-height:80px;resize:vertical}
       return;
     }
     const d = resp.data;
-    if (d.release_results === false) {
+    // V12.43: Tutor can toggle score display per exam (show_score_on_submit) — if false, hide score even if release_results true (for entrance/mock)
+    const showScore = (d.show_score_on_submit !== false) && (d.enable_score_display !== false) && (d.show_score !== false);
+    if (d.release_results === false || !showScore) {
       this.root().innerHTML =
         '<div class="card" style="text-align:center;padding:40px">' +
         '<div style="font-size:3rem;margin-bottom:12px">✅</div>' +
@@ -861,7 +863,8 @@ textarea.form-input{min-height:80px;resize:vertical}
       (d.cert_code ? '<p style="margin-top:20px">Certificate code: <strong style="font-size:1.1rem;color:#0506ae">' + esc(d.cert_code) + '</strong></p>' : '') +
       (d.report_column ? '<p style="color:#64748b;font-size:.88rem">This result was added to the <strong>' + esc(d.report_column) + '</strong> column of your report card.</p>' : '') +
       '<p style="margin-top:20px"><a class="btn btn-primary" href="cbt.html">Back to CBT Manager</a> <a class="btn btn-outline" href="verify-certificate.html">Verify Certificate</a></p>' +
-      '<p style="margin-top:14px"><a class="btn btn-outline" href=\'cbt-exam.html?code='+encodeURIComponent(this.data.code)+'\' onclick="try{CBT.destroyFloatingToolbar(); sessionStorage.setItem(\'sc_next_student\',\'1\');}catch(_){}" style="background:#f0fdf4;border-color:#86efac;color:#166534">🔄 Next Student — Take Another Exam</a> <button class="btn btn-outline" onclick="try{navigator.clipboard.writeText(location.origin+location.pathname+\'?code=\'+encodeURIComponent(Exam.data.code)); toast(\'📋 Public link copied — share via WhatsApp\',\'success\')}catch(_){prompt(\'Copy link:\', location.origin+location.pathname+\'?code=\'+Exam.data.code)}">📋 Copy Public Link</button></p>' +
+      '<p style="margin-top:14px"><a class="btn btn-outline" href=\'#\' onclick="try{CBT.destroyFloatingToolbar(); sessionStorage.setItem(\'sc_next_student\',\'1\'); location.replace(\'cbt-exam.html\');}catch(_){} return false;" style="background:#f0fdf4;border-color:#86efac;color:#166534">🔄 Next Student — Take Another Exam</a> <button class="btn btn-outline" onclick="try{navigator.clipboard.writeText(location.origin+location.pathname+\'?code=\'+encodeURIComponent(Exam.data.code)); toast(\'📋 Public link copied — share via WhatsApp\',\'success\')}catch(_){prompt(\'Copy link:\', location.origin+location.pathname+\'?code=\'+Exam.data.code)}">📋 Copy Public Link</button></p>' +
+      '<script>setTimeout(function(){ try{ if(Exam && Exam._done) { var root=document.getElementById(\'exam-root\'); if(root && root.innerHTML.includes(\'Exam Complete\')) { root.innerHTML=\'<div class=\\\'card\\\' style=\\\'text-align:center;padding:40px\'><p>🔒 Score hidden for privacy. Next student can now take their exam.</p><a class=\\\'btn btn-primary\\\' href=\\\'cbt-exam.html\\\'>Take Another Exam</a></div>\'; CBT.destroyFloatingToolbar(); } } }catch(_){} }, 30000);</script>' +
       '<p style="margin-top:8px;font-size:.78rem;color:#64748b">Share <b>'+esc(location.origin+location.pathname+'?code='+this.data.code)+'</b> — students just enter exam code + student ID, no login needed. On shared lab computers, tap <b>Next Student</b> to clear previous score/timer and let the next student enter their code/ID.</p>' +
       '</div>';
   };

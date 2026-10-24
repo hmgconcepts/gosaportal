@@ -761,6 +761,11 @@ window.CBTUI = {
         <label><input type="checkbox" id="ex-calc" checked> 🧮 Show Scientific Calculator</label>
         <small>Uncheck to hide tools that distract for non-calculation subjects.</small>
       </div>
+      <div class="card" style="background:#eff6ff;border-color:#93c5fd;margin:12px 0">
+        <h3 style="margin-top:0">📊 Results Display</h3>
+        <label><input type="checkbox" id="ex-showscore" checked> 📈 Show score immediately after CBT (uncheck to hide until official release)</label>
+        <small>For mock UTME/entrance, hide score to prevent cheating. Tutor can still see all results in Manager → Recover.</small>
+      </div>
       <div class="form-group"><label>Instructions</label><textarea class="form-input" id="ex-instr" rows="2" placeholder="Read each question carefully…"></textarea></div>
       <div class="form-group"><label>Questions CSV (paste or choose a .csv file)</label>
         <input type="file" id="ex-file" accept=".csv" class="form-input" onchange="CBTUI._readFile(event)">
@@ -846,6 +851,7 @@ window.CBTUI = {
       negative_mark: parseFloat(document.getElementById('ex-neg').value)||0,
       enable_math_keyboard: document.getElementById('ex-mathkb')?.checked!==false,
       enable_calculator: document.getElementById('ex-calc')?.checked!==false,
+      show_score_on_submit: document.getElementById('ex-showscore')?.checked!==false,
       public_link: '',
       select_count: parseInt(document.getElementById('ex-sel').value)||0,
       instructions: document.getElementById('ex-instr').value,
@@ -1014,6 +1020,11 @@ window.CBTUI = {
         <label><input type="checkbox" id="ed-calc" ${e.enable_calculator!==false?'checked':''}> 🧮 Show Scientific Calculator</label>
         <small>Uncheck for subjects that don't need calculation tools.</small>
       </div>
+      <div class="card" style="background:#eff6ff;border-color:#93c5fd;margin-top:12px">
+        <h3 style="margin-top:0">📊 Results Display</h3>
+        <label><input type="checkbox" id="ed-showscore" ${e.show_score_on_submit!==false?'checked':''}> 📈 Show score immediately after CBT</label>
+        <small>Uncheck to hide score until official release (e.g., entrance). Tutor still sees all in Manager.</small>
+      </div>
       <div class="card" style="background:#eff6ff;border-color:#93c5fd;margin-top:12px"><h3 style="margin-top:0">📝 Need to edit questions, options or correct answers?</h3><p style="font-size:.85rem;color:#334155">Questions are managed separately for safety. Click <b>Questions</b> on the exam row to edit individual questions, delete, or attach CSV — your changes save with scoring keys validated and are visible on next load.</p><button type="button" class="btn btn-sm btn-primary" onclick="closeModal(); setTimeout(()=>CBTUI.editQuestions('${id}'), 200)">Open Question Editor →</button></div>`,
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CBTUI.saveEdit(\''+id+'\')">Save all changes</button>');
     this.refreshEditReportColumns();
@@ -1044,9 +1055,9 @@ window.CBTUI = {
       subjects: existingAC.subjects||null,
       multi_subject: existingAC.multi_subject||false
     };
-    const cMathKb=!!(document.getElementById('ed-mathkb')||{}).checked, cCalc=!!(document.getElementById('ed-calc')||{}).checked;
-    acPatch.math_keyboard=cMathKb; acPatch.calculator=cCalc; acPatch.enable_math_keyboard=cMathKb; acPatch.enable_calculator=cCalc;
-    const patch={teacher_id:e.teacher_id||((window.SC_PROFILE&&SC_PROFILE.id)||null),title,subject,class:className,term,session,assessment_type:v('ed-type'),exam_mode:v('ed-mode'),report_column:v('ed-col'),max_score:Number(v('ed-max'))||0,duration:Number(v('ed-dur'))||45,duration_min:Number(v('ed-dur'))||45,negative_mark:Number(v('ed-neg'))||0,select_count:Number(v('ed-sel'))||0,attempt_limit:Number(v('ed-att'))||0,pass_mark:Number(v('ed-pass'))||0,topic:v('ed-topic'),instructions:v('ed-instr'),start_at:start||null,close_at:close||null,is_open:c('ed-open'),is_archived:c('ed-arch'),randomise:c('ed-rand'),release_results:c('ed-rel'),certificate_enabled:c('ed-cert'),is_entrance:c('ed-ent'),enable_math_keyboard:cMathKb,enable_calculator:cCalc,public_link:e.public_link||'',anti_cheat_config:acPatch,updated_at:new Date().toISOString()};
+    const cMathKb=!!(document.getElementById('ed-mathkb')||{}).checked, cCalc=!!(document.getElementById('ed-calc')||{}).checked, cShowScore=!!(document.getElementById('ed-showscore')||{}).checked;
+    acPatch.math_keyboard=cMathKb; acPatch.calculator=cCalc; acPatch.enable_math_keyboard=cMathKb; acPatch.enable_calculator=cCalc; acPatch.show_score_on_submit=cShowScore; acPatch.show_score=cShowScore;
+    const patch={teacher_id:e.teacher_id||((window.SC_PROFILE&&SC_PROFILE.id)||null),title,subject,class:className,term,session,assessment_type:v('ed-type'),exam_mode:v('ed-mode'),report_column:v('ed-col'),max_score:Number(v('ed-max'))||0,duration:Number(v('ed-dur'))||45,duration_min:Number(v('ed-dur'))||45,negative_mark:Number(v('ed-neg'))||0,select_count:Number(v('ed-sel'))||0,attempt_limit:Number(v('ed-att'))||0,pass_mark:Number(v('ed-pass'))||0,topic:v('ed-topic'),instructions:v('ed-instr'),start_at:start||null,close_at:close||null,is_open:c('ed-open'),is_archived:c('ed-arch'),randomise:c('ed-rand'),release_results:c('ed-rel'),certificate_enabled:c('ed-cert'),is_entrance:c('ed-ent'),enable_math_keyboard:cMathKb,enable_calculator:cCalc,show_score_on_submit:cShowScore,public_link:e.public_link||'',anti_cheat_config:acPatch,updated_at:new Date().toISOString()};
     const {data,error}=await sb.from('cbt_exams').update(patch).eq('id',id).select().maybeSingle();if(error){toast('Could not save exam: '+error.message,'danger',10000);return;}if(!data){toast('Exam update was not confirmed. Check teacher ownership/RLS.','danger',10000);return;}toast('✅ Full exam settings updated. Candidate and report-card values are uniform.','success',7000);closeModal();CBTUI.refresh();
   },
   async editQuestions(id){

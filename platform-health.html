@@ -325,6 +325,8 @@ const PH={
     {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'Math keyboard + calculator toggle + public link', kind:'col', table:'cbt_exams', col:'enable_math_keyboard'},
     {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'CBT exam enable_calculator', kind:'col', table:'cbt_exams', col:'enable_calculator'},
     {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'CBT public link', kind:'rpc', fn:'cbt_get_public_exam_v6', args:{p_code:'TEST01'}},
+    {file:'v12.43-score-display-and-privacy.sql', label:'Score display toggle + privacy + Next student', kind:'col', table:'cbt_exams', col:'show_score_on_submit'},
+    {file:'v12.43-score-display-and-privacy.sql', label:'CBT privacy Next Student clean', kind:'rpc', fn:'cbt_get_public_exam_v6', args:{p_code:'TEST01', p_admission_no:'TEST001'}},
     {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'}
   ],
 
