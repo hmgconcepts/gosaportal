@@ -1100,16 +1100,36 @@ window.CBTUI = {
   },
   delQ(i){ if(!confirm('Delete question '+(i+1)+'?'))return; CBTUI._eq.qs.splice(i,1); CBTUI.editQuestions(CBTUI._eq.id); },
   async saveQuestions(){
-    // V12.39 bulletproof: any authenticated who can SELECT exam can edit (no is_staff/subject check), versioned, verified
+    // V12.44 DRAFT/PUBLISH (different expert approach): Save to draft, preview as student, then atomic publish
     const {id,qs}=CBTUI._eq||{}; if(!id)return;
     const saveBtn=document.querySelector('#modal-backdrop .btn-primary');
     let origText='';
-    if(saveBtn){ origText=saveBtn.textContent; saveBtn.textContent='\u23f3 Saving\u2026'; saveBtn.disabled=true; }
-    toast('\u23f3 Saving question bank \u2014 validating scoring keys\u2026','info',2500);
+    if(saveBtn){ origText=saveBtn.textContent; saveBtn.textContent='\u23f3 Saving draft\u2026'; saveBtn.disabled=true; }
+    toast('\u23f3 Validating question bank\u2026','info',1500);
     const bank=(qs||[]).map((q,i)=>CBT.normalizeQuestion(q,i));
-    const check=CBT.validateQuestionBank(bank); if(!check.ok){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Cannot save: '+check.errors.slice(0,6).join(' | '),'danger',12000);return;}
+    const check=CBT.validateQuestionBank(bank); if(!check.ok){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Cannot save: '+check.errors.slice(0,6).join(' | ')+' — fix highlighted questions','danger',12000);return;}
     let curVer=null; try{ const cur=await sb.from('cbt_exams').select('bank_version').eq('id',id).maybeSingle(); if(cur.data) curVer=cur.data.bank_version; }catch(_){}
     try{
+      let draftRes=null;
+      try{ draftRes=await sb.from('cbt_exams_drafts').upsert({exam_id:id, draft:bank, editor_id:(window.SC_PROFILE&&SC_PROFILE.id)||null}, {onConflict:'exam_id'}).select('id').maybeSingle(); }catch(_){}
+      if(draftRes && !draftRes.error && draftRes.data){
+        const preview=bank.slice(0,3).map((q,i)=>'Q'+(i+1)+': '+(q.question||'').slice(0,40)).join('\n');
+        if(!confirm('Draft saved ('+bank.length+' Qs). Preview first 3:\n'+preview+'\n\nPublish now? (Student will see new version)')){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Draft saved — not yet published. Click Publish to make live.', 'info', 6000); return; }
+        const pub=await sb.rpc('cbt_publish_draft',{p_draft_id: draftRes.data.id});
+        if(!pub.error && pub.data && pub.data.ok!==false){
+          if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;}
+          toast('\u2705 Published '+pub.data.new_count+' questions (v'+pub.data.version+'). Students see new version on next load.', 'success', 7000);
+          try{ localStorage.setItem('cbt-bank-updated-'+String(CBTUI._eq.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''), Date.now().toString()); }catch(_){}
+          try{
+            const codeNorm = String((CBTUI._eq&&CBTUI._eq.code)||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+            if(codeNorm){
+              ['cbt-exam-cache-'+codeNorm,'cbt-exam-cache-'+codeNorm.toLowerCase(),'cbt-draft-'+codeNorm,'cbt-draft-'+codeNorm.toLowerCase()].forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});
+              try{ Object.keys(localStorage).filter(k=>k.startsWith('cbt-draft-'+codeNorm+'-')||k.startsWith('cbt-deadline-'+codeNorm+'-')).forEach(k=>localStorage.removeItem(k)); }catch(_){}
+            }
+          }catch(_){}
+          closeModal(); CBTUI.refresh(); return;
+        }
+      }
       const rpc=await sb.rpc('cbt_force_replace_bank',{p_exam_id:id, p_bank:bank, p_expected_version:curVer});
       if(!rpc.error && rpc.data && rpc.data.ok!==false){
         const verify=await sb.from('cbt_exams').select('csv_data,questions,updated_at,code,bank_version').eq('id',id).maybeSingle();
