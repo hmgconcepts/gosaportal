@@ -1105,6 +1105,7 @@ window.CBTUI = {
     const saveBtn=document.querySelector('#modal-backdrop .btn-primary');
     let origText='';
     if(saveBtn){ origText=saveBtn.textContent; saveBtn.textContent='\u23f3 Saving draft\u2026'; saveBtn.disabled=true; }
+    // Saving question bank — via draft/publish (V12.44)
     toast('\u23f3 Validating question bank\u2026','info',1500);
     const bank=(qs||[]).map((q,i)=>CBT.normalizeQuestion(q,i));
     const check=CBT.validateQuestionBank(bank); if(!check.ok){ if(saveBtn){saveBtn.textContent=origText; saveBtn.disabled=false;} toast('Cannot save: '+check.errors.slice(0,6).join(' | ')+' — fix highlighted questions','danger',12000);return;}
