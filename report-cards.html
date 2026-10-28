@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Report Cards • School Portal</title>
+<meta name="description" content="Build printable termly report cards. Custom columns (CA1, CA2, Assignment, Project, Exam). Family-safe: parents and students see only their own.">
+<meta name="keywords" content="report cards, results, scoresheet, broadsheet, school, HMG Concepts">
+<meta name="theme-color" content="#0506ae">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Report Cards • School Portal">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) === */
+:root{--primary:#0506ae;--primary-dark:#0506ae;--primary-light:#964eec;--accent:#964eec;--gradient:linear-gradient(135deg,#0506ae,#964eec);--gradient-dark:linear-gradient(135deg,#0506ae,#964eec);--font:'Plus Jakarta Sans',system-ui,sans-serif;--sc-primary:#0506ae;--sc-accent:#964eec}
+body{font-family:var(--font)!important;background:#f8fafc}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc;color:#0f172a}
+.app-sidebar{width:286px;flex-shrink:0;background:rgba(255,255,255,.98);border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;z-index:40;box-shadow:0 10px 25px rgba(15,23,42,.04)}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px 16px;border-bottom:1px solid #e2e8f0;min-height:78px}
+.app-brand img{width:44px;height:44px;border-radius:12px;object-fit:contain;flex-shrink:0;background:#f8fafc;border:1px solid #e2e8f0}
+.app-brand strong{display:block;font-size:.98rem;font-weight:900;color:#0f172a;line-height:1.2;max-width:190px;white-space:normal}
+.app-nav{display:flex;flex-direction:column;gap:4px;padding:12px 10px 18px;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:10px;min-height:42px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:.875rem;font-weight:700;line-height:1.2;white-space:normal;word-break:normal;transition:background .18s ease,color .18s ease,transform .18s ease}
+.app-nav a:hover{background:#f1f5f9;color:var(--primary);transform:translateX(2px)}
+.app-nav a.active{background:var(--gradient);color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.22)}
+body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!important}.app-nav a[style*="display: none"]{display:none!important}
+.app-nav a.nav-locked{opacity:.62}.app-nav a.nav-locked .app-nav-icon{filter:grayscale(.35)}.app-nav a.nav-locked::after{content:'🔒';font-size:.72rem;opacity:.65;justify-self:end}.app-nav a.nav-locked.active{opacity:1}
+.app-nav-icon{width:32px;height:32px;min-width:32px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;line-height:1;border-radius:10px;background:rgba(79,70,229,.09);color:var(--primary);flex-shrink:0;overflow:hidden}
+.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22);color:#fff}
+.app-nav a span:last-child{overflow:hidden;text-overflow:ellipsis;display:block}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:13px 22px;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30;box-shadow:0 4px 18px rgba(15,23,42,.035)}
+.app-page-title{font-size:1.2rem;font-weight:900;color:#0f172a;margin:0;letter-spacing:-.01em}
+.app-content{padding:24px;flex:1;max-width:1400px;width:100%;margin:0 auto}
+.card{border-radius:18px!important;border:1px solid #e2e8f0!important;box-shadow:0 8px 24px rgba(15,23,42,.06)!important}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:18px}.stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05)}.stat-value{font-size:1.8rem;font-weight:900;color:var(--primary)}.stat-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800}
+.app-layout.topnav,.app-layout.cardhub,.app-layout.mega-menu,.app-layout.tabbed,.app-layout.dashboard-pro{flex-direction:column}
+.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{width:100%;height:auto;max-height:210px;position:sticky;top:0;flex-direction:row;align-items:stretch;overflow:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:260px;min-width:260px;border-bottom:none;border-right:1px solid #e2e8f0}
+.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(116px,150px);overflow-x:auto;overflow-y:hidden;padding:10px;align-items:center}
+.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{grid-template-columns:1fr;text-align:center;justify-items:center;gap:4px;min-height:68px;padding:8px 10px;font-size:.75rem}
+.app-layout.topnav .app-nav-icon,.app-layout.cardhub .app-nav-icon,.app-layout.mega-menu .app-nav-icon,.app-layout.tabbed .app-nav-icon,.app-layout.dashboard-pro .app-nav-icon{margin:auto}
+.app-layout.compact .app-sidebar,.app-layout.dock .app-sidebar{width:224px}.app-layout.compact .app-nav a,.app-layout.dock .app-nav a{font-size:.8rem;grid-template-columns:28px minmax(0,1fr)}.app-layout.compact .app-nav-icon,.app-layout.dock .app-nav-icon{width:28px;height:28px;min-width:28px}
+.app-layout.expanded .app-sidebar{width:330px}.app-layout.minimalist .app-sidebar{box-shadow:none}.app-layout.floating .app-sidebar{margin:14px;border-radius:22px;height:calc(100vh - 28px);border:1px solid #e2e8f0}.app-layout.split-view .app-content,.app-layout.grid-master .app-content,.app-layout.masonry .app-content{max-width:1500px}
+@media(max-width:900px){.app-sidebar,.app-layout.floating .app-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:min(86vw,310px)!important;height:100vh!important;margin:0!important;border-radius:0!important;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 40px rgba(0,0,0,.22);z-index:100}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{flex-direction:column;align-items:stretch}.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:auto;min-width:0;border-right:none;border-bottom:1px solid #e2e8f0}.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);justify-items:stretch;text-align:left;min-height:42px;font-size:.875rem}.app-content{padding:16px}.app-topbar{padding:12px 14px;gap:10px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}.user-chip{max-width:150px;overflow:hidden}.user-chip strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+
+    <meta name="description" content="Build printable termly report cards. Custom columns (CA1, CA2, Assignment, Project, Exam). Family-safe: parents and students see only their own.">
+    <meta name="keywords" content="report cards, results, scoresheet, broadsheet, school, HMG Concepts">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./report-cards.html">
+    <meta property="og:title" content="Report Cards • School Portal">
+    <meta property="og:description" content="Build printable termly report cards. Custom columns (CA1, CA2, Assignment, Project, Exam). Family-safe: parents and students see only their own.">
+    <meta property="og:url" content="./report-cards.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Report Cards • School Portal">
+    <meta name="twitter:description" content="Build printable termly report cards. Custom columns (CA1, CA2, Assignment, Project, Exam). Family-safe: parents and students see only their own.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head>
+<body>
+
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center"><span class="pulse">Loading…</span></div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.png" alt="School" style="object-fit:contain" onerror="this.onerror=null;this.replaceWith(Object.assign(document.createElement('div'),{textContent:('S'),style:'width:40px;height:40px;border-radius:10px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900'}))">
+        <div>
+          <strong>School Portal</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)" data-school-short></div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>My Profile</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔐</span>
+          <span>Change Password</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Report Cards (flexible)</span>
+        </a><a href="affective_traits.html" data-module-id="affective_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Affective Domain</span>
+        </a><a href="psychomotor_traits.html" data-module-id="psychomotor_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏃</span>
+          <span>Psychomotor Domain</span>
+        </a><a href="report_comments.html" data-module-id="report_comments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Report Comments</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Multi-Subject CBT</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="school-fees.html" data-module-id="school_fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏷️</span>
+          <span>Class Fee Structure</span>
+        </a><a href="school-products.html" data-module-id="school_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛒</span>
+          <span>School Products</span>
+        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payment History</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="exam-register.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Exam Registrations</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="hmg-digital-products.html" data-module-id="hmg_digital_products" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Digital Products</span>
+        </a><a href="status-manager.html" data-module-id="status_manager" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔧</span>
+          <span>Role &amp; Status</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="ecosystem.html" data-module-id="ecosystem_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Ecosystem</span>
+        </a><a href="punctuality.html" data-module-id="punctuality" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⏱️</span>
+          <span>Punctuality</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+      </div>
+    </aside>
+  <main class="app-main">
+    <header class="app-topbar">
+      <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
+      <h1 class="app-page-title">Report Cards</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+
+        <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
+        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle dark/light — robust like Fleet Console">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="if(window.ThemeManager)ThemeManager.openPalette()" title="Theme palette — colour themes + dark/light + reset (Ctrl+K)">🎨</button>
+        <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
+      </div>
+    </header>
+    <div class="app-content">
+      <div class="card no-print" style="background:#eff6ff;border:1px solid #93c5fd;margin-bottom:14px"><b>📝 Midterm test sheets:</b> Generate a report containing only this term’s midterm test scores, separately from terminal report cards. <a class="btn btn-sm btn-primary" href="midterm-reports.html">Open Midterm Reports</a></div>
+<div class="card" style="background:#f0f9ff;border:1px solid #0ea5e9;margin-bottom:20px">
+      <h3 style="color:#0369a1;margin-top:0">ℹ️ Report Card Columns Are Global</h3>
+      <p style="margin:0;font-size:.9rem;line-height:1.6">Report card columns (CA1, CA2, CBT, Project, Exam, etc.) are defined <strong>once for all subjects</strong>. You do not need to set up columns separately for each subject. All subjects use the same column structure.</p>
+      <p style="margin:8px 0 0;font-size:.85rem;color:#64748b"><strong>Flexible structure:</strong> create or edit any heading and maximum—e.g. CA1 (20), CA2 (10), Project (10), Exam (60), or CBT-only (100). Printed headings and CBT destinations follow these exact settings; no hard-coded CA maximum is used.</p>
+    </div>
+
+      <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:14px"><b>👀 See samples first:</b> <a href="sample-report-card.html" target="_blank">Report Card</a> · <a href="sample-class-broadsheet.html" target="_blank">Class Broadsheet</a> · <a href="sample-subject-broadsheet.html" target="_blank">Subject Broadsheet</a> · <a href="sample-e-receipt.html" target="_blank">Fee E-Receipt</a></div>
+
+      <div id="rc-family-safe"><!-- family-safe Report Cards: parents see only linked children, students see only themselves --></div>
+
+      <div class="card" style="margin-bottom:16px" data-staff-only>
+        <h3 style="margin-top:0">🛠 Build a report card</h3>
+        <p style="color:var(--gray-600);margin:0 0 12px">Build a report card with <strong>fully custom columns</strong>. Blank cells remain blank and print as <strong>—</strong>; they are never converted to zero. CBT attempts enter official reports only through the explicit <strong>Bulk Push CBT Scores</strong> preview below, preventing phantom or duplicate marks.</p>
+        <div class="grid grid-2">
+          <div class="form-group"><label>Class</label><select class="form-select" id="rc-class"><option value="">— select class —</option></select></div>
+          <div class="form-group"><label>Subject</label><select class="form-select" id="rc-subject"><option value="">— select subject —</option></select></div>
+          <div class="form-group"><label>Term</label><select class="form-select" id="rc-term"><option value="">— select term —</option></select></div>
+          <div class="form-group"><label>Session</label><select class="form-select" id="rc-session"><option value="">— select session —</option></select></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span id="score-grid"></span><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" style="color:#b45309;border-color:#f59e0b" onclick="RC.sweepGhosts()" data-admin-only title="Remove leftover report sheets from deleted columns/students">🧹 Sweep Ghost Report Sheets</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
+      </div>
+      <div id="rc-cols" data-staff-only></div>
+      <div id="rc-grid"></div>
+      <!-- V12.16: One-Click Student Report Access Control -->
+      <div class="card" style="margin-top:16px;border:2px solid #10b981;background:#f0fdf4" data-admin-only id="rc-allow-card">
+        <h3 style="margin-top:0">🔓 Student Report Access Control — One-Click Allow/Disallow (V12.16)</h3>
+        <div style="background:#fff;border:1px solid #86efac;border-radius:10px;padding:10px;margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.7">
+          <b>Modus operandi — Admin one-click allow/disallow (robust, all-inclusive, self-contained, seamless):</b><br>
+          At end of term, admin can <b>allow or disallow</b> students from automatically generating/checking their report cards for that term with <b>just one click</b>. Select Term + Session below, then click <b>✅ Allow Students</b> or <b>🔒 Disallow Students</b>. Status shows instantly.<br>
+          <b>How it works:</b> Sets <code>academic_periods.allow_student_report</code> boolean for that Term/Session (one-click via RPC <code>sc_set_report_generation_allowed</code>). Student portal checks via <code>sc_is_report_generation_allowed</code> — if not allowed, student sees bold "🔒 Report generation not yet allowed by admin — contact school" and cannot generate, even if report not locked by fees. If allowed, student can generate own report (auto-filled name) for previous/current term once admin permits. Also has global toggle (fallback) via <code>school_settings.allow_student_report_global</code>.<br>
+          <b>Robustness:</b> Per-term control overrides global. Admin sees current status per term, can toggle any term/session in one click. Works for parent too (allow_parent_report). RLS: only admin/principal can set.
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Term *</label><select class="form-select" id="rc-allow-term" style="max-width:160px"><option value="">— select term —</option></select></div>
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Session</label><select class="form-select" id="rc-allow-session" style="max-width:160px"><option value="">— select session —</option></select></div>
+          <button class="btn btn-primary" style="background:#10b981;border-color:#10b981" onclick="RC.setReportAllow(true)">✅ Allow Students (One-Click)</button>
+          <button class="btn btn-outline" style="color:#dc2626;border-color:#fca5a5" onclick="RC.setReportAllow(false)">🔒 Disallow Students (One-Click)</button>
+          <button class="btn btn-outline" onclick="RC.loadReportAllowStatus()">🔄 Check Status</button>
+          <span id="rc-allow-status" style="font-size:.85rem;font-weight:700;color:#065f46"></span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+          <span style="font-weight:800;color:#065f46">Global fallback:</span>
+          <button class="btn btn-sm btn-outline" onclick="RC.setGlobalAllow(true)">🌐 Allow All Terms Globally</button>
+          <button class="btn btn-sm btn-outline" onclick="RC.setGlobalAllow(false)">🌐 Disallow All Globally</button>
+          <span id="rc-allow-global-status" style="font-size:.82rem;color:#475569"></span>
+        </div>
+        <div id="rc-allow-log" style="margin-top:10px;font-size:.82rem;color:#475569"></div>
+      </div>
+      <div class="card" style="margin-top:16px;border:2px solid #6366f1">
+        <h3 style="margin-top:0">📄 Generate outputs — Student Report Cards, Broadsheets, Scoresheets (V12.14)</h3>
+        <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:10px;margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.7">
+          <b>Modus operandi — How report card generation works (for all roles, especially new users) — V12.14 robust, all-inclusive, self-contained, seamless:</b><br>
+          <b>Admin/Teacher portal:</b> Build scores first (Class+Subject+Term+Session → Load/Build → enter scores), then Generate outputs: pick Class, Term, Session (or leave blank to use above), enter Student name/admission number (autocomplete from class), click Student Report Card (single), Class Broadsheet (all students, all subjects), Teacher Scoresheet (subject), or Bulk Print ALL (per class, one per page). Edit/Delete restored on Assignments — never drop pre-existing features.<br>
+          <b>Student portal (V12.14 — auto-fill on landing, clickable & responsive, only own):</b> Your <b>student name field is auto-filled the moment you land</b> — no typing needed, already shows your full name + admission no, readonly, only your result (cannot access other students). Your class also auto-filled readonly. <b>Term and Session are now clickable and responsive</b> — <b>Term and Session are clickable and responsive</b> — select <b>previous term or current term</b> once admin permits (when report not locked). If locked, you see 🔒 message with bursary contact. You cannot generate for future terms or other students. This ensures students only check/generate their own report card for previous/current term once school admin permits. Auto-fill uses cached profile for instant landing, then verified via DB (students.user_id = your account). Datalist cleared so you cannot pick others. V12.12: Term and Session are now clickable and responsive — previous/current term once admin permits.<br>
+          <b>Parent portal:</b> Select child from safe list (only your linked children, locked children removed), then Term/Session (previous/current) → Student Report Card.<br>
+          <b>Multi-subject CBT Assignments (V12.14):</b> When Score class clicked for multi-subject CBT assignments, scores auto-fill per subject (just like exams/mid-term), and push fills each subject Assignment column. Works for pre-existing multi-subject assignments too (fallback uses overall %). Assignment page now shows Edit/Delete for admin/tutor + Take beside every CBT assignment for student.<br>
+          <b>Robustness:</b> All fields use dropdowns from live DB (lookups + classes + results + assessment_columns) with defaults fallback, never blank. Report lock via <code>sc_my_access_state</code> RPC blocks locked students with bold message. History merge shows students who moved on (🎓) so past terms regenerate full. Student auto-fill: immediate from localStorage cache + verified DB.
+        </div>
+        <p style="color:var(--gray-600);font-size:.9rem">Generate printable termly outputs from the recorded scores (all subjects). Student name auto-filled on landing — no typing needed.</p>
+        <!-- V7.7 #4: the outputs section has its OWN class/term/session dropdowns so
+             the admin can generate ANY student's card for ANY past term/session/class
+             without touching the score-grid pickers above. Blank = use the pickers above. -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Class</label><select class="form-select" id="rc-out-class" style="max-width:170px" onchange="RC.fillStudentPicker()"><option value="">— same as above —</option></select></div>
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Term</label><select class="form-select" id="rc-out-term" style="max-width:160px"><option value="">— same as above —</option></select></div>
+          <div class="form-group" style="margin:0"><label style="font-size:.75rem">Session</label><select class="form-select" id="rc-out-session" style="max-width:160px"><option value="">— same as above —</option></select></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input class="form-input" id="rc-student" list="rc-student-list" placeholder="Student name OR admission number" style="max-width:280px"><datalist id="rc-student-list"></datalist>
+          <button class="btn btn-primary" onclick="RC.reportCard()">🧾 Student Report Card</button>
+          <button class="btn btn-outline" onclick="RC.broadsheet()" data-staff-only>📊 Class Broadsheet</button>
+          <button class="btn btn-outline" onclick="RC.scoresheet()" data-staff-only>📋 Teacher Scoresheet</button>
+          <button class="btn btn-primary" style="background:linear-gradient(135deg,#7c3aed,#4f46e5)" onclick="RC.bulkClassCards()" data-admin-only>🖨️ Bulk Print ALL Report Cards (per class)</button>
+        </div>
+        <div id="rc-bulk-progress" style="display:none;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:.85rem;color:var(--gray-600)"><span id="rc-bulk-msg">Preparing…</span><span id="rc-bulk-count"></span></div><div style="height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:4px"><div id="rc-bulk-bar" style="height:100%;width:0;background:linear-gradient(90deg,#7c3aed,#4f46e5);transition:width .3s"></div></div></div>
+      </div>
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
+      © <span data-current-year></span> <span data-school-name>School Portal</span> · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+    </footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/voting.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/crud.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
+  else { Notifications.init(sb); Voting.init(sb); }
+  PWAInstall.init();
+  if (window.Super) Super.init(sb, window.SCHOOL);
+  if (window.Enterprise) Enterprise.init(sb);
+  if (window.CRUD) CRUD.init(sb);
+</script>
+<script>
+/* ===================================================================
+   Report Cards v15 — Final Stable
+   - Robust dropdown loading with multiple fallbacks (lookups / classes / subjects / results / defaults)
+   - Family-safe: parents see only linked children, students see only themselves
+   - All operations read-only for parent/student (data-readonly-role + canWrite guards)
+   - Generate report card, broadsheet, scoresheet via ReportEngine
+   - Graceful error states
+   =================================================================== */
+(function(){
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const uniq = (arr) => [...new Set((arr||[]).map(x => String(x||'').trim()).filter(Boolean))].sort();
+  const fillSelect = (id, vals) => {
+    const el = $(id); if (!el) return;
+    const keep = el.value;
+    el.innerHTML = '<option value="">— select —</option>' + (vals||[]).map(v => '<option value="' + esc(v) + '">' + esc(v) + '</option>').join('');
+    if (keep && (vals||[]).includes(keep)) el.value = keep;
+    try { if (window.App) App.dedupeSelectOptions(el); } catch(_){}
+  };
+
+  const DEFAULTS = {
+    classes: ['Pre-Nursery','Nursery 1','Nursery 2','Primary 1','Primary 2','Primary 3','Primary 4','Primary 5','Primary 6','JSS 1','JSS 2','JSS 3','SSS 1','SSS 2','SSS 3'],
+    subjects: ['Mathematics','English Language','Basic Science','Basic Technology','Social Studies','Civic Education','Computer Science','Physical & Health Education','Agricultural Science','Christian Religious Studies','Islamic Religious Studies','Cultural & Creative Arts','History','Geography','Civic Education','Yoruba','Igbo','Hausa','French','Further Mathematics','Physics','Chemistry','Biology','Economics','Government','Commerce','Accounting','Literature in English'],
+    terms: ['First Term','Second Term','Third Term'],
+    sessions: (() => { const out = []; const now = new Date().getFullYear(); for (let y = now-1; y <= now+2; y++) out.push(y + '/' + (y+1)); return out; })()
+  };
+
+  const RC = {
+    ctx: {}, cols: [], students: [],
+    _loaded: false,
+    _loading: false,
+    _role: 'guest',
+    _familyMode: false,
+    _kids: [],
+    _me: null,
+    _lastInited: 0,
+
+    async init(){
+      // Wait for App to expose role
+      for (let i = 0; i < 30; i++) {
+        if (window.App && (window.App.currentRole || window.App.currentRole === '')) break;
+        await new Promise(r => setTimeout(r, 200));
+      }
+      this._role = String((window.App && App.currentRole) || (window.SC_PROFILE && SC_PROFILE.role) || 'guest').toLowerCase();
+      this._familyMode = ['parent','student'].includes(this._role);
+
+      // Render family panel for parents/students
+      if (this._familyMode) {
+        await this._initFamilyMode();
+      }
+
+      // Dropdowns — load lookups + classes + subjects in parallel with fallbacks
+      await this._loadDropdowns();
+
+      this._loaded = true;
+      this._lastInited = Date.now();
+    },
+
+  async _loadDropdowns(){
+    if (this._loading) return;
+    this._loading = true;
+    let classes = [], subjects = [], terms = [], sessions = [];
+    // Fallback sources: sb.from('results').select('class,subject,term,session') + sb.from('assessment_columns').select('class,subject,term,session') + sb.from('students').select('class')
+    try {
+        if (window.sb) {
+          const [cls, sub, termLkp, sesLkp, res, ac, stu, sch] = await Promise.all([
+            this._safe('classes', 'name'),
+            this._safe('subjects', 'name'),
+            this._safe('lookups', 'value', { kind: 'term' }),
+            this._safe('lookups', 'value', { kind: 'session' }),
+            this._safe('results', 'class,subject,term,session', {}, 5000),
+            this._safe('assessment_columns', 'class,subject,term,session', {}, 5000),
+            this._safe('students', 'class', {}, 5000),
+            this._safe('school_settings', 'terms,sessions', { id: 1 })
+          ]);
+          if (cls) classes = uniq(cls.map(r => r.name));
+          if (sub) subjects = uniq(sub.map(r => r.name));
+          if (termLkp) terms = uniq(termLkp.map(r => r.value));
+          if (sesLkp) sessions = uniq(sesLkp.map(r => r.value));
+          if (res) {
+            classes  = uniq([...classes,  ...res.map(r => r.class)]);
+            subjects = uniq([...subjects, ...res.map(r => r.subject)]);
+            terms    = uniq([...terms,    ...res.map(r => r.term)]);
+            sessions = uniq([...sessions, ...res.map(r => r.session)]);
+          }
+          if (ac) {
+            classes  = uniq([...classes,  ...ac.map(r => r.class)]);
+            subjects = uniq([...subjects, ...ac.map(r => r.subject)]);
+            terms    = uniq([...terms,    ...ac.map(r => r.term)]);
+            sessions = uniq([...sessions, ...ac.map(r => r.session)]);
+          }
+          if (stu) classes = uniq([...classes, ...stu.map(r => r.class)]);
+          if (sch && sch.terms) terms = uniq([...terms, ...(Array.isArray(sch.terms)?sch.terms:[])]);
+          if (sch && sch.sessions) sessions = uniq([...sessions, ...(Array.isArray(sch.sessions)?sch.sessions:[])]);
+        }
+      } catch(e) { console.warn('RC dropdown load failed', e); }
+      finally { this._loading = false; }
+
+      // Fallback to defaults if still empty
+      if (!classes.length)  classes  = DEFAULTS.classes;
+      if (!subjects.length) subjects = DEFAULTS.subjects;
+      if (!terms.length)    terms    = DEFAULTS.terms;
+      if (!sessions.length) sessions = DEFAULTS.sessions;
+
+      fillSelect('rc-class', classes);
+      fillSelect('rc-subject', subjects);
+      fillSelect('rc-term', terms);
+      fillSelect('rc-session', sessions);
+      /* V7.7 #4: fill the Generate-outputs dropdowns too (default = inherit). */
+      const fillOut=(id,vals)=>{const el=$(id);if(!el)return;const keep=el.value;el.innerHTML='<option value="">— same as above —</option>'+(vals||[]).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(keep&&(vals||[]).includes(keep))el.value=keep;};
+      fillOut('rc-out-class', classes); fillOut('rc-out-term', terms); fillOut('rc-out-session', sessions);
+      // V12.16: also fill allow-control dropdowns
+      const fillAllow=(id,vals)=>{const el=$(id);if(!el)return;const keep=el.value;el.innerHTML='<option value="">— select —</option>'+(vals||[]).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if(keep&&(vals||[]).includes(keep))el.value=keep;};
+      fillAllow('rc-allow-term', terms); fillAllow('rc-allow-session', sessions);
+    },
+
+    async _safe(table, select, extra, limit){
+      try {
+        let q = window.sb.from(table).select(select);
+        if (extra) q = Object.entries(extra).reduce((acc, [k, v]) => (typeof v === 'object' ? acc : acc.eq(k, v)), q);
+        if (limit) q = q.limit(limit);
+        const r = await q;
+        if (r && !r.error) return r.data;
+      } catch (e) { /* RLS may block; fall through */ }
+      return null;
+    },
+
+    async _initFamilyMode(){
+      const host = $('rc-family-safe'); if (!host) return;
+      host.innerHTML = '<div class="card" style="border-left:5px solid var(--primary);margin-bottom:16px"><span class="pulse">Loading your report card…</span></div>';
+      const sc = window.SCHOOL || {}; const name = sc.name || 'your school';
+      // V12.15: Immediate auto-fill from cached profile for instant landing (robust, all-inclusive, self-contained, seamless)
+      // Ensures student name field is already filled even before DB fetch, so student lands and already sees own details without typing
+      const ensureStudentAutoFill = (stuObj, force=false)=>{
+        try{
+          const inp = $('rc-student');
+          if(!inp) return;
+          const targetName = (stuObj && stuObj.full_name) || (window.SC_PROFILE && SC_PROFILE.full_name) || '';
+          const adm = (stuObj && stuObj.admission_no) || '';
+          if(!targetName) return;
+          if(force || !inp.value || inp.value!==targetName){
+            inp.value = targetName;
+          }
+          inp.removeAttribute('disabled');
+          inp.setAttribute('readonly','readonly');
+          inp.removeAttribute('list');
+          inp.title='Your own report card — auto-filled on landing, only your result, no access to other students';
+          inp.placeholder='Auto-filled: '+targetName+(adm?' ('+adm+')':'')+' — only your result (no typing needed)';
+          const dl=document.getElementById('rc-student-list');
+          if(dl){
+            dl.innerHTML='<option value="'+esc(targetName)+(adm?' — '+esc(adm):'')+'">'+esc(targetName)+' — your result</option>';
+          }
+        }catch(_){}
+      };
+      try{
+        const cachedProfile = window.SC_PROFILE || (function(){ try{return JSON.parse(localStorage.getItem('sc-cached-profile')||'null');}catch(_){return null;}})();
+        const immediateName = cachedProfile && (cachedProfile.full_name || cachedProfile.email || '');
+        if(immediateName && this._role==='student'){
+          ensureStudentAutoFill({full_name: immediateName, admission_no: cachedProfile.admission_no||''}, true);
+          // Keep ensuring for 5 seconds until DB confirms
+          let tries=0;
+          const iv=setInterval(()=>{
+            tries++;
+            ensureStudentAutoFill({full_name: immediateName, admission_no: cachedProfile.admission_no||''}, false);
+            if(tries>10) clearInterval(iv);
+          }, 500);
+        }
+      }catch(_){}
+      try {
+        if (this._role === 'student') {
+          const { data: stu } = await window.sb.from('students').select('id,full_name,class,admission_no').eq('user_id', (window.SC_PROFILE && SC_PROFILE.id) || '').maybeSingle();
+          if (stu) {
+            this._me = stu; this._kids = [stu];
+            // V12.15: student fields — auto-fill without typing, readonly, only own result, already filled on landing — robust
+            // Ensures field auto-fills student detail without typing, already has details when landing, only own result, no access to others
+            ensureStudentAutoFill(stu, true);
+            // Keep ensuring every 800ms for 8 seconds to survive any late fillStudentPicker overwrites
+            let tries2=0;
+            const iv2=setInterval(()=>{
+              tries2++;
+              ensureStudentAutoFill(stu, false);
+              if(tries2>10) clearInterval(iv2);
+            }, 800);
+            // Also clear datalist to only own (family-safe)
+            try{
+              const dl=document.getElementById('rc-student-list');
+              if(dl) dl.innerHTML='<option value="'+esc(stu.full_name)+(stu.admission_no?' — '+esc(stu.admission_no):'')+'">'+esc(stu.full_name)+' — your result</option>';
+            }catch(_){}
+            const cls = $('rc-class'); if (cls && stu.class) { cls.value = stu.class; cls.removeAttribute('disabled'); cls.setAttribute('readonly', 'readonly'); }
+            const outCls = $('rc-out-class'); if(outCls && stu.class){ outCls.innerHTML='<option value="'+esc(stu.class)+'">'+esc(stu.class)+' — your class</option>'; outCls.value=stu.class; outCls.removeAttribute('disabled'); outCls.title='Your class — auto-filled'; }
+            // For student, term/session dropdowns are CLICKABLE and responsive — only previous term or current term once admin permits
+            // Load available terms/sessions for this student that have scores and are not locked
+            let availableTerms=[], availableSessions=[], currentTerm='', currentSession='';
+            try{
+              const ap = await window.sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false}).limit(20);
+              if(ap.data){
+                const cur = ap.data.find(x=>x.is_current);
+                if(cur){ currentTerm=cur.term||''; currentSession=cur.session||''; }
+                // Terms: current + previous (based on DEFAULTS order) + any term that has report_scores for this student
+                const termsSet=new Set();
+                if(currentTerm) termsSet.add(currentTerm);
+                // Previous term logic: if current is Second Term, previous is First Term; if Third, previous is Second, etc.
+                const order=['First Term','Second Term','Third Term'];
+                const idx=order.indexOf(currentTerm);
+                if(idx>0) termsSet.add(order[idx-1]);
+                if(idx>=0 && idx<order.length-1) termsSet.add(order[idx+1]); // also allow next for preview? But spec says previous or current only once admin permits — we will allow current + previous
+                // Also add any term that has scores for this student
+                try{
+                  const rs = await window.sb.from('report_scores').select('term,session').eq('student_id_ref',stu.admission_no||'').eq('class',stu.class||'').limit(100);
+                  (rs.data||[]).forEach(r=>{ if(r.term) termsSet.add(r.term); if(r.session) availableSessions.push(r.session); });
+                }catch(_){}
+                availableTerms=[...termsSet].filter(Boolean);
+                availableSessions=[...new Set(availableSessions)].filter(Boolean);
+                if(currentSession) availableSessions.unshift(currentSession);
+                availableSessions=[...new Set(availableSessions)].filter(Boolean);
+              }
+            }catch(_){}
+            if(!availableTerms.length) availableTerms=DEFAULTS.terms.slice(-2); // fallback to last 2 terms (previous + current)
+            if(!availableSessions.length) availableSessions=DEFAULTS.sessions.slice(0,3);
+            // Fill term/session outputs for student — CLICKABLE and responsive
+            const outTerm=$('rc-out-term'), outSess=$('rc-out-session');
+            if(outTerm){
+              outTerm.innerHTML='<option value="">— select term —</option>'+availableTerms.map(t=>'<option value="'+esc(t)+'" '+(t===currentTerm?'selected':'')+'>'+esc(t)+(t===currentTerm?' — current term':' — previous term')+'</option>').join('');
+              outTerm.removeAttribute('disabled');
+              outTerm.title='Select term — only previous term or current term once admin permits';
+            }
+            if(outSess){
+              outSess.innerHTML='<option value="">— select session —</option>'+availableSessions.map(s=>'<option value="'+esc(s)+'" '+(s===currentSession?'selected':'')+'>'+esc(s)+(s===currentSession?' — current':'')+'</option>').join('');
+              outSess.removeAttribute('disabled');
+            }
+            // Also fill main term/session if needed
+            const mainTerm=$('rc-term'), mainSess=$('rc-session');
+            if(mainTerm && !mainTerm.value){
+              mainTerm.innerHTML='<option value="">— select term —</option>'+availableTerms.map(t=>'<option value="'+esc(t)+'">'+esc(t)+'</option>').join('');
+              mainTerm.removeAttribute('disabled');
+            }
+            if(mainSess && !mainSess.value){
+              mainSess.innerHTML='<option value="">— select session —</option>'+availableSessions.map(s=>'<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');
+              mainSess.removeAttribute('disabled');
+            }
+            // Check report lock status for this student
+            let lockMsg='';
+            try{
+              const ar = await window.sb.rpc('sc_my_access_state');
+              const g = (ar && ar.data) || {};
+              const me = (g.students||[]).find(k=>String(k.name||'').toLowerCase()===String(stu.full_name||'').toLowerCase());
+              if(me && me.report_locked) lockMsg = '<div style="background:#fef2f2;border:2px solid #dc2626;border-radius:10px;padding:12px;margin-top:10px"><b style="color:#b91c1c">🔒 Report card not yet permitted</b><p style="margin:6px 0 0;color:#7f1d1d;font-weight:600">'+esc(me.report_lock_message||'Your report card is not yet available — school admin has not yet permitted generation for this term. Please check later or contact bursary.')+'</p></div>';
+            }catch(_){}
+            host.innerHTML = '<div class="card" style="border-left:5px solid var(--primary);margin-bottom:16px"><h3 style="margin:0 0 6px">🧾 My Report Card — Generate Your Own (V12.11)</h3>'+
+              '<p style="margin:0">Student: <strong>' + esc(stu.full_name) + '</strong> · Class: <strong>' + esc(stu.class || '—') + '</strong> · Admission No: <strong>'+esc(stu.admission_no||'—')+'</strong></p>'+
+              '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px;margin:10px 0;font-size:.88rem;color:#166534"><b>✅ How to generate (for new users):</b><br>1️⃣ Select <b>Term</b> (previous term or current term) and <b>Session</b> in Generate outputs below — fields are now clickable and responsive for students.<br>2️⃣ Your name and class are auto-filled (read-only, only your own).<br>3️⃣ Click <b>🧾 Student Report Card</b> to generate/print your report card for that term. You can only generate for previous term or current term once admin permits (when report is not locked). If locked, you will see 🔒 message.</div>'+
+              lockMsg+
+              '</div>';
+          } else {
+            host.innerHTML = '<div class="card" style="border-left:5px solid var(--primary);margin-bottom:16px"><h3 style="margin:0 0 6px">🧾 My Report Card</h3><p>Your login is not linked to a student record yet. Ask the school admin to link your account in the <em>Students</em> page.</p></div>';
+          }
+          return;
+        }
+        if (this._role === 'parent') {
+          const { data: links } = await window.sb.from('parent_child').select('student_id').eq('parent_id', (window.SC_PROFILE && SC_PROFILE.id) || '');
+          const ids = (links || []).map(l => l.student_id).filter(Boolean);
+          let kids = [];
+          if (ids.length) {
+            const r = await window.sb.from('students').select('id,full_name,class,admission_no').in('id', ids);
+            kids = r.data || [];
+          }
+          this._kids = kids;
+          if (!kids.length) {
+            host.innerHTML = '<div class="card" style="border-left:5px solid var(--primary);margin-bottom:16px"><h3 style="margin:0 0 6px">🧾 My Children Report Cards</h3><p>No child is linked to this parent account yet. Ask the school to add a parent–child link in the <em>Parents</em> page.</p></div>';
+            return;
+          }
+          /* V10.9 (#2): report-locked children are REMOVED from the parent's
+             picker entirely and replaced by the bold lock notice — a parent
+             cannot even attempt to open a locked child's card.
+             V11.0 (#9) ROOT-CAUSE FIX: this used to read window.SC_ACCESS_STATE,
+             which app.js sets ASYNCHRONOUSLY — on a fast page load this panel
+             rendered BEFORE the RPC resolved, so the locked child appeared in
+             the picker anyway (the reported bug; RLS still blanked the data,
+             but the page looked accessible). The page now fetches the access
+             state ITSELF and awaits it — no race, no leak. */
+          let lockNotices = '';
+          try {
+            let g = window.SC_ACCESS_STATE;
+            if (!g || !Array.isArray(g.students)) {
+              try { const ar = await window.sb.rpc('sc_my_access_state'); g = (ar && ar.data) || {}; window.SC_ACCESS_STATE = g; }
+              catch(_) { g = g || {}; }
+            }
+            const lockedNames = (g.students || []).filter(k => k.report_locked);
+            if (lockedNames.length) {
+              const lockedSet = new Set(lockedNames.map(k => String(k.name || '').toLowerCase()));
+              const before = kids.length;
+              kids = kids.filter(k => !lockedSet.has(String(k.full_name || '').toLowerCase()));
+              this._kids = kids;
+              if (before !== kids.length) {
+                lockNotices = lockedNames.map(k =>
+                  '<div style="background:#fef2f2;border:3px solid #dc2626;border-radius:12px;padding:14px 16px;margin:0 0 10px">' +
+                  '<b style="color:#b91c1c">🔒 Report card unavailable — ' + esc(k.name || 'student') + '</b>' +
+                  '<p style="margin:6px 0 0;font-weight:800;color:#7f1d1d;line-height:1.6">' + esc(k.report_lock_message || 'This report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.') + '</p></div>').join('');
+              }
+              if (!kids.length) {
+                host.innerHTML = '<div class="card" style="border-left:5px solid #dc2626;margin-bottom:16px"><h3 style="margin:0 0 6px">🧾 My Children Report Cards</h3>' + lockNotices + '</div>';
+                return;
+              }
+            }
+          } catch(_) {}
+          const opts = kids.map(k => '<option value="' + esc(k.id) + '">' + esc(k.full_name) + ' — ' + esc(k.class || '—') + '</option>').join('');
+          host.innerHTML =
+            '<div class="card" style="border-left:5px solid var(--primary);margin-bottom:16px">' +
+            '<h3 style="margin:0 0 6px">🧾 My Children Report Cards — Generate for Previous/Current Term (V12.11)</h3>' + lockNotices +
+            '<p style="color:var(--gray-500);font-size:.88rem;margin:0 0 10px">Read-only view for your linked children. Select a child, then select Term (previous or current) and Session in Generate outputs below — fields are now clickable and responsive for parents. You can only generate for previous term or current term once admin permits (not locked).</p>' +
+            '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:10px;margin:0 0 10px;font-size:.85rem;color:#166534"><b>✅ How to generate:</b> 1️⃣ Pick child above → 2️⃣ Pick Term (previous/current) + Session in Generate outputs → 3️⃣ Click Student Report Card. If child\'s report is locked (fees), you\'ll see 🔒 message with bursary contact.</div>'+
+            '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+            '<select class="form-select" id="rc-child-safe" style="max-width:340px">' + opts + '</select>' +
+            '<button type="button" class="btn btn-primary" id="rc-child-go">View report card</button>' +
+            '</div></div>';
+          // Ensure outputs term/session are clickable for parent too
+          try{
+            const outTerm=document.getElementById('rc-out-term'), outSess=document.getElementById('rc-out-session');
+            if(outTerm) outTerm.removeAttribute('disabled');
+            if(outSess) outSess.removeAttribute('disabled');
+            const outCls=document.getElementById('rc-out-class');
+            if(outCls) outCls.removeAttribute('disabled');
+          }catch(_){}
+          $('rc-child-go').addEventListener('click', () => {
+            const sel = $('rc-child-safe');
+            const k = kids.find(x => x.id === sel.value);
+            if (!k) { toast('Select a child first.', 'warning'); return; }
+            $('rc-student').value = k.full_name;
+            $('rc-class').value = k.class || '';
+            RC.reportCard();
+          });
+        }
+      } catch (e) {
+        host.innerHTML = '<div class="card" style="border-left:5px solid #f59e0b;margin-bottom:16px"><p>Could not load your children. Please refresh.</p></div>';
+        console.warn('family mode init failed', e);
+      }
+    },
+
+    ctxVals(){
+      return {
+        class: ($('rc-class') || {}).value ? $('rc-class').value.trim() : '',
+        subject: ($('rc-subject') || {}).value ? $('rc-subject').value.trim() : '',
+        term: ($('rc-term') || {}).value ? $('rc-term').value.trim() : '',
+        session: ($('rc-session') || {}).value ? $('rc-session').value.trim() : ''
+      };
+    },
+
+    async load(){
+      if (!window.sb) { toast('Database not configured. Add your Supabase keys in assets/js/config.js.', 'warning'); return; }
+      if (!this._loaded) await this.init();
+      this.ctx = this.ctxVals();
+      if (!this.ctx.class || !this.ctx.subject) { toast('Choose a class and subject first.', 'warning'); return; }
+      try {
+        const { data: allCols } = await window.sb.from('assessment_columns').select('*')
+          .eq('class', this.ctx.class).eq('term', this.ctx.term).eq('session', this.ctx.session).order('position');
+        const global=(allCols||[]).filter(c=>c.subject==='*');
+        const specific=(allCols||[]).filter(c=>String(c.subject||'')===this.ctx.subject);
+        // Modern deployments create the template once with subject='*'. Legacy
+        // deployments remain usable through the exact-subject fallback.
+        this.cols = global.length ? global : specific;
+      } catch (e) { this.cols = []; console.warn('RC cols load failed', e); }
+      try {
+        const { data: studs } = await window.sb.from('students').select('id,full_name,admission_no,class').eq('class', this.ctx.class).order('full_name');
+        this.students = studs || [];
+      } catch (e) { this.students = []; console.warn('RC students load failed', e); }
+      /* V7.6 #1: HISTORY MERGE — when regenerating a PREVIOUS term, students who
+         have since been promoted/graduated out of this class no longer appear on
+         the live roster, which made their old scores unreachable. Merge everyone
+         who actually HAS saved scores for this class+term+session back into the
+         grid (marked “moved on”), so past records always regenerate in full. */
+      try {
+        if (this.cols.length) {
+          const ids=this.cols.map(c=>c.id);
+          const r=await window.sb.from('report_scores').select('student_id,student_id_ref,student_name').in('column_id',ids).eq('class',this.ctx.class).eq('term',this.ctx.term).eq('session',this.ctx.session).limit(5000);
+          const have=new Set(this.students.map(s=>String(s.admission_no||s.full_name).toLowerCase()));
+          const seen=new Set();
+          (r.data||[]).forEach(x=>{
+            const key=String(x.student_id_ref||x.student_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key);
+            const nameKey=String(x.student_name||'').toLowerCase();
+            if(have.has(key)||have.has(nameKey))return;
+            this.students.push({id:x.student_id||null,full_name:x.student_name||key,admission_no:x.student_id_ref||'',class:this.ctx.class,_history:true});
+          });
+        }
+      } catch(e){ console.warn('RC history merge skipped', e); }
+      this.renderCols();
+      this.fillStudentPicker();
+      // V6.8: watch for role CHANGES (not just first resolution) for ~30s.
+      // A stale cached role (e.g. an earlier Staff session on the same device)
+      // could otherwise freeze the wrong view; now the moment the authoritative
+      // role differs from what was last rendered, the card re-renders.
+      clearInterval(this._colsRoleTimer); let _ticks=0;
+      this._lastRoleRendered=this._roleNow();
+      this._colsRoleTimer=setInterval(()=>{ _ticks++;
+        const r=this._roleNow();
+        if(r!==this._lastRoleRendered){ this._lastRoleRendered=r; try{this.renderCols();}catch(_){}}
+        if(_ticks>40) clearInterval(this._colsRoleTimer);
+      },750);
+      await this.renderGrid();
+    },
+
+    _roleNow(){
+      // Priority: LIVE resolved profile → App runtime role → body dataset → cached profile.
+      let r=(window.SC_PROFILE||{}).role||'';
+      if(!r||['guest','demo','pending'].includes(String(r).toLowerCase())) r=(window.App&&App.currentRole)||'';
+      if(!r||['guest','demo','pending'].includes(String(r).toLowerCase())) r=document.body.dataset.currentRole||'';
+      if(!r||['guest','demo','pending'].includes(String(r).toLowerCase())){ try{ const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null'); if(c&&c.role) r=c.role; }catch(_){}}
+      return String(r||'').toLowerCase().replace(/\s+/g,'_');
+    },
+    _roleKnown(){ const r=this._roleNow(); return !!r && !['guest','demo','pending'].includes(r); },
+    _isAdminNow(){
+      const r=this._roleNow();
+      // Self-contained admin-tier list (matches DB is_admin) — never depends on
+      // app.js having finished loading.
+      const ADMIN=['super_admin','superadmin','admin','administrator','owner','director','principal','proprietor','head_teacher','headteacher','bursar'];
+      if(window.App&&App.isAdminRole){ try{ return !!App.isAdminRole(r); }catch(_){}}
+      return ADMIN.includes(r);
+    },
+    renderCols(){
+      /* V6.5 FIX #1 (root cause): this card is injected AFTER app.js applied the
+         data-admin-only visibility pass, so the token never hid it for teachers.
+         Now we branch at render time: non-admins get a READ-ONLY column listing —
+         no add form, no edit, no delete — while the RLS policy ac_admin_write
+         remains the hard database gate. */
+      if(!this._roleKnown()){
+        $('rc-cols').innerHTML='<div class="card"><h3>Report-card columns</h3><p class="pulse" style="color:var(--gray-500)">Confirming your role…</p></div>';
+        return;
+      }
+      if(!this._isAdminNow()){
+        this._lastRoleRendered=this._roleNow();
+        $('rc-cols').innerHTML = '<div class="card"><h3>Report-card columns (read-only)</h3>'+
+          '<div style="float:right"><button class="btn btn-sm btn-outline" onclick="RC._lastRoleRendered=null;RC.renderCols()">↻ Re-check my role</button></div>'+
+          '<p style="color:var(--gray-600);font-size:.86rem">These assessment columns were designed by the administrator. As a teacher you <b>enter scores</b> into them in the Subject Broadsheet grid below — you cannot add, rename or delete columns. Need a new column? Ask an admin.</p>'+
+          '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Max mark</th><th>Source</th></tr></thead><tbody>'+
+          (this.cols.length?this.cols.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.max_mark+'</td><td>'+(c.source==='cbt'?'<span class="badge">From CBT</span>':'Manual')+'</td></tr>').join(''):'<tr><td colspan="3">No columns yet — the administrator has not designed the report template for this class/term.</td></tr>')+
+          '</tbody></table></div></div>';
+        return;
+      }
+      const configuredTotal=this.cols.reduce((a,c)=>a+Number(c.max_mark||0),0),suspicious=this.cols.filter(c=>!(Number(c.max_mark)>0)||Number(c.max_mark)>100),keys=this.cols.map(c=>String(c.name||'').toLowerCase().replace(/[^a-z0-9]/g,'')),duplicates=keys.filter((x,i)=>keys.indexOf(x)!==i);
+      const audit='<div class="notice" style="margin:8px 0;background:'+(suspicious.length||duplicates.length?'#fef2f2':'#f0fdf4')+';border-color:'+(suspicious.length||duplicates.length?'#fca5a5':'#86efac')+';color:'+(suspicious.length||duplicates.length?'#991b1b':'#166534')+'"><b>Configured maximum: '+configuredTotal+'</b>. Printed headings use these exact names/maxima. '+(suspicious.length?'Review unusual maximum: '+suspicious.map(c=>esc(c.name)+' ('+Number(c.max_mark)+')').join(', ')+'. ':'')+(duplicates.length?'Duplicate-like headings detected; rename or delete duplicates.':'Structure looks consistent.')+'</div>';
+      $('rc-cols').innerHTML =
+        '<div class="card" data-admin-only><h3>School-wide assessment columns (admin only)</h3><p style="color:var(--gray-600);font-size:.86rem">Only administrators create, rename or delete report-card columns (CA1, CA2, CBT, project, examination). Teachers do not design the template — they simply enter scores in the Subject Broadsheet grid below; the same admin-approved template is reused for every subject.</p>' +audit+
+        '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Max mark</th><th>Source</th><th></th></tr></thead><tbody>' +
+        (this.cols.length ? this.cols.map(c => '<tr><td>' + esc(c.name) + '</td><td>' + c.max_mark + '</td><td>' + (c.source === 'cbt' ? '<span class="badge">From CBT</span>' : 'Manual') + '</td><td><button type="button" class="btn btn-sm btn-outline" data-edit-col="' + c.id + '">Edit</button> <button type="button" class="btn btn-sm btn-outline" data-del-col="' + c.id + '">✕</button></td></tr>').join('') : '<tr><td colspan="4">No columns yet — add your first one below.</td></tr>') +
+        '</tbody></table></div>' +
+        '<div class="grid grid-2" style="margin-top:10px"><div class="form-group"><label>New column name</label><input class="form-input" id="rc-cn" placeholder="CA1"></div>' +
+        '<div class="form-group"><label>Max mark</label><input class="form-input" type="number" id="rc-cm" value="10"></div></div>' +
+        '<button type="button" class="btn btn-primary" id="rc-add-col">+ Add column</button></div>';
+      $('rc-add-col').addEventListener('click', () => this.addCol());
+      $('rc-cols').querySelectorAll('[data-edit-col]').forEach(btn=>btn.addEventListener('click',()=>this.editCol(btn.dataset.editCol)));
+      $('rc-cols').querySelectorAll('[data-del-col]').forEach(btn => btn.addEventListener('click', () => this.delCol(btn.dataset.delCol)));
+    },
+
+    async addCol(){
+      if (!this._isAdminNow()) { toast('Only administrators can create report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }
+      const name = ($('rc-cn') || {}).value ? $('rc-cn').value.trim() : '';
+      const max = parseFloat(($('rc-cm') || {}).value) || 10;
+      if (!name) { toast('Enter a column name.', 'warning'); return; }
+      const { error } = await window.sb.from('assessment_columns').insert({ ...this.ctx, subject: '*', name, max_mark: max, position: this.cols.length });
+      if (error) { toast(error.message, 'danger'); return; }
+      if (window.App) App.logActivity('create', 'assessment_column', name);
+      toast('School-wide column added once for every subject in this class, term and session.', 'success');
+      this.load();
+    },
+
+    editCol(id){ if (!this._isAdminNow()) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; } const c=this.cols.find(x=>String(x.id)===String(id));if(!c)return;openModal('Edit assessment column','<div class="form-group"><label>Heading shown on reports</label><input class="form-input" id="rc-ec-name" value="'+esc(c.name)+'"></div><div class="form-group"><label>Maximum mark</label><input class="form-input" type="number" min="0.5" step="0.5" id="rc-ec-max" value="'+Number(c.max_mark||0)+'"></div><p>Example: CA1 max 20, CA2 max 10, Project max 10. Report headings and mappings update from these settings.</p>','<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="RC.saveColEdit(\''+id+'\')">Save column</button>');},
+    async saveColEdit(id){
+      if (!this._isAdminNow()) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }const name=document.getElementById('rc-ec-name').value.trim(),max=Number(document.getElementById('rc-ec-max').value);if(!name||!(max>0)){toast('Enter a heading and maximum mark greater than zero.','warning');return;}const old=this.cols.find(x=>String(x.id)===String(id)),r=await window.sb.from('assessment_columns').update({name,max_mark:max}).eq('id',id);if(r.error){toast(r.error.message,'danger');return;}if(old&&old.name!==name){try{await window.sb.from('cbt_exams').update({report_column:name,max_score:max}).eq('class',this.ctx.class).eq('term',this.ctx.term).eq('session',this.ctx.session).eq('report_column',old.name);}catch(_){}}closeModal();toast('Column updated. Report headings and matching CBT mappings now use '+name+' ('+max+').','success');this.load();},
+
+    async delCol(id){
+      if (!this._isAdminNow()) { toast('Only administrators can modify report-card columns. Teachers enter scores in the grid below.', 'warning', 7000); return; }
+      if (!confirm('Delete this column and its scores?')) return;
+      const r=await SCDelete.byId(window.sb,'assessment_columns',id);if(!r.ok){toast(r.error,'danger');return;}toast('Assessment column deleted permanently.','success');this.load();
+    },
+
+    async renderGrid(){
+      if (!this.cols.length) {
+        $('rc-grid').innerHTML = '<div class="card">Add at least one column to start entering scores.</div>';
+        return;
+      }
+      const ids = this.cols.map(c => c.id);
+      let scores = [];
+      try {
+        const r = await window.sb.from('report_scores').select('*').in('column_id', ids).eq('class',this.ctx.class).eq('subject',this.ctx.subject).eq('term',this.ctx.term).eq('session',this.ctx.session);
+        scores = r.data || [];
+      } catch (e) { console.warn('RC scores load failed', e); }
+      const map = {};
+      (scores || []).forEach(s => { map[(s.student_id_ref || s.student_name) + '|' + s.subject + '|' + s.column_id] = s.score; });
+      const totalMax = this.cols.reduce((a, c) => a + Number(c.max_mark), 0);
+      const canWrite = !this._familyMode;
+      let html = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Scores — ' + esc(this.ctx.subject) + ' (' + esc(this.ctx.class) + ')</h3><div style="display:flex;gap:8px">' + (canWrite ? '<button type="button" class="btn btn-sm btn-primary" id="rc-save-all-scores" style="background:var(--gradient);border:none;color:white;font-weight:700">💾 Save All Scores</button>' : '') + '<button type="button" class="btn btn-sm btn-outline" id="rc-export-csv">⬇ Export</button></div></div><div class="table-wrap"><table><thead><tr><th>Student</th>' + this.cols.map(c => '<th>' + esc(c.name) + '<br><small>/' + c.max_mark + '</small></th>').join('') + '<th>Total<br><small>/' + totalMax + '</small></th><th>%</th><th>Grade</th></tr></thead><tbody>';
+      if (!this.students.length) {
+        html += '<tr><td colspan="' + (this.cols.length + 4) + '">No students found for class "' + esc(this.ctx.class) + '". Add students in the Students module first.</td></tr>';
+      }
+      this.students.forEach(st => {
+        const ref = st.admission_no || st.full_name;
+        let tot = 0;
+        const cells = this.cols.map(c => {
+          const v = map[ref + '|' + this.ctx.subject + '|' + c.id];
+          if (v != null) tot += Number(v);
+          return '<td><input style="width:64px" class="form-input" type="number" data-ref="' + esc(ref) + '" data-name="' + esc(st.full_name) + '" data-student-id="' + esc(st.id||'') + '" data-col="' + c.id + '" data-max="' + c.max_mark + '" data-has-score="'+(v!=null?'1':'0')+'" placeholder="—" value="' + (v != null ? v : '') + '"' + (canWrite ? '' : ' readonly') + '></td>';
+        }).join('');
+        const pct = totalMax ? ((tot / totalMax) * 100).toFixed(1) : 0;
+        const g = RC.grade(pct);
+        html += '<tr><td>' + esc(st.full_name) + (st._history ? ' <span class="badge" style="background:#e0e7ff;color:#3730a3" title="No longer in this class (promoted/graduated) — shown because saved scores exist for this term">🎓 moved on</span>' : '') + '</td>' + cells + '<td><strong>' + tot.toFixed(1) + '</strong></td><td>' + pct + '%</td><td>' + g + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      if (canWrite) {
+        html += '<div style="margin-top:12px;text-align:right"><button type="button" class="btn btn-primary" id="rc-save-all-scores-bot" style="background:var(--gradient);border:none;color:white;font-weight:700;padding:10px 24px">💾 Save All Scores</button></div>';
+      }
+      html += '</div>';
+      $('rc-grid').innerHTML = html;
+      if (canWrite) {
+        $('rc-grid').querySelectorAll('input[data-col]').forEach(inp => inp.addEventListener('change', () => RC.saveScore(inp)));
+        const sBtn = $('rc-save-all-scores'); if (sBtn) sBtn.addEventListener('click', () => RC.saveAllScores());
+        const sBtnBot = $('rc-save-all-scores-bot'); if (sBtnBot) sBtnBot.addEventListener('click', () => RC.saveAllScores());
+      }
+      const exp = $('rc-export-csv'); if (exp) exp.addEventListener('click', () => RC.exportCSV());
+    },
+
+    grade(p) { p = Number(p); if (p >= 80) return 'A'; if (p >= 70) return 'B'; if (p >= 60) return 'C'; if (p >= 50) return 'D'; if (p >= 40) return 'E'; return 'F'; },
+
+    async saveScore(el){
+      if (this._familyMode) { toast('Read-only: parents and students cannot edit report cards.', 'warning'); return; }
+      if(String(el.value||'').trim()===''){
+        if(el.dataset.hasScore==='1'){
+          const q=window.sb.from('report_scores').delete().eq('column_id',el.dataset.col).eq('student_id_ref',el.dataset.ref).eq('student_name',el.dataset.name).eq('class',this.ctx.class).eq('subject',this.ctx.subject).eq('term',this.ctx.term).eq('session',this.ctx.session);const {error}=await q;if(error){toast('Could not clear score: '+error.message,'danger');return;}toast('Score cleared — the report will show a dash, not zero.','success');
+        }
+        el.dataset.hasScore='0';this.renderGrid();return;
+      }
+      const max = Number(el.dataset.max); let v = parseFloat(el.value); if (isNaN(v)) {toast('Enter a valid number or leave blank.','warning');return;} if(v<0){v=0;el.value=0;} if (v > max) { v = max; el.value = max; toast('Capped at max ' + max, 'warning'); }
+      const row = { column_id: el.dataset.col, student_id: el.dataset.studentId || null, student_id_ref: el.dataset.ref, student_name: el.dataset.name, class: this.ctx.class, subject: this.ctx.subject, term: this.ctx.term, session: this.ctx.session, score: v, source: 'manual', updated_by: (window.SC_PROFILE && SC_PROFILE.id) || null };
+      /* V6.9: server-side save via SECURITY-DEFINER RPC — immune to RLS/upsert
+         mechanics (the old client upsert could fail on the SELECT policy alone).
+         Falls back to the legacy upsert only when the RPC is not installed yet. */
+      let rpcRes = null;
+      try { rpcRes = await window.sb.rpc('sc_save_report_score', { p_rows: row }); } catch(_) { rpcRes = { error: { message: 'rpc unavailable' } }; }
+      if (rpcRes.error && /could not find|does not exist|schema cache|rpc unavailable/i.test(String(rpcRes.error.message||''))) {
+        const { error } = await window.sb.from('report_scores').upsert(row, { onConflict: 'column_id,student_id_ref,student_name,class,subject,term,session' });
+        if (error) { const em=String(error.message||error); toast(em.includes('row-level security') ? 'Score not saved: this database needs one update. Admin: run the latest database/complete-schema.sql (or database/v6.9-report-score-save.sql) once in the Supabase SQL Editor, then saving works for every teacher.' : ('Score not saved: ' + em), 'danger', 10000); return; }
+      } else if (rpcRes.error) { toast('Score not saved: ' + rpcRes.error.message, 'danger', 9000); return; }
+      else {
+        const d = rpcRes.data || {};
+        if (d.ok === false) { toast(d.error || 'Score not saved.', 'danger', 9000); return; }
+        if ((d.blocked||0) > 0) { toast((d.errors&&d.errors[0]) || 'This score was entered by another teacher — ask an administrator to change it.', 'warning', 9000); return; }
+      }
+      // Mirror standard assessment columns into Results immediately. This is the one-way bridge that makes a subject-broadsheet entry available to the class broadsheet and student report card without retyping.
+      await this.syncScoreToResults(el, v);
+      if (window.App) App.logActivity('update', 'report_score', el.dataset.ref);
+      this.renderGrid();
+    },
+
+    async saveAllScores(){
+      if (this._familyMode) { toast('Read-only: parents and students cannot edit report cards.', 'warning'); return; }
+      const inputs = $('rc-grid').querySelectorAll('input[data-col]');
+      if (!inputs.length) { toast('No scores to save.', 'info'); return; }
+      const saveBtn = $('rc-save-all-scores');
+      const saveBtnBot = $('rc-save-all-scores-bot');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+      if (saveBtnBot) { saveBtnBot.disabled = true; saveBtnBot.textContent = 'Saving…'; }
+      // v12: build all rows first, then ONE batched upsert per 400-row chunk
+      // (single round-trip instead of N requests — faster and atomic per chunk).
+      // Falls back to row-by-row to isolate any bad row if a chunk is rejected.
+      const entries = [], clears=[];
+      for (const el of inputs) {
+        if(String(el.value||'').trim()===''){if(el.dataset.hasScore==='1')clears.push(el);continue;}
+        const max = Number(el.dataset.max); let v = parseFloat(el.value); if (isNaN(v)) continue; if(v<0){v=0;el.value=0;} if (v > max) { v = max; el.value = max; }
+        entries.push({
+          el,
+          v,
+          row: { column_id: el.dataset.col, student_id: el.dataset.studentId || null, student_id_ref: el.dataset.ref, student_name: el.dataset.name, class: this.ctx.class, subject: this.ctx.subject, term: this.ctx.term, session: this.ctx.session, score: v, source: 'manual', updated_by: (window.SC_PROFILE && SC_PROFILE.id) || null }
+        });
+      }
+      let cleared=0;
+      for(const el of clears){const {error}=await window.sb.from('report_scores').delete().eq('column_id',el.dataset.col).eq('student_id_ref',el.dataset.ref).eq('student_name',el.dataset.name).eq('class',this.ctx.class).eq('subject',this.ctx.subject).eq('term',this.ctx.term).eq('session',this.ctx.session);if(!error)cleared++;}
+      const ON_CONFLICT_KEY = 'column_id,student_id_ref,student_name,class,subject,term,session';
+      let ok = 0, fail = 0, lastError = null;
+      let batchOk = true;
+      for (let i = 0; i < entries.length; i += 400) {
+        const chunk = entries.slice(i, i + 400);
+        const { error } = await window.sb.from('report_scores').upsert(chunk.map(c => c.row), { onConflict: ON_CONFLICT_KEY });
+        if (error) { lastError = error; batchOk = false; break; }
+        ok += chunk.length;
+      }
+      if (!batchOk) {
+        // Row-by-row fallback: saves every valid row and reports the first cause
+        ok = 0;
+        /* V6.9: one server-side RPC call saves the whole batch (per-row skip
+           messages for other-teacher-locked rows); legacy per-row upsert only
+           when the RPC is missing on an un-migrated database. */
+        let usedRpc = false;
+        try {
+          const rr = await window.sb.rpc('sc_save_report_score', { p_rows: entries.map(e => e.row) });
+          if (!rr.error && rr.data && rr.data.ok !== false) {
+            usedRpc = true; ok = rr.data.saved || 0; fail = rr.data.blocked || 0;
+            if (fail && rr.data.errors && rr.data.errors.length) lastError = { message: rr.data.errors.slice(0,3).join(' | ') };
+            for (const e of entries) { await this.syncScoreToResults(e.el, e.v); }
+          } else if (!rr.error && rr.data && rr.data.ok === false) {
+            usedRpc = true; fail = entries.length; lastError = { message: rr.data.error || 'Save rejected.' };
+          }
+        } catch(_) {}
+        if (!usedRpc) {
+          for (const e of entries) {
+            const { error } = await window.sb.from('report_scores').upsert(e.row, { onConflict: ON_CONFLICT_KEY });
+            if (error) { fail++; lastError = error; }
+            else { await this.syncScoreToResults(e.el, e.v); ok++; }
+          }
+          if (fail && lastError && String(lastError.message||'').includes('row-level security')) {
+            lastError = { message: 'This database needs one update — Admin: run the latest database/complete-schema.sql (or database/v6.9-report-score-save.sql) once in the Supabase SQL Editor, then saving works for every teacher.' };
+          }
+        }
+      } else {
+        for (const e of entries) { await this.syncScoreToResults(e.el, e.v); }
+      }
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save All Scores'; }
+      if (saveBtnBot) { saveBtnBot.disabled = false; saveBtnBot.textContent = '💾 Save All Scores'; }
+      if (fail || lastError) {
+        toast(`Saved ${ok} score(s). ${fail || 0} failed. ${lastError ? 'Cause: ' + (lastError.message || lastError) : ''}`, fail ? 'warning' : 'danger', 9000);
+      } else {
+        toast(`✅ ${ok} entered score(s) saved; ${cleared} cleared. Blank cells remain blank and print as —, never as invented zero.`, 'success',7000);
+      }
+      if (window.App && App.logActivity) App.logActivity('update-bulk', 'report_score', this.ctx.class + '|' + this.ctx.subject);
+      this.renderGrid();
+    },
+
+    async syncScoreToResults(el, score){
+      const col=(this.cols||[]).find(c=>String(c.id)===String(el.dataset.col)); if(!col) return;
+      const token=String(col.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_');
+      let field = null;
+      if (token.includes('ca1') || token.includes('ca_1') || token.includes('test_1') || token.includes('test1') || token.includes('first_ca') || token.includes('first_test')) {
+        field = 'ca1';
+      } else if (token.includes('ca2') || token.includes('ca_2') || token.includes('test_2') || token.includes('test2') || token.includes('second_ca') || token.includes('second_test')) {
+        field = 'ca2';
+      } else if (token.includes('ca3') || token.includes('ca_3') || token.includes('test_3') || token.includes('test3') || token.includes('cbt') || token.includes('mid_term') || token.includes('midterm') || token.includes('third_ca') || token.includes('third_test')) {
+        field = 'ca3';
+      } else if (token.includes('project') || token.includes('assignment') || token.includes('homework') || token.includes('classwork') || token.includes('practical')) {
+        // `results` is a legacy four-band compatibility table. When a real
+        // CA3/CBT column exists, Project remains authoritative in report_scores
+        // instead of overwriting CA3. The print engine reads report_scores.
+        const hasThird=(this.cols||[]).some(c=>/(ca\s*_?3|cbt|third\s*(ca|test)|mid\s*_?term)/i.test(String(c.name||'')));
+        field = hasThird ? null : 'ca3';
+      } else if (token.includes('exam') || token.includes('test') || token.includes('paper') || token.includes('terminal')) {
+        field = 'exam';
+      } else {
+        const colIndex = (this.cols||[]).findIndex(c => String(c.id) === String(el.dataset.col));
+        if (colIndex === 0) field = 'ca1';
+        else if (colIndex === 1) field = 'ca2';
+        else if (colIndex === 2) field = 'ca3';
+        else field = 'exam';
+      }
+      if(!field) return;
+      const identity={student_id:el.dataset.studentId||null,student_name:el.dataset.name,student_id_ref:el.dataset.ref||'',subject:this.ctx.subject,class:this.ctx.class,term:this.ctx.term,session:this.ctx.session};
+      try { const q=window.sb.from('results').select('id').eq('student_name',identity.student_name).eq('subject',identity.subject).eq('class',identity.class).eq('term',identity.term).eq('session',identity.session).limit(1); const {data}=await q; const payload=Object.assign({},identity,{[field]:score,assessment_source:'report_sheet'}); if(data&&data[0]) await window.sb.from('results').update(payload).eq('id',data[0].id); else await window.sb.from('results').insert(payload); }
+      catch(e){ console.warn('Results mirror failed; report score was saved safely.',e); }
+    },
+
+    async openMetrics(){if(this._familyMode){toast('Metrics entry is staff-only.','warning');return;}if(!window.sb){toast('Database not configured','warning');return;}const c=this.ctx&&this.ctx.class?this.ctx:this.ctxVals();if(!c.class||!c.term||!c.session){toast('Choose class, term and session, then Load / Build.','warning');return;}const sr=await window.sb.from('students').select('id,admission_no,full_name,class').eq('class',c.class).order('full_name'),mr=await window.sb.from('student_term_metrics').select('*').eq('class',c.class).eq('term',c.term).eq('session',c.session);if(mr.error&&/student_term_metrics|schema cache/i.test(mr.error.message)){toast('Run the latest complete-schema.sql to enable term metrics.','danger',9000);return;}this.students=sr.data||[];const map=new Map((mr.data||[]).map(x=>[String(x.student_id||x.student_id_ref||x.student_name),x]));this._metricContext=c;const rows=(sr.data||[]).map(st=>{const m=map.get(String(st.id))||map.get(st.admission_no)||map.get(st.full_name)||{};return '<tr data-metric-student="'+esc(st.id)+'"><td><b>'+esc(st.full_name)+'</b><br><small>'+esc(st.admission_no||'')+'</small></td><td><input class="form-input mt-h" type="number" step="0.1" value="'+(m.height_cm??'')+'" placeholder="cm"></td><td><input class="form-input mt-w" type="number" step="0.1" value="'+(m.weight_kg??'')+'" placeholder="kg"></td><td><input class="form-input mt-bp" value="'+esc(m.blood_pressure||'')+'" placeholder="e.g. 110/70"></td><td><input class="form-input mt-vis" value="'+esc(m.vision||'')+'" placeholder="Normal"></td><td><input class="form-input mt-bg" value="'+esc(m.blood_group||'')+'" placeholder="O+"></td><td><input class="form-input mt-gen" value="'+esc(m.genotype||'')+'" placeholder="AA"></td><td><input class="form-input mt-date" type="date" value="'+esc(m.measured_on||new Date().toISOString().slice(0,10))+'"></td></tr>';}).join('');openModal('📏 Beginning-of-term student metrics — '+esc(c.class)+' · '+esc(c.term)+' · '+esc(c.session),'<p>Enter only values actually measured by the school. Blank details print as —. BMI is calculated automatically from height and weight.</p><div class="table-wrap"><table><thead><tr><th>Student</th><th>Height cm</th><th>Weight kg</th><th>Blood pressure</th><th>Vision</th><th>Blood group</th><th>Genotype</th><th>Measured</th></tr></thead><tbody>'+rows+'</tbody></table></div>','<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="RC.saveMetrics()">Save all entered metrics</button>');},
+    async saveMetrics(){const c=this._metricContext,students=this.students||[],rows=[];for(const tr of document.querySelectorAll('[data-metric-student]')){const id=tr.dataset.metricStudent,st=students.find(x=>String(x.id)===String(id));if(!st)continue;const value=sel=>tr.querySelector(sel).value.trim(),h=value('.mt-h'),w=value('.mt-w'),bp=value('.mt-bp'),vis=value('.mt-vis'),bg=value('.mt-bg'),gen=value('.mt-gen');if(!h&&!w&&!bp&&!vis&&!bg&&!gen)continue;rows.push({student_id:st.id,student_id_ref:st.admission_no||'',student_name:st.full_name,class:c.class,term:c.term,session:c.session,height_cm:h?Number(h):null,weight_kg:w?Number(w):null,blood_pressure:bp,vision:vis,blood_group:bg,genotype:gen,measured_on:value('.mt-date')||new Date().toISOString().slice(0,10),recorded_by:(window.SC_PROFILE&&SC_PROFILE.id)||null,updated_at:new Date().toISOString()});}if(!rows.length){toast('No metrics entered.','warning');return;}const r=await window.sb.from('student_term_metrics').upsert(rows,{onConflict:'student_id_ref,student_name,class,term,session'});if(r.error){toast(r.error.message,'danger',9000);return;}closeModal();toast('✅ Saved metrics for '+rows.length+' student(s). They will appear on reports for this term/session.','success',8000);},
+
+    async openScoreAudit(){
+      if(this._familyMode){toast('Score audit is staff-only.','warning');return;}if(!window.sb){toast('Database not configured','warning');return;}const c=this.ctx&&this.ctx.class?this.ctx:this.ctxVals();if(!c.class||!c.term||!c.session){toast('Choose class, term and session, then Load / Build first.','warning');return;}
+      const cr=await window.sb.from('assessment_columns').select('id,name,max_mark').eq('class',c.class).eq('term',c.term).eq('session',c.session);const cols=cr.data||[],map=Object.fromEntries(cols.map(x=>[x.id,x]));if(!cols.length){toast('No assessment columns for this context.','info');return;}let q=window.sb.from('report_scores').select('*').in('column_id',cols.map(x=>x.id)).eq('class',c.class).eq('term',c.term).eq('session',c.session).order('student_name');if(c.subject)q=q.eq('subject',c.subject);const rr=await q;if(rr.error){toast(rr.error.message,'danger');return;}this._auditRows=rr.data||[];
+      const rows=this._auditRows.map(r=>'<tr><td><input type="checkbox" class="rc-audit-row" value="'+esc(r.id)+'" data-zero="'+(Number(r.score)===0?'1':'0')+'"></td><td>'+esc(r.student_name||'')+'<br><small>'+esc(r.student_id_ref||'')+'</small></td><td>'+esc(r.subject||'')+'</td><td>'+esc((map[r.column_id]||{}).name||r.column_id)+'</td><td><b>'+Number(r.score||0)+'</b> / '+Number((map[r.column_id]||{}).max_mark||0)+'</td><td>'+esc(r.source||'manual')+'</td><td>'+esc(String(r.updated_at||r.created_at||'').slice(0,16).replace('T',' '))+'</td></tr>').join('');
+      openModal('🔎 Official Score Audit — '+esc(c.class)+' · '+esc(c.term)+' · '+esc(c.session),'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>Nothing is deleted automatically.</b> Review source, subject and column. Select only records that were created unintentionally. A genuine entered score of zero must be kept.</div><div style="display:flex;gap:8px;margin-bottom:8px"><button class="btn btn-sm btn-outline" onclick="document.querySelectorAll(\'.rc-audit-row[data-zero=1]\').forEach(x=>x.checked=true)">Select zero rows for review</button><button class="btn btn-sm btn-outline" onclick="document.querySelectorAll(\'.rc-audit-row\').forEach(x=>x.checked=false)">Clear selection</button></div><div class="table-wrap"><table><thead><tr><th>Clear</th><th>Student</th><th>Subject</th><th>Column</th><th>Score</th><th>Source</th><th>Updated</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">No official scores in this context.</td></tr>')+'</tbody></table></div>','<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-danger" onclick="RC.clearAuditedScores()">Delete selected score records</button>');
+    },
+    async clearAuditedScores(){const ids=[...document.querySelectorAll('.rc-audit-row:checked')].map(x=>x.value);if(!ids.length){toast('Select at least one row.','warning');return;}if(!confirm('Permanently delete '+ids.length+' selected official score record(s)? Genuine zero scores should not be deleted.'))return;const {error}=await window.sb.from('report_scores').delete().in('id',ids);if(error){toast('Delete failed: '+error.message,'danger');return;}closeModal();toast('Deleted '+ids.length+' selected score record(s). Blank report cells will now print as —.','success',8000);this.load();},
+
+    exportCSV() {
+      const rows = [['Student', ...this.cols.map(c => c.name), 'Total', '%', 'Grade']];
+      document.querySelectorAll('#rc-grid tbody tr').forEach(tr => {
+        const cells = [...tr.children].map(td => { const inp = td.querySelector('input'); return inp ? inp.value : td.textContent.trim(); });
+        rows.push(cells);
+      });
+      const csv = rows.map(r => r.map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'report-' + this.ctx.class + '-' + this.ctx.subject + '.csv';
+      a.click();
+    },
+
+    _print(title, html) {
+      const w = window.open('', '_blank');
+      if (!w) { toast('Popup blocked! Please allow popups for printable reports.', 'warning'); return; }
+      const sc = (window.SCHOOL || {});
+      const st = window.SC_SETTINGS || {};
+      const rawSig = localStorage.getItem('sc-signature-url') || st.signature_url || '';
+      const pn = localStorage.getItem('sc-principal-name') || st.principal_name || 'Principal';
+      const sig = (window.Super && Super.idcard && Super.idcard.driveDirect) ? Super.idcard.driveDirect(rawSig) : rawSig;
+      const sign = sig ? '<div style="text-align:center;margin-top:28px"><img src="' + sig + '" referrerpolicy="no-referrer" style="max-width:150px;max-height:70px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)"><br><b>' + pn + '</b><br>Official Signature</div>' : '';
+      w.document.open();
+      w.document.write('<!DOCTYPE html><html><head><title>' + title + '</title><base href="' + document.baseURI.replace(/[^/]*$/, '') + '"><style>body{font-family:system-ui,sans-serif;padding:24px;color:#0f172a;background:#fff}table{width:100%;border-collapse:collapse;margin-top:10px}th,td{border:1px solid #cbd5e1;padding:6px 8px;font-size:13px;text-align:left}th{background:#f1f5f9}h1,h2{margin:4px 0}.hd{text-align:center;border-bottom:3px solid ' + (sc.themePrimary || '#4f46e5') + ';padding-bottom:10px;margin-bottom:14px}</style></head><body><div class="hd"><h1>' + esc(sc.name || 'School') + '</h1><p>' + esc(sc.motto || '') + '</p><h2>' + title + '</h2></div>' + html + sign + '<p style="margin-top:30px;font-size:11px;color:#94a3b8;text-align:center">Powered by HMG Concepts · School Connect</p><script>setTimeout(function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}});setTimeout(function(){window.print()},2500);},200);<\/script></body></html>');
+      w.document.close();
+      w.focus();
+    },
+
+
+    /* V7.0 #12: admission-number-aware picker. The datalist offers
+       "Name — ADM/NO (Class)" for every student in the selected class (or all),
+       so two students sharing a name can never be confused; typing either the
+       name or the admission number works. */
+    async fillStudentPicker(){
+      try{
+        if(!window.sb) return; const dl=document.getElementById('rc-student-list'); if(!dl) return;
+        // V12.15: family-safe — students see only themselves, parents only linked children, admin/teacher sees all
+        if(this._role==='student' && this._me){
+          dl.innerHTML='';
+          const s=this._me;
+          const o=document.createElement('option');
+          o.value=(s.admission_no?s.admission_no+' — ':'')+s.full_name;
+          o.label=s.full_name+(s.admission_no?' ('+s.admission_no+')':'')+(s.class?' · '+s.class:'')+' — your result';
+          dl.appendChild(o);
+          // Ensure input stays auto-filled readonly
+          const inp=$('rc-student');
+          if(inp){
+            inp.value=s.full_name;
+            inp.setAttribute('readonly','readonly');
+            inp.removeAttribute('list');
+          }
+          return;
+        }
+        if(this._role==='parent' && this._kids && this._kids.length){
+          dl.innerHTML='';
+          this._kids.forEach(s=>{
+            const o=document.createElement('option');
+            o.value=(s.admission_no?s.admission_no+' — ':'')+s.full_name;
+            o.label=s.full_name+(s.admission_no?' ('+s.admission_no+')':'')+(s.class?' · '+s.class:'');
+            dl.appendChild(o);
+          });
+          return;
+        }
+        let q=window.sb.from('students').select('full_name,admission_no,class').order('full_name').limit(2000);
+        /* V7.7: outputs Class dropdown wins; blank = whole school so the admin
+           can generate a card for ANY student regardless of the grid class. */
+        const cls=($('rc-out-class')||{}).value||this.ctx.class||($('rc-class')||{}).value||''; if(cls)q=q.eq('class',cls);
+        const {data}=await q; dl.innerHTML='';
+        (data||[]).forEach(s=>{const o=document.createElement('option');o.value=(s.admission_no?s.admission_no+' — ':'')+s.full_name;o.label=s.full_name+(s.admission_no?' ('+s.admission_no+')':'')+(s.class?' · '+s.class:'');dl.appendChild(o);});
+      }catch(_){}
+    },
+    /* Resolve whatever was typed (name, adm-no, or "ADM — Name") to the student. */
+    async resolveStudent(raw){
+      raw=String(raw||'').trim(); if(!raw)return null;
+      const admPart=raw.includes('—')?raw.split('—')[0].trim():raw;
+      try{
+        let r=await window.sb.from('students').select('id,full_name,admission_no,class').eq('admission_no',admPart).maybeSingle();
+        if(r.data)return r.data;
+        const namePart=raw.includes('—')?raw.split('—').slice(1).join('—').trim():raw;
+        r=await window.sb.from('students').select('id,full_name,admission_no,class').ilike('full_name',namePart).limit(2);
+        if(r.data&&r.data.length===1)return r.data[0];
+        if(r.data&&r.data.length>1){toast('⚠ '+r.data.length+' students share that name — use the admission number from the dropdown instead.','warning',8000);return r.data[0];}
+      }catch(_){}
+      return {full_name:raw};
+    },
+
+    /* V7.0 #13: one-click cleanup of "ghost" report sheets — mirrored rows left
+       behind when an assessment column was deleted and re-created, plus score
+       rows belonging to students who were deleted. Scoped to the currently
+       selected class/term/session (or everything when blank). */
+    async sweepGhosts(){
+      if(!window.sb){toast('Database not configured','warning');return;}
+      const cls=this.ctx.class||($('rc-class')||{}).value||'', term=this.ctx.term||($('rc-term')||{}).value||'', ses=this.ctx.session||($('rc-session')||{}).value||'';
+      if(!confirm('Sweep ghost report sheets'+(cls?' for '+cls:'')+(term?' — '+term:'')+(ses?' ('+ses+')':'')+'?\n\nRemoves:\n• leftover sheets from report columns you deleted/re-created\n• score rows of students who were deleted\n\nLive scores backed by existing columns and students are NEVER touched.'))return;
+      const r=await window.sb.rpc('sc_sweep_report_ghosts',{p_class:cls,p_term:term,p_session:ses});
+      if(r.error){toast(/could not find|does not exist|schema cache/i.test(String(r.error.message||''))?'This database needs one update — run the latest database/complete-schema.sql (or database/v7.0-clean-data-lifecycle.sql) once in the Supabase SQL Editor.':('Sweep failed: '+r.error.message),'danger',9000);return;}
+      const d=r.data||{};
+      toast('🧹 Ghost sweep complete: '+(d.mirrored_removed||0)+' leftover sheet row(s), '+(d.orphan_scores_removed||0)+' orphan score(s), '+(d.ghost_results_removed||0)+' ghost result(s) removed. Regenerate the report cards now — only current data prints.','success',10000);
+      if(window.App&&App.logActivity)App.logActivity('sweep-ghosts','report_scores',cls+'|'+term+'|'+ses);
+      this.load&&this.load();
+    },
+    async reportCard(){
+      if (!window.sb) { toast('Database not configured', 'warning'); return; }
+      let name = ($('rc-student') || {}).value ? $('rc-student').value.trim() : '';
+      // V7.0 #12: resolve admission numbers / "ADM — Name" entries to the exact student
+      let resolvedClass='';
+      if (name && window.sb) { const stu = await this.resolveStudent(name); if (stu && stu.full_name) { name = stu.full_name; resolvedClass = stu.class || ''; if (stu.class && !this.ctx.class) this.ctx.class = stu.class; } }
+      // Family-mode enforcement
+      if (this._familyMode) {
+        /* V10.9 (#2): REPORT LOCK — a parent must not be able to generate a
+           locked child's card even though their portal stays open for other
+           children. The access-state RPC names each locked child; refuse
+           with the school's BOLD message before any data is fetched (RLS
+           blanks the rows server-side anyway — this is the honest UI). */
+        try {
+          /* V11.0 (#9): await the access state here too — never trust the
+             async global to have resolved before a fast click. */
+          let g = window.SC_ACCESS_STATE;
+          if (!g || !Array.isArray(g.students)) {
+            try { const ar = await window.sb.rpc('sc_my_access_state'); g = (ar && ar.data) || {}; window.SC_ACCESS_STATE = g; }
+            catch(_) { g = g || {}; }
+          }
+          const lk = (g.students || []).find(k => k.report_locked && String(k.name || '').toLowerCase() === String(name || '').toLowerCase());
+          if (lk) {
+            const out = document.getElementById('rc-output') || document.getElementById('rc-out') || null;
+            const msgHtml = '<div style="background:#fef2f2;border:3px solid #dc2626;border-radius:14px;padding:22px;text-align:center">' +
+              '<div style="font-size:2.2rem">🔒</div>' +
+              '<h3 style="color:#b91c1c;margin:8px 0">Report card unavailable — ' + esc(lk.name || 'student') + '</h3>' +
+              '<p style="font-weight:800;color:#7f1d1d;line-height:1.6">' + esc(lk.report_lock_message || 'This report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.') + '</p></div>';
+            if (out) out.innerHTML = msgHtml; else toast('🔒 ' + (lk.report_lock_message || 'This child\'s report card is temporarily unavailable. Please contact the school bursary.'), 'warning', 12000);
+            return;
+          }
+        } catch(_) {}
+        if (this._role === 'parent') {
+          const allowed = this._kids.map(k => String(k.full_name).toLowerCase());
+          if (!name || !allowed.includes(name.toLowerCase())) {
+            // Access denied: you can only view your linked children
+            toast('You can only view your linked children. Select a child above first.', 'warning', 6000);
+            return;
+          }
+        } else if (this._role === 'student') {
+          if (this._me && String(this._me.full_name).toLowerCase() !== name.toLowerCase()) {
+            toast('Students can only view their own report card.', 'warning'); name = this._me.full_name;
+            $('rc-student').value = name;
+          }
+        }
+      }
+      if (!name) { toast('Enter or select a student name first.', 'warning'); return; }
+      /* V7.7 #1/#4 ROOT-CAUSE FIX: outputs previously preferred this.ctx.* —
+         a snapshot frozen at the last Load/Build — over the LIVE dropdowns, so
+         switching Term/Session afterwards was silently ignored and the old
+         period printed again ("cannot regenerate previous terms"). Live
+         dropdowns now always win; ctx is only a fallback. */
+      const term = ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const ses = ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
+      /* the student's OWN class beats the grid class when no explicit outputs
+         class was chosen — a student from any class generates correctly. */
+      const cls = ($('rc-out-class')||{}).value || resolvedClass || ($('rc-class')||{}).value || this.ctx.class || '';
+      // V12.16: One-click allow/disallow check for student/parent generation
+      // Admin can allow/disallow per term with one click — students blocked when not allowed
+      if(this._familyMode && term){
+        try{
+          const {data:allowData, error:allowErr}=await sb.rpc('sc_is_report_generation_allowed',{p_term:term, p_session:ses||null});
+          if(!allowErr && allowData){
+            const isAllowed = allowData.allowed===true || allowData.allowed==='true';
+            const isAdmin = window.App && App.isAdminRole && App.isAdminRole(this._role);
+            if(!isAllowed && !isAdmin){
+              const out = document.getElementById('rc-output') || document.getElementById('rc-out') || null;
+              const msgHtml = '<div style="background:#fef2f2;border:3px solid #dc2626;border-radius:14px;padding:22px;text-align:center">'+
+                '<div style="font-size:2.2rem">🔒</div>'+
+                '<h3 style="color:#b91c1c;margin:8px 0">Report generation not yet allowed by admin — '+esc(term)+(ses?' ('+esc(ses)+')':'')+'</h3>'+
+                '<p style="font-weight:800;color:#7f1d1d;line-height:1.6">Your report card for '+esc(term)+(ses?' '+esc(ses):'')+' is not yet available. The school admin has not yet allowed students to check/generate report cards for this term. Please check later or contact the school admin. Admin can allow with one click in Report Cards → Student Report Access Control.</p>'+
+                '<p style="font-size:.82rem;color:#64748b;margin-top:10px">Source: '+(allowData.source||'default')+' — Allowed: '+(isAllowed?'Yes':'No')+'</p></div>';
+              if(out) out.innerHTML=msgHtml;
+              else toast('🔒 Report generation not yet allowed by admin for '+term+(ses?' '+ses:'')+'. Contact school admin.', 'warning', 10000);
+              return;
+            }
+          }
+        }catch(e){ console.warn('allow check failed', e.message||e); }
+      }
+      try {
+        ReportEngine.init(window.sb);
+        const html=await ReportEngine.renderStudent({student:name,class:cls,term:term,session:ses});
+        ReportEngine.print('Termly Report Card — '+name,html,false);
+      } catch(e) { console.error(e); toast('Could not generate report card: '+(e.message||e),'danger',8000); }
+    },
+
+
+    /* V6.2: bulk print all report cards for the selected class in ONE job.
+       Admin picks class/term/session above; every student's full card renders
+       one-per-page and a single print dialog covers the whole class. */
+    async bulkClassCards(){
+      if (this._familyMode) { toast('Bulk printing is an administrative action.', 'warning'); return; }
+      if (!window.sb) { toast('Database not configured', 'warning'); return; }
+      const cls = ($('rc-out-class')||{}).value || ($('rc-class')||{}).value || this.ctx.class || '';
+      const term = ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const ses = ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
+      if (!cls) { toast('Choose a class first (Class dropdown above or the outputs Class dropdown), then click Bulk Print again.', 'warning', 6000); return; }
+      ReportEngine.init(window.sb);
+      let names = [];
+      try { names = await ReportEngine.listClassStudents({class:cls,term:term,session:ses}); }
+      catch(e){ toast(e.message||e,'danger',8000); return; }
+      if (!names.length) { toast('No result records found for '+cls+' in the selected term/session. Enter scores first.', 'warning', 8000); return; }
+      if (!confirm('Bulk print '+names.length+' report card(s) for '+cls+(term?' — '+term:'')+(ses?' ('+ses+')':'')+'?\n\nEach student prints on their own page in ONE print job. Large classes can take a minute to build.')) return;
+      const wrap=document.getElementById('rc-bulk-progress'),bar=document.getElementById('rc-bulk-bar'),msg=document.getElementById('rc-bulk-msg'),cnt=document.getElementById('rc-bulk-count');
+      if(wrap){wrap.style.display='block';bar.style.width='0%';msg.textContent='Building cards…';cnt.textContent='0 / '+names.length;}
+      try {
+        const out = await ReportEngine.renderClassBulk({class:cls,term:term,session:ses,students:names},(done,total,name)=>{
+          if(wrap){bar.style.width=Math.round(done/total*100)+'%';msg.textContent='Building: '+name;cnt.textContent=done+' / '+total;}
+        });
+        if(wrap){msg.textContent='Opening print dialog…';}
+        ReportEngine.print('Report Cards — '+cls+(term?' — '+term:'')+(ses?' ('+ses+')':''), out.html, false);
+        toast('🖨️ '+out.count+' report card(s) ready — one per page. Use the print dialog to print or Save as PDF.', 'success', 9000);
+        if (window.App && App.logActivity) App.logActivity('bulk-print', 'report_cards', cls+'|'+term+'|'+ses+'|'+out.count+' cards');
+      } catch(e) { console.error(e); toast('Bulk print failed: '+(e.message||e),'danger',9000); }
+      finally { if(wrap) setTimeout(()=>{wrap.style.display='none';},4000); }
+    },
+    async broadsheet(){
+      if (this._familyMode) { toast('Broadsheets are staff-only. Only administrators and teachers can view class broadsheets.', 'warning'); return; }
+      if (!window.sb) { toast('Database not configured', 'warning'); return; }
+      const cls = ($('rc-out-class')||{}).value || ($('rc-class')||{}).value || this.ctx.class || '';
+      const term = ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const ses = ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
+      if (!cls) { toast('Choose a class first.', 'warning'); return; }
+      try {
+        ReportEngine.init(window.sb);
+        const html=await ReportEngine.renderClass({class:cls,term:term,session:ses});
+        ReportEngine.print('Class Broadsheet — '+cls,html,true);
+      } catch(e) { console.error(e); toast('Could not generate class broadsheet: '+(e.message||e),'danger',8000); }
+    },
+
+    async scoresheet(){
+      if (this._familyMode) { toast('Scoresheets are staff-only. Only teachers can record and view subject scoresheets.', 'warning'); return; }
+      if (!window.sb) { toast('Database not configured', 'warning'); return; }
+      const cls = ($('rc-out-class')||{}).value || ($('rc-class')||{}).value || this.ctx.class || '';
+      const sub = this.ctx.subject || ($('rc-subject') || {}).value || '';
+      if (!cls || !sub) { toast('Choose class and subject first.', 'warning'); return; }
+      const term=($('rc-out-term')||{}).value||($('rc-term')||{}).value||this.ctx.term||'';
+      const ses=($('rc-out-session')||{}).value||($('rc-session')||{}).value||this.ctx.session||'';
+      try {
+        ReportEngine.init(window.sb);
+        const html=await ReportEngine.renderSubject({class:cls,subject:sub,term:term,session:ses});
+        ReportEngine.print('Subject Broadsheet — '+sub+' ('+cls+')',html,false);
+      } catch(e) { console.error(e); toast('Could not generate subject broadsheet: '+(e.message||e),'danger',8000); }
+    },
+
+    // V12.16: One-click allow/disallow student report generation per term
+    async loadReportAllowStatus(){
+      const statusEl=$('rc-allow-status');
+      const globalEl=$('rc-allow-global-status');
+      const logEl=$('rc-allow-log');
+      const term=($('rc-allow-term')||{}).value || ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const sess=($('rc-allow-session')||{}).value || ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
+      if(!term){ if(statusEl) statusEl.textContent='Select term first'; return; }
+      try{
+        if(statusEl) statusEl.textContent='⏳ Checking…';
+        const {data, error}=await sb.rpc('sc_is_report_generation_allowed',{p_term:term, p_session:sess||null});
+        if(error) throw error;
+        const allowed=data && (data.allowed || data.allowed===true);
+        const src=data && data.source;
+        if(statusEl){
+          statusEl.textContent=allowed?`✅ Allowed for ${term}${sess?' · '+sess:''} (source: ${src})`:`🔒 Disallowed for ${term}${sess?' · '+sess:''} (source: ${src})`;
+          statusEl.style.color=allowed?'#065f46':'#b91c1c';
+        }
+        if(logEl){
+          logEl.innerHTML=`<div style="background:${allowed?'#f0fdf4':'#fef2f2'};border:1px solid ${allowed?'#86efac':'#fca5a5'};border-radius:8px;padding:8px">Term: <b>${esc(term)}</b>${sess?' · Session: <b>'+esc(sess)+'</b>':''} — <b style="color:${allowed?'#065f46':'#b91c1c'}">${allowed?'✅ Students CAN generate':'🔒 Students CANNOT generate'}</b><br>Source: ${esc(src||'unknown')} — ${allowed?'Students can check/generate own report cards for this term':'Students blocked until admin allows with one click'}</div>`+logEl.innerHTML;
+        }
+        // Also check global
+        try{
+          const {data:gdata}=await sb.from('school_settings').select('allow_student_report_global').eq('id',1).maybeSingle();
+          if(globalEl && gdata){
+            globalEl.textContent=gdata.allow_student_report_global?`🌐 Global: Allowed`:`🌐 Global: Disallowed (per-term overrides)`;
+          }
+        }catch(_){}
+      }catch(e){
+        if(statusEl) statusEl.textContent='❌ Check failed: '+(e.message||e);
+      }
+    },
+    async setReportAllow(allowed){
+      const term=($('rc-allow-term')||{}).value || ($('rc-out-term')||{}).value || ($('rc-term')||{}).value || this.ctx.term || '';
+      const sess=($('rc-allow-session')||{}).value || ($('rc-out-session')||{}).value || ($('rc-session')||{}).value || this.ctx.session || '';
+      const statusEl=$('rc-allow-status');
+      const logEl=$('rc-allow-log');
+      if(!term){ toast('Select term first (Term dropdown in this card or Generate outputs).','warning'); return; }
+      if(!confirm((allowed?'✅ Allow':'🔒 Disallow')+` students from generating report cards for ${term}${sess?' · '+sess:''}? One click.`)) return;
+      try{
+        if(statusEl) statusEl.textContent='⏳ Saving…';
+        const {data, error}=await sb.rpc('sc_set_report_generation_allowed',{p_term:term, p_session:sess||null, p_allowed:!!allowed});
+        if(error) throw error;
+        if(!data.ok) throw Error(data.error||'Failed');
+        if(statusEl){
+          statusEl.textContent=data.allowed?`✅ Now Allowed for ${data.term}${data.session?' · '+data.session:''}`:`🔒 Now Disallowed for ${data.term}${data.session?' · '+data.session:''}`;
+          statusEl.style.color=data.allowed?'#065f46':'#b91c1c';
+        }
+        if(logEl){
+          logEl.innerHTML=`<div style="background:${data.allowed?'#f0fdf4':'#fef2f2'};border:1px solid ${data.allowed?'#86efac':'#fca5a5'};border-radius:8px;padding:8px">✅ One-click ${data.allowed?'Allow':'Disallow'} for <b>${esc(data.term)}</b>${data.session?' · '+esc(data.session):''} — ${data.allowed?'Students CAN now generate':'Students CANNOT generate until allowed'}<br><small>${new Date().toLocaleString()}</small></div>`+logEl.innerHTML;
+        }
+        toast((data.allowed?'✅ Allowed':'🔒 Disallowed')+` students for ${data.term}${data.session?' · '+data.session:''} — one click done.`, data.allowed?'success':'warning', 6000);
+        if(window.App&&App.logActivity) App.logActivity('report-allow', 'academic_periods', term+'|'+sess+'|'+allowed);
+      }catch(e){
+        if(statusEl) statusEl.textContent='❌ Save failed: '+(e.message||e);
+        toast('Failed to set report allow: '+(e.message||e),'danger',8000);
+      }
+    },
+    async setGlobalAllow(allowed){
+      const globalEl=$('rc-allow-global-status');
+      const logEl=$('rc-allow-log');
+      if(!confirm((allowed?'✅ Allow globally':'🔒 Disallow globally')+` student report generation for ALL terms (fallback)? Per-term settings still override.`)) return;
+      try{
+        if(globalEl) globalEl.textContent='⏳ Saving global…';
+        const {data, error}=await sb.rpc('sc_set_report_generation_global',{p_allowed:!!allowed});
+        if(error) throw error;
+        if(!data.ok) throw Error(data.error||'Failed');
+        if(globalEl) globalEl.textContent=data.allowed?`🌐 Global: Allowed`:`🌐 Global: Disallowed`;
+        if(logEl){
+          logEl.innerHTML=`<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:8px">🌐 Global ${data.allowed?'Allowed':'Disallowed'} — fallback for terms without per-term setting<br><small>${new Date().toLocaleString()}</small></div>`+logEl.innerHTML;
+        }
+        toast((data.allowed?'✅ Globally allowed':'🔒 Globally disallowed')+' — per-term overrides still work.', data.allowed?'success':'warning', 6000);
+      }catch(e){
+        if(globalEl) globalEl.textContent='❌ Global save failed: '+(e.message||e);
+        toast('Global set failed: '+(e.message||e),'danger',8000);
+      }
+    }
+  };
+
+  window.RC = RC;
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => RC.init());
+  else RC.init();
+})();
+</script>
+<script>
+/* V7.0 #10: deep link from Student Profile — ?student=&class=&auto=1 prefill
+   the pickers and auto-generate that student's report card for the current term. */
+document.addEventListener('DOMContentLoaded',function(){try{
+  var q=new URLSearchParams(location.search), stu=q.get('student'), cls=q.get('class');
+  /* V7.5 #1: no ?student= in the URL? Fall back to the student the admin just
+     viewed on Student Profile (remembered for 30 minutes) — the sidebar route
+     to Report Cards also lands with that student pre-picked (no auto-print). */
+  if(!stu){try{var last=window.CRUD&&CRUD.lastStudent&&CRUD.lastStudent(30);if(last){stu=last.adm||last.name||'';cls=cls||last.cls||'';}}catch(_){}}
+  if(!stu)return;
+  var tries=0;var t=setInterval(function(){tries++;
+    var inp=document.getElementById('rc-student');
+    if(inp){clearInterval(t);inp.value=stu;
+      var ci=document.getElementById('rc-class');if(ci&&cls)ci.value=cls;
+      if(window.RC&&RC.ctx&&cls)RC.ctx.class=cls;
+      if(q.get('auto')==='1'&&window.RC&&RC.reportCard){
+        /* V7.2 #1: pull the CURRENT academic period so the card generates for
+           the current term/session automatically — no manual picking. */
+        (async function(){
+          try{
+            if(window.sb){var r=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();
+              if(r.data){var te=document.getElementById('rc-term'),se=document.getElementById('rc-session');
+                if(te&&!te.value){if(![...te.options].some(function(o){return o.value===r.data.term;}))te.add(new Option(r.data.term,r.data.term));te.value=r.data.term;}
+                if(se&&!se.value){if(![...se.options].some(function(o){return o.value===r.data.session;}))se.add(new Option(r.data.session,r.data.session));se.value=r.data.session;}
+                if(window.RC&&RC.ctx){RC.ctx.term=RC.ctx.term||r.data.term;RC.ctx.session=RC.ctx.session||r.data.session;}
+                if(typeof toast==='function')toast('Generating '+stu+"'s report card for the CURRENT period: "+r.data.term+' '+r.data.session+'…','info',5000);
+              }}
+          }catch(_){ }
+          setTimeout(function(){RC.reportCard();},900);
+        })();
+      }
+    } else if(tries>20)clearInterval(t);
+  },600);
+}catch(_){}});
+</script>
+<!-- V12.16: Ultra-robust student auto-fill on landing — runs immediately, no typing needed, only own result -->
+<script>
+/* V12.16: Ensures student name field auto-fills the moment student lands on report-cards page, without typing, only own result, no access to others.
+   Runs on DOMContentLoaded + 300ms + 1s + 2s + 5s intervals to survive async role resolution and late overwrites.
+   Uses cached profile (sc-cached-profile) + SC_PROFILE + students table where user_id = current user.
+   For student, sets readonly, removes list, datalist only own.
+*/
+(function(){
+  function immediateFill(){
+    try{
+      var role='';
+      try{ role=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase(); }catch(_){}
+      if(!role || role==='guest'){
+        try{
+          var c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');
+          if(c&&c.role) role=String(c.role).toLowerCase();
+        }catch(_){}
+      }
+      if(role!=='student') return;
+      var inp=document.getElementById('rc-student');
+      if(!inp) return;
+      var cached=null;
+      try{ cached=JSON.parse(localStorage.getItem('sc-cached-profile')||'null'); }catch(_){}
+      var name=(cached&&cached.full_name)||(window.SC_PROFILE&&window.SC_PROFILE.full_name)||'';
+      var adm=(cached&&cached.admission_no)||'';
+      if(name && !inp.value){
+        inp.value=name;
+      }
+      if(inp.value){
+        inp.setAttribute('readonly','readonly');
+        inp.removeAttribute('list');
+        inp.title='Your own report card — auto-filled on landing, only your result, no access to other students';
+        inp.placeholder='Auto-filled: '+inp.value+(adm?' ('+adm+')':'')+' — only your result (no typing needed)';
+        var dl=document.getElementById('rc-student-list');
+        if(dl && dl.children.length!==1){
+          dl.innerHTML='<option value="'+inp.value+(adm?' — '+adm:'')+'">'+inp.value+' — your result</option>';
+        }
+      }
+    }catch(_){}
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    immediateFill();
+    setTimeout(immediateFill, 300);
+    setTimeout(immediateFill, 1000);
+    setTimeout(immediateFill, 2000);
+    setTimeout(immediateFill, 5000);
+    // Also observe App role changes
+    var iv=setInterval(function(){
+      immediateFill();
+    }, 800);
+    setTimeout(function(){ clearInterval(iv); }, 10000);
+  });
+})();
+</script>
+</body></html>
