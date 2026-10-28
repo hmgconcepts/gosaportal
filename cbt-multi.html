@@ -1,0 +1,542 @@
+<!DOCTYPE html><html lang="en"><head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Multi-Subject CBT Builder</title><link rel="stylesheet" href="assets/css/style.css">
+<style>
+.ms-wrap{max-width:1080px;margin:26px auto;padding:0 16px}
+.ms-sub{border:1px solid var(--gray-200,#e2e8f0);border-radius:14px;padding:16px;margin-bottom:14px;background:#fff}
+.ms-sub h4{margin:0 0 8px;color:var(--primary,#4f46e5)}
+.ms-badge{display:inline-block;background:#eef2ff;color:#4338ca;font-size:.72rem;font-weight:800;border-radius:999px;padding:3px 10px;margin-left:8px}
+.ms-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0}
+.ms-step{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;font-size:.85rem}
+.ms-step b{display:block;color:var(--primary,#4f46e5)}
+</style>
+    <meta name="description" content="Multi-Subject CBT Builder — School Connect v5 by HMG Concepts">
+    <meta name="keywords" content="school, multi-subject cbt builder, school management, HMG Concepts, School Connect">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./cbt-multi.html">
+    <meta property="og:title" content="Multi-Subject CBT Builder">
+    <meta property="og:description" content="Multi-Subject CBT Builder — School Connect v5 by HMG Concepts">
+    <meta property="og:url" content="./cbt-multi.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Multi-Subject CBT Builder">
+    <meta name="twitter:description" content="Multi-Subject CBT Builder — School Connect v5 by HMG Concepts">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head><body data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+<div id="sc-page-guard" style="display:none;padding:40px;text-align:center">
+  <h2>🔒 Restricted</h2>
+  <p>This page is only available to staff and administrators.</p>
+  <a class="btn btn-primary" href="dashboard.html">Back to dashboard</a>
+</div>
+<main class="ms-wrap">
+  <div class="card">
+    <h1 style="margin-top:0">🧪 Multi-Subject CBT Builder <span class="ms-badge">UTME / Common-Entrance mode</span></h1>
+    <p style="color:var(--gray-600)">Build ONE exam containing SEVERAL subjects. Students get one exam code, see a tab for each subject during the exam (exactly like UTME/JAMB CBT), and questions never mix across subjects.</p>
+    <div class="ms-steps">
+      <div class="ms-step"><b>1. Exam settings</b>Title, class, duration, marks.</div>
+      <div class="ms-step"><b>2. Add subjects</b>One CSV per subject.</div>
+      <div class="ms-step"><b>3. Publish</b>Share the single exam code.</div>
+      <div class="ms-step"><b>4. Students sit it</b>Subject tabs, per-subject progress.</div>
+    </div>
+
+    <h3>Step 1 — Exam settings</h3>
+    <div class="grid grid-2">
+      <div class="form-group"><label>Package title *</label><input class="form-input" id="mm-title" placeholder="e.g. Mock UTME 2026"></div>
+      <div class="form-group"><label>Class</label><select class="form-select" id="mm-class"><option value="">— select class —</option></select></div>
+      <div class="form-group"><label>Term</label><select class="form-select" id="mm-term"><option value="">— select term —</option></select></div>
+      <div class="form-group"><label>Session</label><select class="form-select" id="mm-session"><option value="">— select session —</option></select></div>
+      <div class="form-group"><label>Total duration (minutes) *</label><input class="form-input" type="number" id="mm-dur" value="120"></div>
+      <div class="form-group"><label>Number of attempts (0 = unlimited) *</label><input class="form-input" type="number" id="mm-attempt" value="1" min="0"><small>How many times a student can submit. 1 = once, 0 = unlimited.</small></div>
+      <div class="form-group"><label>Questions per subject (0 = all)</label><input class="form-input" type="number" id="mm-sel" value="0"></div>
+      <div class="form-group"><label>Negative mark per wrong answer</label><input class="form-input" type="number" step="0.25" id="mm-neg" value="0"></div>
+      <div class="form-group"><label>Purpose — clear differentiation (V12.11)</label><select class="form-select" id="mm-type"><option value="exam">🔴 Terminal Exam (once per term → Exam column)</option><option value="ca">🔵 Mid-term CA (CA1/CA2, once)</option><option value="test">🔵 Mid-term Test (once)</option><option value="assignment">🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)</option><option value="project">🟣 Project</option><option value="quiz">🟡 Quiz</option><option value="practical">🟠 Practical</option></select><small style="color:#475569">🟢 Assignment = multiple per term, cumulative → Assignments page auto-fills with Take link for every student, Score auto-fills kind/max/scores. 🔵/🔴 = once per term → CA/Exam columns.</small></div>
+      <div class="form-group"><label>Report-card column</label><select class="form-select" id="mm-col"><option>Exam</option><option>CBT Exam</option><option>CA1</option><option>CA2</option><option>Assignment</option><option>Project</option><option value="">(not linked)</option></select></div>
+    </div>
+    <div class="form-group"><label>Candidate instructions</label><textarea class="form-input" id="mm-instr" rows="2" placeholder="Answer all questions. Use the subject tabs to move between subjects."></textarea></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="checkbox" id="mm-rand" checked> Randomise questions (within each subject only)</label>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="checkbox" id="mm-rel" checked> Release results instantly</label>
+
+    <h3 style="margin-top:22px">Step 2 — Subjects &amp; their question banks</h3>
+
+    <!-- V10.4: ONE-FILE IMPORT. The Prompt Studio's multi-subject pack (and
+         most AI chats) emit a SINGLE CSV where every row carries its subject
+         in the Section column. Teachers were left splitting that file by hand
+         into per-subject blocks. Now: paste/upload the combined file once and
+         the builder splits it into subject blocks automatically. -->
+    <div class="card" style="background:#f0fdf4;border-color:#86efac;margin-bottom:14px">
+      <h4 style="margin-top:0">⚡ Fast lane — one combined CSV (recommended)</h4>
+      <p style="color:var(--gray-600);font-size:.88rem;margin:4px 0 8px">Got ONE file with a <code>Section</code> column naming each row's subject (what the <a href="cbt-prompts.html">Prompt Studio</a> multi-subject pack produces)? Paste or upload it here — the subject blocks below fill themselves.</p>
+      <textarea class="form-input" id="mm-combined" rows="4" style="font-family:monospace;font-size:.78rem" placeholder="Question,A,B,C,D,CorrectAnswer,Explanation,Type,...,Section  (one file, all subjects)"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center">
+        <input type="file" accept=".csv,text/csv" class="form-input" style="max-width:280px" onchange="MM.readCombinedFile(this)">
+        <button class="btn btn-primary btn-sm" onclick="MM.importCombined()">🪄 Split into subjects</button>
+        <span id="mm-combined-note" style="font-size:.82rem;color:var(--gray-500)"></span>
+      </div>
+    </div>
+
+    <p style="color:var(--gray-600);font-size:.9rem">…or add one block per subject manually. Paste that subject's CSV (headers: <code>question,type,a,b,c,d,answer,explanation,mark</code>) or upload the CSV file. Need CSV help? Open <a href="cbt-prompts.html">CSV Prompt Templates</a>.</p>
+    <div id="mm-subjects"></div>
+    <button class="btn btn-outline" onclick="MM.addSubject()">＋ Add subject</button>
+
+    <!-- V12.16: One-Click Multi-Subject from Pre-existing CBTs -->
+    <div class="card" style="margin-top:24px;border:2px solid #a5b4fc;background:#eef2ff">
+      <h3 style="margin-top:0">🔗 Combine Pre-existing CBTs into Multi-Subject (One-Click) — V12.16</h3>
+      <div style="background:#fff;border:1px solid #c7d2fe;border-radius:10px;padding:10px;margin:0 0 12px;font-size:.88rem;color:#1e293b;line-height:1.7">
+        <b>Modus operandi — One-click multi-subject from existing exams:</b><br>
+        Already have single-subject CBTs (e.g., Mathematics Mid-term, English Assignment, Biology Exam) and want ONE multi-subject exam (like UTME) without re-pasting CSVs? Select them below and click <b>🚀 Create Multi-Subject from Selected</b>. The builder will:<br>
+        1️⃣ Fetch each selected exam's question bank (`csv_data`) from DB (handles JSON array or string).<br>
+        2️⃣ Tag each question's Section/Subject to its original subject (e.g., all questions from Mathematics exam → Section=Mathematics).<br>
+        3️⃣ Build subject_breakdown + subjects list (e.g., Mathematics, English, Biology) — same as manual builder.<br>
+        4️⃣ Publish ONE new multi-subject exam with a single code — students see subject tabs. Original exams stay untouched.<br>
+        <b>Robustness:</b> Works for any purpose (exam/ca/assignment), any class (must be same class or blank — builder warns if mixed), handles pre-existing multi-subject exams too (splits their breakdown), skips archived, shows question counts, validates at least 2 subjects selected, uses current Term/Session from Step 1 or from first selected exam, uses Purpose from Step 1 (mm-type) so you can create multi-subject Assignment (cumulative) in one click.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+        <div class="form-group" style="margin:0"><label>Filter by class (optional)</label><select class="form-select" id="mm-exist-class" style="max-width:160px"><option value="">— all classes —</option></select></div>
+        <div class="form-group" style="margin:0"><label>Filter by term (optional)</label><select class="form-select" id="mm-exist-term" style="max-width:160px"><option value="">— all terms —</option></select></div>
+        <button class="btn btn-outline btn-sm" onclick="MM.listExisting()">🔄 Load existing CBTs</button>
+        <button class="btn btn-outline btn-sm" onclick="MM.selectAllExisting(true)">☑ Select all visible</button>
+        <button class="btn btn-outline btn-sm" onclick="MM.selectAllExisting(false)">☐ Clear</button>
+        <span id="mm-exist-count" style="font-size:.85rem;color:#475569"></span>
+      </div>
+      <div id="mm-existing-list" style="max-height:360px;overflow:auto;border:1px solid #c7d2fe;border-radius:10px;background:#fff;padding:8px">
+        <p style="color:#64748b">Click "Load existing CBTs" to see your current CBT exams (single + multi). Select at least 2 to combine.</p>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input class="form-input" id="mm-exist-title" placeholder="New multi-subject title (e.g., Combined Mock: Maths+English+Biology)" style="max-width:340px">
+        <button class="btn btn-primary" onclick="MM.createFromExisting()">🚀 Create Multi-Subject from Selected (One-Click)</button>
+        <span id="mm-exist-msg" style="font-size:.85rem;color:#475569"></span>
+      </div>
+    </div>
+
+    <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="MM.publish()">🚀 Create Multi-Subject Exam</button>
+      <a class="btn btn-outline" href="cbt.html">Back to CBT Manager</a>
+      <a class="btn btn-outline" href="cbt-exam.html">Student: Take Exam</a>
+    </div>
+    <div id="mm-result" style="margin-top:14px"></div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/cbt-engine.js"></script>
+<script src="assets/js/keepalive-layers.js"></script>
+<script src="assets/js/cbt-practice.js"></script>
+<script src="assets/js/ics-export.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+/* ENTERPRISE V6 (issue 13): dedicated multi-subject CBT builder page. */
+const MM = {
+  n: 0,
+  addSubject(name){
+    this.n++;
+    const box = document.getElementById('mm-subjects');
+    const div = document.createElement('div'); div.className = 'ms-sub'; div.dataset.idx = this.n;
+    div.innerHTML = '<h4>Subject ' + this.n + ' <button class="btn btn-sm btn-outline" style="float:right" onclick="this.closest(\'.ms-sub\').remove()">Remove</button></h4>' +
+      '<div class="form-group"><label>Subject name *</label><input class="form-input ms-name" placeholder="e.g. Mathematics" value="' + (name||'') + '"></div>' +
+      '<div class="form-group"><label>Question CSV (paste)</label><textarea class="form-input ms-csv" rows="5" style="font-family:monospace" placeholder="question,type,a,b,c,d,answer,explanation,mark"></textarea></div>' +
+      '<div class="form-group"><label>…or upload CSV file</label><input type="file" accept=".csv,text/csv" class="form-input" onchange="MM.readFile(this)"></div>' +
+      '<div class="ms-count" style="font-size:.82rem;color:var(--gray-500)"></div>';
+    box.appendChild(div);
+    div.querySelector('.ms-csv').addEventListener('input', () => MM.count(div));
+  },
+  /* V10.4: one-file import — split a combined CSV by its Section column into
+     per-subject blocks, LOSSLESSLY (raw rows are regrouped under the original
+     header, so structured columns like Pairs/Items survive untouched). */
+  readCombinedFile(input){
+    const f = input.files && input.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { document.getElementById('mm-combined').value = String(r.result); MM.importCombined(); };
+    r.readAsText(f);
+  },
+  importCombined(){
+    const raw = document.getElementById('mm-combined').value.trim();
+    const note = document.getElementById('mm-combined-note');
+    if (!raw) { alert('Paste or upload the combined CSV first.'); return; }
+    const rows = CBT.parseCSVRows(raw).filter(r => r.some(v => String(v == null ? '' : v).trim()));
+    if (rows.length < 2) { alert('That CSV has no data rows.'); return; }
+    const canon = h => String(h == null ? '' : h).replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const head = rows[0].map(canon);
+    let secIdx = -1;
+    ['section','subject','subjectsection','examsubject'].some(k => { const i = head.indexOf(k); if (i >= 0) { secIdx = i; return true; } return false; });
+    if (secIdx < 0) { alert('No "Section" (or Subject) column found in the header — the multi-subject prompt always includes one. Check the file, or paste each subject\'s CSV manually below.'); return; }
+    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const headerLine = rows[0].map(q).join(',');
+    const groups = new Map();
+    rows.slice(1).forEach(r => {
+      const sec = String(r[secIdx] || '').trim() || 'General';
+      const key = sec.toLowerCase();
+      if (!groups.has(key)) groups.set(key, { name: sec, lines: [] });
+      groups.get(key).lines.push(r.map(q).join(','));
+    });
+    if (groups.size < 2) { alert('Only ONE subject ("' + [...groups.values()][0].name + '") was found in the Section column. A multi-subject package needs at least two — check the Section values, or use the single-exam CBT Manager instead.'); return; }
+    document.getElementById('mm-subjects').innerHTML = ''; this.n = 0;
+    let total = 0;
+    groups.forEach(g => {
+      this.addSubject(g.name);
+      const div = document.querySelector('.ms-sub:last-child');
+      div.querySelector('.ms-csv').value = headerLine + '\n' + g.lines.join('\n');
+      this.count(div);
+      total += g.lines.length;
+    });
+    if (note) note.textContent = '✅ Split ' + total + ' questions into ' + groups.size + ' subjects: ' + [...groups.values()].map(g => g.name + ' (' + g.lines.length + ')').join(', ') + '. Review each block, then Create.';
+  },
+  readFile(input){
+    const f = input.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { const div = input.closest('.ms-sub'); div.querySelector('.ms-csv').value = String(r.result); MM.count(div); };
+    r.readAsText(f);
+  },
+  count(div){
+    const csv = div.querySelector('.ms-csv').value.trim();
+    const qs = csv ? CBT.parseCSV(csv) : [];
+    div.querySelector('.ms-count').textContent = qs.length ? ('✅ ' + qs.length + ' question(s) detected') : '';
+  },
+  async lookups(){
+    if (!window.sb) return;
+    const fill = async (sel, table, col) => {
+      try { const { data } = await sb.from(table).select(col).order(col);
+        const seen=new Set(); (data||[]).forEach(r => { const v=String(r[col]==null?'':r[col]).trim(); const k=v.toLowerCase(); if(!v||seen.has(k))return; seen.add(k); const o = document.createElement('option'); o.textContent = v; document.getElementById(sel).appendChild(o); });
+      } catch(_){}
+    };
+    fill('mm-class','classes','name');
+    /* V11.0 (#6) ROOT CAUSE of the empty Session dropdown: this page read
+       school_settings.sessions — a column that does not exist. Sessions (and
+       terms) actually live in the `lookups` table and `academic_periods`,
+       exactly as every other page loads them. Now sourced from BOTH, deduped,
+       with the CURRENT academic period preselected. */
+    try {
+      const [lo, ap] = await Promise.all([
+        sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position'),
+        sb.from('academic_periods').select('term,session,is_current').order('starts_on',{ascending:false})
+      ]);
+      const dedupe = a => { const seen=new Set(); return a.filter(v=>{const k=String(v||'').trim().toLowerCase(); if(!v||seen.has(k))return false; seen.add(k); return true;}); };
+      const terms = dedupe([...(lo.data||[]).filter(x=>x.kind==='term').map(x=>x.value), ...(ap.data||[]).map(x=>x.term)]);
+      const sessions = dedupe([...(lo.data||[]).filter(x=>x.kind==='session').map(x=>x.value), ...(ap.data||[]).map(x=>x.session)]);
+      (terms.length?terms:['First Term','Second Term','Third Term']).forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-term').appendChild(o);});
+      sessions.forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-session').appendChild(o);});
+      const cur=(ap.data||[]).find(x=>x.is_current);
+      if(cur){ if(cur.term)document.getElementById('mm-term').value=cur.term; if(cur.session)document.getElementById('mm-session').value=cur.session; }
+    } catch(_){
+      ['First Term','Second Term','Third Term'].forEach(t=>{const o=document.createElement('option');o.textContent=t;document.getElementById('mm-term').appendChild(o);});
+    }
+    // Also fill existing filter dropdowns
+    try{
+      const fillExist = async (selId, table, col) => {
+        const sel=document.getElementById(selId);
+        if(!sel) return;
+        try{
+          const {data}=await sb.from(table).select(col).order(col);
+          const seen=new Set();
+          (data||[]).forEach(r=>{
+            const v=String(r[col]||'').trim();
+            const k=v.toLowerCase();
+            if(!v||seen.has(k)) return;
+            seen.add(k);
+            const o=document.createElement('option');
+            o.textContent=v;
+            sel.appendChild(o);
+          });
+        }catch(_){}
+      };
+      fillExist('mm-exist-class','classes','name');
+      fillExist('mm-exist-term','lookups','value');
+    }catch(_){}
+  },
+  // V12.16: List pre-existing CBTs for one-click multi-subject creation
+  async listExisting(){
+    const box=document.getElementById('mm-existing-list');
+    const countEl=document.getElementById('mm-exist-count');
+    if(!box) return;
+    if(!window.sb){ box.innerHTML='<p style="color:#b91c1c">Database not configured</p>'; return; }
+    box.innerHTML='<span class="pulse">Loading existing CBT exams…</span>';
+    try{
+      const cls=(document.getElementById('mm-exist-class')||{}).value;
+      const term=(document.getElementById('mm-exist-term')||{}).value;
+      let q=sb.from('cbt_exams').select('id,code,title,subject,class,term,session,assessment_type,report_column,csv_data,anti_cheat_config,is_archived,created_at').eq('is_archived', false).order('created_at',{ascending:false}).limit(300);
+      if(cls) q=q.eq('class',cls);
+      if(term) q=q.eq('term',term);
+      const {data, error}=await q;
+      if(error) throw error;
+      if(!data||!data.length){ box.innerHTML='<p style="color:#64748b">No existing CBT exams found for that filter. Create some single-subject exams first on CBT Manager.</p>'; if(countEl) countEl.textContent=''; return; }
+      // Build table
+      let html='<div class="table-wrap"><table><thead><tr><th style="width:34px"><input type="checkbox" id="mm-exist-all" onchange="MM.selectAllExisting(this.checked)"></th><th>Code / Title</th><th>Subject</th><th>Class / Term</th><th>Purpose</th><th>Qs</th></tr></thead><tbody>';
+      data.forEach(ex=>{
+        let qCount=0;
+        try{
+          let raw=ex.csv_data;
+          if(typeof raw==='string'){
+            try{ raw=JSON.parse(raw); }catch(_){ raw=null; }
+          }
+          if(Array.isArray(raw)) qCount=raw.length;
+          else if(raw && typeof raw==='object' && raw.questions) qCount=raw.questions.length;
+          else qCount=0;
+          // If multi-subject, sum breakdown
+          if(ex.anti_cheat_config && Array.isArray(ex.anti_cheat_config.subject_breakdown)){
+            qCount=ex.anti_cheat_config.subject_breakdown.reduce((a,b)=>a+(b.count||0),0) || qCount;
+          }
+        }catch(_){ qCount=0; }
+        const subj=ex.subject||'—';
+        const isMulti=String(subj).toUpperCase().startsWith('MULTI-SUBJECT') || (ex.anti_cheat_config && ex.anti_cheat_config.multi_subject);
+        const badge=isMulti?'<span class="badge" style="background:#eef2ff;color:#4338ca;border:1px solid #a5b4fc">🧪 Multi</span>':'<span class="badge" style="background:#f1f5f9;color:#475569">'+esc(ex.assessment_type||'exam')+'</span>';
+        html+=`<tr><td><input type="checkbox" class="mm-exist-chk" value="${ex.id}" data-subject="${esc(subj)}" data-code="${esc(ex.code||'')}" data-title="${esc(ex.title||'')}" data-class="${esc(ex.class||'')}" data-term="${esc(ex.term||'')}" data-session="${esc(ex.session||'')}" data-type="${esc(ex.assessment_type||'exam')}" data-qcount="${qCount}"></td><td><b>${esc(ex.code||'—')}</b><br>${esc(ex.title||'Untitled').slice(0,60)}<br><small style="color:#64748b">${esc(ex.id.slice(0,8))}</small></td><td style="max-width:180px;white-space:normal;font-size:.82rem">${esc(subj).slice(0,80)} ${isMulti?'<br><small>Subjects: '+esc((ex.anti_cheat_config&&ex.anti_cheat_config.subjects?ex.anti_cheat_config.subjects.join(', '):subj.replace(/^MULTI-SUBJECT:\\s*/i,'')).slice(0,80))+'</small>':''}</td><td>${esc(ex.class||'—')}<br><small>${esc(ex.term||'')}${ex.session?' · '+esc(ex.session):''}</small></td><td>${badge}</td><td><b>${qCount}</b></td></tr>`;
+      });
+      html+='</tbody></table></div><p style="font-size:.82rem;color:#475569;margin-top:8px">Select at least 2 exams (single or multi) to combine into ONE multi-subject exam. Originals stay untouched. Mixed classes will warn — best to use same class.</p>';
+      box.innerHTML=html;
+      if(countEl) countEl.textContent=`${data.length} exams loaded`;
+      // Store for later use
+      this._existingData=data;
+    }catch(e){
+      box.innerHTML=`<p style="color:#b91c1c">${esc(e.message||e)}</p>`;
+      if(countEl) countEl.textContent='Load failed';
+    }
+  },
+  selectAllExisting(checked){
+    document.querySelectorAll('.mm-exist-chk').forEach(ch=>{ ch.checked=!!checked; });
+    const all=document.getElementById('mm-exist-all');
+    if(all && typeof checked==='boolean') all.checked=!!checked;
+    // If called with boolean from filter buttons, handle
+    if(typeof checked!=='boolean'){
+      // called from buttons with true/false
+    }
+  },
+  async createFromExisting(){
+    const msgEl=document.getElementById('mm-exist-msg');
+    const resultEl=document.getElementById('mm-result');
+    if(!window.sb){ alert('Database not configured'); return; }
+    const selected=[...document.querySelectorAll('.mm-exist-chk:checked')];
+    if(selected.length<2){ alert('Select at least TWO existing CBT exams to combine into multi-subject.'); return; }
+    const titleInput=(document.getElementById('mm-exist-title')||{}).value.trim() || (document.getElementById('mm-title')||{}).value.trim();
+    if(!titleInput){ alert('Enter a title for the new multi-subject exam (either in the combine box or Step 1).'); return; }
+    if(msgEl) msgEl.textContent='⏳ Fetching question banks…';
+    try{
+      const ids=selected.map(ch=>ch.value);
+      // Fetch full rows with csv_data
+      const {data:exams, error}=await sb.from('cbt_exams').select('id,code,title,subject,class,term,session,assessment_type,report_column,csv_data,questions,anti_cheat_config').in('id', ids);
+      if(error) throw error;
+      if(!exams||exams.length<2) throw Error('Could not fetch selected exams');
+      // Validate class consistency
+      const classes=[...new Set(exams.map(e=>String(e.class||'').trim()).filter(Boolean))];
+      if(classes.length>1){
+        if(!confirm(`⚠ Selected exams have different classes: ${classes.join(', ')}. Multi-subject exam will use class "${exams[0].class||''}" (from first selected). Continue?`)) { if(msgEl) msgEl.textContent='Cancelled — mixed classes'; return; }
+      }
+      // Build questions per subject
+      let allQuestions=[];
+      let subjects=[];
+      let subject_breakdown=[];
+      let totalQs=0;
+      for(const ex of exams){
+        let qs=[];
+        try{
+          // V12.33 robust: handle csv_data AND questions, string or array, all CBT types
+          let raw=ex.csv_data;
+          let alt=ex.questions;
+          // Prefer csv_data if it has content
+          let candidate=null;
+          if(Array.isArray(raw) && raw.length) candidate=raw;
+          else if(typeof raw==='string' && raw.trim()){
+            try{ candidate=JSON.parse(raw); }catch(_){ candidate=null; }
+            if(!candidate || !candidate.length) candidate=null;
+          }else if(raw && typeof raw==='object' && !Array.isArray(raw)){
+            // object with questions inside or numeric keys
+            if(Array.isArray(raw.questions) && raw.questions.length) candidate=raw.questions;
+            else {
+              const vals=Object.values(raw);
+              if(vals.length && typeof vals[0]==='object' && vals[0].question) candidate=vals;
+            }
+          }
+          // Fallback to questions column
+          if(!candidate || !candidate.length){
+            if(Array.isArray(alt) && alt.length) candidate=alt;
+            else if(typeof alt==='string' && alt.trim()){
+              try{ candidate=JSON.parse(alt); }catch(_){ candidate=null; }
+            }else if(alt && typeof alt==='object' && !Array.isArray(alt)){
+              if(Array.isArray(alt.questions) && alt.questions.length) candidate=alt.questions;
+              else {
+                const vals=Object.values(alt);
+                if(vals.length && typeof vals[0]==='object' && vals[0].question) candidate=vals;
+              }
+            }
+          }
+          if(Array.isArray(candidate)) qs=candidate.map((qq,ii)=>CBT.normalizeQuestion?CBT.normalizeQuestion(qq,ii):qq);
+          else qs=[];
+          // If still empty but exam is multi with subject_breakdown, try to infer from anti_cheat_config? Already handled outside
+        }catch(_){ qs=[]; }
+        if(!qs.length){
+          // If exam is already multi-subject, try to split its breakdown
+          if(ex.anti_cheat_config && Array.isArray(ex.anti_cheat_config.subject_breakdown) && ex.anti_cheat_config.subject_breakdown.length){
+            // For pre-existing multi, we need to get its questions and split by its breakdown
+            // But if csv_data empty, we can't — skip with warning
+            console.warn('Exam has no csv_data but is multi', ex.code);
+            continue;
+          }else{
+            console.warn('Exam has no questions', ex.code);
+            continue;
+          }
+        }
+        // If exam itself is multi-subject, split its questions by its own breakdown
+        if(ex.anti_cheat_config && ex.anti_cheat_config.multi_subject && Array.isArray(ex.anti_cheat_config.subjects) && Array.isArray(ex.anti_cheat_config.subject_breakdown)){
+          // Use its own subjects
+          const subs=ex.anti_cheat_config.subjects;
+          const breakdown=ex.anti_cheat_config.subject_breakdown;
+          subs.forEach((subName, idx)=>{
+            const bd=breakdown[idx]||{};
+            const start=bd.start||0;
+            const count=bd.count||0;
+            const slice=count?qs.slice(start, start+count):[];
+            if(!slice.length) return;
+            // Avoid duplicate subject names — merge if same subject appears twice
+            let existingIdx=subjects.findIndex(s=>s.toLowerCase()===String(subName).toLowerCase());
+            if(existingIdx>=0){
+              // Merge questions into existing subject
+              slice.forEach(q=>{ q.section=subName; q.subject=subName; q.subject_section=subName; q.exam_subject=subName; });
+              // Find breakdown entry and extend
+              const existingBD=subject_breakdown[existingIdx];
+              existingBD.count+=slice.length;
+              existingBD.end=allQuestions.length+slice.length-1;
+              allQuestions=allQuestions.concat(slice);
+            }else{
+              slice.forEach(q=>{ q.section=subName; q.subject=subName; q.subject_section=subName; q.exam_subject=subName; });
+              subject_breakdown.push({ name: subName, start: allQuestions.length, count: slice.length, end: allQuestions.length+slice.length-1 });
+              allQuestions=allQuestions.concat(slice);
+              subjects.push(subName);
+            }
+          });
+        }else{
+          // Single-subject exam — use its subject as block
+          const subName=String(ex.subject||'General').trim() || 'General';
+          // Avoid duplicate subject names — if same subject appears from multiple exams, merge
+          let existingIdx=subjects.findIndex(s=>s.toLowerCase()===subName.toLowerCase());
+          if(existingIdx>=0){
+            qs.forEach(q=>{ q.section=subName; q.subject=subName; q.subject_section=subName; q.exam_subject=subName; });
+            const existingBD=subject_breakdown[existingIdx];
+            existingBD.count+=qs.length;
+            existingBD.end=allQuestions.length+qs.length-1;
+            allQuestions=allQuestions.concat(qs);
+          }else{
+            qs.forEach(q=>{ q.section=subName; q.subject=subName; q.subject_section=subName; q.exam_subject=subName; });
+            subject_breakdown.push({ name: subName, start: allQuestions.length, count: qs.length, end: allQuestions.length+qs.length-1 });
+            allQuestions=allQuestions.concat(qs);
+            subjects.push(subName);
+          }
+        }
+      }
+      if(subjects.length<2){ alert('After fetching, only '+subjects.length+' subject(s) had questions. Need at least 2. Check that selected exams have question banks.'); if(msgEl) msgEl.textContent='Need at least 2 subjects with questions'; return; }
+      if(!allQuestions.length){ alert('No questions found in selected exams.'); if(msgEl) msgEl.textContent='No questions'; return; }
+      // Validate question bank
+      const bankCheck=CBT.validateQuestionBank(allQuestions);
+      if(!bankCheck.ok){ alert('Cannot create combined exam — question bank errors:\\n\\n'+bankCheck.errors.slice(0,8).join('\\n')); if(msgEl) msgEl.textContent='Validation failed'; return; }
+      // V12.35: Use Step 1 Purpose (mm-type) for new multi-subject's assessment_type — works for all CBT types (exam/test/ca/assignment/project/quiz/practical), not just exam
+      // Use Step 1 settings if available, else from first exam
+      const v=(id)=> (document.getElementById(id)||{}).value||'';
+      const first=exams[0]||{};
+      const examObj={
+        title: titleInput,
+        subject: 'MULTI-SUBJECT: '+subjects.join(', '),
+        class: v('mm-class') || first.class || '',
+        term: v('mm-term') || first.term || '',
+        session: v('mm-session') || first.session || '',
+        assessment_type: (document.getElementById('mm-type')||{}).value || first.assessment_type || 'exam',
+        topic: subjects.join(', '),
+        report_column: v('mm-col') || first.report_column || 'Exam',
+        duration: parseInt(v('mm-dur'))||120,
+        duration_min: parseInt(v('mm-dur'))||120,
+        attempt_limit: parseInt(v('mm-attempt')||'1')||1,
+        negative_mark: parseFloat(v('mm-neg'))||0,
+        select_count: parseInt(v('mm-sel'))||0,
+        instructions: v('mm-instr') || `Combined from ${exams.length} exams: ${exams.map(e=>e.code).join(', ')}. Answer all subjects via tabs.`,
+        randomise: document.getElementById('mm-rand') ? document.getElementById('mm-rand').checked : true,
+        release_results: document.getElementById('mm-rel') ? document.getElementById('mm-rel').checked : true,
+        anti_cheat_config: { subject_breakdown, subjects, multi_subject: true, combined_from: exams.map(e=>({id:e.id, code:e.code, title:e.title, subject:e.subject})) },
+        is_open: true,
+        exam_mode: 'registered',
+        csv_data: allQuestions
+      };
+      if(msgEl) msgEl.textContent=`🚀 Publishing ${allQuestions.length} questions across ${subjects.length} subjects…`;
+      const res=await CBT.createExam(examObj);
+      if(res.error) throw res.error;
+      const code=res.data && res.data.code;
+      if(msgEl) msgEl.textContent=`✅ Created multi-subject ${code} — ${subjects.length} subjects, ${allQuestions.length} Qs`;
+      if(resultEl){
+        resultEl.innerHTML=
+          `<div class="card" style="background:#f0fdf4;border-color:#86efac"><h3 style="margin-top:0">🎉 Multi-subject exam created from ${exams.length} existing exams!</h3>`+
+          `<p>New exam code: <strong style="font-size:1.3rem">${esc(code||'—')}</strong> · ${subjects.length} subjects (${esc(subjects.join(', '))}) · ${allQuestions.length} questions</p>`+
+          `<p>Combined from: ${exams.map(e=>`<span class="badge" style="background:#eef2ff;color:#4338ca;border:1px solid #a5b4fc">${esc(e.code||'—')} — ${esc(e.subject||'')}</span>`).join(' ')}</p>`+
+          `<p>Students open <a href="cbt-exam.html">Take Exam</a>, enter this single code and switch between subject tabs — just like UTME. Original exams untouched.</p>`+
+          `<button class="btn btn-outline" onclick="navigator.clipboard.writeText('${esc(code||'')}');alert('Copied!')">Copy code</button> `+
+          `<a class="btn btn-primary" href="cbt.html">Manage / edit this exam</a></div>`;
+      }
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }catch(e){
+      console.error(e);
+      if(msgEl) msgEl.textContent='❌ Failed: '+(e.message||e);
+      alert('Could not create combined multi-subject exam: '+(e.message||e));
+    }
+  },
+  async publish(){
+    if (!window.sb) { alert('Database not configured — add Supabase keys in assets/js/config.js'); return; }
+    const v = (x) => document.getElementById(x).value;
+    const title = v('mm-title').trim();
+    if (!title) { alert('Enter the package title.'); return; }
+    const blocks = [...document.querySelectorAll('.ms-sub')];
+    let questions = []; const subjects = []; const subject_breakdown = [];
+    for (const b of blocks) {
+      const name = b.querySelector('.ms-name').value.trim();
+      const csv = b.querySelector('.ms-csv').value.trim();
+      if (!name || !csv) continue;
+      const qs = CBT.parseCSV(csv);
+      if(!qs.length){ alert('No valid questions were detected for '+name+'. Check the CSV header and rows.'); return; }
+      if(subjects.some(s=>s.toLowerCase()===name.toLowerCase())){alert('Each subject tab needs a unique name. Duplicate: '+name);return;}
+      qs.forEach(q => { q.section = name; q.subject = name; q.subject_section = name; q.exam_subject = name; });
+      subject_breakdown.push({ name, start: questions.length, count: qs.length, end: questions.length + qs.length - 1 });
+      questions = questions.concat(qs); subjects.push(name);
+    }
+    if (subjects.length < 2) { alert('Add at least TWO subjects, each with a name and CSV questions.'); return; }
+    const bankCheck=CBT.validateQuestionBank(questions);
+    if(!bankCheck.ok){alert('Cannot publish this exam:\n\n'+bankCheck.errors.slice(0,8).join('\n'));return;}
+    const exam = {
+      title, subject: 'MULTI-SUBJECT: ' + subjects.join(', '), class: v('mm-class'), term: v('mm-term'), session: v('mm-session'),
+      assessment_type: (document.getElementById('mm-type')||{}).value||'exam', topic: subjects.join(', '), report_column: v('mm-col'),
+      duration: parseInt(v('mm-dur')) || 120, duration_min: parseInt(v('mm-dur')) || 120, attempt_limit: parseInt(v('mm-attempt')||'1')||1, /* V10.4: getter prefers duration_min */ negative_mark: parseFloat(v('mm-neg')) || 0,
+      select_count: parseInt(v('mm-sel')) || 0, instructions: v('mm-instr'),
+      randomise: document.getElementById('mm-rand').checked,
+      release_results: document.getElementById('mm-rel').checked,
+      anti_cheat_config: { subject_breakdown, subjects, multi_subject: true },
+      is_open: true, exam_mode: 'registered', csv_data: questions
+    };
+    const res = await CBT.createExam(exam);
+    if (res.error) { alert('Could not create: ' + res.error.message); return; }
+    const code = res.data && res.data.code;
+    document.getElementById('mm-result').innerHTML =
+      '<div class="card" style="background:#f0fdf4;border-color:#86efac"><h3 style="margin-top:0">🎉 Multi-subject exam created!</h3>' +
+      '<p>Exam code: <strong style="font-size:1.3rem">' + code + '</strong> · ' + subjects.length + ' subjects · ' + questions.length + ' questions</p>' +
+      '<p>Students open <a href="cbt-exam.html">Take Exam</a>, enter this single code and switch between the subject tabs — just like UTME.</p>' +
+      '<button class="btn btn-outline" onclick="navigator.clipboard.writeText(\'' + code + '\');alert(\'Copied!\')">Copy code</button> ' +
+      '<a class="btn btn-primary" href="cbt.html">Manage / edit this exam</a></div>';
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  }
+};
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+MM.addSubject('English Language'); MM.addSubject('Mathematics');
+MM.lookups();
+</script>
+<script>
+/* Role guard for non-shell pages */
+(async function(){
+  try {
+    if (!window.sb) return; // public page when not configured
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) { location.href = 'login.html'; return; }
+    const { data: profile } = await sb.from('profiles').select('role').eq('id', user.id).maybeSingle();
+    const role = String((profile && profile.role) || 'student').toLowerCase();
+    const allowed = ['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher'];
+    if (!allowed.includes(role)) {
+      document.querySelector('.ms-wrap').style.display = 'none';
+      document.getElementById('sc-page-guard').style.display = 'block';
+    }
+  } catch(_) {}
+})();
+</script>
+</body></html>

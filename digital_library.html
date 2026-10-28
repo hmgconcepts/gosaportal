@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Digital Library • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — Digital Library. Comprehensive school management platform.">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+<meta name="theme-color" content="#0506ae">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<meta property="og:title" content="Digital Library • God of Seed Academy">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:image" content="assets/img/logo.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) ===
+   Final UI/UX repair: stable, professional navigation for every layout.
+   Prevents scattered icons/labels, fixes unsupported layout IDs, and keeps
+   large module lists readable on desktop and mobile. */
+:root{--primary:#0506ae;--primary-dark:#0506ae;--primary-light:#964eec;--accent:#964eec;--gradient:linear-gradient(135deg,#0506ae,#964eec);--gradient-dark:linear-gradient(135deg,#0506ae,#964eec);--font:'Plus Jakarta Sans',system-ui,sans-serif;--sc-primary:#0506ae;--sc-accent:#964eec}
+body{font-family:var(--font)!important;background:#f8fafc}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc;color:#0f172a}
+.app-sidebar{width:286px;flex-shrink:0;background:rgba(255,255,255,.98);border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;z-index:40;box-shadow:0 10px 25px rgba(15,23,42,.04)}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px 16px;border-bottom:1px solid #e2e8f0;min-height:78px}
+.app-brand img{width:44px;height:44px;border-radius:12px;object-fit:contain;flex-shrink:0;background:#f8fafc;border:1px solid #e2e8f0}
+.app-brand strong{display:block;font-size:.98rem;font-weight:900;color:#0f172a;line-height:1.2;max-width:190px;white-space:normal}
+.app-nav{display:flex;flex-direction:column;gap:4px;padding:12px 10px 18px;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:10px;min-height:42px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:.875rem;font-weight:700;line-height:1.2;white-space:normal;word-break:normal;transition:background .18s ease,color .18s ease,transform .18s ease}
+.app-nav a:hover{background:#f1f5f9;color:var(--primary);transform:translateX(2px)}
+.app-nav a.active{background:var(--gradient);color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.22)}
+body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!important}.app-nav a[style*="display: none"]{display:none!important}
+.app-nav a.nav-locked{opacity:.62}.app-nav a.nav-locked .app-nav-icon{filter:grayscale(.35)}.app-nav a.nav-locked::after{content:'🔒';font-size:.72rem;opacity:.65;justify-self:end}.app-nav a.nav-locked.active{opacity:1}
+.app-nav-icon{width:32px;height:32px;min-width:32px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;line-height:1;border-radius:10px;background:rgba(79,70,229,.09);color:var(--primary);flex-shrink:0;overflow:hidden}
+.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22);color:#fff}
+.app-nav a span:last-child{overflow:hidden;text-overflow:ellipsis;display:block}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:13px 22px;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30;box-shadow:0 4px 18px rgba(15,23,42,.035)}
+.app-page-title{font-size:1.2rem;font-weight:900;color:#0f172a;margin:0;letter-spacing:-.01em}
+.app-content{padding:24px;flex:1;max-width:1400px;width:100%;margin:0 auto}
+.card{border-radius:18px!important;border:1px solid #e2e8f0!important;box-shadow:0 8px 24px rgba(15,23,42,.06)!important}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:18px}.stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05)}.stat-value{font-size:1.8rem;font-weight:900;color:var(--primary)}.stat-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800}
+/* Stable variants for all builder layout choices. Unsupported visual ideas are
+   expressed as professional variations, not broken experimental layouts. */
+.app-layout.topnav,.app-layout.cardhub,.app-layout.mega-menu,.app-layout.tabbed,.app-layout.dashboard-pro{flex-direction:column}
+.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{width:100%;height:auto;max-height:210px;position:sticky;top:0;flex-direction:row;align-items:stretch;overflow:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:260px;min-width:260px;border-bottom:none;border-right:1px solid #e2e8f0}
+.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(116px,150px);overflow-x:auto;overflow-y:hidden;padding:10px;align-items:center}
+.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{grid-template-columns:1fr;text-align:center;justify-items:center;gap:4px;min-height:68px;padding:8px 10px;font-size:.75rem}
+.app-layout.topnav .app-nav-icon,.app-layout.cardhub .app-nav-icon,.app-layout.mega-menu .app-nav-icon,.app-layout.tabbed .app-nav-icon,.app-layout.dashboard-pro .app-nav-icon{margin:auto}
+.app-layout.compact .app-sidebar,.app-layout.dock .app-sidebar{width:224px}.app-layout.compact .app-nav a,.app-layout.dock .app-nav a{font-size:.8rem;grid-template-columns:28px minmax(0,1fr)}.app-layout.compact .app-nav-icon,.app-layout.dock .app-nav-icon{width:28px;height:28px;min-width:28px}
+.app-layout.expanded .app-sidebar{width:330px}.app-layout.minimalist .app-sidebar{box-shadow:none}.app-layout.floating .app-sidebar{margin:14px;border-radius:22px;height:calc(100vh - 28px);border:1px solid #e2e8f0}.app-layout.split-view .app-content,.app-layout.grid-master .app-content,.app-layout.masonry .app-content{max-width:1500px}
+@media(max-width:900px){.app-sidebar,.app-layout.floating .app-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:min(86vw,310px)!important;height:100vh!important;margin:0!important;border-radius:0!important;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 40px rgba(0,0,0,.22);z-index:100}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{flex-direction:column;align-items:stretch}.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:auto;min-width:0;border-right:none;border-bottom:1px solid #e2e8f0}.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);justify-items:stretch;text-align:left;min-height:42px;font-size:.875rem}.app-content{padding:16px}.app-topbar{padding:12px 14px;gap:10px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}.user-chip{max-width:150px;overflow:hidden}.user-chip strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <link rel="canonical" href="./digital_library.html">
+    <meta property="og:url" content="./digital_library.html">
+</head>
+<body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
+
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher student">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
+        <div>
+          <strong>God of Seed Academy</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>My Profile</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔐</span>
+          <span>Change Password</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Report Cards (flexible)</span>
+        </a><a href="affective_traits.html" data-module-id="affective_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Affective Domain</span>
+        </a><a href="psychomotor_traits.html" data-module-id="psychomotor_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏃</span>
+          <span>Psychomotor Domain</span>
+        </a><a href="report_comments.html" data-module-id="report_comments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Report Comments</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Multi-Subject CBT</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="school-fees.html" data-module-id="school_fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏷️</span>
+          <span>Class Fee Structure</span>
+        </a><a href="school-products.html" data-module-id="school_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛒</span>
+          <span>School Products</span>
+        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payment History</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="exam-register.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Exam Registrations</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="hmg-digital-products.html" data-module-id="hmg_digital_products" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Digital Products</span>
+        </a><a href="status-manager.html" data-module-id="status_manager" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔧</span>
+          <span>Role &amp; Status</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="ecosystem.html" data-module-id="ecosystem_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Ecosystem</span>
+        </a><a href="punctuality.html" data-module-id="punctuality" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⏱️</span>
+          <span>Punctuality</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+      </div>
+    </aside>
+  <main class="app-main">
+    <header class="app-topbar">
+      <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
+      <h1 class="app-page-title">Digital Library</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        
+        <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
+        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle dark/light — robust like Fleet Console">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="if(window.ThemeManager)ThemeManager.openPalette()" title="Theme palette — colour themes + dark/light + reset (Ctrl+K)">🎨</button>
+        <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
+      </div>
+    </header>
+    <div class="app-content">
+      
+      <div class="card" style="margin-bottom:16px"><p style="color:var(--gray-600);margin:0">
+        📚 <strong>Digital Library.</strong> Teachers add a book/resource by pasting its online link (Google Drive, web, etc.)
+        and may attach a few comprehension questions. Students read the book, answer the questions, and their
+        auto-marked score is recorded — it can count toward their continuous-assessment grade. No files are uploaded
+        (links only), so it stays free on Supabase.</p></div>
+
+      <!-- V10.3 (#3): AI-assisted authoring for readings — link-aware prompt
+           packs, structured like Tutoring Connect. No paid AI: the teacher
+           copies a prompt into any free chat and pastes the questions back. -->
+      <div class="card" style="margin-bottom:16px;border-left:6px solid #059669" data-staff-only>
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">🤖 Draft the comprehension questions with AI (free chat, no API)</h3>
+          <span class="badge" style="background:#059669;color:#fff">NEW · V10.3</span>
+        </div>
+        <p style="color:var(--gray-600);margin:6px 0 10px">Have an <b>article/material link</b> or a <b>video link</b>? The Prompt Studio writes a professional, link-aware prompt that makes any free AI chat generate questions <b>answerable only by a student who actually opened your link</b> — then upload the CSV on the CBT page, or type the questions below by hand.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn btn-sm btn-primary" href="cbt-prompts.html?pack=dl_article">📰 Article / material prompt</a>
+          <a class="btn btn-sm btn-primary" href="cbt-prompts.html?pack=dl_video">🎬 Video prompt</a>
+          <span style="align-self:center;font-size:.8rem;color:var(--gray-500)">Tip: after saving a reading with questions, use <b>🧪 Send to CBT</b> on its card to publish it as a timed, anti-cheat CBT exam.</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px" data-staff-only>
+        <h3>➕ Add / set a reading (teacher)</h3>
+        <div class="grid grid-2">
+          <div class="form-group"><label>Title *</label><input class="form-input" id="dl-title" placeholder="e.g. Things Fall Apart — Chapters 1-3"></div>
+          <div class="form-group"><label>Author</label><input class="form-input" id="dl-author"></div>
+          <div class="form-group"><label>Subject</label><select class="form-select" id="dl-subject"><option value="">—</option></select></div>
+          <div class="form-group"><label>Assigned class</label><select class="form-select" id="dl-class"><option value="">—</option></select></div>
+          <div class="form-group" style="grid-column:1/-1"><label>Read link (Drive / web) *</label><input class="form-input" id="dl-link" placeholder="https://drive.google.com/file/d/..."></div>
+          <!-- V10.5: LINKED CBT — a reading can carry a full CBT exam (timed,
+               anti-cheat, own code, server-graded) ALONGSIDE the lightweight
+               embedded quiz below. Paste an existing exam code / cbt-exam.html
+               link, or pick from the school's exam list. Scores from BOTH
+               engines merge in the 🚀 push-to-report-card panel. -->
+          <div class="form-group" style="grid-column:1/-1">
+            <label>🧪 Linked CBT (optional — exam code or cbt-exam.html link)</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input class="form-input" id="dl-cbt" style="flex:1;min-width:220px" placeholder="e.g. AB3K9P  or  https://…/cbt-exam.html?code=AB3K9P">
+              <button type="button" class="btn btn-sm btn-outline" onclick="DL.pickCBT('dl-cbt')">📋 Pick from exam list</button>
+            </div>
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">The full CBT engine (timer, anti-cheat, attempts, server grading) for this reading — separate from the light comprehension quiz below; you can use either or both. Build one from a prompt on <a href="cbt-prompts.html?pack=dl_article">Prompt Studio</a> → upload the CSV on the <a href="cbt.html">CBT page</a> → paste its code here. Results push to the report card from the panel below, together with quiz scores.</div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1"><label>Instructions</label><textarea class="form-input" id="dl-inst" rows="2"></textarea></div>
+          <div class="form-group"><label>Due date</label><input class="form-input" type="date" id="dl-due"></div>
+          <div class="form-group"><label>Max score (counts to grade)</label><input class="form-input" type="number" id="dl-max" value="10"></div>
+          <div class="form-group"><label>Quiz attempts allowed</label><select class="form-select" id="dl-attempts"><option value="1">Once only (default)</option><option value="2">2 attempts</option><option value="3">3 attempts</option><option value="0">Unlimited (practice)</option></select></div>
+        </div>
+        <h4 style="margin:6px 0">❓ Comprehension questions (optional, auto-marked)</h4>
+        <div id="dl-qs"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-outline btn-sm" onclick="DL.addQ('mcq')">+ Multiple choice</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('multi')">+ Multiple response</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('tf')">+ True/False</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('short')">+ Short answer</button><button class="btn btn-outline btn-sm" onclick="DL.addQ('keyword')">+ Keyword</button></div>
+        <div style="margin-top:12px"><button class="btn btn-primary" onclick="DL.save()">💾 Save reading</button></div>
+      </div>
+
+      <div class="card">
+        <h3>📖 Readings</h3>
+        <div id="dl-list"><span class="pulse">Loading…</span></div>
+      </div>
+      <div class="card" style="margin-top:16px" data-staff-only>
+        <h3>🏅 Digital-library points → Report card</h3>
+        <p class="help">Every 📝 embedded quiz a student completes ACCUMULATES per class + subject + term — and readings with a 🧪 Linked CBT contribute their full exam results too (best attempt per student, merged automatically). Show the running totals, then push everything into any report-card column in one click (scaled to the column's maximum mark).</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <div class="form-group"><label>Class</label><select class="form-select" id="dlp-class"><option value="">— class —</option></select></div>
+          <div class="form-group"><label>Subject</label><select class="form-select" id="dlp-subject"><option value="">— subject —</option></select></div>
+          <button class="btn btn-outline" onclick="DLP.totals()">Σ Show accumulated totals</button>
+          <button class="btn btn-primary" onclick="DLP.pushModal()">🚀 Push totals → Report card</button>
+        </div>
+        <div id="dlp-totals" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
+      © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+    </footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/voting.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/crud.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/analytics.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
+  else { Notifications.init(sb); Voting.init(sb); }
+  PWAInstall.init();
+  if (window.Super) Super.init(sb, window.SCHOOL);
+  if (window.Enterprise) Enterprise.init(sb);
+  if (window.CRUD) CRUD.init(sb);
+</script>
+<script>
+const DL={ qs:[],
+  async init(){ if(!sb)return;
+    try{ const {data:subs}=await sb.from('subjects').select('name').order('name'); (function(){var seen=new Set();(subs||[]).forEach(x=>{var v=String(x.name==null?'':x.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.textContent=v;var el=document.getElementById('dl-subject');el&&el.appendChild(o);});})(); }catch(e){}
+    try{ const {data:cls}=await sb.from('classes').select('name').order('name'); (function(){var seen=new Set();(cls||[]).forEach(x=>{var v=String(x.name==null?'':x.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.textContent=v;var el=document.getElementById('dl-class');el&&el.appendChild(o);});})(); }catch(e){}
+    this.render(); this.list();
+  },
+  /* V8.2 #5: FIVE question types — multiple choice (classic), multiple RESPONSE
+     (tick all that apply), True/False, short answer (exact/close match) and
+     KEYWORD (any listed keyword in the student's sentence scores). */
+  addQ(type){ type=type||'mcq';
+    var base={type:type,q:''};
+    if(type==='mcq') Object.assign(base,{options:['','','',''],answer:''});
+    else if(type==='multi') Object.assign(base,{options:['','','',''],answers:[]});
+    else if(type==='tf') Object.assign(base,{answer:'True'});
+    else if(type==='short') Object.assign(base,{answer:''});
+    else if(type==='keyword') Object.assign(base,{keywords:''});
+    this.qs.push(base); this.render(); },
+  render(){ var box=document.getElementById('dl-qs'); if(!box)return; box.innerHTML=this.qs.map((q,i)=>{
+    var t=q.type||'mcq';
+    var head='<div class="card" style="background:#f8fafc;margin:8px 0;padding:10px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center"><b>Q'+(i+1)+' · '+({mcq:'Multiple choice',multi:'Multiple response',tf:'True / False',short:'Short answer',keyword:'Keyword'}[t]||'Question')+'</b>'+
+      '<button class="btn btn-sm btn-outline" onclick="DL.qs.splice('+i+',1);DL.render()">Remove</button></div>'+
+      '<div class="form-group"><label>Question</label><input class="form-input" value="'+esc(q.q)+'" oninput="DL.qs['+i+'].q=this.value"></div>';
+    var body='';
+    if(t==='mcq') body='<div class="grid grid-2">'+q.options.map((op,j)=>'<input class="form-input" placeholder="Option '+(j+1)+'" value="'+esc(op)+'" oninput="DL.qs['+i+'].options['+j+']=this.value">').join('')+'</div>'+
+      '<div class="form-group"><label>Correct answer (exact option text)</label><input class="form-input" value="'+esc(q.answer||'')+'" oninput="DL.qs['+i+'].answer=this.value"></div>';
+    else if(t==='multi') body='<div class="grid grid-2">'+q.options.map((op,j)=>'<input class="form-input" placeholder="Option '+(j+1)+'" value="'+esc(op)+'" oninput="DL.qs['+i+'].options['+j+']=this.value">').join('')+'</div>'+
+      '<div class="form-group"><label>Correct answers (exact option texts, one per line — ALL must be ticked)</label><textarea class="form-input" rows="2" oninput="DL.qs['+i+'].answers=this.value.split(/\\n+/).map(function(s){return s.trim()}).filter(Boolean)">'+esc((q.answers||[]).join('\n'))+'</textarea></div>';
+    else if(t==='tf') body='<div class="form-group"><label>Correct answer</label><select class="form-select" onchange="DL.qs['+i+'].answer=this.value"><option'+(q.answer==='True'?' selected':'')+'>True</option><option'+(q.answer==='False'?' selected':'')+'>False</option></select></div>';
+    else if(t==='short') body='<div class="form-group"><label>Correct answer (case-insensitive; extra spaces ignored)</label><input class="form-input" value="'+esc(q.answer||'')+'" oninput="DL.qs['+i+'].answer=this.value"></div>';
+    else if(t==='keyword') body='<div class="form-group"><label>Accepted keywords (comma-separated — ANY one in the student\'s answer scores)</label><input class="form-input" value="'+esc(q.keywords||'')+'" oninput="DL.qs['+i+'].keywords=this.value" placeholder="photosynthesis, chlorophyll, sunlight"></div>';
+    return head+body+'</div>';}).join(''); },
+  /* V10.5: accept a bare exam code OR a full cbt-exam.html?code=… link and
+     normalise to the canonical uppercase code. */
+  cbtCode(v){
+    v=String(v||'').trim(); if(!v)return'';
+    try{ if(/cbt-exam/i.test(v)||/^https?:/i.test(v)){ var u=new URL(v, location.href); var c=u.searchParams.get('code'); if(c)v=c; } }catch(_){}
+    return v.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  },
+  /* V10.5: verify the code exists before saving — a typo here would strand
+     students on a "no exam matches that code" page. */
+  async cbtVerify(code){
+    if(!code)return{ok:true};
+    try{ var r=await sb.from('cbt_exams').select('id,title,is_open,is_archived').ilike('code',code).limit(1);
+      if(r.error)return{ok:true,unknown:true}; /* RLS may hide other teachers' exams — do not block */
+      if(!r.data||!r.data.length)return{ok:false,msg:'No CBT exam matches code "'+code+'". Check the code on the CBT page (it may also belong to another teacher — an admin can confirm).'};
+      var e=r.data[0]; return{ok:true,title:e.title,open:e.is_open&&!e.is_archived};
+    }catch(_){return{ok:true,unknown:true};}
+  },
+  /* V10.5: pick a linked CBT from the exams this account can see. */
+  async pickCBT(targetId){
+    if(!sb){toast('DB not configured','warning');return;}
+    var r=await sb.from('cbt_exams').select('code,title,subject,class,is_open,is_archived').order('created_at',{ascending:false}).limit(300);
+    if(r.error){toast(r.error.message,'danger');return;}
+    var rows=(r.data||[]).filter(function(e){return !e.is_archived;});
+    if(!rows.length){toast('No CBT exams visible to your account yet — create one on the CBT page first (Prompt Studio → CSV → CBT Manager).','info',8000);return;}
+    openModal('📋 Pick the linked CBT exam',
+      '<input class="form-input" id="dl-cbt-filter" placeholder="Filter by title / subject / class / code" style="margin-bottom:10px">'+
+      '<div class="table-wrap" style="max-height:50vh;overflow:auto"><table><thead><tr><th>Exam</th><th>Code</th><th>Status</th><th></th></tr></thead><tbody id="dl-cbt-rows">'+
+      rows.map(function(e){return '<tr data-blob="'+esc((e.title+' '+e.subject+' '+e.class+' '+e.code).toLowerCase())+'"><td><b>'+esc(e.title||'Untitled')+'</b><br><small>'+esc(e.subject||'')+' · '+esc(e.class||'')+'</small></td><td><code>'+esc(e.code)+'</code></td><td>'+(e.is_open?'🟢 open':'⚪ closed')+'</td><td><button class="btn btn-sm btn-primary" onclick="DL.useCBT(\''+esc(e.code)+'\',\''+esc(targetId)+'\')">Use</button></td></tr>';}).join('')+
+      '</tbody></table></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>');
+    var f=document.getElementById('dl-cbt-filter');
+    if(f)f.addEventListener('input',function(){var q=f.value.toLowerCase();document.querySelectorAll('#dl-cbt-rows tr').forEach(function(tr){tr.style.display=(tr.dataset.blob||'').indexOf(q)>-1?'':'none';});});
+  },
+  useCBT(code,targetId){ var el=document.getElementById(targetId||'dl-cbt'); if(el)el.value=code; closeModal(); toast('Linked CBT set to '+code+' ✓','success'); },
+  async save(){ if(!sb){toast('DB not configured','warning');return;}
+    var title=document.getElementById('dl-title').value, link=document.getElementById('dl-link').value;
+    if(!title||!link){toast('Title and read link are required','warning');return;}
+    /* V10.5: linked CBT — normalise, verify, save alongside the reading. */
+    var cbt=this.cbtCode((document.getElementById('dl-cbt')||{}).value||'');
+    if(cbt){ var chk=await this.cbtVerify(cbt); if(!chk.ok){toast('⚠️ '+chk.msg,'warning',10000);return;}
+      if(chk.title&&!chk.open)toast('ℹ️ Linked CBT "'+chk.title+'" is currently CLOSED — open it in the CBT Manager when students should sit it.','info',8000); }
+    var rec={ title:title, author:document.getElementById('dl-author').value, subject:document.getElementById('dl-subject').value,
+      class:document.getElementById('dl-class').value, read_link:link, instructions:document.getElementById('dl-inst').value,
+      due_date:document.getElementById('dl-due').value||null, has_quiz:this.qs.length>0, questions:this.qs,
+      max_score:Number(document.getElementById('dl-max').value||0), cbt_code:cbt,
+      attempts_allowed:Number((document.getElementById('dl-attempts')||{}).value??1) };
+    var {error}=await sb.from('digital_library').insert(rec);
+    if(error&&/attempts_allowed/.test(error.message||'')){delete rec.attempts_allowed;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Attempt-limit column missing on this database — run database/v8.7-payroll-rebuild.sql to enforce limits.','warning',9000);}
+    if(error&&/cbt_code/.test(error.message||'')){delete rec.cbt_code;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Linked-CBT column missing on this database — run database/v10.5-dl-cbt-link.sql to store CBT links with readings.','warning',10000);}
+    if(error){toast(error.message,'danger',6000);return;} toast('Reading saved ✓'+(cbt&&rec.cbt_code?' · linked CBT '+cbt:''),'success'); this.qs=[]; this.render(); var de=document.getElementById('dl-cbt'); if(de)de.value=''; this.list();
+  },
+  _books:[],
+  async list(){ var box=document.getElementById('dl-list'); if(!sb){box.innerHTML='<p>DB not configured.</p>';return;}
+    var {data}=await sb.from('digital_library').select('*').order('created_at',{ascending:false}).limit(200);
+    if(!data||!data.length){box.innerHTML='<p style="color:var(--gray-500)">No readings yet.</p>';return;}
+    /* V8.2 #5: CLASS SCOPING — a student sees only readings for THEIR class
+       (or school-wide readings with no class). Staff/admin see everything. */
+    try{
+      var role=String((window.SC_PROFILE&&SC_PROFILE.role)||(window.App&&App.currentRole)||'').toLowerCase();
+      if(role==='student'&&window.SC_PROFILE){
+        var st=await sb.from('students').select('class').eq('user_id',SC_PROFILE.id).maybeSingle();
+        var myCls=String((st.data&&st.data.class)||'').toLowerCase().replace(/\s+/g,'');
+        data=data.filter(function(b){var c=String(b.class||'').toLowerCase().replace(/\s+/g,'');return !c||c==='all'||c===myCls;});
+        if(!data.length){box.innerHTML='<p style="color:var(--gray-500)">No readings assigned to your class yet.</p>';return;}
+      }
+    }catch(_){ }
+    this._books=data;
+    /* V8.3 #3 ROOT-CAUSE FIX: the Edit/Delete buttons "disappeared" because
+       this ran on DOMContentLoaded BEFORE auth resolved — App.currentRole was
+       still empty, so staff/admin rendered as visitors. Now we WAIT for the
+       role (up to ~6s), fall back to the cached profile, and re-render once
+       when the role arrives late. The buttons were never removed — they lost
+       a race; this ends it permanently. */
+    let roleNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    if(!roleNow){try{const cached=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(cached&&cached.role)roleNow=String(cached.role).toLowerCase();}catch(_){ }}
+    if(!roleNow){for(let w=0;w<30&&!roleNow;w++){await new Promise(r=>setTimeout(r,200));roleNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();}}
+    if(!this._roleWatch){this._roleWatch=true;let last=roleNow;setInterval(()=>{const cur=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();if(cur&&cur!==last){last=cur;DL.list();}},1500);}
+    const isAdminTier = !!(window.App&&App.isAdminRole&&App.isAdminRole(roleNow)) || ['admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(roleNow);
+    const isStaff = isAdminTier || ['staff','teacher'].includes(roleNow);
+    const myId = (window.SC_PROFILE&&SC_PROFILE.id)||'';
+    box.innerHTML = data.map((b,i) => {
+      /* V8.6 #2: OWNERSHIP — a teacher manages only THEIR OWN readings
+         (or unowned legacy rows); admin-tier manages everything. Matches the
+         dl_teacher_write RLS policy so the UI never promises what the
+         database will refuse. */
+      const canEdit = isAdminTier || (isStaff && (!b.teacher_id || String(b.teacher_id)===String(myId)));
+      return '<div class="card" style="margin:8px 0" data-id="'+esc(b.id)+'"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center">'+
+        '<div style="flex:1;min-width:240px"><strong>'+esc(b.title)+'</strong> '+(b.subject?'<span class="badge">'+esc(b.subject)+'</span> ':'')+(b.class?'<span class="badge">'+esc(b.class)+'</span>':'')+
+        (b.author?'<span class="badge" style="background:#f1f5f9;color:#475569">'+esc(b.author)+'</span>':'')+
+        '<div style="color:var(--gray-500);font-size:.85rem">'+esc(b.instructions||'')+(b.due_date?' · Due '+esc(b.due_date):'')+'</div></div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">'+
+          '<a class="btn btn-sm btn-primary" href="'+esc(DL.drive(b.read_link))+'" target="_blank" rel="noopener">📖 Read</a> '+
+          (b.has_quiz?'<button type="button" class="btn btn-sm btn-outline" data-act="quiz" data-i="'+i+'">📝 Take quiz</button>':'')+
+          /* V10.5: a reading with a LINKED CBT gets a Take-CBT button for
+             everyone — it opens the full exam player with the code prefilled. */
+          (b.cbt_code?'<a class="btn btn-sm btn-outline" style="border-color:#7c3aed;color:#7c3aed" href="cbt-exam.html?code='+encodeURIComponent(b.cbt_code)+'" title="Full CBT exam linked to this reading (timed, anti-cheat, server-graded) — code '+esc(b.cbt_code)+'">🧪 Take CBT</a>':'')+
+          (canEdit&&b.has_quiz?'<button type="button" class="btn btn-sm btn-outline" data-act="tocbt" data-i="'+i+'" title="Publish this reading\'s comprehension questions as a timed, anti-cheat CBT exam with its own exam code">🧪 Send to CBT</button>':'')+
+          (canEdit?'<button type="button" class="btn btn-sm btn-outline" data-act="edit" data-i="'+i+'">✏️ Edit</button>':'')+
+          (canEdit?'<button type="button" class="btn btn-sm btn-outline" data-act="delete" data-i="'+i+'" style="color:#dc2626;border-color:#fca5a5">🗑 Delete</button>':'')+
+        '</div></div></div>';
+    }).join('');
+    // Wire up the buttons
+    box.querySelectorAll('button[data-act]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number(btn.dataset.i);
+        const act = btn.dataset.act;
+        if (act === 'quiz') DL.quiz(i);
+        else if (act === 'tocbt') DL.sendToCBT(i);
+        else if (act === 'edit') DL.edit(i);
+        else if (act === 'delete') DL.del(i);
+      });
+    });
+  },
+  edit(i){
+    const b = this._books[i]; if (!b) { toast('Reading not found.', 'warning'); return; }
+    let rNow=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    if(!rNow){try{const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(c&&c.role)rNow=String(c.role).toLowerCase();}catch(_){ }}
+    const isAdminT = !!(window.App&&App.isAdminRole&&App.isAdminRole(rNow)) || ['admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(rNow);
+    const isStaff = isAdminT || ['staff','teacher'].includes(rNow);
+    if (!isStaff) { toast('Only staff can edit readings. If you ARE staff, wait two seconds for sign-in to finish and try again.', 'warning'); return; }
+    /* V8.6 #2: a teacher may edit only THEIR OWN reading; admin edits all. */
+    if (!isAdminT && b.teacher_id && String(b.teacher_id)!==String((window.SC_PROFILE&&SC_PROFILE.id)||'')) { toast('This reading belongs to another teacher — only that teacher or an admin can change it.', 'warning', 7000); return; }
+    /* V8.6 #2: teachers cannot edit/delete ANOTHER teacher's reading. */
+    try { const bChk=this._books&&this._books.find&&(typeof i!=='undefined')?null:null; } catch(_) {}
+    const opts = (this._books.map((x, j) => '<option value="'+j+'"'+(j===i?' selected':'')+'>'+esc(x.title)+'</option>').join(''));
+    const body =
+      '<div class="form-group"><label>Pick a reading</label><select class="form-select" id="dl-edit-pick">' + opts + '</select></div>' +
+      '<div class="form-group"><label>Title</label><input class="form-input" id="dl-edit-title" value="'+esc(b.title)+'"></div>' +
+      '<div class="form-group"><label>Author</label><input class="form-input" id="dl-edit-author" value="'+esc(b.author||'')+'"></div>' +
+      '<div class="form-group"><label>Subject</label><input class="form-input" id="dl-edit-subject" value="'+esc(b.subject||'')+'"></div>' +
+      '<div class="form-group"><label>Class</label><input class="form-input" id="dl-edit-class" value="'+esc(b.class||'')+'"></div>' +
+      '<div class="form-group"><label>Read link</label><input class="form-input" id="dl-edit-link" value="'+esc(b.read_link)+'"></div>' +
+      '<div class="form-group"><label>🧪 Linked CBT (exam code or cbt-exam.html link — blank = none)</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="form-input" id="dl-edit-cbt" style="flex:1;min-width:180px" value="'+esc(b.cbt_code||'')+'" placeholder="e.g. AB3K9P"><button type="button" class="btn btn-sm btn-outline" onclick="DL.pickCBT(\'dl-edit-cbt\')">📋 Pick</button></div></div>' +
+      '<div class="form-group"><label>Instructions</label><textarea class="form-input" id="dl-edit-inst" rows="2">'+esc(b.instructions||'')+'</textarea></div>' +
+      '<div class="grid grid-2"><div class="form-group"><label>Due date</label><input class="form-input" type="date" id="dl-edit-due" value="'+esc(b.due_date||'')+'"></div>' +
+      '<div class="form-group"><label>Max score</label><input class="form-input" type="number" id="dl-edit-max" value="'+(b.max_score||0)+'"></div></div>' +
+      '<p style="color:#64748b;font-size:.85rem">Quiz questions stay as they are unless you delete and recreate the reading.</p>';
+    openModal('✏️ Edit reading', body, '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" id="dl-edit-save">Save changes</button>');
+    const pick = document.getElementById('dl-edit-pick');
+    pick.addEventListener('change', () => { this.edit(Number(pick.value)); });
+    document.getElementById('dl-edit-save').addEventListener('click', () => this._saveEdit());
+  },
+  async _saveEdit(){
+    const i = this._books.findIndex(b => b.id);
+    const idx = Number(document.getElementById('dl-edit-pick').value);
+    const b = this._books[idx]; if (!b) { toast('Pick a reading.', 'warning'); return; }
+    const patch = {
+      title: document.getElementById('dl-edit-title').value.trim(),
+      author: document.getElementById('dl-edit-author').value.trim(),
+      subject: document.getElementById('dl-edit-subject').value.trim(),
+      class: document.getElementById('dl-edit-class').value.trim(),
+      read_link: document.getElementById('dl-edit-link').value.trim(),
+      instructions: document.getElementById('dl-edit-inst').value,
+      due_date: document.getElementById('dl-edit-due').value || null,
+      max_score: Number(document.getElementById('dl-edit-max').value || 0),
+      cbt_code: this.cbtCode((document.getElementById('dl-edit-cbt')||{}).value||'')
+    };
+    if (!patch.title || !patch.read_link) { toast('Title and read link are required.', 'warning'); return; }
+    /* V10.5: verify a non-empty linked code before saving. */
+    if (patch.cbt_code) { const chk = await this.cbtVerify(patch.cbt_code); if (!chk.ok) { toast('⚠️ ' + chk.msg, 'warning', 10000); return; } }
+    let { error } = await window.sb.from('digital_library').update(patch).eq('id', b.id);
+    if (error && /cbt_code/.test(error.message||'')) { delete patch.cbt_code; ({ error } = await window.sb.from('digital_library').update(patch).eq('id', b.id)); if (!error) toast('Linked-CBT column missing — run database/v10.5-dl-cbt-link.sql to store CBT links with readings.', 'warning', 10000); }
+    if (error) { toast(error.message, 'danger', 6000); return; }
+    if (window.App) App.logActivity('update', 'digital_library', b.id);
+    closeModal();
+    toast('Reading updated ✓', 'success');
+    this.list();
+  },
+  async del(i){
+    const b = this._books[i]; if (!b) { toast('Reading not found.', 'warning'); return; }
+    let rDel=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
+    if(!rDel){try{const c=JSON.parse(localStorage.getItem('sc-cached-profile')||'null');if(c&&c.role)rDel=String(c.role).toLowerCase();}catch(_){ }}
+    const isAdminD = !!(window.App&&App.isAdminRole&&App.isAdminRole(rDel)) || ['admin','super_admin','principal','proprietor','head_teacher','bursar'].includes(rDel);
+    const isStaff = isAdminD || ['staff','teacher'].includes(rDel);
+    if (!isStaff) { toast('Only staff can delete readings.', 'warning'); return; }
+    /* V8.6 #2: teachers delete only their own readings; admin deletes any. */
+    if (!isAdminD && b.teacher_id && String(b.teacher_id)!==String((window.SC_PROFILE&&SC_PROFILE.id)||'')) { toast('This reading belongs to another teacher — only that teacher or an admin can delete it.', 'warning', 7000); return; }
+    if (!confirm('Delete "' + (b.title || 'this reading') + '"?\n\nThis also removes the comprehension questions and the quiz history linked to it.')) return;
+    try { await window.sb.from('reading_scores').delete().eq('book_id', b.id); } catch (e) {}
+    const r=await SCDelete.byId(window.sb,'digital_library',b.id);if(!r.ok){toast('Delete failed: '+r.error,'danger',6000);return;}
+    if (window.App) App.logActivity('delete', 'digital_library', b.id);
+    toast('Reading deleted ✓', 'success');
+    this.list();
+  },
+  drive(u){ if(!u)return '#'; var m=u.match(/drive\.google\.com\/file\/d\/([^/]+)/); return m?('https://drive.google.com/file/d/'+m[1]+'/view'):u; },
+  /* V10.3 (#3): PROFESSIONAL CBT FOR THE DIGITAL LIBRARY. One click converts
+     a reading's comprehension questions into a real, timed, anti-cheat CBT
+     exam (own exam code, attempt limits, registered/open modes, server-side
+     grading) — the reading link travels with it as the exam instructions so
+     the candidate can open the material policy the teacher chooses. The
+     lightweight in-page quiz stays exactly as it was; this is additive. */
+  async sendToCBT(i){
+    var b=this._books[i]; if(!b){toast('Reading not found.','warning');return;}
+    var qs=(b.questions||[]).filter(function(q){return q&&String(q.q||'').trim();});
+    if(!qs.length){toast('This reading has no comprehension questions yet — edit it and add some first.','warning',7000);return;}
+    if(!sb){toast('DB not configured','warning');return;}
+    if(!confirm('Publish "'+(b.title||'this reading')+'" as a CBT exam?\n\n• '+qs.length+' question(s) will be copied into a new CBT exam\n• It gets its own exam code, timer, attempt limit and anti-cheat\n• The reading stays here unchanged — students can still use the light quiz\n\nContinue?'))return;
+    var letters=['A','B','C','D','E'];
+    var bank=qs.map(function(q){
+      var t=q.type||'mcq';
+      var row={question:q.q,mark:1,section:b.subject||'',subject:b.subject||''};
+      if(t==='mcq'){ row.type='mcq'; row.options=(q.options||[]).filter(Boolean);
+        var ai=row.options.findIndex(function(o){return String(o).trim().toLowerCase()===String(q.answer||'').trim().toLowerCase();});
+        row.answer=ai>=0?letters[ai]:(q.answer||''); }
+      else if(t==='multi'){ row.type='multi_select'; row.options=(q.options||[]).filter(Boolean);
+        row.answer=(q.answers||[]).map(function(a){var j=row.options.findIndex(function(o){return String(o).trim().toLowerCase()===String(a).trim().toLowerCase();});return j>=0?letters[j]:a;}); }
+      else if(t==='tf'){ row.type='true_false'; row.options=['True','False']; row.answer=(String(q.answer||'True').toLowerCase()==='true')?'A':'B'; }
+      else if(t==='short'){ row.type='short_answer'; row.answer=q.answer||''; }
+      else if(t==='keyword'){ row.type='short_answer'; var ks=String(q.keywords||'').split(/\s*,\s*/).filter(Boolean); row.answer=ks[0]||''; row.accept=ks.join('|'); }
+      else { row.type='short_answer'; row.answer=q.answer||''; }
+      return row;
+    });
+    var code=(function(n){var c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',r='';for(var k=0;k<n;k++)r+=c.charAt(Math.floor(Math.random()*c.length));return r;})(6);
+    var cp={}; try{ var r0=await sb.from('academic_periods').select('term,session').eq('is_current',true).limit(1); cp=(r0.data&&r0.data[0])||{}; }catch(_){}
+    var exam={ code:code, title:'📚 Reading CBT — '+(b.title||'Digital Library'),
+      subject:b.subject||'General', class:b.class||'', term:cp.term||null, session:cp.session||null,
+      assessment_type:'quiz', exam_mode:'registered', duration:Math.max(10,Math.min(60,qs.length*2)), duration_min:Math.max(10,Math.min(60,qs.length*2)),
+      attempt_limit:Number(b.attempts_allowed||1)||1, max_score:Number(b.max_score||0)||qs.length,
+      report_column:'CA1', is_open:false, release_results:true, randomise:false, select_count:0, negative_mark:0,
+      instructions:'This CBT is based on the reading "'+(b.title||'')+'". Material link: '+(b.read_link||'')+(b.instructions?('\n'+b.instructions):'')+'\nAnswer from the material you read.',
+      anti_cheat_config:{tab_switch:true,window_blur:true,copy_paste:true,right_click:true,fullscreen:true,watermark:true,max_violations:5},
+      csv_data:bank, questions:bank, created_at:new Date().toISOString() };
+    if(window.SC_PROFILE&&SC_PROFILE.id)exam.teacher_id=SC_PROFILE.id;
+    /* V10.4: same SC_PROFILE race as CBT.createExam — the RLS insert policy
+       requires teacher_id = auth.uid(), so fall back to the live session. */
+    if(!exam.teacher_id){ try{ var u=await sb.auth.getUser(); if(u&&u.data&&u.data.user)exam.teacher_id=u.data.user.id; }catch(_){} }
+    var res=await sb.from('cbt_exams').insert(exam).select('id,code').single();
+    if(res.error&&/attempt_limit|randomise|select_count|negative_mark|release_results/.test(res.error.message||'')){
+      ['attempt_limit','randomise','select_count','negative_mark','release_results'].forEach(function(k){delete exam[k];});
+      res=await sb.from('cbt_exams').insert(exam).select('id,code').single();
+    }
+    if(res.error){toast('Could not create the CBT exam: '+res.error.message,'danger',9000);return;}
+    if(window.App&&App.logActivity)App.logActivity('create','cbt_exam','Reading CBT '+code);
+    /* V10.5: auto-link the freshly created exam back onto the reading so the
+       🧪 Take CBT button appears for students the moment it is opened. */
+    var newCode=(res.data&&res.data.code)||code;
+    try{ var lr=await sb.from('digital_library').update({cbt_code:newCode}).eq('id',b.id);
+      if(lr.error&&/cbt_code/.test(lr.error.message||''))toast('Reading↔CBT auto-link needs database/v10.5-dl-cbt-link.sql — the exam was still created (code '+newCode+'); paste it into the reading\'s "Linked CBT" box after the update.','warning',12000);
+      else b.cbt_code=newCode;
+    }catch(_){}
+    toast('✅ CBT exam created from "'+(b.title||'reading')+'" — code '+newCode+' — and linked to this reading (🧪 Take CBT button). It is CLOSED until you open it in the CBT Manager (review questions, set schedule, then Open).','success',12000);
+    setTimeout(function(){ if(confirm('Open the CBT Manager now to review and publish it?')) location.href='cbt.html'; },600);
+  },
+  quiz(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[];
+    /* V8.6: some rows store questions as a JSON STRING — parse defensively. */
+    if(typeof qs==='string'){try{qs=JSON.parse(qs);}catch(_){qs=[];}}
+    if(!Array.isArray(qs))qs=[];
+    b.questions=qs;
+    if(!qs.length){toast('No questions on this reading.','info');return;}
+    /* V8.7 #1: ATTEMPT LIMIT — once (default) or as set by the teacher. */
+    var allowed=(b.attempts_allowed==null?1:Number(b.attempts_allowed));
+    if(allowed>0&&window.sb){
+      var self=this;
+      return (async function(){
+        var me=(window.SC_PROFILE&&SC_PROFILE.full_name)||'';
+        if(me){
+          var prev=await sb.from('reading_scores').select('id').eq('book_id',b.id).eq('student_name',me).limit(50);
+          var used=(prev.data||[]).length;
+          if(used>=allowed){toast('You have used your '+allowed+' attempt'+(allowed>1?'s':'')+' on this quiz. Your best effort is already recorded — ask your teacher if you need another try.','warning',9000);return;}
+          if(used>0)toast('Attempt '+(used+1)+' of '+allowed+'.','info',5000);
+        }
+        self._openQuiz(i,qs,b);
+      })();
+    }
+    this._openQuiz(i,qs,b);
+  },
+  _openQuiz(i,qs,b){
+    var html=qs.map(function(q,j){ var t=q.type||'mcq'; var inner='';
+      if(t==='mcq') inner=(q.options||[]).filter(Boolean).map(function(op){return '<label style="display:block"><input type="radio" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>';}).join('');
+      else if(t==='multi') inner=(q.options||[]).filter(Boolean).map(function(op){return '<label style="display:block"><input type="checkbox" name="dq'+j+'" value="'+esc(op)+'"> '+esc(op)+'</label>';}).join('')+'<small style="color:#64748b">Tick ALL correct options.</small>';
+      else if(t==='tf') inner='<label style="display:block"><input type="radio" name="dq'+j+'" value="True"> True</label><label style="display:block"><input type="radio" name="dq'+j+'" value="False"> False</label>';
+      else inner='<input class="form-input" name="dq'+j+'" placeholder="'+(t==='keyword'?'Answer in your own words…':'Type the answer…')+'">';
+      return '<div class="form-group"><label>Q'+(j+1)+'. '+esc(q.q)+'</label>'+inner+'</div>'; }).join('');
+    openModal('Quiz: '+esc(b.title), html, '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="DL.submit('+i+')">Submit</button>');
+  },
+  async submit(i){ var b=this._books[i]; if(!b)return; var qs=b.questions||[];
+    if(typeof qs==='string'){try{qs=JSON.parse(qs);}catch(_){qs=[];}}
+    if(!Array.isArray(qs))qs=[];
+    var correct=0;
+    var normTxt=function(s){return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();};
+    /* V8.6 ROOT-CAUSE FIX: teachers naturally set the answer as a LETTER
+       ('C') or a POSITION ('3') instead of the exact option text — the old
+       strict text comparison marked every such quiz wrong. answerMatches now
+       accepts: exact option text · option letter A–J · 1-based option number. */
+    var answerMatches=function(pickedText,q){
+      var ans=normTxt(q.answer); if(!ans)return false;
+      if(normTxt(pickedText)===ans)return true;
+      var opts=(q.options||[]).filter(Boolean);
+      var idx=-1;
+      if(/^[a-j]$/.test(ans)) idx=ans.charCodeAt(0)-97;                       // 'c' → 2
+      else if(/^(10|[1-9])$/.test(ans)&&!opts.some(function(o){return normTxt(o)===ans;})) idx=parseInt(ans,10)-1; // '3' → 2 (only when no option IS '3')
+      return idx>=0&&idx<opts.length&&normTxt(opts[idx])===normTxt(pickedText);
+    };
+    qs.forEach(function(q,j){ var t=q.type||'mcq';
+      if(t==='mcq'){ var sel=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel&&answerMatches(sel.value,q)) correct++; }
+      else if(t==='tf'){ var sel2=document.querySelector('input[name="dq'+j+'"]:checked'); if(sel2&&normTxt(sel2.value)===normTxt(q.answer)) correct++; }
+      else if(t==='multi'){ var picked=[...document.querySelectorAll('input[name="dq'+j+'"]:checked')].map(function(x){return normTxt(x.value);}).sort(); var want=(q.answers||[]).map(normTxt).sort(); if(picked.length&&picked.length===want.length&&picked.every(function(v,k){return v===want[k];})) correct++; }
+      else if(t==='short'){ var inp=document.querySelector('input[name="dq'+j+'"]'); if(inp&&normTxt(inp.value)===normTxt(q.answer)) correct++; }
+      else if(t==='keyword'){ var inp2=document.querySelector('input[name="dq'+j+'"]'); var txt=normTxt(inp2&&inp2.value); var kws=String(q.keywords||'').split(',').map(normTxt).filter(Boolean); if(txt&&kws.some(function(k){return txt.indexOf(k)!==-1;})) correct++; }
+    });
+    var max=Number(b.max_score||qs.length); var score=Math.round((correct/qs.length)*max*10)/10;
+    var me=(window.App&&App.user)?App.user:null; var name=(me&&me.full_name)||(window.SC_PROFILE&&SC_PROFILE.full_name)||'';
+    if(!name){ name=prompt('Enter your full name to record this score:')||''; }
+    if(sb&&name){ try{
+      let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+      let ref='';try{if(window.SC_PROFILE){const st=await sb.from('students').select('admission_no').eq('user_id',SC_PROFILE.id).maybeSingle();ref=(st.data&&st.data.admission_no)||'';}}catch(_){ }
+      let r=await sb.from('reading_scores').insert({ student_name:name, student_id_ref:ref||null, subject:b.subject, class:b.class, book_id:b.id, score:score, max_score:max, source:'digital_library', term:cp.term||null, session:cp.session||null });
+      if(r.error&&/term|session|student_id_ref/.test(r.error.message||'')){ await sb.from('reading_scores').insert({ student_name:name, subject:b.subject, class:b.class, book_id:b.id, score:score, max_score:max, source:'digital_library' }); }
+    }catch(e){} }
+    closeModal(); toast('You scored '+score+' / '+max+' — recorded ✓','success',6000);
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>DL.init()); DL.init();
+</script>
+<script>
+/* V8.4 #3 — Digital-library points accumulation + push (DLP). */
+const DLP={
+  esc(s){return String(s==null?'':s).replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));},
+  async init(){ if(!window.sb)return;
+    try{const {data}=await sb.from('classes').select('name').order('name');const el=document.getElementById('dlp-class');if(el)(data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;el.appendChild(o);});}catch(_){ }
+    try{const {data}=await sb.from('subjects').select('name').order('name');const el=document.getElementById('dlp-subject');if(el)(data||[]).forEach(s0=>{const o=document.createElement('option');o.value=s0.name;o.textContent=s0.name;el.appendChild(o);});}catch(_){ }
+  },
+  async totals(){
+    const cls=(document.getElementById('dlp-class')||{}).value,sub=(document.getElementById('dlp-subject')||{}).value;
+    const box=document.getElementById('dlp-totals');
+    if(!cls||!sub){box.innerHTML='<p style=\"color:var(--gray-500)\">Pick a class AND subject first.</p>';return;}
+    let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
+    let q=sb.from('reading_scores').select('*').eq('class',cls).eq('subject',sub);
+    let r=await q.limit(5000);
+    if(r.error){box.innerHTML='<p style=\"color:#b91c1c\">'+DLP.esc(r.error.message)+'</p>';return;}
+    let rows=r.data||[];
+    /* prefer the current term's rows when the term columns exist and are stamped */
+    if(cp.term&&rows.some(x=>x.term)){rows=rows.filter(x=>!x.term||x.term===cp.term);}
+    const by={};const add=(name,ref,score,max,kind)=>{const k=(ref||'')+'|'+String(name||'').toLowerCase();(by[k]=by[k]||{name:name,ref:ref,got:0,max:0,n:0,quiz:0,cbt:0});by[k].got+=Number(score)||0;by[k].max+=Number(max)||0;by[k].n++;by[k][kind]++;};
+    rows.forEach(x=>add(x.student_name,x.student_id_ref,x.score,x.max_score,'quiz'));
+    /* V10.5: MERGE LINKED-CBT RESULTS. Readings of this class+subject that
+       carry a cbt_code contribute their FULL CBT results (best attempt per
+       student per exam) into the same accumulation, so both the light quiz
+       and the linked exam feed one report-card push. */
+    let cbtExams=0,cbtResults=0,cbtNote='';
+    try{
+      const lb=await sb.from('digital_library').select('cbt_code,max_score').eq('class',cls).eq('subject',sub).neq('cbt_code','').limit(200);
+      const codes=[...new Set((lb.data||[]).map(x=>String(x.cbt_code||'').toUpperCase()).filter(Boolean))];
+      if(codes.length){
+        const ex=await sb.from('cbt_exams').select('id,code,max_score').in('code',codes);
+        if(ex.error&&/cbt_code|column/.test(ex.error.message||''))cbtNote='';
+        const exams=ex.data||[];cbtExams=exams.length;
+        if(exams.length){
+          const ids=exams.map(e=>e.id);
+          const rr=await sb.from('cbt_results').select('exam_id,student_name,student_id_ref,score,total,percent').in('exam_id',ids).limit(5000);
+          if(rr.error){cbtNote='<p style=\"color:#92400e;font-size:.8rem\">⚠️ Linked-CBT results could not be read ('+DLP.esc(rr.error.message)+') — quiz totals shown alone.</p>';}
+          else{
+            /* best attempt per student per exam */
+            const best={};(rr.data||[]).forEach(x=>{const k=x.exam_id+'|'+(x.student_id_ref||'')+'|'+String(x.student_name||'').toLowerCase();if(!best[k]||Number(x.percent||0)>Number(best[k].percent||0))best[k]=x;});
+            Object.values(best).forEach(x=>{add(x.student_name,x.student_id_ref,x.score,x.total,'cbt');cbtResults++;});
+          }
+        }
+      }
+    }catch(_){cbtNote='';}
+    const list=Object.values(by).sort((a,b)=>(b.got/(b.max||1))-(a.got/(a.max||1)));
+    this._totals={list:list,cls:cls,sub:sub,cp:cp};
+    box.innerHTML=(list.length?'<div class=\"table-wrap\"><table><thead><tr><th>Student</th><th>📝 Quizzes</th><th>🧪 CBTs</th><th>Points</th><th>%</th></tr></thead><tbody>'+list.map(t=>'<tr><td><b>'+DLP.esc(t.name)+'</b><br><small>'+DLP.esc(t.ref||'')+'</small></td><td>'+(t.quiz||0)+'</td><td>'+(t.cbt||0)+'</td><td>'+t.got+' / '+t.max+'</td><td><b>'+(t.max?Math.round(t.got/t.max*1000)/10:0)+'%</b></td></tr>').join('')+'</tbody></table></div>'+(cbtExams?'<p style=\"color:var(--gray-500);font-size:.8rem;margin:6px 0 0\">Includes '+cbtResults+' best-attempt result(s) from '+cbtExams+' linked CBT exam(s) — merged with embedded quiz scores.</p>':''):'<p style=\"color:var(--gray-500)\">No quiz or linked-CBT scores yet for '+DLP.esc(cls)+' · '+DLP.esc(sub)+'. Students take quizzes / linked CBTs on the readings above.</p>')+cbtNote;
+  },
+  async pushModal(){
+    if(!this._totals||!this._totals.list.length){toast('Click Σ Show accumulated totals first.','warning');return;}
+    let cols=[];
+    try{if(window.ReportEngine&&ReportEngine.reportPickerOptions){const p=await ReportEngine.reportPickerOptions();cols=p.columns||[];}}catch(_){ }
+    if(!cols.length&&window.sb){try{const cr=await sb.from('assessment_columns').select('id,name,max_mark').order('position').limit(500);const seen=new Set();(cr.data||[]).forEach(c=>{const k=String(c.name||'').toLowerCase();if(!k||seen.has(k))return;seen.add(k);cols.push(c);});}catch(_){ }}
+    if(!cols.length){openModal('🚀 Push digital-library points','<div class=\"notice\">No report-card columns exist yet. Admin: Report Cards → “School-wide assessment columns” → add e.g. a “Reading/Project” column → return here.</div>','<button class=\"btn btn-outline\" onclick=\"closeModal()\">Close</button>');return;}
+    openModal('🚀 Push accumulated reading points → Report card',
+      '<p>'+this._totals.list.length+' student total(s) for <b>'+DLP.esc(this._totals.cls)+' · '+DLP.esc(this._totals.sub)+'</b> will be scaled into the chosen column.</p>'+
+      '<div class=\"form-group\"><label>Destination column</label><select class=\"form-select\" id=\"dlp-col\">'+cols.map(c=>'<option value=\"'+c.id+'\" data-max=\"'+(c.max_mark||10)+'\">'+DLP.esc(c.name)+' (max '+(c.max_mark||10)+')</option>').join('')+'</select></div>',
+      '<button class=\"btn btn-outline\" onclick=\"closeModal()\">Cancel</button><button class=\"btn btn-primary\" onclick=\"DLP.push()\">🚀 Push now</button>');
+  },
+  async push(){
+    const sel=document.getElementById('dlp-col'),colId=sel.value,colMax=Number(sel.selectedOptions[0].dataset.max)||10;
+    const t=this._totals;
+    const rows=t.list.map(x=>({column_id:colId,student_id:null,student_id_ref:x.ref||'',student_name:x.name,
+      class:t.cls,subject:t.sub,term:(t.cp&&t.cp.term)||'',session:(t.cp&&t.cp.session)||'',
+      score:Math.round(((x.max?x.got/x.max:0)*colMax)*10)/10,source:'digital_library'}));
+    let saved=0,failed=0;
+    try{const r=await sb.rpc('sc_save_report_score',{p_rows:rows});
+      if(r.data&&r.data.ok!==false){saved=Number(r.data.saved||rows.length);failed=Number(r.data.blocked||0);}else throw new Error((r.data&&r.data.error)||(r.error&&r.error.message)||'RPC failed');
+    }catch(e){
+      for(const row of rows){const q=await sb.from('report_scores').upsert(row,{onConflict:'column_id,student_id_ref,student_name,class,subject,term,session'});if(q.error)failed++;else saved++;}
+    }
+    closeModal();toast('🚀 Pushed '+saved+' reading score(s) into the report card'+(failed?' · '+failed+' failed':'')+'.',failed?'warning':'success',9000);
+    if(window.App&&App.logActivity)App.logActivity('push','reading_scores',t.cls+'|'+t.sub);
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>DLP.init());
+</script></body></html>

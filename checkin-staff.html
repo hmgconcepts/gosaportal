@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>⏰ Staff Attendance & Check-In • School Portal</title>
+<meta name="description" content="On-premises geofenced attendance check-in for staff and teachers.">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+:root{--primary:#4f46e5;--primary-dark:#3730a3;--primary-light:#818cf8;--font:'Plus Jakarta Sans',system-ui,sans-serif}
+body{font-family:var(--font)!important;background:#f8fafc}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc;color:#0f172a}
+.app-sidebar{width:286px;flex-shrink:0;background:rgba(255,255,255,.98);border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;z-index:40}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px 16px;border-bottom:1px solid #e2e8f0}
+.app-brand img{width:44px;height:44px;border-radius:12px;object-fit:contain}
+.app-nav{display:flex;flex-direction:column;gap:4px;padding:12px 10px;flex:1;overflow-y:auto}
+.app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:10px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:.875rem;font-weight:700}
+.app-nav a.active{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:#fff}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:13px 22px;background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30}
+.app-content{padding:24px;flex:1;max-width:1400px;width:100%;margin:0 auto}
+.card{border-radius:18px;border:1px solid #e2e8f0;box-shadow:0 8px 24px rgba(15,23,42,.04);background:#fff;padding:24px;margin-bottom:20px}
+.location-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:99px;font-weight:800;font-size:0.85rem;margin-bottom:16px}
+.location-ok{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.location-err{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+.camera-box{width:100%;max-width:540px;height:380px;background:#000;border-radius:18px;overflow:hidden;position:relative;margin:0 auto 16px;border:3px solid #e2e8f0}
+video{width:100%;height:100%;object-fit:cover}
+.scanner-overlay{position:absolute;top:0;left:0;right:0;bottom:0;border:2px dashed rgba(255,255,255,0.4);margin:40px;border-radius:12px;pointer-events:none}
+</style>
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <link rel="canonical" href="./checkin-staff.html">
+    <meta property="og:url" content="./checkin-staff.html">
+    <meta name="twitter:card" content="summary_large_image">
+<style>
+/* V6.3 NAV-UNIFY: single canonical navigation look on every page. */
+.app-sidebar{width:286px!important;overflow:hidden!important}
+.app-nav{display:flex!important;flex-direction:column!important;gap:4px!important;padding:12px 10px!important;flex:1!important;overflow-y:auto!important}
+.app-nav a{display:grid!important;grid-template-columns:32px minmax(0,1fr)!important;align-items:center!important;gap:10px!important;min-height:42px!important;padding:8px 10px!important;border-radius:12px!important;font-size:.875rem!important;font-weight:700!important;line-height:1.2!important;white-space:normal!important;text-align:left!important;flex-direction:row!important}
+.app-nav a span:first-child,.app-nav .app-nav-icon{width:32px!important;height:32px!important;min-width:32px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:1.05rem!important;line-height:1!important;border-radius:10px!important;background:rgba(79,70,229,.09)!important;color:var(--primary)!important;flex-shrink:0!important;overflow:hidden!important}
+.app-nav a.active span:first-child,.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22)!important;color:#fff!important}
+</style>
+</head>
+<body data-school="School Portal">
+
+<div class="app-layout sidebar">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
+        <div>
+          <strong>God of Seed Academy</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>My Profile</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔐</span>
+          <span>Change Password</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Report Cards (flexible)</span>
+        </a><a href="affective_traits.html" data-module-id="affective_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Affective Domain</span>
+        </a><a href="psychomotor_traits.html" data-module-id="psychomotor_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏃</span>
+          <span>Psychomotor Domain</span>
+        </a><a href="report_comments.html" data-module-id="report_comments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Report Comments</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Multi-Subject CBT</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="school-fees.html" data-module-id="school_fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏷️</span>
+          <span>Class Fee Structure</span>
+        </a><a href="school-products.html" data-module-id="school_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛒</span>
+          <span>School Products</span>
+        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payment History</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="exam-register.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Exam Registrations</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="hmg-digital-products.html" data-module-id="hmg_digital_products" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Digital Products</span>
+        </a><a href="status-manager.html" data-module-id="status_manager" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔧</span>
+          <span>Role &amp; Status</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="ecosystem.html" data-module-id="ecosystem_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Ecosystem</span>
+        </a><a href="punctuality.html" data-module-id="punctuality" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⏱️</span>
+          <span>Punctuality</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+      </div>
+    </aside><!-- V6.3 NAV-UNIFY-FULL -->
+
+  <main class="app-main">
+    <header class="app-topbar">
+      <h1 class="app-page-title" style="margin:0;font-size:1.4rem">⏰ On-Premises Staff Attendance Check-In</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid #e2e8f0;border-radius:999px;background:#fff">
+          <span>👤</span><span><strong id="user-display-name">Loading…</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <div class="app-content">
+      <div id="location-indicator" class="location-badge location-err">
+        <span>📍</span><span id="location-text">Checking GPS coordinates…</span>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>📷 Camera Barcode/QR Scanner</h3>
+          <p style="color:#64748b;font-size:0.875rem;margin-bottom:16px">Hold your staff ID card unique barcode or QR code in front of the camera. The system automatically marks your attendance, logs your check-in time, and computes lateness relative to school opening hours (8:00 AM).</p>
+          
+          <div class="camera-box">
+            <video id="ck-video" style="display:none"></video>
+            <div id="ck-placeholder" style="width:100%;height:100%;background:#0f172a;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94a3b8;gap:12px">
+              <span style="font-size:3rem">📷</span>
+              <strong>Camera Standby</strong>
+            </div>
+            <div class="scanner-overlay"></div>
+            <canvas id="ck-canvas" style="display:none"></canvas>
+          </div>
+
+          <div style="display:flex;gap:8px;justify-content:center">
+            <button class="btn btn-primary" id="ck-cam-start" onclick="CK.startCam()">Activate Scanner</button>
+            <button class="btn btn-outline" id="ck-cam-stop" onclick="CK.stopCam()" style="display:none">Stop Scanner</button>
+          </div>
+          <p id="ck-cam-msg" style="text-align:center;font-size:0.85rem;color:#64748b;margin-top:8px"></p>
+        </div>
+
+        <div class="card">
+          <h3>✍️ Manual Code Registry</h3>
+          <p style="color:#64748b;font-size:0.875rem;margin-bottom:16px">Don't have your barcode handy? Type your Staff Number or username directly below to log your daily attendance.</p>
+          
+          <div class="form-group">
+            <label>Staff Number / Username</label>
+            <input class="form-input" id="ck-id" placeholder="e.g. STF/2026/049">
+          </div>
+          <div class="form-group">
+            <label>Full Name (Optional fallback)</label>
+            <input class="form-input" id="ck-name" placeholder="e.g. Mrs. Bello">
+          </div>
+          
+          <div class="form-group" style="margin-top: 14px; margin-bottom: 14px;">
+            <label style="font-weight: 700; margin-bottom: 8px; display: block;">Select Attendance Action:</label>
+            <div style="display: flex; gap: 20px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem;">
+                <input type="radio" name="clock_action" value="in" checked style="width:18px;height:18px;"> ⏰ <b>Clock In (Daily Arrival)</b>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.95rem;">
+                <input type="radio" name="clock_action" value="out" style="width:18px;height:18px;"> 🚪 <b>Clock Out (Departure)</b>
+              </label>
+            </div>
+          </div>
+          
+          <button class="btn btn-primary" onclick="CK.go(document.getElementById('ck-id').value, 'code')" style="width:100%">Mark Attendance</button>
+          
+          <hr style="margin:20px 0;border:0;border-top:1px solid #e2e8f0">
+          
+          <div id="ck-log">
+            <h4 style="margin:0 0 10px">Today's Logs</h4>
+            <p style="color:#94a3b8;font-style:italic">No logs yet in this session.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){ if(window.Super&&Super.scanner) Super.scanner.attach(function(raw){ CK.go(raw,'wedge'); }); });
+const CK = {
+  done: [],
+  stream: null,
+  scanning: false,
+  last: '',
+  lastAt: 0,
+  hasLocation: false,
+
+  async init() {
+    await this.verifyGeofence();
+    const sc = window.SCHOOL || {};
+    const brand = document.getElementById('sidebar-school-name');
+    if (brand && sc.name) brand.textContent = sc.name;
+    const nameEl = document.getElementById('user-display-name');
+    if (nameEl && window.SC_PROFILE) nameEl.textContent = window.SC_PROFILE.full_name || 'Staff User';
+  },
+
+  /* V9.3 (#2) ROOT-CAUSE FIX for "GPS permission/error: Timeout expired":
+     the old call gave the browser only 5 seconds with enableHighAccuracy+
+     maximumAge:0 — a cold GPS fix on a phone routinely needs 10–30 s, so the
+     API gave up BEFORE the GPS locked and enforcement then blocked the staff
+     member. Robust multi-stage acquisition (enforcement itself is unchanged —
+     still fail-closed):
+       Stage 1: high accuracy, 20 s, accept a fix cached up to 30 s.
+       Stage 2: low accuracy (network/wifi), 15 s, accept up to 5-min cache.
+       Stage 3: watchPosition for 20 s — lets the GPS warm up and delivers
+                the first fix the hardware produces.
+     Plus a 🔄 Retry button so a slow first lock never dead-ends the page. */
+  acquirePosition() {
+    const tryOnce = (opts) => new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, opts));
+    return tryOnce({ enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 })
+      .catch((e1) => {
+        if (e1 && e1.code === 1) throw e1; // permission denied — retrying won't help
+        CK.updateLocationBadge(false, '📡 Still locking GPS — trying network location…');
+        return tryOnce({ enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+      })
+      .catch((e2) => {
+        if (e2 && e2.code === 1) throw e2;
+        CK.updateLocationBadge(false, '📡 Waiting for the GPS chip to warm up (up to 20 s)…');
+        return new Promise((res, rej) => {
+          let done = false;
+          const id = navigator.geolocation.watchPosition(
+            (pos) => { if (!done) { done = true; navigator.geolocation.clearWatch(id); res(pos); } },
+            (err) => { if (!done && err && err.code === 1) { done = true; navigator.geolocation.clearWatch(id); rej(err); } },
+            { enableHighAccuracy: true, maximumAge: 0 });
+          setTimeout(() => { if (!done) { done = true; navigator.geolocation.clearWatch(id); rej(new Error('GPS could not get a fix. Move near a window/outdoors and retry.')); } }, 20000);
+        });
+      });
+  },
+  async verifyGeofence() {
+    return new Promise((resolve) => {
+      // V12 strict staff geofence: never bypass GPS when enforcement is enabled.
+      const settings = window.SC_SETTINGS || {};
+      const enforce = (window.SCHOOL && window.SCHOOL.enforceGeofence !== false) && settings.enforce_geofence !== false;
+      if (!navigator.geolocation) {
+        this.updateLocationBadge(!enforce, enforce ? '❌ GPS not supported. Staff attendance is blocked until GPS is available.' : '⚠️ GPS not supported; geofence not enforced.');
+        resolve(!enforce);
+        return;
+      }
+      this.updateLocationBadge(false, '📍 Checking GPS coordinates… (first fix can take up to 20 s)');
+      this.acquirePosition().then(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const schoolLat = Number((window.SC_SETTINGS && window.SC_SETTINGS.latitude) || (window.SCHOOL && window.SCHOOL.latitude));
+          const schoolLng = Number((window.SC_SETTINGS && window.SC_SETTINGS.longitude) || (window.SCHOOL && window.SCHOOL.longitude));
+          const radius = Number((window.SC_SETTINGS && window.SC_SETTINGS.geo_radius_m) || (window.SCHOOL && window.SCHOOL.geoRadius) || 200);
+          if (!isFinite(schoolLat) || !isFinite(schoolLng)) { CK.updateLocationBadge(false, '❌ School geofence is not configured. Admin must set Settings → Staff Attendance Geofence.'); resolve(false); return; } 
+          
+          const R = 6371e3; 
+          const phi1 = lat * Math.PI/180;
+          const phi2 = schoolLat * Math.PI/180;
+          const deltaPhi = (schoolLat-lat) * Math.PI/180;
+          const deltaLambda = (schoolLng-lng) * Math.PI/180;
+          
+          const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                    Math.cos(phi1) * Math.cos(phi2) *
+                    Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const dist = R * c; 
+          
+          if (dist <= radius) {
+            CK.hasLocation = true;
+            CK.updateLocationBadge(true, '📍 Location verified: Inside school premises (' + Math.round(dist) + 'm away).');
+            resolve(true);
+          } else {
+            CK.hasLocation = false;
+            CK.updateLocationBadge(false, '❌ Out of Bounds: You are ' + Math.round(dist) + 'm away from school premises. Enforced radius is ' + radius + 'm.');
+            resolve(false);
+          }
+        },
+        (err) => {
+          // FIX GEO-01 (#7) + V9.3: actionable guidance per failure type.
+          let hint = (err && err.message) || 'Geolocation unavailable';
+          if (err && err.code === 1) {
+            hint = 'GPS permission was blocked. On the server, ensure _headers / vercel.json set geolocation=(self). On your device, tap the lock/ⓘ icon next to the address bar → Site settings → Location → Allow, then reload.';
+          } else if (/timeout|expired|fix/i.test(hint)) {
+            hint = 'GPS timed out — the phone could not get a satellite fix in time. Step outside or near a window, make sure Location/GPS is switched ON in the phone\'s quick settings, then tap Retry.';
+          }
+          CK.updateLocationBadge(false, '❌ GPS: ' + hint + (enforce ? ' Staff check-in stays blocked until location is verified (on-premises attendance is enforced).' : ' Geofence is off — you can still check in.'));
+          CK.showRetry();
+          // Fail closed whenever the school has enabled on-premises attendance.
+          if (enforce) { resolve(false); return; }
+          resolve(true);
+        }
+      );
+    });
+  },
+  /* V9.3: one-tap GPS retry — a slow first lock is normal; never a dead end. */
+  showRetry() {
+    try {
+      if (document.getElementById('ck-gps-retry')) return;
+      const badge = document.getElementById('location-indicator');
+      if (!badge) return;
+      const b = document.createElement('button');
+      b.id = 'ck-gps-retry'; b.className = 'btn btn-sm btn-primary'; b.textContent = '🔄 Retry GPS';
+      b.style.marginLeft = '10px';
+      b.onclick = async () => { b.remove(); CK.updateLocationBadge(false, '📍 Re-checking GPS…'); await CK.verifyGeofence(); };
+      badge.appendChild(b);
+    } catch (_) {}
+  },
+
+  updateLocationBadge(isOk, text) {
+    const el = document.getElementById('location-indicator');
+    if (!el) return;
+    el.className = isOk ? 'location-badge location-ok' : 'location-badge location-err';
+    document.getElementById('location-text').textContent = text;
+  },
+
+  async startCam() {
+    if (!CK.hasLocation) {
+      const retry = await this.verifyGeofence();
+      if (!retry) { alert('Check-in blocked: You must be physically on the school premises to mark attendance.'); return; }
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert('Camera not supported.'); return; }
+    try {
+      CK.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    } catch(e) { alert('Camera permission denied.'); return; }
+    const v = document.getElementById('ck-video');
+    v.srcObject = CK.stream;
+    v.setAttribute('playsinline', 'true');
+    await v.play();
+    v.style.display = 'block';
+    document.getElementById('ck-placeholder').style.display = 'none';
+    document.getElementById('ck-cam-start').style.display = 'none';
+    document.getElementById('ck-cam-stop').style.display = 'inline-flex';
+    document.getElementById('ck-cam-msg').textContent = 'Scanning unique barcode/QR code…';
+    CK.scanning = true;
+    CK.tick();
+  },
+
+  stopCam() {
+    CK.scanning = false;
+    if (CK.stream) { CK.stream.getTracks().forEach(t => t.stop()); CK.stream = null; }
+    document.getElementById('ck-video').style.display = 'none';
+    document.getElementById('ck-placeholder').style.display = 'flex';
+    document.getElementById('ck-cam-start').style.display = 'inline-flex';
+    document.getElementById('ck-cam-stop').style.display = 'none';
+    document.getElementById('ck-cam-msg').textContent = 'Camera stopped.';
+  },
+
+  tick(){
+    /* V11.7: shared scanner engine — reads the card's QR AND Code 39 barcode
+       via BarcodeDetector; jsQR below stays as the QR fallback. */
+    if (!CK.scanning) return;
+    const v = document.getElementById('ck-video'), c = document.getElementById('ck-canvas');
+    if (window.Super && Super.scanner) { Super.scanner.loop(v, c, (raw) => CK.go(raw, 'scan'), () => CK.scanning); return; }
+    if (v.readyState === v.HAVE_ENOUGH_DATA && window.jsQR) {
+      c.width = v.videoWidth; c.height = v.videoHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      try {
+        const img = ctx.getImageData(0, 0, c.width, c.height);
+        const code = jsQR(img.data, img.width, img.height);
+        if (code && code.data) {
+          const now = Date.now();
+          if (code.data !== CK.last || now - CK.lastAt > 4000) {
+            CK.last = code.data;
+            CK.lastAt = now;
+            CK.go(code.data, 'qr');
+            if (navigator.vibrate) navigator.vibrate(120);
+          }
+        }
+      } catch(e) {}
+    }
+    requestAnimationFrame(CK.tick);
+  },
+
+  async go(raw, method) {
+    raw = (raw || '').trim();
+    if (!raw) { alert('Type or scan a valid code.'); return; }
+    if (!CK.hasLocation) {
+      const ok = await this.verifyGeofence();
+      if (!ok) { alert('Check-in aborted: Outside school premises.'); return; }
+    }
+    
+    const p = Enterprise.checkin.parseQR(raw);
+    const id = p.id || raw;
+    const nm = p.name || document.getElementById('ck-name').value || 'Staff Member';
+    const action = document.querySelector('input[name="clock_action"]:checked')?.value || 'in';
+    
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    
+    // Admin lateness cutoff: uses checkin_deadline from school_settings
+    const deadline = window.SC_SETTINGS?.checkin_deadline || localStorage.getItem('sc-checkin-deadline') || '08:00';
+    const [dh, dm] = deadline.split(':').map(Number);
+    const grace = Number(window.SC_SETTINGS?.checkin_grace_minutes || localStorage.getItem('sc-checkin-grace') || 0);
+    const nowMinutes = hours * 60 + minutes;
+    const deadlineMinutes = (dh * 60 + dm) + grace;
+    const status = (nowMinutes > deadlineMinutes) ? 'late' : 'present';
+    
+    const supabase = window.sb || sb;
+    if (!supabase) { alert('Database not configured.'); return; }
+    
+    // Resolve staff member ID from staff_no or name
+    let staffId = null;
+    let staffName = nm;
+    try {
+      const { data: stMember } = await supabase.from('staff').select('id, full_name').or(`staff_no.eq.${id},full_name.ilike.%${nm}%`).maybeSingle();
+      if (stMember) {
+        staffId = stMember.id;
+        staffName = stMember.full_name;
+      }
+    } catch (_) {}
+
+    if (action === 'in') {
+      // 1. Log Clock-In in staff_clock table
+      const { error: clErr } = await supabase.from('staff_clock').insert({
+        staff_id: staffId,
+        clock_in: now.toISOString(),
+        date: now.toISOString().slice(0, 10),
+        note: 'Checked in as ' + status.toUpperCase()
+      });
+      if (clErr) { alert('Error logging clock-in: ' + clErr.message); return; }
+
+      // 2. Also log in generic attendance_checkins for standard listings
+      await supabase.from('attendance_checkins').insert({
+        student_id_ref: id,
+        student_name: staffName,
+        class: 'Staff/Teacher',
+        method: method || 'code',
+        status: status,
+        device: navigator.userAgent.slice(0, 60)
+      });
+      
+      CK.done.unshift({ id, name: staffName, at: now.toLocaleTimeString(), status: status + ' (clock in)' });
+      alert('✅ Clock-In Successful! Checked in as ' + status.toUpperCase() + ' at ' + now.toLocaleTimeString());
+    } else {
+      // 1. Log Clock-Out in staff_clock table
+      const todayStr = now.toISOString().slice(0, 10);
+      const { data: todayClock } = await supabase.from('staff_clock').select('*').eq('staff_id', staffId).eq('date', todayStr).maybeSingle();
+      if (todayClock) {
+        await supabase.from('staff_clock').update({ clock_out: now.toISOString(), note: 'Clocked out at ' + now.toLocaleTimeString() }).eq('id', todayClock.id);
+      } else {
+        await supabase.from('staff_clock').insert({ staff_id: staffId, clock_out: now.toISOString(), date: todayStr, note: 'Clock out only' });
+      }
+      
+      CK.done.unshift({ id, name: staffName, at: now.toLocaleTimeString(), status: 'clock out' });
+      alert('🚪 Clock-Out Successful! Clocked out at ' + now.toLocaleTimeString());
+    }
+    
+    document.getElementById('ck-id').value = '';
+    document.getElementById('ck-name').value = '';
+    
+    document.getElementById('ck-log').innerHTML = '<h4 style="margin:20px 0 10px">Today\'s Logs (' + CK.done.length + ')</h4>' +
+      CK.done.map(d => '<div style="padding:8px 0;border-bottom:1px solid #e2e8f0">✅ <strong>' + esc(d.name) + '</strong> (' + esc(d.id) + ') - <span class="badge ' + (d.status.includes('late') ? 'badge-danger' : 'badge-success') + '">' + d.status.toUpperCase() + '</span> <span style="color:#64748b;float:right">' + d.at + '</span></div>').join('');
+  }
+};
+
+window.addEventListener('beforeunload', () => CK.stopCam());
+document.addEventListener('DOMContentLoaded', () => CK.init());
+</script>
+</body>
+</html>

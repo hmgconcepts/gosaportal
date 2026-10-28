@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Midterm Reports • School Portal</title>
+<meta name="description" content="Generate midterm test report sheets per student — only midterm test scores, separate from terminal reports.">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.mr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.mr-card{border:1px solid #e2e8f0;border-radius:12px;padding:16px;background:white}
+.mr-card h3{margin:0 0 8px;font-size:1rem}
+.mr-table{width:100%;border-collapse:collapse;margin-top:12px}
+.mr-table th,.mr-table td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left;font-size:.88rem}
+.mr-table th{background:#f8fafc;font-weight:800}
+@media print{.no-print{display:none} .mr-card{break-inside:avoid}}
+/* Standalone page shell: match the portal layout and prevent mobile drawer/content overlap. */
+.mr-sidebar-scrim{display:none}
+.mr-brand-caption,.mr-brand-foot{font-size:.76rem;color:var(--gray-500,#64748b)}
+.mr-brand-foot{margin-top:auto;padding:16px;border-top:1px solid var(--gray-200,#e2e8f0)}
+#mr-app-shell{width:100%;min-width:0}
+#mr-app-shell .app-main{min-width:0;width:calc(100% - 250px)}
+#mr-app-shell .app-content{width:100%;max-width:1280px;margin:0 auto;min-width:0}
+#mr-app-shell .mr-table{min-width:0}
+#mr-app-shell .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+#mr-app-shell .app-topbar{min-width:0}
+@media(max-width:900px){
+  #mr-app-shell .app-main{width:100%;max-width:100%}
+  #mr-app-shell .app-content{padding:14px;width:100%;max-width:100%}
+  #mr-app-shell .grid-3{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+  #mr-app-shell .app-sidebar{transform:translateX(-105%);visibility:hidden;transition:transform .22s ease,visibility .22s ease}
+  #mr-app-shell .app-sidebar.open{transform:translateX(0);visibility:visible}
+  #mr-app-shell .mr-sidebar-scrim.open{display:block;position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:90}
+  #mr-app-shell .app-sidebar{z-index:100}
+  #mr-app-shell .app-topbar{position:sticky;top:0;padding:10px 12px;gap:10px}
+  #mr-app-shell .app-page-title{font-size:1.05rem;min-width:0}
+  #mr-app-shell .app-content .card{min-width:0;overflow-wrap:anywhere}
+  #mr-app-shell .mr-table{display:block;overflow-x:auto}
+}
+</style>
+</head>
+<body>
+<div class="app-layout sidebar" id="mr-app-shell">
+  <div class="mr-sidebar-scrim" id="mr-sidebar-scrim" onclick="MR.closeSidebar()" aria-hidden="true"></div>
+  <aside class="app-sidebar" id="app-sidebar" aria-label="School navigation">
+    <div class="app-brand"><img src="assets/img/logo.png" alt="School logo" onerror="this.style.display='none'"><div><strong id="mr-school-name">School Connect</strong><div class="mr-brand-caption">School Portal</div></div></div>
+    <nav class="app-nav" aria-label="Main navigation">
+      <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student"><span class="app-nav-icon">🏠</span><span>Dashboard</span></a>
+      <a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student"><span class="app-nav-icon">📋</span><span>Terminal Report Cards</span></a>
+      <a href="midterm-reports.html" data-module-id="midterm-reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="active"><span class="app-nav-icon">📝</span><span>Midterm Reports</span></a>
+      <a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher staff teacher"><span class="app-nav-icon">🖥️</span><span>CBT Manager</span></a>
+      <a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher staff teacher parent student"><span class="app-nav-icon">📅</span><span>Attendance</span></a>
+      <a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher staff teacher"><span class="app-nav-icon">👨‍🎓</span><span>Students</span></a>
+      <a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student"><span class="app-nav-icon">👤</span><span>My Profile</span></a>
+    </nav>
+    <div class="mr-brand-foot">Powered by HMG Concepts</div>
+  </aside>
+  <main class="app-main">
+    <header class="app-topbar"><button class="mobile-toggle" type="button" aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false" onclick="MR.toggleSidebar(this)">☰</button><h1 class="app-page-title">Midterm Reports</h1><div style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()">🌙</button><button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout style="display:none">Sign out</button></div></header>
+    <div class="app-content">
+      <div class="card" style="background:#eff6ff;border-color:#93c5fd">
+        <h3 style="margin-top:0">📝 Midterm Test Reports — Once per term</h3>
+        <p style="color:#1e3a8a">Generate <b>midterm sheets</b> that contain <b>only midterm test scores</b> (from CBTs with <code>assessment_type='test'</code> pushed to a <code>Midterm</code> column). These are <b>separate from terminal reports</b> (which contain CA1/CA2/Exam etc.) — both can coexist for same class/term/session, in sync via <code>report_scores</code>, not conflicting.</p>
+        <p style="font-size:.85rem;color:#334155">Tip: Create a Midterm Test CBT (type <code>test</code>), push its scores to a column named <b>Midterm</b> (create it in Report Cards → Columns if not exists), then generate here.</p>
+      </div>
+
+      <div class="card" id="mr-staff-tools">
+        <div class="grid grid-3" style="gap:10px">
+          <div class="form-group"><label>Class *</label><select id="mr-class" class="form-select"><option value="">— select class —</option></select></div>
+          <div class="form-group"><label>Term *</label><select id="mr-term" class="form-select"><option value="">— select term —</option></select></div>
+          <div class="form-group"><label>Session *</label><select id="mr-session" class="form-select"><option value="">— select session —</option></select></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="MR.generate()">📊 Generate Midterm Reports</button>
+          <button class="btn btn-outline" onclick="MR.preview()">👁️ Preview (first 5)</button>
+          <button class="btn btn-outline" onclick="MR.publish(true)">✅ Publish (student/parent can view)</button>
+          <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="MR.publish(false)">🚫 Unpublish</button>
+          <button class="btn btn-outline" onclick="MR.exportCSV()">⬇ Export CSV</button>
+        </div>
+        <div id="mr-status" style="margin-top:12px;font-size:.9rem;color:#475569"></div>
+      </div>
+
+      <div class="card" id="mr-family-view" style="display:none;margin-top:16px">
+        <h3>👨‍👩‍👧 Your Midterm Sheet</h3>
+        <p style="color:#475569">Only your own (or your linked child’s) <b>published</b> midterm report is shown here. Terminal reports remain separate.</p>
+        <div class="grid grid-3" style="gap:10px">
+          <div class="form-group"><label>Student</label><select id="mr-family-student" class="form-select"><option value="">Loading linked student…</option></select></div>
+          <div class="form-group"><label>Term</label><select id="mr-family-term" class="form-select"><option value="">Select term</option></select></div>
+          <div class="form-group"><label>Session</label><select id="mr-family-session" class="form-select"><option value="">Select session</option></select></div>
+        </div>
+        <button class="btn btn-primary" onclick="MR.loadFamilyReport()">View Midterm Sheet</button>
+        <div id="mr-family-output" style="margin-top:12px"></div>
+        <p><a href="report-cards.html" class="btn btn-outline">View Terminal Report Card</a></p>
+      </div>
+      <div id="mr-list" class="card" style="margin-top:16px"><span class="pulse">Select class/term/session to generate.</span></div>
+
+      <div class="card" style="margin-top:16px;background:#f8fafc">
+        <h4>How it stays in sync with terminal reports</h4>
+        <ul style="font-size:.88rem;color:#334155;line-height:1.6">
+          <li><b>Same source:</b> Both midterm and terminal read from <code>report_scores</code> → <code>assessment_columns</code>. Midterm filters <code>name ILIKE 'midterm%'</code> or <code>cbt_assessment_type='test'</code>; terminal uses all other columns. So updating a score via CBT push instantly reflects in both reports after re-generating.</li>
+          <li><b>No conflict:</b> <code>midterm_report_cards</code> has <code>unique(student_id_ref, class, term, session)</code> separate from <code>report_cards</code> (<code>report_cards</code> is terminal). Same student can have both for same term.</li>
+          <li><b>Published flag:</b> Tutors generate (published=false) first to preview, then publish. Students/parents only see published via <code>get_midterm_report</code> + RLS <code>is_parent_of</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">© 2026 HMG Concepts · <a href="developer.html">About</a></footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script>
+const MR = {
+  toggleSidebar(button){
+    const side=document.getElementById('app-sidebar'),scrim=document.getElementById('mr-sidebar-scrim');
+    if(!side)return;
+    const open=!side.classList.contains('open');side.classList.toggle('open',open);if(scrim)scrim.classList.toggle('open',open);
+    if(button)button.setAttribute('aria-expanded',String(open));
+  },
+  closeSidebar(){
+    const side=document.getElementById('app-sidebar'),scrim=document.getElementById('mr-sidebar-scrim'),button=document.querySelector('#mr-app-shell .mobile-toggle');
+    if(side)side.classList.remove('open');if(scrim)scrim.classList.remove('open');if(button)button.setAttribute('aria-expanded','false');
+  },
+  async init(){
+    const school=window.SCHOOL||{};const brand=document.getElementById('mr-school-name');if(brand)brand.textContent=school.shortName||school.name||'School Connect';
+    const logo=document.querySelector('#app-sidebar .app-brand img');if(logo&&school.logoExt)logo.src='assets/img/logo.'+String(school.logoExt).replace(/[^a-z0-9]/gi,'');
+    document.querySelectorAll('#app-sidebar .app-nav a').forEach(a=>a.addEventListener('click',()=>MR.closeSidebar()));
+    if(!window.sb) { document.getElementById('mr-status').innerHTML='<span style="color:#dc2626">Supabase not configured.</span>'; return; }
+    // Load lookups for class/term/session
+    try{
+      const [cls, terms, sess] = await Promise.all([
+        sb.from('classes').select('name').order('name'),
+        sb.from('lookups').select('value').eq('kind','term').eq('active',true).order('position'),
+        sb.from('lookups').select('value').eq('kind','session').eq('active',true).order('position')
+      ]);
+      // Show actionable feedback instead of silently leaving an empty page when
+      // RLS, a missing lookup table, or an expired session blocks a lookup.
+      const lookupErrors=[['classes',cls.error],['terms',terms.error],['sessions',sess.error]].filter(x=>x[1]);
+      const fill=(id, result, key)=>{ const el=document.getElementById(id); if(!el) return; const vals=result.data||[]; el.innerHTML='<option value="">— select —</option>'+vals.map(r=>'<option value="'+MR.esc(r[key]||'')+'">'+MR.esc(r[key]||'')+'</option>').join(''); };
+      fill('mr-class', cls, 'name');
+      fill('mr-term', terms, 'value');
+      fill('mr-session', sess, 'value');
+      const status=document.getElementById('mr-status');
+      if(lookupErrors.length && status) status.innerHTML='<span style="color:#b91c1c"><b>Could not load report selectors.</b> '+MR.esc(lookupErrors.map(x=>x[0]+': '+x[1].message).join(' · '))+' Please sign in again or contact the school administrator.</span>';
+      else if(status) status.innerHTML='<span style="color:#475569">Report tools ready. Choose a class, term and session; reports appear after a staff member generates them.</span>';
+      // Also try academic_periods for session/term
+      try{
+        const ap=await sb.from('academic_periods').select('session,term').eq('is_current',true).limit(1).maybeSingle();
+        if(ap.data){ if(ap.data.session) document.getElementById('mr-session').value=ap.data.session; if(ap.data.term) document.getElementById('mr-term').value=ap.data.term; }
+      }catch(_){}
+      // Family-safe view: students/parents see only published reports for linked children.
+      for(let i=0;i<25 && !(window.SC_PROFILE&&SC_PROFILE.role);i++) await new Promise(r=>setTimeout(r,200));
+      const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if(['student','parent'].includes(role)){
+        const tools=document.getElementById('mr-staff-tools'); if(tools) tools.style.display='none';
+        const family=document.getElementById('mr-family-view'); if(family) family.style.display='block';
+        const sel=document.getElementById('mr-family-student'); let people=[];
+        try{
+          if(role==='student'){
+            const r=await sb.from('students').select('id,admission_no,full_name,class').eq('user_id',SC_PROFILE.id); people=r.data||[];
+          }else{
+            const links=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);
+            const ids=(links.data||[]).map(x=>x.student_id).filter(Boolean);
+            if(ids.length){const r=await sb.from('students').select('id,admission_no,full_name,class').in('id',ids);people=r.data||[];}
+          }
+        }catch(e){console.warn('Midterm family lookup',e.message);}
+        if(sel) sel.innerHTML=people.length?people.map(x=>'<option value="'+MR.esc(x.admission_no||'')+'" data-class="'+MR.esc(x.class||'')+'">'+MR.esc(x.admission_no||'')+' — '+MR.esc(x.full_name||'')+' ('+MR.esc(x.class||'')+')</option>').join(''):'<option value="">No linked student found</option>';
+        const terms=document.getElementById('mr-family-term'), sessions=document.getElementById('mr-family-session');
+        const fill2=(el,rows,key)=>{if(el&&rows&&rows.length)el.innerHTML='<option value="">Select</option>'+rows.map(r=>'<option>'+String(r[key]||'')+'</option>').join('');};
+        fill2(terms,(await sb.from('lookups').select('value').eq('kind','term').eq('active',true).order('position')).data,'value');
+        fill2(sessions,(await sb.from('lookups').select('value').eq('kind','session').eq('active',true).order('position')).data,'value');
+        const currentTerm=document.getElementById('mr-term')?.value||'', currentSession=document.getElementById('mr-session')?.value||''; if(terms) terms.value=currentTerm; if(sessions) sessions.value=currentSession;
+      }
+    }catch(e){
+      console.warn('MR init failed', e.message);
+      const status=document.getElementById('mr-status');
+      if(status) status.innerHTML='<span style="color:#b91c1c"><b>Midterm reports could not finish loading.</b> '+MR.esc(e.message||'Unexpected error')+' Refresh the page after signing in. If this continues, send this message to the school administrator.</span>';
+    }
+  },
+  esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');},
+  vals(){ return {c:document.getElementById('mr-class').value.trim(), t:document.getElementById('mr-term').value.trim(), s:document.getElementById('mr-session').value.trim()}; },
+  async loadFamilyReport(){
+    const student=document.getElementById('mr-family-student'), sid=student?.value||'', cls=student?.selectedOptions?.[0]?.dataset?.class||'', term=document.getElementById('mr-family-term')?.value||'', session=document.getElementById('mr-family-session')?.value||'', host=document.getElementById('mr-family-output');
+    if(!sid||!cls||!term||!session){if(host)host.innerHTML='<div class="notice">Select student, term and session.</div>';return;}
+    if(host)host.innerHTML='<span class="pulse">Loading published midterm sheet…</span>';
+    const r=await sb.rpc('get_midterm_report',{p_student_id_ref:sid,p_class:cls,p_term:term,p_session:session});
+    if(r.error||!r.data||!r.data.ok){host.innerHTML='<div class="notice">'+MR.esc((r.data&&r.data.message)|| (r.data&&r.data.error)||r.error?.message||'No report available')+'</div>';return;}
+    const row=r.data.report, scores=row.scores||{};
+    if(row.has_scores===false){host.innerHTML='<div class="notice">No midterm test score has been recorded for this student yet. Please contact the tutor if you believe this is incorrect.</div>';return;}
+    host.innerHTML='<div class="mr-card"><h3>Midterm Report — '+MR.esc(row.student_name)+' · '+MR.esc(row.class)+'</h3><p>'+MR.esc(row.term)+' · '+MR.esc(row.session)+' · Position '+MR.esc(row.position||'—')+'</p><table class="mr-table"><thead><tr><th>Subject</th><th>Midterm score</th></tr></thead><tbody>'+Object.entries(scores).map(([subject,score])=>'<tr><td>'+MR.esc(subject)+'</td><td>'+Number(score||0).toFixed(1)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Total / Average</th><th>'+Number(row.total||0).toFixed(1)+' / '+Number(row.average||0).toFixed(1)+'%</th></tr></tfoot></table><button class="btn btn-outline no-print" onclick="window.print()">🖨️ Print / Save PDF</button></div>';
+  },
+  async generate(){
+    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
+    const status=document.getElementById('mr-status'); status.innerHTML='<span class="pulse">Generating midterm reports…</span>';
+    const r=await sb.rpc('generate_midterm_reports',{p_class:c, p_term:t, p_session:s});
+    if(r.error || !r.data || r.data.ok===false){ status.innerHTML='<span style="color:#dc2626">'+((r.data&&r.data.error)||r.error?.message||'Generate failed')+'</span>'; return; }
+    status.innerHTML='<span style="color:#16a34a">✅ Generated '+r.data.generated+' midterm reports for '+c+' · '+t+' · '+s+'</span>';
+    this.preview();
+  },
+  async preview(){
+    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
+    const box=document.getElementById('mr-list'); box.innerHTML='<span class="pulse">Loading…</span>';
+    const r=await sb.from('midterm_report_cards').select('*').eq('class',c).eq('term',t).eq('session',s).order('average',{ascending:false}).limit(100);
+    if(r.error){ box.innerHTML='<span style="color:#dc2626">'+r.error.message+'</span>'; return; }
+    const rows=r.data||[];
+    if(!rows.length){ box.innerHTML='<p>No midterm reports yet. Generate first.</p>'; return; }
+    box.innerHTML='<div class="table-wrap"><table class="mr-table"><thead><tr><th>#</th><th>Student</th><th>ID</th><th>Total</th><th>Average</th><th>Position</th><th>Score status</th><th>Published</th><th>Subjects</th></tr></thead><tbody>'+rows.map((row,i)=>'<tr><td>'+(i+1)+'</td><td>'+(row.student_name||'')+'</td><td>'+(row.student_id_ref||'')+'</td><td>'+Number(row.total||0).toFixed(1)+'</td><td>'+Number(row.average||0).toFixed(1)+'%</td><td>'+(row.position||'-')+'</td><td>'+(row.has_scores?'Has score':'No score')+'</td><td>'+(row.published?'✅':'—')+'</td><td style="max-width:300px;white-space:normal;font-size:.78rem">'+Object.entries(row.scores||{}).map(([subj,score])=>subj+': '+score).join(', ')+'</td></tr>').join('')+'</tbody></table></div><p style="font-size:.82rem;color:#64748b;margin-top:8px">Showing '+rows.length+' (first 100). Terminal reports are separate — generate them in Report Cards.</p>';
+  },
+  async publish(flag){
+    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
+    const r=await sb.rpc('publish_midterm_reports',{p_class:c, p_term:t, p_session:s, p_publish:flag});
+    if(r.error || !r.data || r.data.ok===false){ toast((r.data&&r.data.error)||r.error?.message||'Publish failed','danger'); return; }
+    toast((flag?'✅ Published':'🚫 Unpublished')+' midterm reports','success'); this.preview();
+  },
+  async exportCSV(){
+    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
+    const r=await sb.from('midterm_report_cards').select('*').eq('class',c).eq('term',t).eq('session',s).order('average',{ascending:false});
+    if(r.error){ toast(r.error.message,'danger'); return; }
+    const rows=r.data||[]; if(!rows.length){ toast('No data','warning'); return; }
+    const header=['Student','ID','Class','Term','Session','Total','Average','Position','Published','Scores_JSON'];
+    const csv=[header.join(',')].concat(rows.map(row=> [row.student_name,row.student_id_ref,row.class,row.term,row.session,row.total,row.average,row.position,row.published, '"'+JSON.stringify(row.scores).replace(/"/g,'""')+'"'].map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(','))).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='midterm-'+c+'-'+t+'-'+s+'.csv'; a.click();
+  }
+};
+document.addEventListener('DOMContentLoaded', ()=>{ if(window.App) App.init('midterm-reports'); MR.init(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html><html lang="en"><head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Site License &amp; Subscription</title><meta name="description" content="View and manage this portal's School Connect license: ownership model, subscription status, expiry, grace period and renewal."><meta name="robots" content="noindex"><link rel="stylesheet" href="assets/css/style.css"></head><body>
+<main style="max-width:960px;margin:30px auto;padding:20px" id="page">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <h1 style="margin:0;font-size:1.5rem">🔑 Site License &amp; Subscription</h1>
+    <div><a class="btn btn-outline btn-sm" href="settings.html">⚙️ Settings</a> <a class="btn btn-outline btn-sm" href="dashboard.html">Dashboard</a></div>
+  </div>
+
+  <div class="card" id="status-card"><span class="pulse">Checking license…</span></div>
+
+  <div class="grid grid-2" style="margin-top:16px">
+    <div class="card">
+      <h3 style="margin-top:0">💎 One-time payment (Lifetime)</h3>
+      <p style="color:var(--gray-700);font-size:.9rem;line-height:1.6">The client pays once and <b>owns the site forever</b> — no recurring fees. The portal runs 100% on the client's own free Supabase + free hosting. HMG is only paid again if the client asks for <b>services</b> (maintenance, troubleshooting, training, new features).</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">🔄 Subscription</h3>
+      <p style="color:var(--gray-700);font-size:.9rem;line-height:1.6">For clients who cannot pay at once: a monthly / termly / annual plan. When the paid term ends, a <b>grace period</b> begins; if it lapses without renewal, every page of the portal shows a renewal screen until HMG extends the subscription. <b>All data stays intact</b> — nothing is deleted; access simply resumes on renewal.</p>
+    </div>
+  </div>
+
+  <div class="card" id="manage-card" style="margin-top:16px;display:none">
+    <h3 style="margin-top:0">🛠 Manage license (HMG / Super Admin)</h3>
+    <p style="color:var(--gray-600);font-size:.85rem">Changes write directly to <code>public.site_license</code> (row 1) and are re-signed automatically. The portal re-checks every 15 minutes and on tab refocus — no redeploy needed.</p>
+    <div class="grid grid-2">
+      <div class="form-group"><label>Model</label><select id="lic-model" class="form-input"><option value="lifetime">lifetime (one-time ownership)</option><option value="subscription">subscription</option></select></div>
+      <div class="form-group"><label>Plan label</label><input id="lic-plan" class="form-input" placeholder="e.g. Termly plan · 2026/2027"></div>
+      <div class="form-group"><label>Billing cycle</label><select id="lic-cycle" class="form-input"><option value="">—</option><option value="monthly">monthly</option><option value="termly">termly</option><option value="annual">annual</option><option value="custom">custom</option></select></div>
+      <div class="form-group"><label>Expires on (subscription)</label><input id="lic-exp" type="date" class="form-input"></div>
+      <div class="form-group"><label>Grace days after expiry</label><input id="lic-grace" type="number" min="0" class="form-input" value="7"></div>
+      <div class="form-group"><label>Status</label><select id="lic-status" class="form-input"><option value="active">active</option><option value="suspended">suspended</option></select></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Renewal link (WhatsApp/payment URL)</label><input id="lic-renew" class="form-input" placeholder="https://wa.me/2348100866322?text=…"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>Custom lock-screen message (optional)</label><textarea id="lic-msg" class="form-input" rows="2" placeholder="Shown on the renewal screen. If empty, the standard message is used."></textarea></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" onclick="saveLicense()">💾 Save &amp; re-sign license</button>
+      <button class="btn btn-outline" onclick="quickExtend(30)">+30 days</button>
+      <button class="btn btn-outline" onclick="quickExtend(90)">+1 term (≈90 days)</button>
+      <button class="btn btn-outline" onclick="quickExtend(365)">+1 year</button>
+      <span id="lic-save-msg" style="font-size:.85rem;color:var(--gray-600)"></span>
+    </div>
+  </div>
+
+  <!-- V9.1 ENTERPRISE: activation keys + key-lock + audit trail -->
+  <div class="card" id="key-card" style="margin-top:16px">
+    <h3 style="margin-top:0">🎟️ Activation key</h3>
+    <p style="color:var(--gray-600);font-size:.85rem">When this site is <b>key-locked</b>, the subscription can only be changed with a signed HMG activation key (<code>SC1.…</code>). Paste the key you received and apply — the server verifies its signature, applies the new expiry/status, and each key works exactly once.</p>
+    <div style="background:var(--gray-100);border-radius:10px;padding:8px 12px;font-size:.8rem;color:var(--gray-600);margin-bottom:8px">
+      <b>Key recipes (HMG side · V9.9):</b><br>
+      · Renew a term: <code>node tools/make-license-key.mjs --salt "…" --expires 2027-01-31</code><br>
+      · Suspend: <code>… --expires 2026-01-01 --status suspended</code><br>
+      · <b>Convert to ONE-TIME/lifetime ownership:</b> <code>… --model lifetime</code> — one key, the lock never shows again, no database access needed.<br>
+      · Back to subscription later: issue a normal key with a new expiry.
+    </div>
+    <div id="lic-monitor" style="margin-bottom:10px"></div>
+    <!-- V11.0 (#7): HMG-SIDE FLEET MONITORING + PAUSE-PROOF GUARANTEE.
+         One copyable block that tells the HMG representative everything
+         needed to monitor a client from OUTSIDE the portal, plus the
+         written guarantee that an expired subscription can never lose its
+         database to the Supabase 7-day pause. -->
+    <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:10px">
+      <h4 style="margin-top:0">📡 HMG fleet monitoring — how to watch this school from outside</h4>
+      <ol style="margin:4px 0 8px 18px;font-size:.85rem;line-height:1.8;color:var(--gray-700)">
+        <li><b>Server verdict URL (no sign-in needed):</b> <code id="lic-verdict-url" style="word-break:break-all"></code>
+          <button class="btn btn-sm btn-outline" onclick="(function(){var t=document.getElementById('lic-verdict-url').textContent;navigator.clipboard&&navigator.clipboard.writeText(t);toast('Verdict URL copied — bookmark it or add it to UptimeRobot.','success');})()">📋 Copy</button><br>
+          <small style="color:var(--gray-500)">Returns the live subscription state (<code>active / grace / expired</code>, expiry date, days over). Add it to UptimeRobot with a keyword alert on <code>expired</code> and HMG gets an email the day any client lapses — no portal login, no database access.</small></li>
+        <li><b>Renew from anywhere:</b> generate a key with the recipes above and send it on WhatsApp — the school pastes it here. No Supabase access needed on either side.</li>
+        <li><b>⏸️ Pause-proof guarantee:</b> an EXPIRED subscription never loses data. Three independent keep-alive layers continue while locked: the GitHub-Actions workflow (client-independent), the locked page itself (pings on every visit, once/day), and the Vercel keep-alive endpoint. The school's Supabase stays awake until they renew — whenever that is.</li>
+        <li><b>🛰️ Best practice — register this school in the HMG Fleet Console:</b> HMG's standalone ops platform (its own private deployment) monitors every client from one screen: keep-alive pings, health checks, this subscription verdict, renewal-date reminders and an incident journal. Registration needs only this site's <code>config.js</code> URL + anon key — no portal access, no data visibility. The console's own cron layers (GitHub Actions / cron-job.org / UptimeRobot) then keep this school awake even if every layer above were disabled.</li>
+      </ol>
+    </div>
+    <script>document.addEventListener('DOMContentLoaded',function(){try{var u=(window.SUPABASE_URL||(window.SCHOOL&&SCHOOL.supabaseUrl)||'').replace(/\/$/,'');var k=window.SUPABASE_ANON_KEY||'';var el=document.getElementById('lic-verdict-url');if(el)el.textContent=u?(u+'/rest/v1/rpc/sc_license_status?apikey='+(k?k.slice(0,12)+'…(anon key)':'ANON_KEY')):'(configure Supabase in config.js first)';}catch(_){}});</script>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <div class="form-group" style="flex:1;min-width:260px"><label>Activation key</label><input id="lic-key" class="form-input" placeholder="SC1.eyJleHBpcmVzX29uIjoi….3fb2…"></div>
+      <button class="btn btn-primary" onclick="applyActivationKey()">✅ Apply key</button>
+    </div>
+    <div id="lic-key-msg" style="font-size:.85rem;margin-top:6px;color:var(--gray-600)"></div>
+    <div id="lock-tools" style="display:none;border-top:1px solid var(--gray-200);margin-top:12px;padding-top:12px">
+      <h4 style="margin:0 0 6px">🔐 Key-lock this site (HMG — one time, at handover)</h4>
+      <p style="color:var(--gray-600);font-size:.83rem;margin:0 0 8px">Locking stores a secret salt <b>inside the database</b> (schema <code>sc_private</code>, unreachable via the API). After locking: the form above stops working for everyone including admins, and only keys signed with that salt can modify the subscription. <b>This cannot be undone from the app.</b> Generate keys with <code>tools/make-license-key.mjs</code>.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+        <div class="form-group" style="flex:1;min-width:220px"><label>Secret salt (min 12 chars — keep it safe at HMG)</label><input id="lic-salt" class="form-input" type="password" placeholder="e.g. a long random phrase"></div>
+        <button class="btn btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="lockLicense()">🔐 Lock license permanently</button>
+      </div>
+    </div>
+    <div id="lic-events" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h3 style="margin-top:0">❓ How enforcement works</h3>
+    <ol style="margin:0;padding-left:20px;color:var(--gray-700);font-size:.88rem;line-height:1.7">
+      <li>Every page loads <code>assets/js/license.js</code>, which reads the state from the HMG license registry (if configured) → the <code>site_license</code> table → the build config.</li>
+      <li><b>30 days before expiry</b>: a gentle gold banner reminds everyone to renew.</li>
+      <li><b>During grace</b>: a red banner with a renewal link stays on top of every page.</li>
+      <li><b>After expiry + grace (or suspension)</b>: a full renewal screen covers the portal. It re-appears even if removed, and cannot be dismissed.</li>
+      <li>License rows written here carry a SHA-256 signature; a hand-edited database row fails verification and raises a tamper notice.</li>
+      <li>With the optional HMG registry (a JSON on HMG-controlled hosting), the authoritative status lives outside the client's control — local edits cannot suspend or extend the term.</li>
+    </ol>
+    <p style="font-size:.8rem;color:var(--gray-500);margin:10px 0 0">Honest note: any software hosted by the client can ultimately be modified by its owner; these layers make bypassing the subscription impractical for non-experts, keep the authoritative status with HMG, and keep everything transparent for both sides.</p>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script>
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+var __lic=null,__isAdmin=false,__user=null;
+async function roleCheck(){
+  if(!window.sb){document.getElementById('status-card').innerHTML='Database not configured.';return false;}
+  var r=await sb.auth.getUser();__user=r&&r.data&&r.data.user;
+  if(!__user){location.href='login.html';return false;}
+  var p=await sb.from('profiles').select('role,status,full_name').eq('id',__user.id).maybeSingle();
+  var role=String((p&&p.data&&p.data.role)||'').toLowerCase();
+  __isAdmin=['super_admin','admin','principal','proprietor'].indexOf(role)>-1;
+  return true;
+}
+function render(){
+  var card=document.getElementById('status-card');
+  if(!__lic){card.innerHTML='Could not read license state.';return;}
+  var lic=__lic.lic,res=__lic.result,src=__lic.source;
+  var badge={lifetime:'💎 Lifetime ownership',active:'✅ Active',warning:'🔔 Expiring soon',grace:'⚠️ Grace period',expired:'🔴 Expired — locked',suspended:'⛔ Suspended'}[res.state]||res.state;
+  var rows='';
+  rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Model</td><td style="padding:6px 10px"><b>'+esc(lic.model)+'</b> — '+esc(lic.plan)+'</td></tr>';
+  if(lic.model==='subscription'){
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Cycle</td><td style="padding:6px 10px">'+esc(lic.cycle||'—')+'</td></tr>';
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">State</td><td style="padding:6px 10px"><b>'+badge+'</b>'+(res.daysLeft!=null?' · '+res.daysLeft+' day(s)':'')+(res.daysOver?' · '+res.daysOver+' day(s) past grace':'')+'</td></tr>';
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Expires</td><td style="padding:6px 10px">'+esc(lic.expires_on||'—')+' · grace '+lic.grace_days+' day(s)</td></tr>';
+  } else {
+    rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">State</td><td style="padding:6px 10px"><b>'+badge+'</b> — no recurring payments, the client owns this portal.</td></tr>';
+  }
+  rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Source</td><td style="padding:6px 10px">'+esc(src)+(__lic.tampered?' · <b style="color:#b91c1c">signature mismatch (tamper check failed)</b>':' · signature OK/not required')+'</td></tr>';
+  if(lic.renew_url)rows+='<tr><td style="padding:6px 10px;color:var(--gray-500)">Renewal</td><td style="padding:6px 10px"><a href="'+esc(lic.renew_url)+'" target="_blank" rel="noopener">'+esc(lic.renew_url)+'</a> <a class="btn btn-outline btn-sm" href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener">📢 Join the HMG WhatsApp Channel</a></td></tr>';
+  card.innerHTML='<table style="width:100%;border-collapse:collapse">'+rows+'</table>';
+}
+async function load(){
+  if(!(await roleCheck()))return;
+  __lic=await window.License.status();
+  // prefer the DB row for editing
+  try{var r=await sb.from('site_license').select('*').eq('id',1).maybeSingle();if(r&&r.data){__lic.lic=window.License.normalize(r.data);}}catch(e){}
+  render();
+  if(__isAdmin){
+    document.getElementById('manage-card').style.display='';
+    var l=__lic.lic;
+    document.getElementById('lic-model').value=l.model;
+    document.getElementById('lic-plan').value=l.plan||'';
+    document.getElementById('lic-cycle').value=l.cycle||'';
+    document.getElementById('lic-exp').value=l.expires_on||'';
+    document.getElementById('lic-grace').value=(l.grace_days==null?7:l.grace_days);
+    document.getElementById('lic-status').value=l.status||'active';
+    document.getElementById('lic-renew').value=l.renew_url||'';
+    document.getElementById('lic-msg').value=l.lock_message||'';
+  }
+}
+async function saveLicense(){
+  var msg=document.getElementById('lic-save-msg');
+  if(!__isAdmin){msg.textContent='Admins only.';return;}
+  var lic={id:1,
+    model:document.getElementById('lic-model').value,
+    plan:document.getElementById('lic-plan').value.trim(),
+    cycle:document.getElementById('lic-cycle').value,
+    expires_on:document.getElementById('lic-exp').value||null,
+    grace_days:Math.max(0,+document.getElementById('lic-grace').value||0),
+    status:document.getElementById('lic-status').value,
+    renew_url:document.getElementById('lic-renew').value.trim(),
+    lock_message:document.getElementById('lic-msg').value.trim()};
+  lic.signature=await window.License.signature(lic);
+  var r=await sb.from('site_license').upsert(lic,{onConflict:'id'});
+  msg.textContent=r.error?('Error: '+r.error.message):'Saved ✔ — the whole portal picks this up within 15 minutes (or on next page load).';
+  if(!r.error){__lic=await window.License.refresh();try{var rr=await sb.from('site_license').select('*').eq('id',1).maybeSingle();if(rr&&rr.data)__lic.lic=window.License.normalize(rr.data);}catch(e){}render();}
+}
+function quickExtend(days){
+  var base=document.getElementById('lic-exp').value?new Date(document.getElementById('lic-exp').value+'T12:00:00'):new Date();
+  var today=new Date();if(base<today)base=today;
+  base.setDate(base.getDate()+days);
+  document.getElementById('lic-exp').value=base.toISOString().slice(0,10);
+  document.getElementById('lic-model').value='subscription';
+  document.getElementById('lic-status').value='active';
+  saveLicense();
+}
+/* ---------- V9.1 enterprise: activation keys, key-lock, audit ---------- */
+async function applyActivationKey(){
+  var box=document.getElementById('lic-key-msg');
+  var key=(document.getElementById('lic-key').value||'').trim();
+  if(!key){box.textContent='Paste the key first.';return;}
+  box.textContent='Verifying key on the server…';
+  var res=await window.License.applyKey(key);
+  if(res&&res.ok){box.innerHTML='<b style="color:#16a34a">✅ '+esc(res.message||'Key applied.')+'</b>'+(res.expires_on?' New expiry: <b>'+esc(res.expires_on)+'</b>.':'')+' The whole portal picks this up within 15 minutes.';document.getElementById('lic-key').value='';__lic=await window.License.refresh();render();loadKeyState();}
+  else box.innerHTML='<b style="color:#b91c1c">'+esc((res&&res.error)||'Key rejected.')+'</b>';
+}
+async function lockLicense(){
+  var salt=(document.getElementById('lic-salt').value||'').trim();
+  if(salt.length<12){alert('Salt must be at least 12 characters.');return;}
+  if(!confirm('LOCK this site permanently?\n\nAfter locking:\n• The manage form stops working for EVERYONE (including you).\n• Only signed HMG activation keys can change the subscription.\n• This cannot be undone from the app.\n\nKeep the salt safe at HMG — it is needed to generate every future key.'))return;
+  var r=await sb.rpc('sc_license_set_salt',{p_salt:salt});
+  if(r.error)alert('Error: '+r.error.message);
+  else{alert(r.data||'Locked.');document.getElementById('lic-salt').value='';loadKeyState();}
+}
+async function loadKeyState(){
+  try{
+    var locked=false;
+    try{var s=await sb.rpc('sc_license_locked');locked=!!(s&&s.data===true);}catch(e){}
+    /* V9.9 (#8): live server-verdict monitor — one glance answers "what does
+       the DATABASE think right now?" (state, days, server date, lock). */
+    try{var mv=await sb.rpc('sc_license_status');var mb=document.getElementById('lic-monitor');
+      if(mb&&mv&&mv.data){var md=mv.data;
+        var col={active:'#16a34a',warning:'#b45309',grace:'#b91c1c',expired:'#b91c1c',suspended:'#b91c1c',lifetime:'#4f46e5'}[md.state]||'#334155';
+        mb.innerHTML='<div style="display:flex;gap:16px;flex-wrap:wrap;border:1.5px solid '+col+';border-radius:12px;padding:10px 14px;background:#fff">'
+          +'<div><div style="font-weight:900;font-size:1.05rem;color:'+col+'">'+esc(String(md.state||'').toUpperCase())+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Server verdict</div></div>'
+          +(md.days!=null?'<div><div style="font-weight:900;font-size:1.05rem">'+esc(md.days)+' day(s)</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">'+(md.state==='expired'?'past grace':md.state==='grace'?'grace left':'until expiry')+'</div></div>':'')
+          +(md.expires_on?'<div><div style="font-weight:900;font-size:1.05rem">'+esc(md.expires_on)+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Expires</div></div>':'')
+          +'<div><div style="font-weight:900;font-size:1.05rem">'+(md.locked?'🔐 Locked':'🔓 Open')+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Key-lock</div></div>'
+          +(md.server_date?'<div><div style="font-weight:900;font-size:1.05rem">'+esc(md.server_date)+'</div><div style="font-size:.7rem;color:var(--gray-500);text-transform:uppercase">Server date (authoritative)</div></div>':'')
+          +'</div>';
+      }}catch(e){}
+    var lt=document.getElementById('lock-tools');
+    if(lt)lt.style.display=(__isAdmin&&!locked)?'':'none';
+    var mc=document.getElementById('manage-card');
+    if(mc&&locked){mc.querySelectorAll('input,select,textarea,button').forEach(function(el){el.disabled=true;});
+      var note=document.createElement('p');note.style.cssText='color:#b91c1c;font-size:.85rem;font-weight:700';note.textContent='🔐 This site is key-locked: the form is read-only. Use an HMG activation key above to modify the subscription.';mc.appendChild(note);}
+    if(__isAdmin){
+      var ev=await sb.from('license_events').select('*').order('at',{ascending:false}).limit(15);
+      if(ev&&ev.data&&ev.data.length){
+        document.getElementById('lic-events').innerHTML='<h4 style="margin:0 0 6px">📜 License history</h4><div class="table-wrap"><table><thead><tr><th>When</th><th>Action</th><th>Details</th></tr></thead><tbody>'+
+          ev.data.map(function(x){return '<tr><td>'+esc(new Date(x.at).toLocaleString())+'</td><td>'+esc(x.action)+'</td><td style="font-size:.8rem">'+esc(JSON.stringify(x.details||{}))+'</td></tr>';}).join('')+'</tbody></table></div>';
+      }
+    }
+  }catch(e){}
+}
+load().then(loadKeyState).catch(function(){setTimeout(loadKeyState,1200);});
+</script><script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+</body></html>

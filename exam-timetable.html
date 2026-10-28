@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Exam Timetable • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+<meta name="theme-color" content="#0506ae">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<meta property="og:title" content="Timetable • God of Seed Academy">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:image" content="assets/img/logo.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) ===
+   Final UI/UX repair: stable, professional navigation for every layout.
+   Prevents scattered icons/labels, fixes unsupported layout IDs, and keeps
+   large module lists readable on desktop and mobile. */
+:root{--primary:#0506ae;--primary-dark:#0506ae;--primary-light:#964eec;--accent:#964eec;--gradient:linear-gradient(135deg,#0506ae,#964eec);--gradient-dark:linear-gradient(135deg,#0506ae,#964eec);--font:'Plus Jakarta Sans',system-ui,sans-serif;--sc-primary:#0506ae;--sc-accent:#964eec}
+body{font-family:var(--font)!important;background:#f8fafc}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc;color:#0f172a}
+.app-sidebar{width:286px;flex-shrink:0;background:rgba(255,255,255,.98);border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;z-index:40;box-shadow:0 10px 25px rgba(15,23,42,.04)}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px 16px;border-bottom:1px solid #e2e8f0;min-height:78px}
+.app-brand img{width:44px;height:44px;border-radius:12px;object-fit:contain;flex-shrink:0;background:#f8fafc;border:1px solid #e2e8f0}
+.app-brand strong{display:block;font-size:.98rem;font-weight:900;color:#0f172a;line-height:1.2;max-width:190px;white-space:normal}
+.app-nav{display:flex;flex-direction:column;gap:4px;padding:12px 10px 18px;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:10px;min-height:42px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:.875rem;font-weight:700;line-height:1.2;white-space:normal;word-break:normal;transition:background .18s ease,color .18s ease,transform .18s ease}
+.app-nav a:hover{background:#f1f5f9;color:var(--primary);transform:translateX(2px)}
+.app-nav a.active{background:var(--gradient);color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.22)}
+body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!important}.app-nav a[style*="display: none"]{display:none!important}
+.app-nav a.nav-locked{opacity:.62}.app-nav a.nav-locked .app-nav-icon{filter:grayscale(.35)}.app-nav a.nav-locked::after{content:'🔒';font-size:.72rem;opacity:.65;justify-self:end}.app-nav a.nav-locked.active{opacity:1}
+.app-nav-icon{width:32px;height:32px;min-width:32px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;line-height:1;border-radius:10px;background:rgba(79,70,229,.09);color:var(--primary);flex-shrink:0;overflow:hidden}
+.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22);color:#fff}
+.app-nav a span:last-child{overflow:hidden;text-overflow:ellipsis;display:block}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:13px 22px;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30;box-shadow:0 4px 18px rgba(15,23,42,.035)}
+.app-page-title{font-size:1.2rem;font-weight:900;color:#0f172a;margin:0;letter-spacing:-.01em}
+.app-content{padding:24px;flex:1;max-width:1400px;width:100%;margin:0 auto}
+.card{border-radius:18px!important;border:1px solid #e2e8f0!important;box-shadow:0 8px 24px rgba(15,23,42,.06)!important}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:18px}.stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05)}.stat-value{font-size:1.8rem;font-weight:900;color:var(--primary)}.stat-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800}
+/* Stable variants for all builder layout choices. Unsupported visual ideas are
+   expressed as professional variations, not broken experimental layouts. */
+.app-layout.topnav,.app-layout.cardhub,.app-layout.mega-menu,.app-layout.tabbed,.app-layout.dashboard-pro{flex-direction:column}
+.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{width:100%;height:auto;max-height:210px;position:sticky;top:0;flex-direction:row;align-items:stretch;overflow:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:260px;min-width:260px;border-bottom:none;border-right:1px solid #e2e8f0}
+.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(116px,150px);overflow-x:auto;overflow-y:hidden;padding:10px;align-items:center}
+.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{grid-template-columns:1fr;text-align:center;justify-items:center;gap:4px;min-height:68px;padding:8px 10px;font-size:.75rem}
+.app-layout.topnav .app-nav-icon,.app-layout.cardhub .app-nav-icon,.app-layout.mega-menu .app-nav-icon,.app-layout.tabbed .app-nav-icon,.app-layout.dashboard-pro .app-nav-icon{margin:auto}
+.app-layout.compact .app-sidebar,.app-layout.dock .app-sidebar{width:224px}.app-layout.compact .app-nav a,.app-layout.dock .app-nav a{font-size:.8rem;grid-template-columns:28px minmax(0,1fr)}.app-layout.compact .app-nav-icon,.app-layout.dock .app-nav-icon{width:28px;height:28px;min-width:28px}
+.app-layout.expanded .app-sidebar{width:330px}.app-layout.minimalist .app-sidebar{box-shadow:none}.app-layout.floating .app-sidebar{margin:14px;border-radius:22px;height:calc(100vh - 28px);border:1px solid #e2e8f0}.app-layout.split-view .app-content,.app-layout.grid-master .app-content,.app-layout.masonry .app-content{max-width:1500px}
+@media(max-width:900px){.app-sidebar,.app-layout.floating .app-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:min(86vw,310px)!important;height:100vh!important;margin:0!important;border-radius:0!important;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 40px rgba(0,0,0,.22);z-index:100}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{flex-direction:column;align-items:stretch}.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:auto;min-width:0;border-right:none;border-bottom:1px solid #e2e8f0}.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);justify-items:stretch;text-align:left;min-height:42px;font-size:.875rem}.app-content{padding:16px}.app-topbar{padding:12px 14px;gap:10px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}.user-chip{max-width:150px;overflow:hidden}.user-chip strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+
+    <meta name="description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./timetable.html">
+    <meta property="og:title" content="Timetable • God of Seed Academy">
+    <meta property="og:description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
+    <meta property="og:url" content="./timetable.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Timetable • God of Seed Academy">
+    <meta name="twitter:description" content="God of Seed Academy — Timetable. Comprehensive school management platform.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head>
+<body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
+
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
+        <div>
+          <strong>God of Seed Academy</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>My Profile</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔐</span>
+          <span>Change Password</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Report Cards (flexible)</span>
+        </a><a href="affective_traits.html" data-module-id="affective_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Affective Domain</span>
+        </a><a href="psychomotor_traits.html" data-module-id="psychomotor_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏃</span>
+          <span>Psychomotor Domain</span>
+        </a><a href="report_comments.html" data-module-id="report_comments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Report Comments</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Multi-Subject CBT</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="school-fees.html" data-module-id="school_fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏷️</span>
+          <span>Class Fee Structure</span>
+        </a><a href="school-products.html" data-module-id="school_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛒</span>
+          <span>School Products</span>
+        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payment History</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="exam-register.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Exam Registrations</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="hmg-digital-products.html" data-module-id="hmg_digital_products" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Digital Products</span>
+        </a><a href="status-manager.html" data-module-id="status_manager" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔧</span>
+          <span>Role &amp; Status</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="ecosystem.html" data-module-id="ecosystem_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Ecosystem</span>
+        </a><a href="punctuality.html" data-module-id="punctuality" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⏱️</span>
+          <span>Punctuality</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+      </div>
+    </aside>
+  <main class="app-main">
+    <header class="app-topbar">
+      <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
+      <h1 class="app-page-title">Exam Timetable</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        
+        <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
+        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle dark/light — robust like Fleet Console">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="if(window.ThemeManager)ThemeManager.openPalette()" title="Theme palette — colour themes + dark/light + reset (Ctrl+K)">🎨</button>
+        <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
+      </div>
+    </header>
+    <div class="app-content">
+      
+      <div class="card" style="margin-bottom:16px;background:#fef3c7;border-color:#fcd34d"><h3 style="margin-top:0">🗓️ Examination Timetable</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">The official exam schedule for the selected term. Staff/admin build it below (manually or with the ⚡ auto-spread helper); students and parents see their class's papers with dates, times, venues and invigilators. Clashes (same class, same date+time) are detected automatically.</p></div>
+      <div class="card" style="margin-bottom:16px"><div id="ex-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+        <div class="form-group"><label>Class</label><select class="form-select" id="ex-class" onchange="EXT.load()"><option value="">All classes</option></select></div>
+        <div class="form-group"><label>Term</label><select class="form-select" id="ex-term"><option>First Term</option><option>Second Term</option><option>Third Term</option></select></div>
+        <div class="form-group"><label>Session</label><input class="form-input" id="ex-session" placeholder="e.g. 2026/2027" style="width:130px"></div>
+        <button class="btn btn-outline" onclick="EXT.load()">Refresh</button>
+        <button class="btn btn-primary" data-staff-only onclick="EXT.addModal()">+ Add paper</button>
+        <button class="btn btn-outline" data-staff-only onclick="EXT.autoModal()">⚡ Auto-spread subjects</button>
+        <button class="btn btn-outline" onclick="EXT.toggleCompact()" id="ex-compact-btn" title="One-row-per-sitting compact card per class — ideal for photocopying">🗜️ Compact view</button>
+        <button class="btn btn-outline" data-staff-only onclick="EXT.shiftModal()" title="School closed unexpectedly? Move every paper from one day onwards by N days">↔️ Shift days</button>
+        <button class="btn btn-outline" onclick="EXT.exportCSV()" title="Download the filtered schedule as CSV">⬇ CSV</button>
+        <button class="btn btn-outline" onclick="EXT.print()">🖨️ Print</button>
+      </div></div>
+      <div id="ex-clashes"></div>
+      <div id="ex-view"><p class="pulse">Loading exam timetable…</p></div>
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
+      © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+    </footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/voting.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/crud.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/analytics.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
+  else { Notifications.init(sb); Voting.init(sb); }
+  PWAInstall.init();
+  if (window.Super) Super.init(sb, window.SCHOOL);
+  if (window.Enterprise) Enterprise.init(sb);
+  if (window.CRUD) CRUD.init(sb);
+</script>
+<script>
+/* ===== EXT — Examination Timetable engine (V9.1) =====
+   exam_timetable table · staff build, everyone reads · clash detection ·
+   auto-spread (one paper per subject over a date range, morning/afternoon
+   slots, weekends skipped) · per-class landing for students/parents · print. */
+const EXT={
+  canEdit:false,
+  /* V9.2 (issue 6): editing = admin tier OR explicitly authorized editor
+     (sc_module_editors, granted on the Timetable Wizard). Others read-only. */
+  async resolveEdit(){try{
+    for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+    const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+    const isAdmin=!!(window.App&&App.isAdminRole&&App.isAdminRole(role));
+    if(isAdmin){this.canEdit=true;}
+    else{
+      try{const r=await sb.rpc('sc_can_edit',{p_module:'timetable'});this.canEdit=!!(r&&r.data===true);}
+      catch(_){this.canEdit=false;}
+    }
+    if(!this.canEdit)document.querySelectorAll('#ex-actions [data-staff-only]').forEach(el=>el.style.display='none');
+  }catch(_){}},
+  async init(){
+    this.resolveEdit();
+    try{const {data}=await sb.from('classes').select('name').order('name');const sel=document.getElementById('ex-class');(function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();}catch(e){}
+    try{const cp=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();if(cp.data){if(cp.data.term)document.getElementById('ex-term').value=cp.data.term;if(cp.data.session)document.getElementById('ex-session').value=cp.data.session;}}catch(e){}
+    /* students/parents land on their own class */
+    try{for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+      const role=String((window.SC_PROFILE||{}).role||'').toLowerCase(),sel=document.getElementById('ex-class');
+      if(role==='student'){const r=await sb.from('students').select('class').eq('user_id',SC_PROFILE.id).maybeSingle();if(r.data&&r.data.class&&[...sel.options].some(o=>o.value===r.data.class))sel.value=r.data.class;}
+      else if(role==='parent'){const l=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);const ids=(l.data||[]).map(x=>x.student_id);if(ids.length){const st=await sb.from('students').select('class').in('id',ids).limit(1);if(st.data&&st.data[0]&&st.data[0].class&&[...sel.options].some(o=>o.value===st.data[0].class))sel.value=st.data[0].class;}}
+    }catch(_){}
+    this.load();},
+  ctx(){return{cls:document.getElementById('ex-class').value,term:document.getElementById('ex-term').value,session:(document.getElementById('ex-session').value||'').trim()};},
+  async load(){
+    if(!sb)return;const c=this.ctx();
+    let q=sb.from('exam_timetable').select('*').order('exam_date').order('start_time').limit(2000);
+    if(c.cls)q=q.eq('class',c.cls);if(c.term)q=q.eq('term',c.term);if(c.session)q=q.eq('session',c.session);
+    const {data,error}=await q;const box=document.getElementById('ex-view');
+    if(error){box.innerHTML='<div class="card">'+(/does not exist|schema cache/i.test(error.message)?'Database update needed: run <code>database/v9.1-enterprise-pack.sql</code> (or complete-schema.sql) once in the Supabase SQL Editor.':esc(error.message))+'</div>';return;}
+    const rows=data||[];this.rows=rows;
+    /* clash detection: same class, same date, overlapping time */
+    const clashes=[];for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++){const a=rows[i],b=rows[j];
+      if(a.class===b.class&&a.exam_date===b.exam_date&&(a.start_time<b.end_time&&b.start_time<a.end_time))clashes.push(a.class+' · '+a.exam_date+': '+a.subject+' ('+a.start_time+'–'+a.end_time+') overlaps '+b.subject+' ('+b.start_time+'–'+b.end_time+')');}
+    document.getElementById('ex-clashes').innerHTML=clashes.length?'<div class="card" style="border-color:#fca5a5;background:#fef2f2;margin-bottom:16px"><b style="color:#b91c1c">⛔ '+clashes.length+' clash(es) found</b><ul style="margin:6px 0 0;padding-left:18px;font-size:.85rem">'+clashes.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'';
+    if(!rows.length){box.innerHTML='<div class="card">No exam papers scheduled yet'+(c.cls?' for '+esc(c.cls):'')+'. Staff can add papers or use ⚡ Auto-spread.</div>';return;}
+    /* V9.4 (#4/#5): two view modes and day-number awareness.
+       • Standard: grouped by DATE, or by "Day N" when rows carry day_no.
+       • 🗜️ Compact: ONE CARD PER CLASS — a dense sitting list (Day/Date ·
+         time · subject · paper · venue) that fits a term's whole schedule on
+         one A4 sheet per class; perfect for photocopying to students. */
+    const isStaff=this.canEdit; /* V9.2: row edit buttons only for authorized editors */
+    const dayMode=rows.some(r=>r.day_no!=null&&r.day_no!=='');
+    const keyOf=r=>dayMode?('Day '+(r.day_no!=null&&r.day_no!==''?r.day_no:'?')):r.exam_date;
+    const keys=[...new Set(rows.map(keyOf))].sort((a,b)=>{if(dayMode)return (parseInt(a.replace(/\D/g,''))||0)-(parseInt(b.replace(/\D/g,''))||0);return a<b?-1:1;});
+    const labelOf=k=>{if(dayMode)return '🔢 '+k+' <small style="color:var(--gray-500)">(attach the real date later — Edit any paper)</small>';const day=new Date(k+'T12:00:00');return '📅 '+day.toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});};
+    let h='<div class="card" id="ex-print-area"><h2 style="text-align:center">'+esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h2><h3 style="text-align:center">EXAMINATION TIMETABLE'+(c.cls?' · '+esc(c.cls):'')+(c.term?' · '+esc(c.term):'')+(c.session?' · '+esc(c.session):'')+'</h3>';
+    if(this.compact){
+      /* ---- COMPACT: one dense card per class ---- */
+      const classes=[...new Set(rows.map(r=>r.class))].sort();
+      classes.forEach(cls=>{
+        const mine=rows.filter(r=>r.class===cls).sort((a,b)=>{const ka=dayMode?(a.day_no||0):a.exam_date,kb=dayMode?(b.day_no||0):b.exam_date;return ka<kb?-1:ka>kb?1:(a.start_time<b.start_time?-1:1);});
+        h+='<div style="border:1.5px solid var(--gray-300);border-radius:12px;padding:10px 12px;margin:10px 0;page-break-inside:avoid"><h4 style="margin:0 0 6px">'+esc(cls)+' <small style="color:var(--gray-500)">('+mine.length+' sitting'+(mine.length===1?'':'s')+')</small></h4>'
+          +'<table style="width:100%;border-collapse:collapse;font-size:.85rem">'
+          +mine.map(r=>'<tr style="border-bottom:1px solid var(--gray-200)">'
+            +'<td style="padding:3px 6px;white-space:nowrap"><b>'+(dayMode?('Day '+(r.day_no??'?')):esc(String(r.exam_date||'').slice(5)))+'</b></td>'
+            +'<td style="padding:3px 6px;white-space:nowrap">'+esc(r.start_time)+'–'+esc(r.end_time)+'</td>'
+            +'<td style="padding:3px 6px"><b>'+esc(r.subject)+'</b>'+(r.paper?' <span style="color:#7c3aed">· '+esc(r.paper)+'</span>':'')+'</td>'
+            +'<td style="padding:3px 6px;color:var(--gray-600)">'+esc(r.venue||'')+'</td>'
+            +'<td style="padding:3px 6px;color:var(--gray-600)">'+esc(r.invigilator||'')+'</td></tr>').join('')
+          +'</table></div>';});
+    } else {
+      keys.forEach(k=>{
+        h+='<h4 style="margin:14px 0 6px;border-bottom:2px solid var(--gray-200);padding-bottom:4px">'+labelOf(k)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th>'+(c.cls?'':'<th>Class</th>')+'<th>Subject</th><th>Paper</th><th>Venue</th><th>Invigilator</th>'+(isStaff?'<th></th>':'')+'</tr></thead><tbody>';
+        rows.filter(r=>keyOf(r)===k).sort((a,b)=>(a.start_time+a.class).localeCompare(b.start_time+b.class)).forEach(r=>{
+          h+='<tr><td><b>'+esc(r.start_time)+'–'+esc(r.end_time)+'</b></td>'+(c.cls?'':'<td>'+esc(r.class)+'</td>')+'<td><b>'+esc(r.subject)+'</b>'+(r.notes?'<br><small style="color:var(--gray-500)">'+esc(r.notes)+'</small>':'')+'</td><td>'+esc(r.paper||'—')+'</td><td>'+esc(r.venue||'—')+'</td><td>'+esc(r.invigilator||'—')+'</td>'+(isStaff?'<td><button class="btn btn-sm btn-outline" onclick="EXT.edit(\''+r.id+'\')">✏️</button> <button class="btn btn-sm btn-outline" onclick="EXT.del(\''+r.id+'\')">🗑</button></td>':'')+'</tr>';});
+        h+='</tbody></table></div>';});
+    }
+    h+='<p style="font-size:.75rem;color:#64748b">Generated '+new Date().toLocaleString()+(dayMode?' · Day-number schedule (dates to be announced)':'')+'</p></div>';
+    box.innerHTML=h;},
+  /* V9.4 (#4): compact one-card-per-class toggle */
+  toggleCompact(){this.compact=!this.compact;const b=document.getElementById('ex-compact-btn');if(b)b.textContent=this.compact?'📋 Standard view':'🗜️ Compact view';this.load();},
+  formHtml(r){r=r||{};const c=this.ctx();
+    return '<div class="grid grid-2">'+
+    '<div class="form-group"><label>Class</label><select class="form-select" id="exf-class">'+[...document.getElementById('ex-class').options].filter(o=>o.value).map(o=>'<option'+((r.class||c.cls)===o.value?' selected':'')+'>'+esc(o.value)+'</option>').join('')+'</select></div>'+
+    '<div class="form-group"><label>Subject</label><input class="form-input" id="exf-subject" value="'+esc(r.subject||'')+'" list="exf-subjects"><datalist id="exf-subjects"></datalist></div>'+
+    '<div class="form-group"><label>Date</label><input class="form-input" id="exf-date" type="date" value="'+esc(r.exam_date||'')+'"></div>'+
+    '<div class="form-group"><label>Day number (Day 1/2/3 mode — blank when using real dates)</label><input class="form-input" id="exf-dayno" type="number" min="1" value="'+esc(r.day_no!=null?r.day_no:'')+'"></div>'+
+    '<div class="form-group"><label>Start</label><input class="form-input" id="exf-start" type="time" value="'+esc(r.start_time||'09:00')+'"></div>'+
+    '<div class="form-group"><label>End</label><input class="form-input" id="exf-end" type="time" value="'+esc(r.end_time||'11:00')+'"></div>'+
+    '<div class="form-group"><label>Paper (optional)</label><input class="form-input" id="exf-paper" value="'+esc(r.paper||'')+'" placeholder="e.g. Paper 1 · Objective"></div>'+
+    '<div class="form-group"><label>Venue</label><input class="form-input" id="exf-venue" value="'+esc(r.venue||'')+'" placeholder="e.g. Main Hall"></div>'+
+    '<div class="form-group"><label>Invigilator</label><input class="form-input" id="exf-inv" value="'+esc(r.invigilator||'')+'"></div>'+
+    '<div class="form-group" style="grid-column:1/-1"><label>Notes</label><input class="form-input" id="exf-notes" value="'+esc(r.notes||'')+'" placeholder="e.g. Bring mathematical set"></div></div>';},
+  async fillSubjects(){try{const {data}=await sb.from('subjects').select('name').order('name');const dl=document.getElementById('exf-subjects');if(dl)dl.innerHTML=(data||[]).map(s=>'<option value="'+esc(s.name)+'">').join('');}catch(e){}},
+  addModal(){openModal('Add exam paper',this.formHtml(null),'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.save()">💾 Save paper</button>');this.fillSubjects();},
+  async edit(id){const r=(this.rows||[]).find(x=>x.id===id);if(!r)return;this._editing=id;openModal('Edit exam paper',this.formHtml(r),'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.save(\''+id+'\')">💾 Save changes</button>');this.fillSubjects();},
+  async save(id){const c=this.ctx();
+    if(!this.canEdit){toast('Only the admin or an authorized timetable editor can modify the exam timetable.','warning',7000);return;}
+    const dayNoRaw=(document.getElementById('exf-dayno')||{}).value;
+    const row={class:document.getElementById('exf-class').value,subject:(document.getElementById('exf-subject').value||'').trim(),exam_date:document.getElementById('exf-date').value,start_time:document.getElementById('exf-start').value,end_time:document.getElementById('exf-end').value,paper:(document.getElementById('exf-paper').value||'').trim(),venue:(document.getElementById('exf-venue').value||'').trim(),invigilator:(document.getElementById('exf-inv').value||'').trim(),notes:(document.getElementById('exf-notes').value||'').trim(),term:c.term,session:c.session,day_no:dayNoRaw?parseInt(dayNoRaw,10):null};
+    if(!row.class||!row.subject||!row.exam_date){toast('Class, subject and date are required.','warning');return;}
+    if(row.end_time<=row.start_time){toast('End time must be after start time.','warning');return;}
+    let r=id?await sb.from('exam_timetable').update(row).eq('id',id):await sb.from('exam_timetable').insert(row);
+    if(r.error&&/day_no/.test(r.error.message||'')){delete row.day_no;r=id?await sb.from('exam_timetable').update(row).eq('id',id):await sb.from('exam_timetable').insert(row);}
+    if(r.error){toast(r.error.message,'danger',8000);return;}
+    closeModal();toast('💾 Exam paper saved.','success');this.load();},
+  async del(id){if(!this.canEdit){toast('Only the admin or an authorized timetable editor can modify the exam timetable.','warning',7000);return;}
+    if(!confirm('Remove this exam paper?'))return;const r=await sb.from('exam_timetable').delete().eq('id',id);if(r.error){toast(r.error.message,'danger');return;}toast('Removed.','success');this.load();},
+  /* ===== V9.4 (#3/#5): FLEXIBLE AUTO-SPREAD =====
+     • UNLIMITED daily slots — the school creates as many as it needs (3, 4, 5+
+       papers a day), each with its own time window.
+     • Paper divisions — each subject can sit MULTIPLE papers (e.g. Paper 1
+       (Objective) / Paper 2 (Theory) / CBT / Practical); the school types its
+       own division labels, one set applied to every subject, and divisions of
+       the same subject are automatically spread to DIFFERENT days.
+     • Venue + invigilator pools — comma-separated lists; the system RANDOMISES
+       fairly across them (round-robin from a shuffled pool, so no venue or
+       teacher is overloaded).
+     • DAY-NUMBER MODE (#5) — schools unsure of exact dates schedule as Day 1,
+       Day 2, Day 3…; printable immediately, dates can be attached later. */
+  autoModal(){const c=this.ctx();
+    openModal('⚡ Auto-spread subjects into an exam timetable',
+      '<p style="font-size:.85rem;color:var(--gray-600)">Papers are spread across days (weekends skipped in date mode). Existing papers for the class/term/session are replaced. Everything is editable afterwards.</p>'+
+      '<div class="grid grid-2">'+
+      '<div class="form-group"><label>Class (one, or ALL)</label><select class="form-select" id="exa-class"><option value="__ALL__">ALL classes</option>'+[...document.getElementById('ex-class').options].filter(o=>o.value).map(o=>'<option'+(c.cls===o.value?' selected':'')+'>'+esc(o.value)+'</option>').join('')+'</select></div>'+
+      '<div class="form-group"><label>Scheduling mode</label><select class="form-select" id="exa-mode" onchange="document.getElementById(\'exa-datewrap\').style.display=this.value===\'date\'?\'\':\'none\'"><option value="date">📅 Exact dates (weekends skipped)</option><option value="day">🔢 Day 1, Day 2, Day 3… (attach dates later)</option></select></div>'+
+      '</div>'+
+      '<div id="exa-datewrap" class="form-group"><label>First exam day</label><input class="form-input" id="exa-start" type="date"></div>'+
+      '<div class="form-group"><label><b>Daily time slots</b> — one per line, as many as your school runs in a day (e.g. 4+ papers/day)</label>'+
+      '<textarea class="form-input" id="exa-slots" rows="4" placeholder="08:30-10:00&#10;10:30-12:00&#10;12:30-14:00&#10;14:30-16:00">09:00-11:00\n12:00-14:00</textarea>'+
+      '<small style="color:var(--gray-500)">Format HH:MM-HH:MM per line. 2 lines = 2 papers/day, 5 lines = 5 papers/day.</small></div>'+
+      '<div class="form-group"><label><b>Paper divisions per subject</b> (optional — comma-separated; each division becomes its own sitting on a DIFFERENT day)</label>'+
+      '<input class="form-input" id="exa-papers" placeholder="e.g. Paper 1 (Objective), Paper 2 (Theory), CBT — blank = one paper per subject">'+
+      '<small style="color:var(--gray-500)">Type your own labels: Objective/Theory/CBT/Practical/Oral — anything the school uses. V9.5: divisions are INTERMIXED through the timetable (every day carries a blend — never "all Paper first, all CBT last").</small></div>'+
+      '<div class="form-group"><label><b>📌 Reserve subjects for specific days</b> (optional — one per line: <code>Subject = Day 3</code> or <code>Subject = 2026-03-12</code>)</label>'+
+      '<textarea class="form-input" id="exa-pins" rows="2" placeholder="Mathematics = Day 1&#10;English Language = 2026-03-12"></textarea>'+
+      '<small style="color:var(--gray-500)">Pinned subjects sit ONLY on their reserved day (all their divisions that day); everything else flows around them.</small></div>'+
+      '<div class="form-group"><label><input type="checkbox" id="exa-sat"> Include Saturdays (some schools examine on Saturday)</label></div>'+
+      '<div class="grid grid-2">'+
+      '<div class="form-group"><label>Venue pool (comma-separated — randomised fairly)</label><input class="form-input" id="exa-venues" placeholder="e.g. Main Hall, Block B Hall, ICT Lab"></div>'+
+      '<div class="form-group"><label>Invigilator pool (comma-separated — randomised fairly)</label><input class="form-input" id="exa-invs" placeholder="e.g. Mr Ade, Mrs Bello, Mr Chukwu — blank = fill later"></div>'+
+      '</div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.autoRun()">⚡ Build timetable</button>');},
+  async autoRun(){const c=this.ctx();
+    if(!this.canEdit){toast('Only the admin or an authorized timetable editor can build the exam timetable.','warning',7000);return;}
+    const clsPick=document.getElementById('exa-class').value;
+    const mode=document.getElementById('exa-mode').value;
+    const start=(document.getElementById('exa-start')||{}).value;
+    /* parse the unlimited slot list */
+    const slotLines=String((document.getElementById('exa-slots')||{}).value||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    const slots=[];for(const ln of slotLines){const m=ln.match(/^(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})$/);if(!m){toast('Bad slot "'+ln+'" — use HH:MM-HH:MM, one per line.','warning',7000);return;}if(m[2]<=m[1]){toast('Slot "'+ln+'": end must be after start.','warning');return;}slots.push([m[1],m[2]]);}
+    if(!slots.length){toast('Add at least one daily time slot.','warning');return;}
+    if(mode==='date'&&!start){toast('Pick the first exam day (or switch to Day 1/Day 2 mode).','warning');return;}
+    const papers=String((document.getElementById('exa-papers')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean);
+    const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+    const venues=shuffle(String((document.getElementById('exa-venues')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean));
+    const invs=shuffle(String((document.getElementById('exa-invs')||{}).value||'').split(',').map(x=>x.trim()).filter(Boolean));
+    let vi=0,ii=0;const nextVenue=()=>venues.length?venues[(vi++)%venues.length]:'';const nextInv=()=>invs.length?invs[(ii++)%invs.length]:'';
+    const satOK=!!(document.getElementById('exa-sat')||{}).checked;
+    /* 📌 day pins: 'Subject = Day 3' or 'Subject = YYYY-MM-DD' */
+    const pins={};let pinErr=null;
+    String((document.getElementById('exa-pins')||{}).value||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(ln=>{
+      const m=ln.match(/^(.+?)\s*=\s*(.+)$/);if(!m){pinErr='Bad pin line: "'+ln+'" — use Subject = Day 3 or Subject = 2026-03-12';return;}
+      const subj=m[1].trim().toLowerCase(),v=m[2].trim();
+      const dm=v.match(/^day\s*(\d+)$/i),dt=v.match(/^\d{4}-\d{2}-\d{2}$/);
+      if(dm)pins[subj]={day:parseInt(dm[1],10)};else if(dt)pins[subj]={date:v};else pinErr='Bad pin value in "'+ln+'"';});
+    if(pinErr){toast(pinErr,'warning',8000);return;}
+    const classes=clsPick==='__ALL__'?[...document.getElementById('ex-class').options].map(o=>o.value).filter(Boolean):[clsPick];
+    /* subject sources (V9.2 chain): demand → published timetable → level match → all */
+    const subj=await sb.from('subjects').select('name,level').order('name');
+    if(subj.error){toast(subj.error.message,'danger');return;}
+    const reqAll=await sb.from('timetable_requirements').select('class,subject');
+    const ttAll=await sb.from('timetable').select('class,subject').limit(4000);
+    let made=0;
+    for(const cls of classes){
+      let subjects=[];
+      (reqAll.data||[]).filter(r=>r.class===cls).forEach(r=>{String(r.subject||'').split('/').map(x=>x.trim()).filter(Boolean).forEach(s=>{if(!subjects.includes(s))subjects.push(s);});});
+      if(!subjects.length)(ttAll.data||[]).filter(r=>r.class===cls&&r.subject&&!/^⛔/.test(r.subject)).forEach(r=>{const s=String(r.subject).replace(/\s*\(double\)$/,'').trim();if(s&&!subjects.includes(s))subjects.push(s);});
+      if(!subjects.length){const lvl=(cls.match(/^[A-Za-z]+/)||[''])[0].toUpperCase();
+        subjects=[...new Set((subj.data||[]).filter(s=>!s.level||String(s.level).toUpperCase().indexOf(lvl)>-1).map(s=>s.name))];
+        if(!subjects.length)subjects=[...new Set((subj.data||[]).map(s=>s.name))];}
+      if(!subjects.length)continue;
+      await sb.from('exam_timetable').delete().eq('class',cls).eq('term',c.term).eq('session',c.session);
+      /* ===== V9.5 SCHEDULING CORE =====
+         (2) INTERMIXED divisions: one shuffled subject-queue PER division,
+             offset from each other; we take one sitting from each division's
+             queue in turn — so every day carries a blend of divisions, never
+             "all Paper 1 first, all CBT last".
+         (—) Same-subject protection: a subject never sits twice on one day —
+             a candidate whose subject already sat today is swapped with the
+             next eligible sitting.
+         (3) 📌 DAY PINS: 'Subject = Day 3' / 'Subject = 2026-03-12' reserves
+             that subject (ALL its divisions) for that day only.
+         (4) Saturday option honoured in date mode. */
+      const isSkippedDay=(dt)=>dt.getDay()===0||(!satOK&&dt.getDay()===6);
+      /* interleaved sitting list */
+      let sittings=[];
+      if(papers.length){
+        const queues=papers.map((pk,qi)=>{const q=shuffle(subjects).map(s=>({subject:s,paper:pk}));
+          /* offset each division's queue so subject k's divisions are far apart */
+          for(let r=0;r<qi*Math.ceil(subjects.length/papers.length);r++)q.push(q.shift());
+          return q;});
+        let remaining=subjects.length*papers.length;
+        while(remaining>0){for(const q of queues){if(q.length){sittings.push(q.shift());remaining--;}}}
+      } else sittings=shuffle(subjects).map(s=>({subject:s,paper:''}));
+      /* split out pinned subjects */
+      const pinned=sittings.filter(x=>pins[x.subject.toLowerCase()]!=null);
+      sittings=sittings.filter(x=>pins[x.subject.toLowerCase()]==null);
+      /* day/slot cursor */
+      let dayNo=1,si=0;let d0=mode==='date'?new Date(start+'T12:00:00'):null;
+      if(d0)while(isSkippedDay(d0))d0.setDate(d0.getDate()+1);
+      const advance=()=>{si++;if(si>=slots.length){si=0;dayNo++;if(d0){d0.setDate(d0.getDate()+1);while(isSkippedDay(d0))d0.setDate(d0.getDate()+1);}}};
+      const rows=[];const todaySubjects=()=>new Set(rows.filter(r=>d0?(r.exam_date===d0.toISOString().slice(0,10)):(r.day_no===dayNo)).map(r=>r.subject));
+      const push=(x)=>{rows.push({class:cls,subject:x.subject,start_time:slots[si][0],end_time:slots[si][1],
+          venue:nextVenue(),invigilator:nextInv(),paper:x.paper,paper_kind:x.paper,term:c.term,session:c.session,notes:'',
+          exam_date:d0?d0.toISOString().slice(0,10):new Date(Date.now()+dayNo*86400000).toISOString().slice(0,10),
+          day_no:d0?null:dayNo});advance();};
+      while(sittings.length){
+        const seen=todaySubjects();
+        let idx=sittings.findIndex(x=>!seen.has(x.subject));
+        if(idx<0)idx=0;                       // day too small to avoid a repeat — accept
+        push(sittings.splice(idx,1)[0]);
+      }
+      /* place pinned subjects on their reserved day (their own slot sequence) */
+      const pinCursor={};
+      pinned.forEach(x=>{
+        const pin=pins[x.subject.toLowerCase()];
+        const key=x.subject.toLowerCase();
+        pinCursor[key]=(pinCursor[key]||0);
+        const slot=slots[pinCursor[key]%slots.length];pinCursor[key]++;
+        const row={class:cls,subject:x.subject,start_time:slot[0],end_time:slot[1],
+          venue:nextVenue(),invigilator:nextInv(),paper:x.paper,paper_kind:x.paper,term:c.term,session:c.session,
+          notes:'📌 reserved day',exam_date:null,day_no:null};
+        if(pin.date){row.exam_date=pin.date;row.day_no=mode==='day'?null:null;}
+        else{row.day_no=mode==='day'?pin.day:null;
+          if(mode==='date'&&d0){/* Day N pin in date mode → count N scheduling days from start */
+            const dd=new Date(start+'T12:00:00');let n=1;while(isSkippedDay(dd))dd.setDate(dd.getDate()+1);
+            while(n<pin.day){dd.setDate(dd.getDate()+1);while(isSkippedDay(dd))dd.setDate(dd.getDate()+1);n++;}
+            row.exam_date=dd.toISOString().slice(0,10);}
+          else if(mode==='day')row.exam_date=new Date(Date.now()+pin.day*86400000).toISOString().slice(0,10);
+        }
+        if(!row.exam_date)row.exam_date=new Date(Date.now()+(pin.day||1)*86400000).toISOString().slice(0,10);
+        rows.push(row);});
+      /* insert with graceful fallback for pre-v9.4 databases (no day_no/paper_kind) */
+      let r=await sb.from('exam_timetable').insert(rows);
+      if(r.error&&/day_no|paper_kind/.test(r.error.message||'')){
+        rows.forEach(x=>{delete x.day_no;delete x.paper_kind;});
+        r=await sb.from('exam_timetable').insert(rows);
+        if(!r.error&&mode==='day')toast('Day-number mode needs the v9.4 database update — scheduled with placeholder dates for now.','warning',9000);
+      }
+      if(r.error){toast(cls+': '+r.error.message,'danger',8000);continue;}
+      made+=rows.length;}
+    closeModal();toast('⚡ '+made+' sitting(s) scheduled across '+classes.length+' class(es)'+(papers.length?' · '+papers.length+' paper division(s) per subject':'')+(venues.length?' · venues randomised':'')+(invs.length?' · invigilators randomised':'')+'. Review the grid and adjust as needed.','success',9000);
+    if(window.App&&App.logActivity)App.logActivity('generate','exam_timetable',classes.join(','));this.load();},
+  /* V9.5 (#4): SHIFT DAYS — strikes/holidays happen; move every paper from a
+     cut-off date onwards by N days in one click (weekends skipped). */
+  shiftModal(){
+    if(!this.canEdit){toast('Only the admin or an authorized timetable editor can shift the schedule.','warning');return;}
+    openModal('↔️ Shift exam days',
+      '<p style="font-size:.85rem;color:var(--gray-600)">School closed unexpectedly? Every paper ON or AFTER the cut-off moves forward by the chosen number of days (Sundays'+((this._satOK)?'':' and Saturdays')+' skipped). Day-number rows shift their Day N instead.</p>'+
+      '<div class="grid grid-2"><div class="form-group"><label>From date (papers on/after this move)</label><input class="form-input" id="exs-from" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+      '<div class="form-group"><label>Shift by (days)</label><input class="form-input" id="exs-by" type="number" value="1" min="1" max="30"></div></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.shiftRun()">↔️ Shift now</button>');},
+  async shiftRun(){
+    const from=document.getElementById('exs-from').value,by=Math.max(1,Number(document.getElementById('exs-by').value)||1);
+    if(!from){toast('Pick the cut-off date.','warning');return;}
+    const c=this.ctx();let q=sb.from('exam_timetable').select('*').gte('exam_date',from);
+    if(c.term)q=q.eq('term',c.term);if(c.session)q=q.eq('session',c.session);if(c.cls)q=q.eq('class',c.cls);
+    const r=await q.limit(2000);if(r.error){toast(r.error.message,'danger');return;}
+    const rows=r.data||[];if(!rows.length){toast('No papers on/after '+from+' in this scope.','info');return;}
+    if(!confirm('Shift '+rows.length+' paper(s) forward by '+by+' day(s)?'))return;
+    let moved=0;
+    for(const row of rows){
+      if(row.day_no!=null&&row.day_no!==''){ /* day-number rows shift Day N */
+        const u=await sb.from('exam_timetable').update({day_no:Number(row.day_no)+by}).eq('id',row.id);
+        if(!u.error)moved++;continue;}
+      const dt=new Date(row.exam_date+'T12:00:00');let n=0;
+      while(n<by){dt.setDate(dt.getDate()+1);if(dt.getDay()!==0&&dt.getDay()!==6)n++;}
+      const u=await sb.from('exam_timetable').update({exam_date:dt.toISOString().slice(0,10)}).eq('id',row.id);
+      if(!u.error)moved++;}
+    toast('↔️ '+moved+' paper(s) shifted by '+by+' day(s).','success',8000);
+    if(window.App&&App.logActivity)App.logActivity('shift','exam_timetable',from+'+'+by);this.load();},
+  /* V9.5 (#4): CSV export of the current filter */
+  exportCSV(){
+    const rows=this.rows||[];if(!rows.length){toast('Nothing to export — load a schedule first.','info');return;}
+    const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const csv=['Class,Subject,Paper,Day,Date,Start,End,Venue,Invigilator,Term,Session,Notes']
+      .concat(rows.map(r=>[r.class,r.subject,r.paper||'',r.day_no!=null?('Day '+r.day_no):'',r.exam_date||'',r.start_time,r.end_time,r.venue||'',r.invigilator||'',r.term||'',r.session||'',r.notes||''].map(esc2).join(','))).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='exam-timetable.csv';a.click();},
+  print(){const el=document.getElementById('ex-print-area');if(!el){toast('Nothing to print yet.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Exam Timetable</title><style>@page{size:A4;margin:10mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #111;padding:6px;text-align:left;font-size:12px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();}
+};
+document.addEventListener('DOMContentLoaded',()=>EXT.init());EXT.init();
+</script></body></html>

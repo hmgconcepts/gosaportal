@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AI Question Prompts (for CBT CSV) • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — AI Question Prompts (for CBT CSV). Free school management platform by HMG Concepts.">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+<meta name="theme-color" content="#0506ae">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<meta property="og:title" content="AI Question Prompts (for CBT CSV) • God of Seed Academy">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:image" content="assets/img/og-cover.svg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) ===
+   Guarantees the logged-in dashboard layout renders correctly even if the
+   external stylesheet is cached/blocked/fails to load. Mirrors style.css. */
+:root{--sc-primary:#0506ae;--sc-accent:#964eec}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc}
+.app-sidebar{width:250px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:40}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px;border-bottom:1px solid #e2e8f0}
+.app-brand img{width:40px;height:40px;border-radius:10px;object-fit:contain;flex-shrink:0;background:#f8fafc}
+.app-brand strong{display:block;font-size:.95rem;font-weight:800;color:#0f172a;line-height:1.2}
+.app-nav{display:flex;flex-direction:column;gap:2px;padding:12px 10px;flex:1}
+.app-nav a{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;color:#475569;text-decoration:none;font-size:.9rem;font-weight:600;line-height:1;white-space:nowrap}
+.app-nav a:hover{background:#f1f5f9;color:#0506ae}
+.app-nav a.active{background:#0506ae;color:#fff}
+.app-nav-icon{width:24px;min-width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:14px 24px;background:#fff;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30}
+.app-page-title{font-size:1.25rem;font-weight:800;color:#0f172a;margin:0}
+.app-content{padding:24px;flex:1;max-width:1280px;width:100%}
+.app-layout.topnav{flex-direction:column}
+.app-layout.topnav .app-sidebar{width:100%;height:auto;flex-direction:row;align-items:center;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-nav{flex-direction:row;flex:1;padding:8px;gap:4px}
+.app-layout.topnav .app-nav a{flex-direction:column;gap:4px;font-size:.7rem;padding:8px 12px;text-align:center}
+@media(max-width:900px){.app-sidebar{position:fixed;left:0;top:0;bottom:0;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 25px -5px rgba(0,0,0,.2)}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar{position:sticky;transform:none}.app-content{padding:16px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+
+    <meta name="description" content="God of Seed Academy — AI Question Prompts (for CBT CSV). Free school management platform by HMG Concepts.">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./cbt-prompts.html">
+    <meta property="og:title" content="AI Question Prompts (for CBT CSV) • God of Seed Academy">
+    <meta property="og:description" content="God of Seed Academy — AI Question Prompts (for CBT CSV). Free school management platform by HMG Concepts.">
+    <meta property="og:url" content="./cbt-prompts.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="AI Question Prompts (for CBT CSV) • God of Seed Academy">
+    <meta name="twitter:description" content="God of Seed Academy — AI Question Prompts (for CBT CSV). Free school management platform by HMG Concepts.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  <style>
+/* V6.3 NAV-UNIFY: single canonical navigation look on every page. */
+.app-sidebar{width:286px!important;overflow:hidden!important}
+.app-nav{display:flex!important;flex-direction:column!important;gap:4px!important;padding:12px 10px!important;flex:1!important;overflow-y:auto!important}
+.app-nav a{display:grid!important;grid-template-columns:32px minmax(0,1fr)!important;align-items:center!important;gap:10px!important;min-height:42px!important;padding:8px 10px!important;border-radius:12px!important;font-size:.875rem!important;font-weight:700!important;line-height:1.2!important;white-space:normal!important;text-align:left!important;flex-direction:row!important}
+.app-nav a span:first-child,.app-nav .app-nav-icon{width:32px!important;height:32px!important;min-width:32px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-size:1.05rem!important;line-height:1!important;border-radius:10px!important;background:rgba(79,70,229,.09)!important;color:var(--primary)!important;flex-shrink:0!important;overflow:hidden!important}
+.app-nav a.active span:first-child,.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22)!important;color:#fff!important}
+</style>
+</head>
+<body data-theme="theme2" data-school="God of Seed Academy" data-font="raleway">
+
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
+        <div>
+          <strong>God of Seed Academy</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>My Profile</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔐</span>
+          <span>Change Password</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Report Cards (flexible)</span>
+        </a><a href="affective_traits.html" data-module-id="affective_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Affective Domain</span>
+        </a><a href="psychomotor_traits.html" data-module-id="psychomotor_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏃</span>
+          <span>Psychomotor Domain</span>
+        </a><a href="report_comments.html" data-module-id="report_comments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Report Comments</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Multi-Subject CBT</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="school-fees.html" data-module-id="school_fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏷️</span>
+          <span>Class Fee Structure</span>
+        </a><a href="school-products.html" data-module-id="school_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛒</span>
+          <span>School Products</span>
+        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payment History</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="exam-register.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Exam Registrations</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="hmg-digital-products.html" data-module-id="hmg_digital_products" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Digital Products</span>
+        </a><a href="status-manager.html" data-module-id="status_manager" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔧</span>
+          <span>Role &amp; Status</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="ecosystem.html" data-module-id="ecosystem_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Ecosystem</span>
+        </a><a href="punctuality.html" data-module-id="punctuality" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⏱️</span>
+          <span>Punctuality</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a>
+      </div>
+    </aside>
+  <main class="app-main">
+    <header class="app-topbar">
+      <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
+      <h1 class="app-page-title">AI Question Prompts (for CBT CSV)</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        
+        <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle dark/light — robust like Fleet Console">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="if(window.ThemeManager)ThemeManager.openPalette()" title="Theme palette — colour themes + dark/light + reset (Ctrl+K)">🎨</button>
+        <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout style="display:none">Sign out</button>
+      </div>
+    </header>
+    <div class="app-content">
+      
+      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe">
+        <h3 style="margin-top:0">🧩 What is this page?</h3>
+        <p style="margin:0;color:var(--gray-700)">Writing exam questions by hand is slow. This page gives you ready-made <strong>prompts</strong> you can paste into <strong>any free AI chat</strong>
+        (ChatGPT, Google Gemini, Microsoft Copilot, etc.) to instantly draft questions in the <strong>exact CSV format the CBT page accepts</strong>.
+        <br><br><strong>The platform itself uses no paid AI</strong> — you simply copy a prompt, fill in the blanks ([TOPIC], [NUMBER], [CLASS/LEVEL]),
+        paste it into a free chat, copy the CSV it returns, <strong>edit it to suit your needs</strong>, save as a <code>.csv</code> file, and upload it on the
+        <a href="cbt.html">CBT page</a>. Pick the level that matches your need:</p>
+      </div>
+
+      <!-- ===================================================================
+           V10.3 PROMPT STUDIO — Tutoring Connect parity, School Connect flavour.
+           An interactive builder: pick a pack, type the topic/count/class once,
+           and a COMPLETE, tailored prompt is assembled — no [BLANKS] to hunt
+           for. Each pack is a genuinely different prompt (its own role,
+           mission, type distribution, briefing sections, quality bar and
+           final checklist), sharing only the CSV output contract that keeps
+           files importable. The classic copy-paste prompt cards below are
+           untouched — this is purely additive.
+           =================================================================== -->
+      <div class="card" style="margin-bottom:16px;border-left:6px solid #059669">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">🎛 Prompt Studio — build a tailored prompt in seconds</h3>
+          <span class="badge" style="background:#059669;color:#fff">NEW · V10.3</span>
+        </div>
+        <p style="color:var(--gray-600);margin:6px 0 12px">Fill the boxes once — the studio writes the whole prompt for you, correctly formatted for the pack you choose. Includes the <b>advanced 17+ question types</b>, <b>multi-subject papers with per-subject topics</b>, <b>📚 Digital Library reading packs (link-based)</b> and <b>📝 Assignment briefs (link-based)</b>.</p>
+        <div class="grid grid-2">
+          <div class="form-group"><label>Pack</label>
+            <select class="form-select" id="ps-pack">
+              <optgroup label="Question banks">
+                <option value="simple">Simple recall (MCQ + True/False)</option>
+                <option value="intermediate">Intermediate (adds numeric, short, MRQ)</option>
+                <option value="advanced">Advanced (matching, ordering, essay)</option>
+                <option value="enterprise" selected>Auto-Graded Ultimate Pack (every auto-marked type)</option>
+                <option value="mcq_only">MCQ-only strict paper</option>
+                <option value="multi_subject">Multi-subject paper (UTME / Common Entrance)</option>
+              </optgroup>
+              <optgroup label="Examiner specials">
+                <option value="exam_board">Exam-board style (WAEC / NECO / UTME / IGCSE…)</option>
+                <option value="past_paper">From a past paper link</option>
+                <option value="marking_scheme">Paper + full marking scheme</option>
+                <option value="differentiated">Differentiated — Support / Core / Stretch</option>
+                <option value="misconception">Diagnostic misconception hunter</option>
+              </optgroup>
+              <optgroup label="STEM & materials (NEW)">
+                <option value="multiline_math">🧮 Multi-line maths / STEM (typeset fractions, surds, matrices)</option>
+                <option value="material_upload">📄 Uploaded Material CBT (paste/attach a document)</option>
+                <option value="material_link">🔗 Linked Material CBT (questions strictly from a URL)</option>
+              </optgroup>
+              <optgroup label="School Connect specials">
+                <option value="dl_article">📚 Digital Library — article / material link</option>
+                <option value="dl_video">📚 Digital Library — video link</option>
+                <option value="assignment">📝 Assignment brief + rubric (link-based)</option>
+              </optgroup>
+            </select></div>
+          <div class="form-group" data-ps-hide="subjects"><label>Topic</label><input class="form-input" id="ps-topic" value="" placeholder="e.g. Quadratic equations"></div>
+          <div class="form-group"><label>Number of questions</label><input class="form-input" id="ps-n" type="number" value="20" min="1"></div>
+          <div class="form-group"><label>Class / level</label><input class="form-input" id="ps-lv" value="" placeholder="e.g. JSS 3 / SS 2" list="ps-classes"><datalist id="ps-classes"></datalist></div>
+          <div class="form-group" data-ps-hide="subjects"><label>Subject</label><input class="form-input" id="ps-subject" value="" placeholder="e.g. Mathematics" list="ps-subjects"><datalist id="ps-subjects"></datalist></div>
+          <div class="form-group"><label>Exam type / board</label>
+            <select class="form-select" id="ps-board">
+              <option>General classwork</option><option>WAEC</option><option>NECO</option>
+              <option>GCE</option><option>NABTEB</option><option>BECE</option>
+              <option>UTME / JAMB</option><option>Common Entrance</option>
+              <option>Cambridge Checkpoint</option><option>IGCSE</option><option>A-Level</option>
+              <option>IELTS</option><option>TOEFL</option><option>SAT</option>
+              <option>Olympiad / competition</option>
+            </select></div>
+          <div class="form-group" style="grid-column:1/-1" data-ps-need="source" hidden><label>Source link — the article, video, material or past paper the questions come from</label>
+            <input class="form-input" id="ps-src" placeholder="https://… or a Google Drive / YouTube link">
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">Links only — never upload a file (protects the free Supabase storage quota). The student opens this same link from the Digital Library / Assignment, so the questions and the material always match.</div></div>
+          <div class="form-group" style="grid-column:1/-1" data-ps-need="subjects" hidden>
+            <label>Subjects (comma separated)</label>
+            <input class="form-input" id="ps-subjects-list" placeholder="Mathematics, English, Basic Science">
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">Type the subjects, separated by commas. A topic box appears for each one below.</div>
+          </div>
+          <div class="form-group" style="grid-column:1/-1" data-ps-need="subjects" hidden>
+            <label>Topic for each subject</label>
+            <div id="ps-subject-topics"></div>
+            <div style="font-size:.78rem;color:var(--gray-500);margin-top:4px">Give each subject its own topic. Leave one blank to let the model choose a representative topic for that subject.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" type="button" id="ps-build">⚙️ Build prompt</button>
+          <button class="btn btn-outline" type="button" id="ps-copy">📋 Copy prompt</button>
+        </div>
+        <textarea class="form-input" id="ps-out" rows="16" style="margin-top:12px;font-family:monospace;font-size:.78rem" placeholder="Your tailored prompt appears here — click Build prompt."></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:stretch">
+          <textarea class="form-input" id="ps-csvback" rows="3" style="flex:1;min-width:260px" placeholder="Paste the CSV the chat gave you here, then press Save as .csv"></textarea>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn btn-outline" type="button" id="ps-savecsv">⬇ Save as .csv</button>
+            <a class="btn btn-outline" href="cbt.html">Open CBT to upload</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <h3 style="margin:0">1. Simple question prompt</h3>
+            <button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-simple')">📋 Copy prompt</button>
+          </div>
+          <p style="color:var(--gray-600);margin:6px 0">Best for younger classes & quick tests — multiple choice and yes/no only.</p>
+          <textarea id="p-simple" class="form-input" rows="10" style="font-family:monospace;font-size:.8rem">You are a Nigerian school exam question writer. Generate exactly [NUMBER] questions on the topic &quot;[TOPIC]&quot; for [CLASS/LEVEL].
+Use ONLY these simple question types: mcq (multiple choice with 4 options) and truefalse (yes/no).
+Output ONLY a downloadable CSV file content with this EXACT header row and one question per line (no extra text, no markdown, no explanation outside the CSV). Wrap every field in double quotes:
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+Rules:
+- For mcq: fill A,B,C,D and put the correct letter (A/B/C/D) in CorrectAnswer. Type = mcq.
+- For truefalse: leave A,B,C,D blank, put A (for True) or B (for False) in CorrectAnswer. Type = truefalse.
+- Wrap every field in double quotes. Escape inner double quotes by writing them twice.
+- Difficulty = Easy. Tags = the topic. Section = the subject.
+- Leave Tolerance, Unit, Accept, MRQ_AON, Pairs, Items blank.</textarea>
+        </div><div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <h3 style="margin:0">2. Intermediate question prompt</h3>
+            <button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-inter')">📋 Copy prompt</button>
+          </div>
+          <p style="color:var(--gray-600);margin:6px 0">For mid-level assessments — adds numeric, short-answer and multiple-response questions.</p>
+          <textarea id="p-inter" class="form-input" rows="10" style="font-family:monospace;font-size:.8rem">You are a Nigerian school exam question writer. Generate exactly [NUMBER] questions on &quot;[TOPIC]&quot; for [CLASS/LEVEL], mixing these intermediate types: mcq, truefalse, numeric, short, mrq (multiple-response).
+Output ONLY a downloadable CSV file content with this EXACT header and one question per line (no extra text, no markdown, no explanation outside the CSV). Wrap every field in double quotes:
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+Rules:
+- mcq: A,B,C,D filled; CorrectAnswer = A/B/C/D. Type=mcq.
+- truefalse: CorrectAnswer = A (True) or B (False). Type=truefalse.
+- numeric: CorrectAnswer = the number; set Tolerance (e.g. 0.01) and Unit if any. Type=numeric.
+- short: CorrectAnswer = main answer; put alternative accepted answers in Accept separated by | . Type=short.
+- mrq: A,B,C,D filled; CorrectAnswer = all correct letters joined by | (e.g. A|C); MRQ_AON = 1 for all-or-nothing scoring. Type=mrq.
+- Difficulty = Easy/Medium mix. Tags = subtopics. Section = subject. Wrap every field in double quotes and escape inner quotes as two double quotes.</textarea>
+        </div><div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <h3 style="margin:0">3. Advanced question prompt</h3>
+            <button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-adv')">📋 Copy prompt</button>
+          </div>
+          <p style="color:var(--gray-600);margin:6px 0">Exam-grade (WAEC/NECO/UTME) — adds matching, ordering and essay questions.</p>
+          <textarea id="p-adv" class="form-input" rows="10" style="font-family:monospace;font-size:.8rem">You are a senior Nigerian examiner. Generate exactly [NUMBER] rigorous questions on &quot;[TOPIC]&quot; for [CLASS/LEVEL] (WAEC/NECO/UTME standard), using a rich mix of types: mcq, mrq, numeric, short, truefalse, matching (Pairs), ordering (Items), and essay (open).
+Output ONLY a downloadable CSV file content with this EXACT header and one question per line (no commentary, no code fences, no explanation outside the CSV). Wrap every field in double quotes:
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+Type-specific rules:
+- matching: list pairs in Pairs as &quot;left=right;left2=right2&quot;. Type=matching. Leave A-D blank.
+- ordering: list the correct order in Items as &quot;step1;step2;step3&quot;. Type=ordering.
+- essay/open: leave options blank; put a model answer / keywords in Explanation; Type=essay.
+- numeric: CorrectAnswer = value; set Tolerance and Unit. short: use Accept for alternates (| separated).
+- mrq: CorrectAnswer = correct letters joined by | ; set MRQ_AON=1 for all-or-nothing.
+- Difficulty = Medium/Hard mix; include a one-line worked Explanation for each; Tags = curriculum subtopics; Section = subject.
+- Wrap every field in double quotes and escape inner quotes as two double quotes. Do not invent unsupported columns.</textarea>
+        </div>
+
+
+      <div class="card" style="background:#fff7ed;border-color:#fed7aa">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0">4. Enterprise CBT Pro v3 prompt — 17 question types</h3>
+          <button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-enterprise')">📋 Copy prompt</button>
+        </div>
+        <p style="color:var(--gray-600);margin:6px 0">Structured like HMG Academy CBT Pro: strict CSV header, type distribution, deterministic scoring, no paid API.</p>
+        <textarea id="p-enterprise" class="form-input" rows="18" style="font-family:monospace;font-size:.78rem">You are an expert [CURRICULUM] [SUBJECT] teacher, examiner, and assessment designer.
+
+Generate a [NUMBER]-question CSV question bank for School Connect CBT Pro.
+
+Class: [CLASS]
+Subject: [SUBJECT]
+Topic: [TOPIC]
+Subtopics: [SUBTOPIC 1] | [SUBTOPIC 2] | [SUBTOPIC 3]
+Curriculum/Exam standard: [WAEC/NECO/UTME/IGCSE/NATIONAL]
+Learning level: [LOWER BASIC / UPPER BASIC / JSS / SSS]
+
+IMPORTANT OUTPUT RULES:
+- Output CSV only. No markdown table. No commentary.
+- First line must be exactly:
+Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section
+- Wrap every CSV field in double quotes.
+- Escape inner JSON double quotes as two double quotes.
+- Use UTF-8 science/math symbols correctly.
+- Do not include paid API instructions.
+
+SUPPORTED TYPES:
+mcq, tf, mrq, short, numeric, matching, ordering, cloze, categorization, multi_numeric, essay, assertion_reason, case_study, image_mcq, matrix, hot_text.
+
+TYPE RULES:
+mcq: A-D options, CorrectAnswer=A/B/C/D.
+tf: A=True, B=False, CorrectAnswer=A or B.
+mrq: CorrectAnswer sorted letters like A,C; MRQ_AON true/false.
+short: CorrectAnswer primary; Accept alternatives separated by |.
+numeric: CorrectAnswer number; Tolerance and Unit may be filled.
+matching: Pairs contains JSON array [{"left":"Term","right":"Definition"}].
+ordering: Items contains JSON array in correct order.
+cloze: Question includes ___ blanks; Items contains answers in order.
+essay: Accept contains keywords separated by |; Items may include {"min_words":30,"keywords":[...]}.
+categorization: Items contains [{"item":"...","category":"..."}].
+multi_numeric: Items contains [{"label":"x","answer":3,"tolerance":0}].
+assertion_reason: A-D should contain standard assertion/reason options.
+case_study: Question includes a short case, A-D options follow.
+image_mcq: Question includes an image/video/Drive link and text.
+matrix: Items contains rows/columns JSON.
+hot_text: CorrectAnswer contains the exact phrase(s) to select.
+
+QUALITY RULES:
+- Mix easy, medium and challenging items (roughly 30% easy, 50% medium, 20% hard).
+- Distractors must reflect the most common student misconceptions — never random filler.
+- Explanations must TEACH the concept in 1–2 sentences, not merely restate the answer.
+- Avoid ambiguous stems, double negatives, "all/none of the above", and trick wording.
+- Numeric questions must include tolerance where rounding is possible.
+- Essay scoring must be deterministic by keywords/min words; teacher review recommended.
+- Spread questions across every listed subtopic — do not cluster on one.
+- Vary the position of the correct option (do not favour A or C).
+- Use Nigerian/local context in word problems where natural (names, currency ₦, places).
+
+DELIVERABLE: a single .csv FILE (attachment/download), UTF-8, comma-separated — never a chat table, never inline text. If your interface can attach files, attach the .csv; otherwise output pure CSV text that saves cleanly as a .csv file.
+
+SELF-CHECK BEFORE OUTPUT (do this silently):
+1. Count the rows — exactly [NUMBER] questions plus the single header row.
+2. Every row has ALL 17 columns, every field wrapped in double quotes, inner quotes doubled.
+3. Every answer is verifiably correct and every JSON field parses.
+4. No commentary, no markdown fences, no blank lines inside the CSV.
+If any check fails, silently fix it before responding.
+
+Now output/generate the downloadable CSV file only.</textarea>
+      </div>
+
+      <div class="card" style="background:#f0fdfa;border-color:#99f6e4">
+        <h3 style="margin-top:0">✅ Step-by-step</h3>
+        <ol style="line-height:1.8;color:var(--gray-700);margin:0;padding-left:20px">
+          <li>Click <strong>Copy prompt</strong> on the level you want.</li>
+          <li>Open any free AI chat in a new tab and <strong>paste</strong> the prompt.</li>
+          <li>Replace <code>[TOPIC]</code>, <code>[NUMBER]</code> and <code>[CLASS/LEVEL]</code> with your details, then send.</li>
+          <li>Copy the CSV the AI returns. <strong>Review and edit</strong> every question for accuracy (you are the teacher!).</li>
+          <li>Paste it into a spreadsheet or a plain text file and save as <code>questions.csv</code>.</li>
+          <li>Go to the <a href="cbt.html">CBT page</a> → create an exam → <strong>Upload CSV</strong>. Done.</li>
+        </ol>
+      </div>
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
+      © 2026 God of Seed Academy · Built by <a href="https://cssadewale.pages.dev" target="_blank" rel="noopener">Adewale Samson Adeagbo</a> · Powered by <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a> · <a href="developer.html">About the developer</a>
+    </footer>
+  
+<div class="card" style="margin-top:18px;border-left:6px solid var(--primary)">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <h2 style="margin:0">ENTERPRISE STRICT CSV PROMPT — UTME / Common Entrance / Multi-Subject</h2>
+    <button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-utme')">📋 Copy prompt</button>
+  </div>
+  <p style="color:var(--gray-700);line-height:1.7">Use this when the exam contains multiple subjects at once. It forces the output to be a downloadable CSV file content and tags every question with its subject/section so the CBT page can show subject tabs simultaneously.</p>
+  <textarea id="p-utme" class="form-input" rows="18" style="font-family:monospace;font-size:.82rem" onclick="this.select()">You are a senior Nigerian school examination setter and CSV data validator.
+
+TASK: Generate a complete downloadable CSV question bank for School Connect CBT.
+EXAM TYPE: [Common Entrance / UTME Practice / Term Exam / Continuous Assessment]
+CLASS/LEVEL: [e.g. Primary 6 / JSS3 / SSS2]
+SUBJECTS: [e.g. English Language, Mathematics, Basic Science]
+QUESTIONS PER SUBJECT: [e.g. 40]
+DIFFICULTY MIX: 30% simple recall, 50% applied/intermediate, 20% advanced reasoning.
+
+OUTPUT RULES — obey strictly:
+1. Output ONLY CSV file content. No markdown, no code fences, no explanation outside the CSV.
+2. The first row must be exactly:
+"question","type","a","b","c","d","answer","explanation","mark","difficulty","topic","tolerance","section"
+3. Wrap every field in double quotes. Escape internal quotes by doubling them.
+4. The "section" column MUST contain the subject name so the CBT can group the exam into subject tabs.
+5. Supported type values: mcq, true_false, fill_blank, numeric, short_answer, essay, multi_select, matching, ordering, comprehension, image_based, math_equation.
+6. For mcq, supply options a-d and put the correct option text or letter in answer.
+7. For numeric, put the numeric answer in answer and allowed tolerance in tolerance.
+8. For multi_select, separate correct answers with semicolons.
+9. Every question must have an explanation that helps a teacher review the answer.
+10. Questions must be original, age-appropriate, unambiguous and curriculum-aligned.
+11. Balance difficulty inside EVERY subject (30% recall, 50% applied, 20% reasoning) and spread topics across each subject's syllabus — no clustering.
+12. Vary the correct-option position evenly across A–D; never favour one letter.
+13. Keep all subjects to EXACTLY the requested question count — equal weighting matters for UTME/Common Entrance scoring.
+14. Use Nigerian curriculum context and ₦ currency in applied questions where natural.
+
+DELIVERABLE: a single .csv FILE (attachment/download), UTF-8, comma-separated — never a chat table, never inline text. If your interface can attach files, attach the .csv; otherwise output pure CSV text that saves cleanly as a .csv file.
+
+SELF-CHECK BEFORE OUTPUT (do this silently):
+- Row count = subjects × questions-per-subject, plus one header row.
+- The "section" value on every row exactly matches one of the listed subjects (same spelling).
+- All fields quoted, inner quotes doubled, no blank lines, no text outside the CSV.
+If any check fails, silently fix it before responding.
+
+Now output/generate the downloadable CSV file only.</textarea>
+</div>
+
+<div class="card" style="margin-top:18px;border-left:6px solid #2563eb"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">MCQ-ONLY STRICT CSV PROMPT</h2><button class="btn btn-primary btn-sm" onclick="CPUI.copy('p-mcqonly')">📋 Copy prompt</button></div><p style="color:var(--gray-700)">Use this when you want only multiple-choice questions. The output must be saved as a downloadable CSV file and uploaded directly into CBT.</p><textarea id="p-mcqonly" class="form-input" rows="14" style="font-family:monospace;font-size:.82rem" onclick="this.select()">Generate [NUMBER] multiple-choice questions for [SUBJECT], [CLASS], topic [TOPIC].
+
+Output ONLY downloadable CSV file content. Do not output markdown, code fence, notes, numbering outside CSV, or explanation outside CSV.
+
+Use this exact header row:
+"question","type","a","b","c","d","answer","explanation","mark","difficulty","topic","tolerance","section"
+
+Rules:
+- Every row must have type "mcq".
+- Options a, b, c and d must all be plausible — distractors must reflect real student misconceptions, never obvious filler.
+- Exactly ONE option is correct; the answer field contains that option's text or letter.
+- The explanation field must teach WHY the answer is correct in 1–2 sentences.
+- Wrap every field in double quotes; escape inner quotes by doubling them.
+- Put the subject name in section.
+- Difficulty mix: about 30% easy recall, 50% applied, 20% challenging reasoning.
+- Vary the position of the correct option evenly across a–d; never favour one letter.
+- Cover the topic broadly — consecutive questions must not test the same fact.
+- Age-appropriate wording for [CLASS]; use Nigerian context (names, ₦, places) where natural.
+
+DELIVERABLE: a single .csv FILE (attachment/download), UTF-8, comma-separated — never a chat table, never inline text. If your interface can attach files, attach the .csv; otherwise output pure CSV text that saves cleanly as a .csv file.
+
+SELF-CHECK BEFORE OUTPUT (do this silently):
+- Exactly [NUMBER] data rows plus the single header row.
+- Every row has all 13 columns and parses as valid CSV.
+- No commentary, markdown, code fences or blank lines anywhere.
+If any check fails, silently fix it before responding.
+
+Now output/generate the downloadable CSV file only.</textarea></div>
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/voting.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/crud.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/analytics.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
+  else { Notifications.init(sb); Voting.init(sb); }
+  PWAInstall.init();
+  if (window.Super) Super.init(sb, window.SCHOOL);
+  if (window.Enterprise) Enterprise.init(sb);
+  if (window.CRUD) CRUD.init(sb);
+</script>
+<script>
+const CPUI={ copy(id){ var t=document.getElementById(id); t.select(); t.setSelectionRange(0,99999);
+  try{ if(navigator.clipboard){ navigator.clipboard.writeText(t.value); } else { document.execCommand('copy'); } toast('Prompt copied — paste it into any free AI chat ✓','success',5000); }catch(e){ document.execCommand('copy'); toast('Prompt copied ✓','success'); } } };
+
+/* ===========================================================================
+   V10.3 PROMPT STUDIO ENGINE — Tutoring Connect parity, School Connect made.
+   Every pack is a DIFFERENT prompt: its own role, mission, type distribution
+   (scaled exactly to the requested count), briefing sections, quality bar and
+   final checklist. Only the CSV OUTPUT CONTRACT is shared — that must stay
+   byte-identical across packs or files stop importing. School-specific packs
+   (Digital Library link readings, Assignment briefs) speak School Connect's
+   own vocabulary: read_link, class/arm, term/session, report-card columns.
+   =========================================================================== */
+const PS = {
+  HEADER: 'Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section',
+
+  /* =====================================================================
+     V10.7 — THE UNIVERSAL EXPLANATION STANDARD (Adewale Classroom parity).
+     Injected into EVERY generated prompt ahead of the pack sections, so no
+     pack can forget it and no pack can dilute it. "Be detailed" is advice a
+     model ignores; "name the misconception behind each wrong option" is an
+     instruction it can be graded against — and the FINAL CHECK grades it.
+     ===================================================================== */
+  EXPLANATION_STANDARD: [
+    'Col7 (Explanation) is the single most valuable column in the file. It is',
+    'the only teaching the student receives after the paper closes. Treat it as',
+    'a marking-scheme entry written for a student sitting alone, not as a note',
+    'to a colleague.',
+    '',
+    'EVERY row — every type, including numeric, matching, ordering and essay —',
+    'must carry an explanation with these FOUR MOVES, in this order:',
+    '',
+    '  MOVE 1 — VERDICT. State the correct answer in full words, not just a',
+    '           letter. Write "The correct answer is 3/4, option C" and never',
+    '           "C" or "Option C is correct". The letter may have moved: this',
+    '           platform can randomise option order per candidate, so a review',
+    '           sheet that only says "B" is meaningless to the student reading it.',
+    '',
+    '  MOVE 2 — REASONING. Show HOW the answer is reached, step by numbered',
+    '           step. For calculations, every line of working, with the rule or',
+    '           formula named at the step where it is used ("multiply both sides',
+    '           by the LCM, 6"). For language items, quote the exact words from',
+    '           the passage or option that decide it. For factual items, give the',
+    '           principle, then apply it to this specific stem. Never write',
+    '           "by simple calculation" or "as we know" — that is the exact',
+    '           sentence the struggling student cannot fill in.',
+    '',
+    '  MOVE 3 — THE DISTRACTOR AUTOPSY. Take each wrong option in turn and name',
+    '           the SPECIFIC misconception or slip that produces it: "Option A,',
+    '           7/12, comes from adding the numerators and the denominators',
+    '           separately." A student who chose A must be able to find their own',
+    '           mistake described in words. This move is what turns a score into',
+    '           a diagnosis, and it is mandatory on every option-based item.',
+    '',
+    '  MOVE 4 — THE TAKEAWAY. One sentence naming the transferable rule or the',
+    '           checkpoint that prevents the error next time ("Always convert to',
+    '           a common denominator before adding fractions").',
+    '',
+    'LENGTH AND FORM',
+    '  - Minimum 45 words for a one-mark objective item; 80 or more for numeric,',
+    '    multi-part, case-study and essay items.',
+    '  - Number the reasoning steps 1) 2) 3) and put each on its own line using',
+    '    the literal two-character sequence \\n. The review screen renders those',
+    '    as real line breaks, so a wall of text is never necessary.',
+    '  - Plain language at the student\'s reading age. Define any technical term',
+    '    the moment it is used.',
+    '  - Self-contained: never write "see above", "as explained in question 4",',
+    '    "refer to your notes" or "the diagram makes this obvious". The student',
+    '    may be reviewing this one row on a phone, out of order, weeks later.',
+    '',
+    'FOR TYPES WITH NO WRONG OPTIONS TO DISSECT',
+    '  - numeric / multi_numeric: show the substitution and the arithmetic, state',
+    '    the unit, and name the two most common wrong answers and what causes',
+    '    them (usually a unit slip or a rounding slip).',
+    '  - matching / ordering / categorization: justify EVERY pair or position,',
+    '    not only the difficult ones, and name the pair most often swapped.',
+    '  - essay: give the full mark-scheme — the points that earn credit, the',
+    '    weight of each, a model answer, and the two most common ways candidates',
+    '    lose marks.',
+    '  - cloze / short: list every accepted variant spelling or phrasing and',
+    '    say plainly why a near-miss is or is not accepted.'
+  ].join('\n'),
+
+  /* Per-type column rules — emitted only for the types a pack actually uses,
+     so a 20-item MCQ paper is not padded with pages of irrelevant rules. */
+  RULES: {
+    mcq: 'mcq — one correct option\n  Col2-5: four plausible options. Col6: the correct LETTER (A/B/C/D).\n  Col8: mcq',
+    truefalse: 'truefalse — true/false\n  Col2: True   Col3: False   Col4-5: blank.  Col6: A (True) or B (False).  Col8: truefalse',
+    mrq: 'mrq — several correct options\n  Col2-5: options. Col6: correct letters joined by | (e.g. A|C).\n  Col12: true for all-or-nothing, false for per-option partial credit.  Col8: mrq',
+    short: 'short — typed short answer\n  Col6: the primary answer.  Col11: accepted alternatives separated by |.\n  Col8: short',
+    numeric: 'numeric — a number\n  Col6: the number only.  Col9: tolerance.  Col10: unit.  Col8: numeric',
+    multi_numeric: 'multi_numeric — several numeric sub-parts, part marks\n  Col14: [{"label":"x","answer":3,"tolerance":0},{"label":"y","answer":2,"tolerance":0}]\n  Col8: multi_numeric',
+    matching: 'matching — pair left with right\n  Col13: [{"left":"Na","right":"Sodium"},{"left":"K","right":"Potassium"}]\n  Col11 may add distractors separated by |.  Col8: matching',
+    ordering: 'ordering — arrange in sequence\n  Col14: the items IN THE CORRECT ORDER, e.g. ["Mercury","Venus","Earth"]\n  Col8: ordering',
+    cloze: 'cloze — fill several blanks\n  Col1: the sentence, each blank written as ___ (three underscores).\n  Col14: accepted answers per blank in order, alternatives with |,\n         e.g. ["mass|m","acceleration|a"]\n  Col8: cloze',
+    categorization: 'categorization — sort items into groups\n  Col14: [{"item":"Sodium","category":"Metal"},{"item":"Oxygen","category":"Non-metal"}]\n  Col8: categorization',
+    matrix: 'matrix — several rows sharing one set of options\n  Col11: the shared options separated by |, e.g. True|False\n  Col14: [{"statement":"Water boils at 100 °C at sea level","answer":"True"}]\n  Col8: matrix',
+    hot_text: 'hot_text — tap the correct parts\n  Col14: [{"text":"2","correct":true},{"text":"4","correct":false}]\n  Col8: hot_text',
+    assertion_reason: 'assertion_reason — WAEC/JAMB logic item\n  Col14: {"assertion":"...","reason":"..."}\n  Col6: A/B/C/D/E where A = both true and Reason explains Assertion,\n        B = both true but Reason does not explain it, C = Assertion true only,\n        D = Reason true only, E = both false.  Col8: assertion_reason',
+    case_study: 'case_study — passage or scenario, then a question\n  Col14: {"passage":"Write the full passage or data here."}\n  Col1: the question. Col2-5: options. Col6: the letter.  Col8: case_study',
+    image_based: 'image_based — diagram question\n  Col14: {"image":"https://..."} — a public https or Drive LINK only.\n  With no real image, describe the diagram fully in Col1.  Col8: image_based',
+    essay: 'essay — extended response, marked by the TEACHER (no AI)\n  Col14: {"min_words":40,"keywords":["photosynthesis","chlorophyll"]}\n  Col7 must contain the model answer / marking points.  Col8: essay'
+  },
+
+  /* Scale a pack's reference mix to the requested count. `minOne` keeps every
+     declared type alive at small counts (a pack promising breadth must
+     deliver it); the remainder lands on the pack's dominant type. */
+  mix(ref, n, dominant, minOne) {
+    const keys = Object.keys(ref);
+    const total = keys.reduce((a, k) => a + ref[k], 0);
+    const out = {}; let running = 0;
+    keys.forEach(k => {
+      let v = Math.floor(ref[k] * n / total);
+      if (minOne && v < 1) v = 1;
+      if (v > 0) { out[k] = v; running += v; }
+    });
+    const d = dominant || keys[0];
+    if (running > n) {
+      out[d] = Math.max(minOne ? 1 : 0, (out[d] || 0) - (running - n));
+      running = keys.reduce((a, k) => a + (out[k] || 0), 0);
+      let guard = 0;
+      while (running > n && guard++ < 500) {
+        const biggest = keys.filter(k => (out[k] || 0) > 1).sort((a, b) => out[b] - out[a])[0];
+        if (!biggest) break;
+        out[biggest] -= 1; running -= 1;
+      }
+    } else out[d] = (out[d] || 0) + Math.max(0, n - running);
+    return out;
+  },
+
+  PACKS: {
+    simple: {
+      label: 'Simple recall',
+      role: 'a patient Nigerian classroom teacher who writes clear, confidence-building questions for learners still finding their feet',
+      mission: 'Build fluency and confidence. This paper should reward a student who has done the reading, and never punish them for misreading a convoluted stem.',
+      ref: { mcq: 14, truefalse: 6 }, dominant: 'mcq',
+      sections: [
+        ['LANGUAGE', 'Use the shortest sentence that asks the question. No subordinate clauses.\nNo negatives ("which is NOT..."). No double negatives ever. A learner\nreading at two years below the nominal level should still understand the task.'],
+        ['SCOPE', 'One idea per question. Never combine two skills in one item — if a\nstudent gets it wrong you must be able to say exactly which idea they missed.']
+      ],
+      quality: [
+        'Every stem is under 25 words.',
+        'Options are similar in length; the longest option is not always the answer.',
+        'Explanations restate the rule in one plain sentence.',
+        'No trick questions of any kind.'
+      ]
+    },
+    intermediate: {
+      label: 'Intermediate application',
+      role: 'an experienced {{BOARD}} subject teacher writing a balanced continuous-assessment paper',
+      mission: 'Test application, not just recall: the student should have to USE the idea — calculate, choose the right method, spot the exception — in familiar contexts.',
+      ref: { mcq: 9, truefalse: 3, numeric: 3, short: 3, mrq: 2 }, dominant: 'mcq',
+      sections: [
+        ['APPLICATION OVER RECALL', 'At most a third of the items may be answerable from memory alone. The rest\nmust require one worked step: a small calculation, a comparison, a\nclassification, or applying a rule to a new example.'],
+        ['NUMERIC DISCIPLINE', 'Every numeric item must state its unit in Col10 and carry a sensible\ntolerance in Col9 wherever rounding is possible.']
+      ],
+      quality: [
+        'Distractors reflect real student misconceptions, never random filler.',
+        'Short-answer items list every legitimate alternative in Col11.',
+        'The Explanation column teaches the method, not just the answer.'
+      ]
+    },
+    advanced: {
+      label: 'Advanced examiner',
+      role: 'a senior {{BOARD}} examiner who has marked thousands of scripts and knows exactly where candidates lose marks',
+      mission: 'Produce an exam-grade paper with genuine structural variety — matching, ordering and extended writing alongside objective items — that discriminates fairly between grades.',
+      ref: { mcq: 8, mrq: 2, numeric: 3, short: 2, matching: 2, ordering: 2, essay: 1 }, dominant: 'mcq',
+      sections: [
+        ['STRUCTURAL VARIETY IS THE POINT', 'The matching, ordering and essay items are not decoration. Matching must\npair concepts a candidate genuinely confuses; ordering must sequence a real\nprocess; the essay must demand an argument, not a list.'],
+        ['PROGRESSION', 'Open with accessible items, build steadily, and place the most demanding\nitems in the final third. Col15 (Difficulty) must show that curve.']
+      ],
+      quality: [
+        'Matching right-hand pools include at least one plausible distractor.',
+        'Ordering sequences have exactly one defensible correct order.',
+        'The essay item carries a model answer and keywords in Col7/Col14.',
+        'Difficulty rises across the paper rather than jumping about.'
+      ]
+    },
+    enterprise: {
+      label: 'Auto-Graded Ultimate Pack',
+      role: 'an assessment architect building a reference paper that demonstrates all AUTO-GRADED question formats School Connect supports',
+      mission: 'Exercise the FULL range of auto-graded question types with 100% automated scoring. Do NOT use any type that needs teacher review (no essay, no code, no oral, no file uploads). Every mark on this paper is awarded by the engine the moment the candidate submits.',
+      ref: { mcq: 3, truefalse: 2, mrq: 2, short: 2, numeric: 2, multi_numeric: 2, cloze: 2, matching: 2, ordering: 2, categorization: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2, image_based: 2 },
+      dominant: 'mcq', minOne: true,
+      sections: [
+        ['COVERAGE — EVERY AUTO-GRADED TYPE MUST SURVIVE', 'The distribution below guarantees at least one item of every auto-graded\ntype even at small counts. Strictly EXCLUDE essay, code and any manual-\nreview type. Do not silently drop a type because it is harder to write.'],
+        ['SELF-DOCUMENTING', 'Because teachers read this paper to learn the formats, each Explanation\nshould also note in one clause why that TYPE suited that question.'],
+        ['JSON CELLS', 'Structured types live in Col13 (Pairs) and Col14 (Items) as JSON with every\ninner double quote doubled (""). One malformed JSON cell breaks the import\nof the whole row — validate each one mentally before moving on.']
+      ],
+      quality: [
+        'All auto-graded types present; strictly NO essay, NO code, NO manual-review types.',
+        'Every JSON cell parses after un-doubling the quotes.',
+        'Partial-credit types (matching, ordering, cloze, matrix, multi_numeric) have at least 3 rows/parts each so partial credit is meaningful.',
+        'The paper still reads as a coherent assessment, not a format catalogue.'
+      ]
+    },
+    mcq_only: {
+      label: 'MCQ-only strict',
+      role: 'an objective-test specialist writing a machine-gradable multiple-choice paper',
+      mission: 'One clean skill per item, four working distractors, zero ambiguity. This paper feeds directly into report-card columns, so the key must be beyond dispute.',
+      ref: { mcq: 20 }, dominant: 'mcq',
+      sections: [
+        ['DISTRACTOR CRAFT', 'Each wrong option must be the answer a student gets by making one SPECIFIC\nmistake (sign error, off-by-one, confused definition). Name the mistake to\nyourself before writing the distractor.'],
+        ['KEY BALANCE', 'Spread the correct letter evenly across A–D. Never three of the same\nletter in a row.']
+      ],
+      quality: [
+        'Every item has exactly one defensibly correct option.',
+        'No "all of the above" / "none of the above".',
+        'Consecutive questions never test the same fact.'
+      ]
+    },
+    multi_subject: {
+      label: 'Multi-subject paper (all auto-graded types)',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner assembling a combined UTME / Common-Entrance style paper across several subjects',
+      mission: 'Build one comprehensive sitting that covers several subjects cleanly, exclusively using AUTO-GRADED question types (no teacher supervision needed), with the subject tabs the candidate sees driven correctly by the data.',
+      ref: { mcq: 4, truefalse: 2, mrq: 2, short: 2, numeric: 2, matching: 2, ordering: 2, cloze: 2, categorization: 2, multi_numeric: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2, image_based: 2 },
+      dominant: 'mcq',
+      sections: [
+        ['SUBJECTS AND THEIR TOPICS', 'Cover these subjects: {{SUBJECTS}}\n{{SUBJECT_TOPICS}}\nDivide the items as evenly as possible between them.'],
+        ['SECTION COLUMN IS CRITICAL', 'Col17 (Section) must contain the SUBJECT NAME for that row, spelled\nidentically every time. This column drives the subject tabs in the School\nConnect exam player — an inconsistent spelling creates a phantom extra tab.'],
+        ['NO CROSS-CONTAMINATION', 'A Mathematics item must not require Biology knowledge, and vice versa.\nEach item belongs to exactly one subject.'],
+        ['TYPE SPREAD PER SUBJECT', 'Spread the structured types across the subjects — every subject should\ncarry at least one structured item (matching / ordering / matrix / cloze /\nmulti-numeric), not just MCQs.']
+      ],
+      quality: [
+        'Item counts per subject differ by at most one.',
+        'Col17 spellings are identical within each subject, with no stray spaces.',
+        'No item requires knowledge from another subject in the set.',
+        'All question types are entirely auto-graded — no essay, no manual review.'
+      ]
+    },
+    exam_board: {
+      label: 'Exam-board style',
+      role: 'a chief examiner reproducing the authentic voice, structure and difficulty profile of real {{BOARD}} papers',
+      mission: 'A candidate who sits this paper should feel they are sitting the real {{BOARD}} exam — same stems, same pacing, same topic weighting.',
+      ref: { mcq: 12, numeric: 3, short: 2, case_study: 2, essay: 1 }, dominant: 'mcq',
+      sections: [
+        ['BOARD REGISTER', 'Use {{BOARD}}\'s habitual phrasing ("Which of the following...", "Calculate,\ncorrect to 2 decimal places..."). Weight sub-topics the way the board\nhistorically does, not evenly.'],
+        ['AUTHENTIC PROGRESSION', 'Real papers ramp: open accessible, finish demanding. Col15 must show the curve.']
+      ],
+      quality: [
+        'Phrasing is idiomatic to {{BOARD}}, not generic.',
+        'The topic weighting is defensible against real past papers.',
+        'Difficulty rises across the paper.'
+      ]
+    },
+    past_paper: {
+      label: 'From a past paper link',
+      role: 'an archivist reconstructing a paper in the authentic style of the past paper at the source link',
+      mission: 'Recreate the feel of the linked past paper — its structure, its progression, its topic emphasis — with entirely NEW questions (never copy an item verbatim).',
+      ref: { mcq: 12, short: 3, numeric: 3, case_study: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE SOURCE', 'Base the style, difficulty and topic emphasis on this past paper:\n{{SOURCE}}\nWrite NEW items in the same spirit — never reproduce an original question.'],
+        ['PERIOD REGISTER', 'Match the linked paper\'s stem conventions and section structure.']
+      ],
+      quality: [
+        'No item is a copy or near-copy of a source item.',
+        'The topic emphasis mirrors the source paper.',
+        'Difficulty progression matches the source.'
+      ]
+    },
+    marking_scheme: {
+      label: 'Paper + marking scheme',
+      role: 'a chief examiner writing both the paper AND the marking scheme that accompanies it',
+      mission: 'Produce a paper a second marker could mark identically without speaking to you.',
+      ref: { short: 6, numeric: 4, multi_numeric: 3, essay: 2, mcq: 3, case_study: 2 }, dominant: 'short',
+      sections: [
+        ['COL7 IS A MARKING SCHEME', 'The Explanation column must read as a marking scheme, not a hint: the\nacceptable answers, where each mark is earned, and what earns no credit.\nUse the convention "M1 — method mark for ...; A1 — accuracy mark for ...".'],
+        ['ACCEPT GENEROUSLY', 'Col11 must list every legitimate alternative wording, spelling and form,\nseparated by |. This is what prevents a correct answer being marked wrong.'],
+        ['TOLERANCES', 'Every numeric item MUST carry a tolerance in Col9.']
+      ],
+      quality: [
+        'Every row\'s Col7 identifies where each mark is earned.',
+        'Col11 is populated for every non-objective item.',
+        'A second marker would award the same marks.'
+      ]
+    },
+    differentiated: {
+      label: 'Differentiated — Support / Core / Stretch',
+      role: 'an inclusion-minded subject lead writing one paper that serves three ability tiers honestly',
+      mission: 'Every student meets questions they can start AND questions that stretch them. Tag each item Support, Core or Stretch in Col16 (Tags) so the teacher can filter.',
+      ref: { mcq: 10, truefalse: 2, numeric: 3, short: 3, essay: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE THREE TIERS', 'Support (≈30%): the entry version of the skill, concrete numbers, familiar\ncontexts. Core (≈50%): the standard curriculum expectation. Stretch (≈20%):\ntransfer to an unfamiliar context or a multi-step chain.\nWrite the tier name as the FIRST tag in Col16 on every row.'],
+        ['SAME TOPIC, THREE DEPTHS', 'All three tiers examine THE SAME topic. Do not make Support a different,\neasier topic — that defeats the diagnosis.']
+      ],
+      quality: [
+        'Every row\'s Col16 starts with Support, Core or Stretch.',
+        'The three tiers are the same topic at different depths.',
+        'Tier proportions are within ±1 item of 30/50/20.'
+      ]
+    },
+    /* V10.7 — Adewale Classroom parity packs, School Connect flavour. */
+    multiline_math: {
+      label: '🧮 Multi-line maths / STEM',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner crafting a rigorous, self-contained, perfectly auto-graded STEM assessment',
+      mission: 'Generate a highly robust auto-graded CBT. ONLY use question types that grade without teacher supervision (no essay, no oral, no uploads). Multi-line working, fractions, surds, indices and matrices must be encoded so the platform renders them as real typeset maths.',
+      ref: { mcq: 4, truefalse: 2, mrq: 2, short: 2, numeric: 3, multi_numeric: 3, cloze: 2, matching: 2, ordering: 2, matrix: 2, assertion_reason: 2, case_study: 2 },
+      dominant: 'multi_numeric',
+      sections: [
+        ['ENCODING RULES (MANDATORY) — WHAT THE RENDERER ACTUALLY SUPPORTS', 'School Connect renders a LaTeX subset as real typeset maths on the\ncandidate screen — stacked fractions with a horizontal bar, surds, raised\nindices, bracketed matrices. Stay inside this subset:\n\n1. LINE BREAKS. A CSV cell cannot hold a real newline safely, so write the\n   literal two-character sequence \\n. The renderer converts it to a real\n   line break. One equation per line is always clearer.\n   Example: "Solve the simultaneous equations:\\n2x + 3y = 12\\nx - y = 1"\n2. FRACTIONS. Always \\frac{NUMERATOR}{DENOMINATOR}. Never "3x+6/9" (ambiguous)\n   and never an ASCII-art bar. Nested fractions are supported.\n3. INDICES AND SUBSCRIPTS. x^2, e^{2x}, a_1, \\log_{10}. Brace anything longer\n   than one character: x^{n+1}, not x^n+1.\n4. ROOTS. \\sqrt{x+1}; cube roots as \\sqrt[3]{8}.\n5. SYMBOLS. \\times \\div \\pm \\leq \\geq \\neq \\pi \\theta \\alpha \\beta \\Delta\n   \\infty \\degree render as real symbols. Use them instead of *, /, <=, !=.\n6. MATRICES. \\begin{matrix}1 & 2\\\\3 & 4\\end{matrix} inside $$…$$.\n7. Anything outside this subset degrades to plain text — so stay inside it.'],
+        ['WORKING SHOWN', 'Numeric and multi-part items must be solvable with clean values; the\nExplanation column carries the full worked solution line by line using the\nsame \\n and \\frac conventions so the review screen shows real maths.']
+      ],
+      quality: [
+        'Every multi-line stem uses literal \\n, never a semicolon run-on.',
+        'Every fraction uses \\frac{}{}, every index is braced when longer than one character.',
+        'No essay, no code, no manual-review types — 100% auto-graded.',
+        'Values are clean enough to sanity-check without a calculator where possible.'
+      ]
+    },
+    material_upload: {
+      label: '📄 Uploaded Material CBT',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner creating a rigorous auto-graded assessment strictly from the provided document material',
+      mission: 'Generate a comprehensive CBT strictly based on the material the teacher pastes or attaches into the chat. ONLY use facts found in the document — no external knowledge. Exclude any type requiring teacher review (no essay). Prepare students to local, national and international examination standards.',
+      ref: { mcq: 5, truefalse: 2, mrq: 2, short: 2, numeric: 2, matching: 2, ordering: 2, cloze: 2, categorization: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2 },
+      dominant: 'mcq',
+      sections: [
+        ['SOURCE ADHERENCE', 'Every single question MUST be derivable directly from the uploaded/pasted\nmaterial. No hallucinated facts, no outside syllabus content. If the\nmaterial does not support the requested count, say so and produce fewer\nrather than inventing.'],
+        ['TARGETED EXTRACTION', 'Focus entirely on the pages, chapters or sections the teacher names:\n{{SOURCE}}'],
+        ['EXAMINATION RIGOR', 'Design questions that test critical thinking, analysis and application of\nthe text — not just line-by-line recall — matching world-class standards.']
+      ],
+      quality: [
+        'No hallucinated information; every answer is verifiable against the text.',
+        'Strictly auto-graded types only.',
+        'Question difficulty spans recall, application and analysis of the material.'
+      ]
+    },
+    material_link: {
+      label: '🔗 Linked Material CBT',
+      role: 'an expert professional, seasoned educator and experienced world-class examiner creating a rigorous auto-graded assessment strictly from the material at the provided link(s)',
+      mission: 'Analyse the material at the provided URL(s) and generate a comprehensive CBT strictly based on it. ONLY use facts found in the linked material. Exclude any type requiring teacher review. If you cannot open links, say so in ONE line and ask the teacher to paste the text, then continue from the pasted text.',
+      ref: { mcq: 5, truefalse: 2, mrq: 2, short: 2, numeric: 2, matching: 2, ordering: 2, cloze: 2, categorization: 2, matrix: 2, hot_text: 2, assertion_reason: 2, case_study: 2 },
+      dominant: 'mcq',
+      sections: [
+        ['THE LINKED MATERIAL', 'The material is at this link (public https / Drive / web):\n{{SOURCE}}\nSchool Connect stores LINKS ONLY — never uploads.'],
+        ['SOURCE ADHERENCE', 'Every single question MUST be derivable directly from the linked material.\nNo external facts. Reference specific sections, figures and arguments FROM\nthe material so only a student who read it can answer.'],
+        ['EXAMINATION RIGOR', 'Design questions that test critical thinking, analysis and application of\nthe text, matching world-class standards.']
+      ],
+      quality: [
+        'No hallucinated information; stick perfectly to the linked text.',
+        'Strictly auto-graded types only.',
+        'Every item cites something specific in the linked material.'
+      ]
+    },
+    misconception: {
+      label: 'Misconception hunter',
+      role: 'a diagnostic assessment specialist who designs items that make hidden misconceptions VISIBLE',
+      mission: 'Every distractor is a named misconception. When the class data comes back, the teacher must be able to read WHICH wrong idea each student holds from WHICH option they picked.',
+      ref: { mcq: 16, truefalse: 2, mrq: 2 }, dominant: 'mcq',
+      sections: [
+        ['ONE MISCONCEPTION PER DISTRACTOR', 'For every wrong option, write in Col7 the exact misconception that produces\nit, in the form "B = believes multiplication always makes bigger". The\nExplanation column is the teacher\'s diagnosis key.'],
+        ['NO FILLER DISTRACTORS', 'If you cannot name the wrong thinking that produces an option, replace the\noption. Random wrong numbers diagnose nothing.']
+      ],
+      quality: [
+        'Every distractor maps to a named, real misconception in Col7.',
+        'The same misconception is probed by at least two different items.',
+        'No option is filler.'
+      ]
+    },
+    dl_article: {
+      label: '📚 Digital Library — article / material',
+      role: 'a reading-comprehension specialist preparing a School Connect Digital Library assignment: a linked article or material plus the comprehension quiz that proves it was read',
+      mission: 'The student opens the LINK from the 📚 Digital Library page, reads it, then answers the quiz. Every question must be answerable ONLY by someone who actually engaged with the linked material — not from general knowledge.',
+      ref: { mcq: 10, truefalse: 3, short: 3, cloze: 2, essay: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE LINKED MATERIAL', 'The reading is at this link (article / Drive material):\n{{SOURCE}}\nSchool Connect stores LINKS ONLY (read_link) — never uploads — to protect\nthe free storage quota. If you cannot open links, say so in ONE line and\nask the teacher to paste the text; then continue from the pasted text.'],
+        ['QUESTIONS MUST PROVE READING', 'Reference specific sections, figures, arguments and examples FROM the\nmaterial ("According to the third paragraph...", "The author\'s example of\n..."). A student who has not opened the link should not be able to guess.'],
+        ['TEACHER SETUP NOTE (include as a comment in Col7 of row 1)', 'Remind the teacher: paste the same link into the Digital Library "Read\nlink" field, tick "Has comprehension questions", and set the Max score so\nthe quiz feeds the report card as CA.']
+      ],
+      quality: [
+        'Every item cites something specific in the linked material.',
+        'The two essay items ask for the author\'s argument, not opinion.',
+        'Cloze items quote sentences from the material with key terms gapped.'
+      ]
+    },
+    dl_video: {
+      label: '📚 Digital Library — video',
+      role: 'a media-literacy teacher preparing a School Connect Digital Library video assignment: a linked video plus the comprehension quiz that proves it was watched',
+      mission: 'The student opens the VIDEO LINK from the 📚 Digital Library page, watches it, then answers. Every question must be answerable only by someone who actually watched — anchored to moments, demonstrations and spoken claims in the video.',
+      ref: { mcq: 10, truefalse: 3, short: 3, ordering: 2, essay: 2 }, dominant: 'mcq',
+      sections: [
+        ['THE LINKED VIDEO', 'The video is at this link (YouTube / Drive):\n{{SOURCE}}\nSchool Connect stores LINKS ONLY — never uploads. If you cannot open\nlinks, say so in ONE line and ask the teacher for the transcript or a\ndescription of the video; then continue from that.'],
+        ['ANCHOR TO THE TIMELINE', 'Reference visible moments ("the demonstration at the start", "the second\nexperiment", "the final summary"). Use ordering items to sequence the\nsteps the video actually shows.'],
+        ['TEACHER SETUP NOTE (include as a comment in Col7 of row 1)', 'Remind the teacher: paste the same link into the Digital Library "Read\nlink" field, tick "Has comprehension questions", and set the Max score so\nthe quiz feeds the report card as CA.']
+      ],
+      quality: [
+        'Every item is anchored to a specific moment or claim in the video.',
+        'Ordering items sequence steps exactly as demonstrated.',
+        'No item is answerable from the title alone.'
+      ]
+    },
+    assignment: {
+      label: '📝 Assignment brief + rubric',
+      role: 'a curriculum-aligned assignment designer writing a complete take-home task for the School Connect 📝 Assignments page',
+      mission: 'Produce a professional assignment BRIEF (not an exam): the task, the linked resources, the submission expectations and a transparent marking rubric a parent could read. Then a short self-check quiz the teacher may optionally import as CBT.',
+      ref: { essay: 3, short: 4, mcq: 3 }, dominant: 'short',
+      isBrief: true,
+      sections: [
+        ['PART 1 — THE ASSIGNMENT BRIEF (plain text, BEFORE the CSV)', 'Write these sections in clear student-facing language:\n  TITLE — one line.\n  TASK — exactly what to produce, in numbered steps.\n  RESOURCES — this link (Drive/web, LINKS ONLY, never uploads):\n  {{SOURCE}}\n  DELIVERABLE — what the student hands in and HOW (School Connect stores a\n  link in the assignment record; physical work is handed to the teacher).\n  DUE — leave as [DUE DATE] for the teacher to fill.\n  RUBRIC — a marks table totalling [TOTAL MARKS]: criterion, what full marks\n  looks like, marks available. Plain language a parent could read.'],
+        ['PART 2 — THE SELF-CHECK QUIZ (the CSV)', 'After the brief, output the CSV: a short self-check the student answers\nBEFORE submitting, testing that they understood the task and the resource.\nThe teacher may import it on the CBT page as a low-stakes check.'],
+        ['TEACHER SETUP NOTE (last line of the brief)', 'Remind the teacher: create the assignment on the 📝 Assignments page with\nthe same title, paste the resource link into "Drive link", set the due\ndate — and optionally import the self-check CSV on the CBT page.']
+      ],
+      quality: [
+        'The brief is complete enough to hand out without editing (except the due date).',
+        'The rubric criteria add up to exactly the stated total marks.',
+        'Every resource is a LINK — the brief never asks for a file upload into School Connect.',
+        'The self-check quiz tests understanding of the TASK and RESOURCE, not new content.'
+      ]
+    }
+  },
+
+  build() {
+    const packKey = document.getElementById('ps-pack').value;
+    const P = this.PACKS[packKey] || this.PACKS.enterprise;
+    const topic = document.getElementById('ps-topic').value.trim() || '[TOPIC]';
+    const n = Math.max(1, Number(document.getElementById('ps-n').value) || 20);
+    const lv = document.getElementById('ps-lv').value.trim() || '[CLASS/LEVEL]';
+    const subject = document.getElementById('ps-subject').value.trim() || '[SUBJECT]';
+    const board = document.getElementById('ps-board').value || 'General classwork';
+    const source = document.getElementById('ps-src').value.trim() || '[PASTE THE LINK HERE]';
+    const subjectsRaw = document.getElementById('ps-subjects-list').value.trim();
+    const subjects = subjectsRaw || subject;
+    const school = (window.SCHOOL && SCHOOL.name) || document.body.getAttribute('data-school') || 'this school';
+
+    const st = {};
+    document.querySelectorAll('[data-ps-subject-topic]').forEach(i => { if (i.value.trim()) st[i.dataset.psSubjectTopic] = i.value.trim(); });
+    const stLines = Object.keys(st).length
+      ? 'Use these topics, one per subject — do NOT apply one topic to all:\n' + Object.keys(st).map(k => '  - ' + k + ': ' + st[k]).join('\n')
+      : 'No per-subject topic was given, so choose a representative core topic for each subject.';
+
+    const fill = s => String(s)
+      .replace(/\{\{BOARD\}\}/g, board)
+      .replace(/\{\{SOURCE\}\}/g, source)
+      .replace(/\{\{SUBJECT_TOPICS\}\}/g, stLines)
+      .replace(/\{\{SUBJECTS\}\}/g, subjects);
+
+    const mixed = this.mix(P.ref, n, P.dominant, P.minOne);
+    const usedTypes = Object.keys(mixed);
+    const distribution = usedTypes.map(k => k + '=' + mixed[k]).join(', ');
+    const rule = '===================================================================';
+    const fname = (topic === '[TOPIC]' ? 'questions' : topic).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'questions';
+
+    const sections = (P.sections || []).map(s => rule + '\n' + fill(s[0]) + '\n' + rule + '\n' + fill(s[1])).join('\n\n');
+    const quality = (P.quality || []).map(q => '- ' + fill(q)).join('\n');
+    const checks = [
+      'Output is a DOWNLOADABLE .csv FILE named "' + fname + '.csv".',
+      'Exactly ' + n + ' data rows, plus the one header row.',
+      'Header matches the contract character for character (17 columns).',
+      'Type counts match the distribution and sum to ' + n + '.',
+      'Every JSON cell has inner quotes doubled ("") and the whole cell quoted.',
+      'Every objective row has a non-empty, unambiguous key in Col6.',
+      'Col17 is the subject on every row.',
+      /* V10.7 — the Explanation Standard is only real if it is checked. */
+      'EVERY row\'s Col7 contains all four moves: verdict in words, numbered',
+      '   reasoning, a named misconception for EACH wrong option, and a takeaway.',
+      'No Col7 is under 45 words. No Col7 says only "Option X is correct".',
+      'No Col7 refers to another question, to "the above", or to notes the',
+      '   student does not have in front of them.',
+      'Col7 names the correct answer in WORDS, never by letter alone, because',
+      '   option order can be randomised per candidate.'
+    ].map(c => '[ ] ' + fill(c)).join('\n');
+
+    const briefNote = P.isBrief
+      ? 'STRUCTURE OF YOUR REPLY\nFirst the assignment BRIEF as plain text (see Part 1 below), THEN the CSV\nfile. Only the CSV goes in the file — the brief is chat text the teacher\ncopies into the Assignments page.\n\n'
+      : '';
+
+    const out = 'PACK: ' + P.label.toUpperCase() + '\n\n' +
+'ROLE\nYou are ' + fill(P.role) + '.\n' +
+'You are writing for ' + school + ', a school running School Connect\n(by HMG Concepts) — a free, link-based school platform. No paid AI, no file\nuploads: every resource is a public https / Google Drive / YouTube LINK.\n\n' +
+'MISSION FOR THIS PARTICULAR PAPER\n' + fill(P.mission) + '\n\n' +
+briefNote +
+'TASK\nProduce EXACTLY ' + n + ' assessment items on "' + topic + '" for ' + lv + '\nsitting ' + board + ' in ' + subject + '.\n\n' +
+rule + '\nOUTPUT CONTRACT — READ TWICE. THIS IS THE MOST IMPORTANT PART.\n' + rule + '\n\n' +
+'0. OUTPUT A DOWNLOADABLE .CSV FILE — NOT RAW CSV TEXT.\n' +
+'   Produce a real, clickable file attachment named "' + fname + '.csv" that the\n' +
+'   teacher can download and import directly on the CBT page. Use whatever\n' +
+'   file-generating capability you have.\n' +
+'   Only if you genuinely cannot emit a file, say so in ONE short line, then\n' +
+'   output a single raw CSV code block instead.\n\n' +
+'1. The file contains the CSV and nothing else — no preamble, no commentary.\n\n' +
+'2. The FIRST line must be exactly this header, character for character:\n' + this.HEADER + '\n\n' +
+'3. Then EXACTLY ' + n + ' data rows — one item per row.\n\n' +
+'4. Wrap EVERY field in double quotes. Escape any inner double quote by\n' +
+'   doubling it (""). This is what lets JSON live inside a CSV cell.\n\n' +
+'5. Use correct UTF-8 for scientific notation: H₂O, CO₂, π, Ω, ≤, ≥, °C, ₦.\n\n' +
+'6. "Section" (Col17) must be exactly: ' + (subjectsRaw ? 'the subject name for that row' : subject) + '\n\n' +
+'7. Never leave "CorrectAnswer" empty on an objective item.\n\n' +
+'8. Any media must be a public https, Google Drive or YouTube LINK. School\n' +
+'   Connect NEVER accepts file uploads — links only.\n\n' +
+rule + '\nQUESTION TYPE DISTRIBUTION — MUST SUM TO EXACTLY ' + n + '\n' + rule + '\n' + distribution + '\n\n' +
+rule + '\nCOLUMN RULES FOR THE TYPES THIS PACK USES\n' +
+'Columns: 1 Question | 2 A | 3 B | 4 C | 5 D | 6 CorrectAnswer |\n' +
+'7 Explanation | 8 Type | 9 Tolerance | 10 Unit | 11 Accept |\n' +
+'12 MRQ_AON | 13 Pairs | 14 Items | 15 Difficulty | 16 Tags | 17 Section\n' + rule + '\n\n' +
+usedTypes.map(t => this.RULES[t]).filter(Boolean).join('\n\n') + '\n\n' +
+rule + '\nEXPLANATION STANDARD — APPLIES TO EVERY ROW, EVERY TYPE\n' + rule + '\n' +
+this.EXPLANATION_STANDARD + '\n\n' +
+sections + '\n\n' +
+rule + '\nQUALITY BAR FOR THIS PACK — an item failing any of these is rejected\n' + rule + '\n' + quality + '\n\n' +
+rule + '\nFINAL CHECK BEFORE YOU ANSWER\n' + rule + '\n' + checks;
+
+    document.getElementById('ps-out').value = out;
+    return out;
+  },
+
+  NEEDS: { past_paper: ['source'], dl_article: ['source'], dl_video: ['source'], assignment: ['source'], material_upload: ['source'], material_link: ['source'], multi_subject: ['subjects'] },
+
+  syncFields() {
+    const pack = document.getElementById('ps-pack').value;
+    const need = this.NEEDS[pack] || [];
+    document.querySelectorAll('[data-ps-need]').forEach(el => { el.hidden = need.indexOf(el.dataset.psNeed) === -1; });
+    document.querySelectorAll('[data-ps-hide]').forEach(el => { el.hidden = need.indexOf(el.dataset.psHide) !== -1; });
+    if (need.indexOf('subjects') !== -1) this.syncSubjectTopics();
+  },
+
+  syncSubjectTopics() {
+    const host = document.getElementById('ps-subject-topics');
+    if (!host) return;
+    const list = (document.getElementById('ps-subjects-list').value || '').split(',').map(x => x.trim()).filter(Boolean);
+    const keep = {};
+    host.querySelectorAll('[data-ps-subject-topic]').forEach(i => { keep[i.dataset.psSubjectTopic] = i.value; });
+    const escq = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    host.innerHTML = list.length
+      ? list.map(sub => '<div style="display:flex;align-items:center;gap:10px;margin:4px 0"><label style="min-width:130px;font-weight:700;font-size:.85rem">' + escq(sub) + '</label><input class="form-input" data-ps-subject-topic="' + escq(sub) + '" value="' + escq(keep[sub] || '') + '" placeholder="Topic for ' + escq(sub) + '"></div>').join('')
+      : '<p style="color:var(--gray-500);margin:0;font-size:.85rem">Type the subjects above and a topic box will appear for each.</p>';
+    host.querySelectorAll('[data-ps-subject-topic]').forEach(i => i.addEventListener('input', () => PS.build()));
+  },
+
+  async init() {
+    const pk = document.getElementById('ps-pack');
+    if (!pk) return;
+    /* Deep link: cbt-prompts.html?pack=dl_article|dl_video|assignment|…
+       lets the 📚 Digital Library and 📝 Assignments pages open the studio
+       with the right pack already selected. */
+    try {
+      const want = new URLSearchParams(location.search).get('pack');
+      if (want && this.PACKS[want]) { pk.value = want; setTimeout(() => { const c = pk.closest('.card'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); }
+    } catch (_) {}
+    pk.addEventListener('change', () => { this.syncFields(); this.build(); });
+    ['ps-topic','ps-n','ps-lv','ps-subject','ps-board','ps-src'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.addEventListener('input', () => this.build());
+    });
+    document.getElementById('ps-subjects-list').addEventListener('input', () => { this.syncSubjectTopics(); this.build(); });
+    document.getElementById('ps-build').addEventListener('click', () => { this.build(); toast('Prompt built — copy it into any free AI chat.', 'success', 4000); });
+    document.getElementById('ps-copy').addEventListener('click', async () => {
+      if (!document.getElementById('ps-out').value) this.build();
+      const t = document.getElementById('ps-out'); t.select(); t.setSelectionRange(0, 999999);
+      try { if (navigator.clipboard) await navigator.clipboard.writeText(t.value); else document.execCommand('copy'); toast('Prompt copied — paste into any free AI chat ✓', 'success', 5000); }
+      catch (e) { document.execCommand('copy'); toast('Prompt copied ✓', 'success'); }
+    });
+    document.getElementById('ps-savecsv').addEventListener('click', () => {
+      const t = (document.getElementById('ps-csvback').value || '').trim().replace(/^```[a-z]*\s*/i, '').replace(/```$/, '').trim();
+      if (!t) { toast('Paste the CSV the chat produced first.', 'warning'); return; }
+      const topic = (document.getElementById('ps-topic').value || 'questions').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) || 'questions';
+      const blob = new Blob([t], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = topic + '.csv'; a.click(); URL.revokeObjectURL(a.href);
+      const rows = t.split(/\r?\n/).filter(Boolean).length - 1;
+      toast('Saved ' + topic + '.csv (' + rows + ' question rows). Upload it on the CBT page.', 'success', 7000);
+    });
+    /* Pull real classes + subjects into datalists so the teacher picks
+       instead of typing (typo-proof, matches student records). */
+    try {
+      if (window.sb) {
+        const [cls, subs] = await Promise.all([
+          sb.from('classes').select('name').order('name'),
+          sb.from('subjects').select('name').order('name')
+        ]);
+        const cd = document.getElementById('ps-classes'), sd = document.getElementById('ps-subjects');
+        (cls.data || []).forEach(c => { const o = document.createElement('option'); o.value = c.name; cd && cd.appendChild(o); });
+        (subs.data || []).forEach(s => { const o = document.createElement('option'); o.value = s.name; sd && sd.appendChild(o); });
+      }
+    } catch (_) {}
+    this.syncFields();
+    this.build();
+  }
+};
+document.addEventListener('DOMContentLoaded', () => { try { PS.init(); } catch (e) { console.warn('Prompt Studio init failed:', e); } });
+</script></body></html>

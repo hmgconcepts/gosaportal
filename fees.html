@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Fees &amp; Payments • God of Seed Academy</title>
+<meta name="description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+<meta name="theme-color" content="#0506ae">
+<link rel="icon" type="image/png" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<meta property="og:title" content="Fees &amp; Payments • God of Seed Academy">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:image" content="assets/img/logo.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* === Critical app-shell CSS (inlined as a safety net) ===
+   Final UI/UX repair: stable, professional navigation for every layout.
+   Prevents scattered icons/labels, fixes unsupported layout IDs, and keeps
+   large module lists readable on desktop and mobile. */
+:root{--primary:#0506ae;--primary-dark:#0506ae;--primary-light:#964eec;--accent:#964eec;--gradient:linear-gradient(135deg,#0506ae,#964eec);--gradient-dark:linear-gradient(135deg,#0506ae,#964eec);--font:'Plus Jakarta Sans',system-ui,sans-serif;--sc-primary:#0506ae;--sc-accent:#964eec}
+body{font-family:var(--font)!important;background:#f8fafc}
+.app-layout{display:flex;min-height:100vh;background:#f8fafc;color:#0f172a}
+.app-sidebar{width:286px;flex-shrink:0;background:rgba(255,255,255,.98);border-right:1px solid #e2e8f0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden;z-index:40;box-shadow:0 10px 25px rgba(15,23,42,.04)}
+.app-brand{display:flex;align-items:center;gap:12px;padding:18px 16px;border-bottom:1px solid #e2e8f0;min-height:78px}
+.app-brand img{width:44px;height:44px;border-radius:12px;object-fit:contain;flex-shrink:0;background:#f8fafc;border:1px solid #e2e8f0}
+.app-brand strong{display:block;font-size:.98rem;font-weight:900;color:#0f172a;line-height:1.2;max-width:190px;white-space:normal}
+.app-nav{display:flex;flex-direction:column;gap:4px;padding:12px 10px 18px;flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin}
+.app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center;gap:10px;min-height:42px;padding:8px 10px;border-radius:12px;color:#475569;text-decoration:none;font-size:.875rem;font-weight:700;line-height:1.2;white-space:normal;word-break:normal;transition:background .18s ease,color .18s ease,transform .18s ease}
+.app-nav a:hover{background:#f1f5f9;color:var(--primary);transform:translateX(2px)}
+.app-nav a.active{background:var(--gradient);color:#fff;box-shadow:0 8px 20px rgba(79,70,229,.22)}
+body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!important}.app-nav a[style*="display: none"]{display:none!important}
+.app-nav a.nav-locked{opacity:.62}.app-nav a.nav-locked .app-nav-icon{filter:grayscale(.35)}.app-nav a.nav-locked::after{content:'🔒';font-size:.72rem;opacity:.65;justify-self:end}.app-nav a.nav-locked.active{opacity:1}
+.app-nav-icon{width:32px;height:32px;min-width:32px;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;line-height:1;border-radius:10px;background:rgba(79,70,229,.09);color:var(--primary);flex-shrink:0;overflow:hidden}
+.app-nav a.active .app-nav-icon{background:rgba(255,255,255,.22);color:#fff}
+.app-nav a span:last-child{overflow:hidden;text-overflow:ellipsis;display:block}
+.app-main{flex:1;min-width:0;display:flex;flex-direction:column}
+.app-topbar{display:flex;align-items:center;gap:14px;padding:13px 22px;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:30;box-shadow:0 4px 18px rgba(15,23,42,.035)}
+.app-page-title{font-size:1.2rem;font-weight:900;color:#0f172a;margin:0;letter-spacing:-.01em}
+.app-content{padding:24px;flex:1;max-width:1400px;width:100%;margin:0 auto}
+.card{border-radius:18px!important;border:1px solid #e2e8f0!important;box-shadow:0 8px 24px rgba(15,23,42,.06)!important}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:18px}.stat-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;box-shadow:0 6px 18px rgba(15,23,42,.05)}.stat-value{font-size:1.8rem;font-weight:900;color:var(--primary)}.stat-label{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800}
+/* Stable variants for all builder layout choices. Unsupported visual ideas are
+   expressed as professional variations, not broken experimental layouts. */
+.app-layout.topnav,.app-layout.cardhub,.app-layout.mega-menu,.app-layout.tabbed,.app-layout.dashboard-pro{flex-direction:column}
+.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{width:100%;height:auto;max-height:210px;position:sticky;top:0;flex-direction:row;align-items:stretch;overflow:hidden;border-right:none;border-bottom:1px solid #e2e8f0}
+.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:260px;min-width:260px;border-bottom:none;border-right:1px solid #e2e8f0}
+.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(116px,150px);overflow-x:auto;overflow-y:hidden;padding:10px;align-items:center}
+.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{grid-template-columns:1fr;text-align:center;justify-items:center;gap:4px;min-height:68px;padding:8px 10px;font-size:.75rem}
+.app-layout.topnav .app-nav-icon,.app-layout.cardhub .app-nav-icon,.app-layout.mega-menu .app-nav-icon,.app-layout.tabbed .app-nav-icon,.app-layout.dashboard-pro .app-nav-icon{margin:auto}
+.app-layout.compact .app-sidebar,.app-layout.dock .app-sidebar{width:224px}.app-layout.compact .app-nav a,.app-layout.dock .app-nav a{font-size:.8rem;grid-template-columns:28px minmax(0,1fr)}.app-layout.compact .app-nav-icon,.app-layout.dock .app-nav-icon{width:28px;height:28px;min-width:28px}
+.app-layout.expanded .app-sidebar{width:330px}.app-layout.minimalist .app-sidebar{box-shadow:none}.app-layout.floating .app-sidebar{margin:14px;border-radius:22px;height:calc(100vh - 28px);border:1px solid #e2e8f0}.app-layout.split-view .app-content,.app-layout.grid-master .app-content,.app-layout.masonry .app-content{max-width:1500px}
+@media(max-width:900px){.app-sidebar,.app-layout.floating .app-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:min(86vw,310px)!important;height:100vh!important;margin:0!important;border-radius:0!important;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 40px rgba(0,0,0,.22);z-index:100}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{flex-direction:column;align-items:stretch}.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:auto;min-width:0;border-right:none;border-bottom:1px solid #e2e8f0}.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);justify-items:stretch;text-align:left;min-height:42px;font-size:.875rem}.app-content{padding:16px}.app-topbar{padding:12px 14px;gap:10px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}.user-chip{max-width:150px;overflow:hidden}.user-chip strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
+</style>
+
+    <meta name="description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+    <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="./fees.html">
+    <meta property="og:title" content="Fees &amp; Payments • God of Seed Academy">
+    <meta property="og:description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
+    <meta property="og:url" content="./fees.html">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Fees &amp; Payments • God of Seed Academy">
+    <meta name="twitter:description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head>
+<body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
+
+<div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+  <span id="notif-badge" class="notif-badge" style="display:none">0</span>
+  <div id="notif-dropdown" class="notif-dropdown">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center">
+      <strong style="color:var(--dark)">Notifications</strong>
+      <button class="btn btn-sm btn-outline" onclick="Notifications.markAllRead()">Mark all read</button>
+    </div>
+    <div id="notif-list"><div class="toast-msg" style="padding:24px;text-align:center">Loading…</div></div>
+  </div>
+</div>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+<div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
+  <aside class="app-sidebar" id="app-sidebar">
+      <div class="app-brand">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
+        <div>
+          <strong>God of Seed Academy</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+        </div>
+      </div>
+      <nav class="app-nav">
+        <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🏠</span>
+          <span>Dashboard</span>
+        </a><a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>My Profile</span>
+        </a><a href="student-profile.html" data-module-id="student-profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">👤</span>
+          <span>Student Profile</span>
+        </a><a href="change-password.html" data-module-id="change-password" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔐</span>
+          <span>Change Password</span>
+        </a><a href="notifications.html" data-module-id="notifications" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🔔</span>
+          <span>Notifications</span>
+        </a><a href="academic_setup.html" data-module-id="academic_setup" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Academic Setup</span>
+        </a><a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🎓</span>
+          <span>Students</span>
+        </a><a href="staff.html" data-module-id="staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Staff</span>
+        </a><a href="parents.html" data-module-id="parents" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👨‍👩‍👧</span>
+          <span>Parent–Child</span>
+        </a><a href="classes.html" data-module-id="classes" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Classes</span>
+        </a><a href="subjects.html" data-module-id="subjects" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Subjects</span>
+        </a><a href="departments.html" data-module-id="departments" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏢</span>
+          <span>Departments</span>
+        </a><a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Attendance</span>
+        </a><a href="timetable.html" data-module-id="timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Timetable</span>
+        </a><a href="exam-timetable.html" data-module-id="exam_timetable" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Exam Timetable</span>
+        </a><a href="timetable-generator.html" data-module-id="timetable-generator" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗓️</span>
+          <span>Auto-Timetable</span>
+        </a><a href="sow.html" data-module-id="sow" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📋</span>
+          <span>Scheme</span>
+        </a><a href="lesson_plans.html" data-module-id="lesson_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Lesson Plans</span>
+        </a><a href="results.html" data-module-id="results" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Results</span>
+        </a><a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">◦</span>
+          <span>Report Cards (flexible)</span>
+        </a><a href="affective_traits.html" data-module-id="affective_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Affective Domain</span>
+        </a><a href="psychomotor_traits.html" data-module-id="psychomotor_traits" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏃</span>
+          <span>Psychomotor Domain</span>
+        </a><a href="report_comments.html" data-module-id="report_comments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Report Comments</span>
+        </a><a href="academic-records.html" data-module-id="academic_records" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Records</span>
+        </a><a href="transcripts.html" data-module-id="transcripts" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Academic Transcripts</span>
+        </a><a href="rubrics.html" data-module-id="rubrics" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📐</span>
+          <span>Grading Rubrics</span>
+        </a><a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💻</span>
+          <span>CBT</span>
+        </a><a href="cbt-prompts.html" data-module-id="cbt-prompts" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>AI Question Prompts</span>
+        </a><a href="cbt-multi.html" data-module-id="cbt-multi" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Multi-Subject CBT</span>
+        </a><a href="cbt-exam.html" data-module-id="cbt-exam" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🧪</span>
+          <span>Take Exam</span>
+        </a><a href="entrance.html" data-module-id="entrance" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎯</span>
+          <span>Entrance &amp; Assessments</span>
+        </a><a href="assignments.html" data-module-id="assignments" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Assignments</span>
+        </a><a href="digital_library.html" data-module-id="digital_library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher student" class="">
+          <span class="app-nav-icon">📚</span>
+          <span>Digital Library</span>
+        </a><a href="library.html" data-module-id="library" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Library</span>
+        </a><a href="book_request.html" data-module-id="book_request" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📖</span>
+          <span>Book Request</span>
+        </a><a href="eresources.html" data-module-id="eresources" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📁</span>
+          <span>E-Resources</span>
+        </a><a href="lms.html" data-module-id="lms" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>LMS</span>
+        </a><a href="announcements.html" data-module-id="announcements" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📢</span>
+          <span>Announcements</span>
+        </a><a href="events.html" data-module-id="events" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🎭</span>
+          <span>Events</span>
+        </a><a href="school_calendar.html" data-module-id="school_calendar" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">📅</span>
+          <span>Calendar</span>
+        </a><a href="messages.html" data-module-id="messages" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📱</span>
+          <span>Messaging</span>
+        </a><a href="inbox.html" data-module-id="inbox" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Inbox</span>
+        </a><a href="broadcast.html" data-module-id="broadcast" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Result Broadcast</span>
+        </a><a href="complaints.html" data-module-id="complaints" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📨</span>
+          <span>Complaints</span>
+        </a><a href="voting.html" data-module-id="voting" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent student" class="">
+          <span class="app-nav-icon">🗳️</span>
+          <span>Voting</span>
+        </a><a href="surveys.html" data-module-id="surveys" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗒️</span>
+          <span>Surveys</span>
+        </a><a href="gallery.html" data-module-id="gallery" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🖼️</span>
+          <span>Gallery</span>
+        </a><a href="birthdays.html" data-module-id="birthdays" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎂</span>
+          <span>Birthdays</span>
+        </a><a href="fees.html" data-module-id="fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💰</span>
+          <span>Fees</span>
+        </a><a href="school-fees.html" data-module-id="school_fees" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏷️</span>
+          <span>Class Fee Structure</span>
+        </a><a href="school-products.html" data-module-id="school_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛒</span>
+          <span>School Products</span>
+        </a><a href="payment-history.html" data-module-id="payment-history" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payment History</span>
+        </a><a href="payments_online.html" data-module-id="payments_online" data-role-allow="super_admin admin principal proprietor head_teacher bursar parent" class="">
+          <span class="app-nav-icon">💳</span>
+          <span>Online Pay</span>
+        </a><a href="finance.html" data-module-id="finance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💵</span>
+          <span>Finance</span>
+        </a><a href="financial_aid.html" data-module-id="financial_aid" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎗️</span>
+          <span>Financial Aid</span>
+        </a><a href="donations.html" data-module-id="donations" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">💝</span>
+          <span>Donations</span>
+        </a><a href="payroll.html" data-module-id="payroll" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Payroll Register</span>
+        </a><a href="staff_loans.html" data-module-id="staff_loans" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏦</span>
+          <span>Staff Loans &amp; Advances</span>
+        </a><a href="staff_bonus.html" data-module-id="staff_bonus" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎁</span>
+          <span>Staff Bonuses</span>
+        </a><a href="appraisals.html" data-module-id="appraisals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⭐</span>
+          <span>Staff Appraisals</span>
+        </a><a href="leave.html" data-module-id="leave" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏖️</span>
+          <span>Leave</span>
+        </a><a href="substitutions.html" data-module-id="substitutions" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔁</span>
+          <span>Substitutions</span>
+        </a><a href="admissions.html" data-module-id="admissions" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Admissions</span>
+        </a><a href="exam-register.html" data-module-id="exam_registrations" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Exam Registrations</span>
+        </a><a href="promotion.html" data-module-id="promotion" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🎓</span>
+          <span>Promotion</span>
+        </a><a href="alumni.html" data-module-id="alumni" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🤝</span>
+          <span>Alumni</span>
+        </a><a href="certificates.html" data-module-id="certificates" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📜</span>
+          <span>Certificates</span>
+        </a><a href="transfer_cert.html" data-module-id="transfer_cert" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📄</span>
+          <span>Transfer Certificates</span>
+        </a><a href="idcards.html" data-module-id="idcards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🪪</span>
+          <span>ID Cards</span>
+        </a><a href="flyer.html" data-module-id="flyer" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📰</span>
+          <span>Flyer</span>
+        </a><a href="document_builder.html" data-module-id="document_builder" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧾</span>
+          <span>Documents</span>
+        </a><a href="conduct.html" data-module-id="conduct" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⚖️</span>
+          <span>Conduct</span>
+        </a><a href="behaviour.html" data-module-id="behaviour" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Behaviour</span>
+        </a><a href="health.html" data-module-id="health" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🩺</span>
+          <span>Health</span>
+        </a><a href="counselling.html" data-module-id="counselling" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">💬</span>
+          <span>Counselling &amp; Wellbeing</span>
+        </a><a href="support_plans.html" data-module-id="support_plans" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🧩</span>
+          <span>Support Plans</span>
+        </a><a href="diary.html" data-module-id="diary" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📔</span>
+          <span>Diary</span>
+        </a><a href="gamification.html" data-module-id="gamification" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏅</span>
+          <span>Gamification</span>
+        </a><a href="hostel.html" data-module-id="hostel" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛏️</span>
+          <span>Hostel</span>
+        </a><a href="cafeteria.html" data-module-id="cafeteria" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Cafeteria</span>
+        </a><a href="menu.html" data-module-id="menu" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🍽️</span>
+          <span>Menu</span>
+        </a><a href="transport.html" data-module-id="transport" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚌</span>
+          <span>Transport</span>
+        </a><a href="fleet_tracking.html" data-module-id="fleet_tracking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛰️</span>
+          <span>Fleet</span>
+        </a><a href="visitors.html" data-module-id="visitors" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🚪</span>
+          <span>Visitors</span>
+        </a><a href="checkin.html" data-module-id="checkin" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📲</span>
+          <span>QR Check-in</span>
+        </a><a href="front_desk.html" data-module-id="front_desk" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🛎️</span>
+          <span>Front Desk</span>
+        </a><a href="lost_found.html" data-module-id="lost_found" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Lost &amp; Found</span>
+        </a><a href="parent_meeting.html" data-module-id="parent_meeting" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">👥</span>
+          <span>PTA Meeting</span>
+        </a><a href="facility_booking.html" data-module-id="facility_booking" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🏟️</span>
+          <span>Facilities</span>
+        </a><a href="career_counseling.html" data-module-id="career_counseling" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧭</span>
+          <span>Career</span>
+        </a><a href="helpdesk.html" data-module-id="helpdesk" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🆘</span>
+          <span>Help Desk</span>
+        </a><a href="directory.html" data-module-id="directory" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔍</span>
+          <span>Directory</span>
+        </a><a href="reports.html" data-module-id="reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">📈</span>
+          <span>Reports</span>
+        </a><a href="analytics.html" data-module-id="analytics" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📊</span>
+          <span>Analytics</span>
+        </a><a href="inventory.html" data-module-id="inventory" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">📦</span>
+          <span>Inventory</span>
+        </a><a href="storage.html" data-module-id="storage" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Storage Manager</span>
+        </a><a href="compliance.html" data-module-id="compliance" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Compliance</span>
+        </a><a href="activity_log.html" data-module-id="activity_log" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🧮</span>
+          <span>Activity Log</span>
+        </a><a href="admin-data.html" data-module-id="admin-data" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🗄️</span>
+          <span>Admin Data</span>
+        </a><a href="approvals.html" data-module-id="approvals" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">✅</span>
+          <span>Approvals</span>
+        </a><a href="settings.html" data-module-id="settings" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">⚙️</span>
+          <span>Settings (2FA · Language · A11y)</span>
+        </a><a href="teacher-overview.html" data-module-id="teacher-overview" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">👨‍🏫</span>
+          <span>Teacher Overview</span>
+        </a><a href="feature-guide.html" data-module-id="feature-guide" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">📘</span>
+          <span>Feature Guide</span>
+        </a><a href="hmg-digital-products.html" data-module-id="hmg_digital_products" data-role-allow="any all public super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Digital Products</span>
+        </a><a href="status-manager.html" data-module-id="status_manager" data-role-allow="super_admin admin principal proprietor head_teacher bursar" class="">
+          <span class="app-nav-icon">🔧</span>
+          <span>Role &amp; Status</span>
+        </a><a href="developer.html" data-module-id="developer" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">👨‍💻</span>
+          <span>About the Developer</span>
+        </a><a href="about.html" data-module-id="about" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">🏫</span>
+          <span>About</span>
+        </a><a href="apply.html" data-module-id="apply" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">📝</span>
+          <span>Apply</span>
+        </a><a href="checkin-staff.html" data-module-id="checkin-staff" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">⏰</span>
+          <span>Staff Check-In</span>
+        </a><a href="contact.html" data-module-id="contact" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher any all public" class="">
+          <span class="app-nav-icon">☎️</span>
+          <span>Contact</span>
+        </a><a href="ecosystem.html" data-module-id="ecosystem_products" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="">
+          <span class="app-nav-icon">🌐</span>
+          <span>HMG Ecosystem</span>
+        </a><a href="punctuality.html" data-module-id="punctuality" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">⏱️</span>
+          <span>Punctuality</span>
+        </a><a href="verify-certificate.html" data-module-id="verify-certificate" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher" class="">
+          <span class="app-nav-icon">🔎</span>
+          <span>Verify Certificate</span>
+        </a>
+      </nav>
+      <div style="margin-top:auto;padding:16px;border-top:1px solid var(--gray-200);font-size:0.78rem;color:var(--gray-500)">
+        Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+      </div>
+    </aside>
+  <main class="app-main">
+    <header class="app-topbar">
+      <button class="mobile-toggle" onclick="App.toggleSidebar()" title="Menu">☰</button>
+      <h1 class="app-page-title">Fees &amp; Payments</h1>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+        
+        <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
+        <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle dark/light — robust like Fleet Console">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="if(window.ThemeManager)ThemeManager.openPalette()" title="Theme palette — colour themes + dark/light + reset (Ctrl+K)">🎨</button>
+        <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
+      </div>
+    </header>
+    <div class="app-content">
+      <div id="fam-fees" style="display:none;margin-bottom:16px"></div>
+      <div class="card" style="background:#eef2ff;border-color:#c7d2fe;margin-bottom:14px"><b>👀 See samples first:</b> <a href="samples/sample-report-card.html" target="_blank">Report Card</a> · <a href="samples/sample-class-broadsheet.html" target="_blank">Class Broadsheet</a> · <a href="samples/sample-subject-broadsheet.html" target="_blank">Subject Broadsheet</a> · <a href="samples/sample-e-receipt.html" target="_blank">Fee E-Receipt</a></div>
+      
+      <!-- V10.9 (#1): FEE LEDGER DOCTOR — every recording error a bursar can
+           make, found in advance: duplicates, unlinked rows, zero/negative
+           amounts, future dates, overpayments, missing term/session, stale
+           snapshots. One click scans; Heal rewrites every stale snapshot. -->
+      <div class="card" style="margin-bottom:16px;border:2px solid #fbbf24" data-admin-only>
+        <h2 style="margin-top:0">🩺 Fee Ledger Doctor — find & fix recording errors</h2>
+        <p style="color:var(--gray-600);margin:6px 0 10px">Scans every payment row for the seven error patterns bursars actually make: <b>double entries</b>, <b>rows with no student linked</b>, <b>zero/negative amounts</b>, <b>future dates</b>, <b>overpayments beyond the bill</b>, <b>missing term/session</b> and <b>stale totals</b> from before the self-healing update. Deleting or editing any row is safe — the whole term recomputes automatically (V10.8).</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="FeeDoctor.run(false)">🔍 Scan the ledger</button>
+          <button class="btn btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="FeeDoctor.run(true)">🧮 Scan + Heal snapshots</button>
+        </div>
+        <div id="fee-doctor-out" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe" data-admin-only><h2 style="margin-top:0">📑 Master Financial Records — export by class (V10.1)</h2>
+        <p style="color:var(--gray-600);font-size:.9rem">One row per student: current-term bill, scholarship/aid, paid so far, balance, previous-term arrears and TOTAL outstanding — computed live by the same engine that powers the dashboards. Print/save as PDF or download CSV. Needs <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+          <div class="form-group" style="margin:0"><label>Class</label><select class="form-select" id="fm-class"><option value="">ALL classes</option></select></div>
+          <button class="btn btn-primary" onclick="FM.load()">📊 Build master sheet</button>
+          <button class="btn btn-outline" onclick="FM.printPDF()">🖨️ Print / Save PDF</button>
+          <button class="btn btn-outline" onclick="FM.exportCSV()">⬇ CSV</button>
+        </div>
+        <div id="fm-out" style="margin-top:12px"></div>
+      </div>
+      <div class="card" style="margin-bottom:16px;border:2px solid #86efac" data-admin-only><h2 style="margin-top:0">💰 Daily Fee Collection Dashboard</h2><p>Know exactly what entered the school each day. Select a date to see total payments, transaction count, average receipt, payment methods, classes, collectors and an auditable transaction list.</p><div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><div class="form-group" style="margin:0"><label>Collection date</label><input class="form-input" id="fd-date" type="date"></div><button class="btn btn-primary" onclick="FeeDaily.load()">View daily collection</button><button class="btn btn-outline" onclick="FeeDaily.exportDay()">Export this day CSV</button></div><div id="fd-out" style="margin-top:12px"><span class="pulse">Loading today’s fees…</span></div></div>
+      <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer" onclick="var b=document.getElementById('pg-more');b.style.display=b.style.display==='none'?'block':'none'">
+        <div><strong>ℹ️ What is this page?</strong> <span style="color:var(--gray-700)">Records school-fee payments and shows balances per student.</span></div>
+        <span style="color:var(--primary)">▼</span>
+      </div>
+      <div id="pg-more" style="display:none;margin-top:10px">
+        <p style="margin:4px 0;color:var(--gray-700)"><strong>Who uses it:</strong> Bursar/admin record payments; parents see their own.</p>
+        <p style="margin:8px 0 4px;color:var(--gray-700)"><strong>How to use it:</strong></p>
+        <ol style="margin:0;padding-left:20px;color:var(--gray-700);line-height:1.7"><li>Click <b>+ Add new</b>, pick the student, enter the amount, method and reference.</li><li>Each payment appears in the student's <b>payment history</b> on their dashboard.</li><li>Export statements to CSV/PDF.</li></ol>
+        
+        
+        <p style="margin:10px 0 0;font-size:.85rem;color:var(--gray-500)">Tip: click the <strong>ℹ️ Help</strong> button in the top bar, or the 💬 assistant, for the full explanation of any page.</p>
+      </div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <button class="btn btn-primary" onclick="CRUD.openForm('fees')" data-admin-only>+ Add new (admin/bursar)</button> <a class="btn btn-outline" href="payment-history.html" data-admin-only>🧾 Payment History & Bulk Receipts</a>
+        <button class="btn btn-outline" onclick="CRUD.renderList('fees')">↻ Refresh</button>
+        <button class="btn btn-outline" onclick="CRUD.exportCSV('fees')" data-staff-only>⬇ Export CSV</button>
+        <button class="btn btn-outline" onclick="CRUD.exportPDF('fees')" data-staff-only>📄 Export PDF</button>
+        <button class="btn btn-outline" onclick="CRUD.importCSV('fees')" data-admin-only>⬆ Import CSV</button>
+        
+        
+        
+        
+        
+      </div>
+      
+      <div class="table-wrap"><table id="fees-table"><thead><tr><th>Loading…</th></tr></thead><tbody><tr><td><span class="pulse">Loading…</span></td></tr></tbody></table></div>
+      <script>document.addEventListener('DOMContentLoaded',function(){ if(window.CRUD) CRUD.renderList('fees'); });</script>
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
+      © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+    </footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/voting.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
+<script src="assets/js/super.js"></script>
+<script src="assets/js/enterprise.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/crud.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/analytics.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
+  else { Notifications.init(sb); Voting.init(sb); }
+  PWAInstall.init();
+  if (window.Super) Super.init(sb, window.SCHOOL);
+  if (window.Enterprise) Enterprise.init(sb);
+  if (window.CRUD) CRUD.init(sb);
+</script>
+<script>
+const FeeDaily={rows:[],esc:s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'),today(){return new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});},money(n){return((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},async fetchDate(date){const all=[];for(let from=0;;from+=1000){const r=await sb.from('fee_payments').select('*').eq('payment_date',date).order('created_at',{ascending:false}).range(from,from+999);if(r.error)throw r.error;all.push(...(r.data||[]));if(!r.data||r.data.length<1000)break;}return all;},async sumRange(from,to){let total=0,count=0;for(let start=0;;start+=1000){const r=await sb.from('fee_payments').select('amount_paid').gte('payment_date',from).lte('payment_date',to).range(start,start+999);if(r.error)throw r.error;(r.data||[]).forEach(x=>{total+=Number(x.amount_paid||0);count++;});if(!r.data||r.data.length<1000)break;}return{total,count};},async load(){if(!window.sb)return;const input=document.getElementById('fd-date'),date=input.value||this.today();input.value=date;try{const rows=await this.fetchDate(date);this.rows=rows;const ids=[...new Set(rows.map(x=>x.student_id).filter(Boolean))],students={};if(ids.length){const r=await sb.from('students').select('id,full_name,admission_no,class').in('id',ids);(r.data||[]).forEach(x=>students[x.id]=x);}const d=new Date(date+'T12:00:00'),yd=new Date(d);yd.setDate(d.getDate()-1);const yesterday=yd.toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'}),monthStart=date.slice(0,7)+'-01',[prev,month]=await Promise.all([this.sumRange(yesterday,yesterday),this.sumRange(monthStart,date)]),total=rows.reduce((a,x)=>a+Number(x.amount_paid||0),0),methods={},classes={},collectors={};rows.forEach(x=>{methods[x.method||'unspecified']=(methods[x.method||'unspecified']||0)+Number(x.amount_paid||0);const st=students[x.student_id]||{},cl=st.class||'Unassigned';classes[cl]=(classes[cl]||0)+Number(x.amount_paid||0);const by=x.received_by_name||'Not recorded';collectors[by]=(collectors[by]||0)+Number(x.amount_paid||0);});const breakdown=(title,obj)=>'<div><h4>'+title+'</h4><div class="table-wrap"><table><tbody>'+Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+this.esc(k)+'</td><td><b>'+this.money(v)+'</b></td></tr>').join('')+'</tbody></table></div></div>';document.getElementById('fd-out').innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+this.money(total)+'</div><div class="stat-label">Selected day total</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Transactions</div></div><div class="stat-card"><div class="stat-value">'+this.money(rows.length?total/rows.length:0)+'</div><div class="stat-label">Average receipt</div></div><div class="stat-card"><div class="stat-value">'+this.money(prev.total)+'</div><div class="stat-label">Previous day</div></div><div class="stat-card"><div class="stat-value">'+this.money(month.total)+'</div><div class="stat-label">Month-to-date</div></div></div><div class="grid grid-3">'+breakdown('By payment method',methods)+breakdown('By class',classes)+breakdown('By collector',collectors)+'</div><h4>Transactions for '+this.esc(date)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th><th>Student</th><th>Class</th><th>Amount</th><th>Method</th><th>Reference</th><th>Collector</th></tr></thead><tbody>'+(rows.length?rows.map(x=>{const st=students[x.student_id]||{};return'<tr><td>'+this.esc(String(x.created_at||'').slice(11,16))+'</td><td>'+this.esc(st.full_name||x.student_name||'')+'<br><small>'+this.esc(st.admission_no||'')+'</small></td><td>'+this.esc(st.class||'')+'</td><td><b>'+this.money(x.amount_paid)+'</b></td><td>'+this.esc(x.method||'')+'</td><td>'+this.esc(x.reference||'')+'</td><td>'+this.esc(x.received_by_name||'')+'</td></tr>';}).join(''):'<tr><td colspan="7">No fees recorded on this date.</td></tr>')+'</tbody></table></div>';}catch(e){document.getElementById('fd-out').innerHTML='<div class="notice notice-error">'+this.esc(e.message||e)+'. Run the latest complete-schema.sql if payment_date is missing.</div>'; }},exportDay(){if(!this.rows.length){toast('No daily rows to export.','warning');return;}const keys=['payment_date','created_at','student_id','student_name','amount_paid','method','reference','term','session','received_by_name'],csv=[keys.join(',')].concat(this.rows.map(r=>keys.map(k=>'"'+String(r[k]??'').replace(/"/g,'""')+'"').join(','))).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='daily-fees-'+document.getElementById('fd-date').value+'.csv';a.click();}};
+document.addEventListener('DOMContentLoaded',()=>FeeDaily.load());
+</script>
+<script>
+/* ===== FAM — V9.4 (#1): Family fee panel for parents & students =====
+   Bold current-term totals per child (sc_student_fee_state), the child's FULL
+   payment history, and one-click printable e-receipts. Staff/admin never see
+   this panel (they have the full ledgers above). */
+const FAM={
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  money(cur,n){return (cur||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},
+  async init(){
+    try{
+      for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+      const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if(!['parent','student'].includes(role))return;
+      /* hide the admin ledgers for family users */
+      document.querySelectorAll('.app-content [data-admin-only],.app-content [data-staff-only]').forEach(el=>el.style.display='none');
+      const host=document.getElementById('fam-fees');if(!host)return;host.style.display='';
+      host.innerHTML='<div class="card"><span class="pulse">Loading your fee records…</span></div>';
+      let studs=[];
+      if(role==='student'){const r=await sb.from('students').select('id,full_name,class,admission_no').eq('user_id',SC_PROFILE.id);studs=r.data||[];}
+      else{const l=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);const ids=(l.data||[]).map(x=>x.student_id);
+        if(ids.length){const st=await sb.from('students').select('id,full_name,class,admission_no').in('id',ids);studs=st.data||[];}}
+      if(!studs.length){host.innerHTML='<div class="card">No linked student record yet — ask the admin to link your account.</div>';return;}
+      let h='';
+      for(const s of studs){
+        let f={};try{const fr=await sb.rpc('sc_student_fee_state',{p_student:s.id});f=(fr.data&&fr.data.ok!==false)?fr.data:{};}catch(_){}
+        const cur=f.currency||'₦';
+        const pr=await sb.from('fee_payments').select('*').eq('student_id',s.id).order('payment_date',{ascending:false}).order('created_at',{ascending:false}).limit(200);
+        const pays=pr.data||[];this._pays=this._pays||{};this._pays[s.id]=pays;
+        h+='<div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">💰 '+this.esc(s.full_name)+' · '+this.esc(s.class||'')+' <small style="color:var(--gray-500)">'+this.esc(s.admission_no||'')+'</small></h3>';
+        if(f.ok){
+          const owing=Number(f.total_due||0);
+          h+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px">'
+            +'<div><div style="font-size:1.6rem;font-weight:900">'+this.money(cur,f.bill)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Total fees · '+this.esc(f.term||'')+'</div></div>'
+            +'<div><div style="font-size:1.6rem;font-weight:900;color:#15803d">'+this.money(cur,f.paid)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Paid this term</div></div>'
+            +(Number(f.aid||0)>0?'<div><div style="font-size:1.6rem;font-weight:900;color:#7c3aed">−'+this.money(cur,f.aid)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:#7c3aed">🎓 Scholarship / aid</div></div>':'')
+            +(Number(f.arrears||0)>0?'<div><div style="font-size:1.6rem;font-weight:900;color:#b91c1c">'+this.money(cur,f.arrears)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Previous terms owing</div></div>':'')
+            +'<div><div style="font-size:1.6rem;font-weight:900;color:'+(owing>0?'#b91c1c':'#15803d')+'">'+this.money(cur,owing)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:'+(owing>0?'#b91c1c':'#15803d')+'">'+(owing>0?'Total outstanding':'✅ Fully paid')+'</div></div></div>';
+        } else h+='<p style="font-size:.85rem;color:var(--gray-500)">Live fee totals appear after the school installs the v9.4 database update. Your payment history is below.</p>';
+        h+='<h4 style="margin:8px 0 4px">🧾 Payment history</h4>';
+        h+=pays.length?'<div class="table-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Term</th><th>Reference</th><th>E-receipt</th></tr></thead><tbody>'
+          +pays.map((p,i)=>'<tr><td>'+this.esc(p.payment_date||String(p.created_at||'').slice(0,10))+'</td><td><b>'+this.money(cur,p.amount_paid)+'</b></td><td>'+this.esc(p.method||'')+'</td><td>'+this.esc((p.term||'')+(p.session?' · '+p.session:''))+'</td><td>'+this.esc(p.reference||'—')+'</td><td><button class="btn btn-sm btn-outline" onclick="FAM.receipt(\''+s.id+'\','+i+')">🖨️ Print</button></td></tr>').join('')
+          +'</tbody></table></div>':'<p style="color:var(--gray-500);font-size:.85rem">No payments recorded yet.</p>';
+        h+='</div>';
+      }
+      host.innerHTML=h;
+    }catch(e){console.warn('[FAM]',e);}
+  },
+  receipt(studentId,idx){
+    const p=(this._pays&&this._pays[studentId]||[])[idx];if(!p)return;
+    const sc=window.SCHOOL||{};const cur=(sc.currency)||'₦';
+    const w=window.open('','_blank');if(!w){toast('Allow popups to print the receipt.','warning');return;}
+    const money=n=>cur+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+    w.document.write('<!DOCTYPE html><html><head><title>E-Receipt — '+this.esc(p.student_name||'')+'</title><style>@page{size:A5 landscape;margin:8mm}body{font-family:Georgia,serif;color:#111;padding:18px;max-width:640px;margin:auto}h1{font-size:20px;margin:0;text-align:center}p.m{margin:2px 0;text-align:center;color:#555;font-size:11px}table{width:100%;border-collapse:collapse;margin-top:14px}td{padding:7px 10px;border-bottom:1px solid #ddd;font-size:13px}td:first-child{color:#555;width:45%}.tot{font-size:16px;font-weight:bold}.foot{margin-top:22px;text-align:center;font-size:10.5px;color:#777}.badge{display:inline-block;border:2px solid #16a34a;color:#16a34a;border-radius:8px;padding:3px 14px;font-weight:bold;margin-top:8px}</style></head><body>'
+      +'<h1>'+this.esc(sc.name||'School')+'</h1><p class="m">'+this.esc(sc.address||'')+'</p><p class="m">'+this.esc(sc.phone||'')+' · '+this.esc(sc.email||'')+'</p>'
+      +'<p class="m" style="margin-top:10px;font-size:14px;font-weight:bold;letter-spacing:1px">OFFICIAL FEE E-RECEIPT</p><div style="text-align:center"><span class="badge">PAYMENT RECEIVED</span></div>'
+      +'<table><tr><td>Receipt for</td><td><b>'+this.esc(p.student_name||'')+'</b></td></tr>'
+      +'<tr><td>Date</td><td>'+this.esc(p.payment_date||String(p.created_at||'').slice(0,10))+'</td></tr>'
+      +'<tr><td>Amount paid</td><td class="tot">'+money(p.amount_paid)+'</td></tr>'
+      +(p.fee_total?'<tr><td>Total fee for the term</td><td>'+money(p.fee_total)+'</td></tr>':'')
+      +(p.balance!=null&&p.balance!==''?'<tr><td>Remaining balance</td><td><b>'+money(p.balance)+'</b></td></tr>':'')
+      +'<tr><td>Method</td><td>'+this.esc(p.method||'—')+'</td></tr>'
+      +'<tr><td>Term / Session</td><td>'+this.esc((p.term||'—')+(p.session?' · '+p.session:''))+'</td></tr>'
+      +'<tr><td>Reference</td><td>'+this.esc(p.reference||'—')+'</td></tr>'
+      +(p.received_by_name?'<tr><td>Received by</td><td>'+this.esc(p.received_by_name)+'</td></tr>':'')
+      +'</table><p class="foot">Generated by School Connect · '+new Date().toLocaleString()+' · Verify with the school bursar quoting the reference above.</p>'
+      +'<script>window.onload=()=>window.print()<\/script></body></html>');
+    w.document.close();
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>FAM.init());FAM.init();
+/* ===== FM — V10.1 (#7): Master financial records export ===== */
+const FM={rows:[],ctx:{},
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  money(n){return((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},
+  async init(){try{const {data}=await sb.from('classes').select('name').order('name');const el=document.getElementById('fm-class');if(el)(data||[]).forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;el.appendChild(o);});}catch(_){}},
+  async load(){
+    const cls=(document.getElementById('fm-class')||{}).value||'';
+    const box=document.getElementById('fm-out');box.innerHTML='<span class="pulse">Computing every student\'s financial state…</span>';
+    const r=await sb.rpc('sc_class_fee_master',{p_class:cls});
+    if(r.error){box.innerHTML='<div class="notice notice-error">'+this.esc(/could not find|does not exist|schema cache/i.test(r.error.message||'')?'Run database/v10.1-staffpay-attendance-vetting.sql once, then rebuild.':r.error.message)+'</div>';return;}
+    const d=r.data||{};if(d.ok===false){box.innerHTML='<div class="notice notice-error">'+this.esc(d.error||'Failed')+'</div>';return;}
+    this.rows=d.rows||[];this.ctx={cls:cls,term:d.term,session:d.session};
+    if(!this.rows.length){box.innerHTML='<p style="color:var(--gray-500)">No students found'+(cls?' in '+this.esc(cls):'')+'.</p>';return;}
+    let tb=0,tp=0,to=0;this.rows.forEach(x=>{tb+=Number(x.bill)||0;tp+=Number(x.paid)||0;to+=Number(x.total_due)||0;});
+    box.innerHTML='<div id="fm-print-area"><h3 style="text-align:center;margin:4px 0">'+this.esc((window.SCHOOL&&SCHOOL.name)||'School')+'</h3>'
+      +'<p style="text-align:center;margin:0 0 8px;color:var(--gray-600)">MASTER FINANCIAL RECORDS · '+this.esc(cls||'ALL CLASSES')+' · '+this.esc(d.term||'')+' '+this.esc(d.session||'')+' · generated '+new Date().toLocaleString()+'</p>'
+      +'<div class="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Adm. No</th><th>Class</th><th>Dept</th><th>Term bill</th><th>Aid</th><th>Paid</th><th>Balance</th><th>Prev. terms owing</th><th>TOTAL DUE</th></tr></thead><tbody>'
+      +this.rows.map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+this.esc(x.student)+'</b></td><td>'+this.esc(x.admission_no||'')+'</td><td>'+this.esc(x.class||'')+'</td><td>'+this.esc(x.department||'')+'</td><td>'+this.money(x.bill)+'</td><td>'+(Number(x.aid)>0?'−'+this.money(x.aid):'—')+'</td><td>'+this.money(x.paid)+'</td><td>'+this.money(x.balance)+'</td><td>'+(Number(x.arrears)>0?'<b style="color:#b91c1c">'+this.money(x.arrears)+'</b>':'—')+'</td><td><b style="color:'+(Number(x.total_due)>0?'#b91c1c':'#15803d')+'">'+this.money(x.total_due)+'</b></td></tr>').join('')
+      +'<tr style="background:var(--gray-100);font-weight:800"><td colspan="5">TOTALS · '+this.rows.length+' student(s)</td><td>'+this.money(tb)+'</td><td></td><td>'+this.money(tp)+'</td><td></td><td></td><td>'+this.money(to)+'</td></tr></tbody></table></div></div>';},
+  printPDF(){const el=document.getElementById('fm-print-area');if(!el){toast('Build the master sheet first.','warning');return;}
+    const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}
+    w.document.write('<html><head><title>Master Financial Records</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;padding:10px;color:#111}table{width:100%;border-collapse:collapse}th,td{border:1px solid #334155;padding:4px 6px;font-size:10.5px;text-align:left}th{background:#e2e8f0}h3{margin:0;text-align:center}</style></head><body>'+el.innerHTML+'<p style="text-align:center;font-size:9px;color:#64748b;margin-top:10px">Generated by School Connect · HMG Concepts · Bursar signature: ______________________</p><script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();},
+  exportCSV(){if(!this.rows.length){toast('Build the master sheet first.','warning');return;}
+    const esc2=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const csv=['Student,Admission No,Class,Department,Term Bill,Aid,Paid,Balance,Previous Terms Owing,Total Due']
+      .concat(this.rows.map(x=>[x.student,x.admission_no,x.class,x.department,x.bill,x.aid,x.paid,x.balance,x.arrears,x.total_due].map(esc2).join(','))).join('\n');
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='master-financial-records'+(this.ctx.cls?'-'+this.ctx.cls.replace(/\s+/g,'_'):'')+'.csv';a.click();}
+};
+document.addEventListener('DOMContentLoaded',()=>FM.init());FM.init();
+</script>
+<script>
+/* V10.9 (#1): FEE LEDGER DOCTOR UI — renders the sc_fee_ledger_doctor scan,
+   grouped by error kind, with per-row shortcuts into the fees table. */
+const FeeDoctor={
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  async run(heal){
+    const box=document.getElementById('fee-doctor-out'); if(!box||!window.sb)return;
+    box.innerHTML='<span class="pulse">Scanning the whole ledger…</span>';
+    const r=await sb.rpc('sc_fee_ledger_doctor',{p_heal:!!heal});
+    if(r.error||!r.data||r.data.ok===false){
+      const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Scan failed';
+      box.innerHTML='<p style="color:#b91c1c">'+(/sc_fee_ledger_doctor|schema cache|function/i.test(String(msg))?'The Fee Doctor needs a one-time database update — run database/v10.9b-fee-doctor.sql (or the latest complete-schema.sql) in Supabase.':this.esc(msg))+'</p>';
+      return;
+    }
+    const d=r.data, issues=d.issues||[];
+    const KINDS={duplicate:['👯 Possible double entries','#fef2f2','#dc2626'],unlinked:['🔗 Payments with no student linked','#fff7ed','#ea580c'],non_positive:['0️⃣ Zero / negative amounts','#fef2f2','#dc2626'],future_dated:['📅 Future-dated payments','#fefce8','#ca8a04'],overpayment:['💸 Paid beyond the bill','#fdf2f8','#be185d'],no_period:['🗓 Missing term/session','#eff6ff','#2563eb'],stale_snapshot:['🧮 Stale totals (run Heal)','#f5f3ff','#7c3aed']};
+    if(!issues.length){box.innerHTML='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;color:#166534;font-weight:700">✅ Ledger clean — no duplicates, no unlinked rows, no overpayments, no stale totals.'+(heal?' Snapshots re-verified for '+(d.healed_terms||0)+' student-term(s).':'')+'</div>';return;}
+    const groups={};issues.forEach(i=>{(groups[i.kind]=groups[i.kind]||[]).push(i);});
+    box.innerHTML=(heal?'<p style="color:#166534;font-weight:700">🧮 Healed snapshots across '+(d.healed_terms||0)+' student-term(s). Remaining findings need a human decision:</p>':'')+
+      Object.keys(groups).map(k=>{
+        const meta=KINDS[k]||['❓ '+k,'#f8fafc','#334155'];
+        return '<div style="background:'+meta[1]+';border:1px solid '+meta[2]+'33;border-left:5px solid '+meta[2]+';border-radius:10px;padding:10px 14px;margin-bottom:10px">'+
+          '<b style="color:'+meta[2]+'">'+meta[0]+' · '+groups[k].length+'</b>'+
+          '<ul style="margin:6px 0 0 18px;font-size:.86rem;line-height:1.6">'+groups[k].slice(0,12).map(i=>'<li><b>'+this.esc(i.student||'')+'</b>'+(i.amount!=null?' · '+Number(i.amount).toLocaleString():'')+(i.term?' · '+this.esc(i.term):'')+(i.excess!=null?' · excess '+Number(i.excess).toLocaleString():'')+'<br><span style="color:var(--gray-600)">'+this.esc(i.advice||'')+'</span></li>').join('')+(groups[k].length>12?'<li>… and '+(groups[k].length-12)+' more</li>':'')+'</ul></div>';
+      }).join('')+
+      '<p style="font-size:.82rem;color:var(--gray-500)">Fix rows in the table below (Edit/Delete) — every change recomputes the student\'s whole term automatically. Re-scan afterwards.</p>';
+    if(window.App&&App.logActivity)App.logActivity(heal?'fee-doctor-heal':'fee-doctor-scan','fee_payments',String(issues.length)+' finding(s)');
+  }
+};
+</script></body></html>

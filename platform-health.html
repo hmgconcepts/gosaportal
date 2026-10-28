@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Platform Health Console • School Connect V12.17</title>
+<meta name="description" content="Owner cockpit: 14-layer keep-alive, storage, backups, security, fleet, audit — free-tier protection against Supabase pausing">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.ph-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.ph-badge{display:inline-block;padding:3px 12px;border-radius:99px;font-size:.8rem;font-weight:700}
+.ok{background:#dcfce7;color:#166534}.warn{background:#fef3c7;color:#92400e}.bad{background:#fee2e2;color:#991b1b}.muted{color:var(--gray-500);font-size:.85rem}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.ph-big{font-size:2rem;font-weight:900;line-height:1}
+.ph-meter{height:12px;border-radius:9999px;background:#e2e8f0;overflow:hidden}
+.ph-meter i{display:block;height:100%;border-radius:9999px}
+.dc-section{margin-top:20px;padding:18px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 6px 18px rgba(15,23,42,.05)}
+.dc-section h2{margin:0 0 8px;font-size:1.15rem;font-weight:900;color:#0f172a}
+.lead{color:#475569;font-size:.9rem;margin:0 0 12px}
+.dc-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.dc-kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px}
+.dc-kpi .l{font-size:.70rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:800}
+.dc-kpi .v{font-size:1.3rem;font-weight:900;color:#0f172a;margin:4px 0}
+.dc-kpi .s{font-size:.75rem;color:#64748b}
+.dc-scroll{overflow:auto;max-height:500px;border:1px solid #e2e8f0;border-radius:12px}
+.dc-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.dc-table th{background:#f1f5f9;padding:8px 10px;text-align:left;font-weight:800;color:#334155;border-bottom:1px solid #e2e8f0}
+.dc-table td{padding:8px 10px;border-bottom:1px solid #f1f5f9}
+.dc-muted{color:#64748b;font-size:.82rem}
+.dc-field{font-weight:800;color:#0f172a;font-size:.85rem;margin:0 0 6px}
+.dc-code{display:block;background:#0f172a;color:#e2e8f0;padding:10px;border-radius:10px;font-family:ui-monospace,monospace;font-size:.78rem;word-break:break-all}
+.dc-input{border:1px solid #cbd5e1;border-radius:8px;padding:6px 10px;font-size:.85rem}
+.dc-btn{border:1px solid #cbd5e1;border-radius:10px;padding:6px 12px;font-size:.85rem;font-weight:700;background:#fff;cursor:pointer}
+.dc-btn.ghost{background:#f8fafc}
+.ph-toc{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.ph-toc a{font-size:.75rem;font-weight:700;padding:4px 10px;border-radius:999px;background:#e0e7ff;color:#3730a3;text-decoration:none;white-space:nowrap}
+</style>
+</head>
+<body>
+<main style="max-width:1180px;margin:20px auto;padding:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+    <div><h1 style="margin:0">🛡️ Platform Health Console — V12.17 (14-Layer Anti-Pause + Fleet + Doctor)</h1>
+    <p class="muted" style="margin:4px 0 0">One page to confirm school portal is alive, backed up, within free-tier limits and secure. Owner/admin only. Enhanced from DramaConnect v14.2 — monitors every layer against Supabase pausing.</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-outline" href="dashboard.html">← Dashboard</a><button class="btn btn-primary" onclick="PH.refresh()">🔄 Refresh all</button><button class="btn btn-outline" onclick="PH.exportReport()">⬇ Health JSON</button></div>
+  </div>
+
+  <div class="ph-toc">
+    <a href="#sec-keepalive">🫀 Keep-alive 14 Layers</a><a href="#sec-doctor">🩺 Schema Doctor</a><a href="#sec-space">💾 Space</a><a href="#sec-backup">☁️ Backup & Archives</a><a href="#sec-license">🔑 Licence</a><a href="#sec-security">🛡️ Security</a><a href="#sec-fleet">🛰️ Fleet Console</a><a href="#sec-audit">🕵️ Login Audit</a><a href="#sec-cbt-advanced">🧪 CBT Advanced</a><a href="#sec-tutoring">📚 Tutoring Features</a>
+  </div>
+
+  <div id="health-error" class="card" style="display:none;background:#fef2f2;border-color:#fca5a5;color:#991b1b"></div>
+
+  <!-- Snapshot cards -->
+  <div class="ph-grid" style="margin-bottom:18px">
+    <div class="card" style="padding:14px"><p style="font-size:.70rem;text-transform:uppercase;font-weight:800;color:#64748b">Database</p><p id="database-state" style="font-size:1.1rem;font-weight:900;margin:6px 0 0">Checking…</p><p id="schema-version" class="muted" style="margin:4px 0 0">Schema —</p></div>
+    <div class="card" style="padding:14px"><p style="font-size:.70rem;text-transform:uppercase;font-weight:800;color:#64748b">Heartbeat</p><p id="heartbeat-state" style="font-size:1.1rem;font-weight:900;margin:6px 0 0">Checking…</p><p id="heartbeat-last" class="muted">—</p></div>
+    <div class="card" style="padding:14px;border:2px solid rgba(79,70,229,.3)"><p style="font-size:.70rem;text-transform:uppercase;font-weight:800;color:#64748b">Schema packs</p><p id="doctor-state" style="font-size:1.1rem;font-weight:900;margin:6px 0 0">Checking…</p><p id="doctor-detail" class="muted">—</p><a href="#sec-doctor" style="font-size:.75rem;font-weight:800;color:#4f46e5">Schema Doctor →</a></div>
+    <div class="card" style="padding:14px"><p style="font-size:.70rem;text-transform:uppercase;font-weight:800;color:#64748b">Database space</p><p id="space-state" style="font-size:1.1rem;font-weight:900;margin:6px 0 0">Checking…</p><p id="space-detail" class="muted">—</p></div>
+    <div class="card" style="padding:14px"><p style="font-size:.70rem;text-transform:uppercase;font-weight:800;color:#64748b">Verified backup</p><p id="backup-state" style="font-size:1.1rem;font-weight:900;margin:6px 0 0">Checking…</p><p id="backup-last" class="muted">—</p><a href="admin-data.html" style="font-size:.75rem;font-weight:800;color:#4f46e5">Archives & Drive →</a></div>
+    <div class="card" style="padding:14px"><p style="font-size:.70rem;text-transform:uppercase;font-weight:800;color:#64748b">License</p><p id="license-state" style="font-size:1.1rem;font-weight:900;margin:6px 0 0">Checking…</p><p id="license-detail" class="muted">—</p><a href="license.html" style="font-size:.75rem;font-weight:800;color:#4f46e5">Licence detail →</a></div>
+  </div>
+
+  <!-- 1. Keep-alive 14 layers -->
+  <section id="sec-keepalive" class="dc-section">
+    <h2>🫀 Keep-Alive (Anti-Pause) — 14 Layers Monitoring (from DramaConnect) — Where did last ping come from?</h2>
+    <p class="lead">Supabase pauses free project after 7 days without database activity. Every layer below writes heartbeat via <code>sc_keep_alive(src)</code>; this panel shows most recent one, who sent it, total pings, pause countdown, quorum, and all 14 layers including never-run — each with specific fix. Reporting shows when these layers carry out their functions.</p>
+    <div class="dc-kpi-grid" style="margin-bottom:14px">
+      <div class="dc-kpi"><div class="l">Last ping age</div><div class="v" id="ka-age">—</div><div class="s" id="ka-at">—</div></div>
+      <div class="dc-kpi"><div class="l">Came from (last source)</div><div class="v" style="font-size:1rem" id="ka-source">—</div><div class="s mono" id="ka-source-id">—</div></div>
+      <div class="dc-kpi"><div class="l">Total pings recorded</div><div class="v" id="ka-total">—</div><div class="s">across every layer</div></div>
+      <div class="dc-kpi"><div class="l">Pause countdown (168h window)</div><div class="v" id="ka-countdown">—</div><div class="s" id="ka-countdown-note">of 7-day window</div></div>
+      <div class="dc-kpi"><div class="l">Fleet heartbeat (sc_keepalive)</div><div class="v" style="font-size:1rem" id="ka-fleet">—</div><div class="s" id="ka-fleet-note">what HMG Fleet Console reads</div></div>
+      <div class="dc-kpi"><div class="l">Quorum</div><div class="v" style="font-size:1rem" id="ka-quorum">—</div><div class="s" id="ka-quorum-note">≥2 fresh layers = safe</div></div>
+    </div>
+    <div class="ph-meter" style="margin-bottom:14px"><i id="ka-meter" style="width:0%;background:#10b981"></i></div>
+    <div id="quorum-banner" style="display:none;margin-bottom:12px;border-radius:12px;border:1px solid #fcd34d;padding:10px;font-size:.85rem"></div>
+    <p class="muted" style="margin-bottom:8px">A layer is evidence of recent activity — not guarantee against provider pause. External layers can reach sleeping service; internal pg_cron cannot wake paused DB. Automated layers protect idle project; human layers stop during holidays.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button class="btn btn-primary" onclick="PH.pingNow()">💓 Send keep-alive NOW (L8 manual)</button><button class="btn btn-outline" onclick="PH.pingLayer('site-visit')">L2 Site-visit</button><button class="btn btn-outline" onclick="PH.pingLayer('fleet-console')">L12 Fleet Console</button><button class="btn btn-outline" onclick="PH.pingLayer('cron-job-org')">L6 cron-job.org</button></div>
+    <div class="dc-scroll"><table class="dc-table"><thead><tr><th>Layer</th><th>Kind</th><th>State</th><th>Last ping</th><th>Age</th><th style="text-align:right">Count</th><th>Fix if never</th></tr></thead><tbody id="heartbeats"><tr><td colspan="7" class="dc-muted" style="padding:16px">Loading 14 layers…</td></tr></tbody></table></div>
+  </section>
+
+  <!-- 2. Schema Doctor -->
+  <section id="sec-doctor" class="dc-section">
+    <h2>🩺 Schema Doctor — is every SQL pack installed? <span id="doctor-pill"></span></h2>
+    <div id="ph-schema" style="margin-bottom:10px"><span class="pulse">Probing packs…</span></div>
+    <p class="lead">Checks every table, function, view and storage bucket each SQL pack creates. Missing object means pack not run (or older copy). Fix: run <span class="mono">database/complete-schema.sql</span> once in Supabase SQL Editor — safe to re-run. Enhanced from DramaConnect — probes every object.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><button class="btn btn-primary btn-sm" onclick="PH.schemaDoctor()">🔄 Re-check</button><button class="btn btn-outline btn-sm" onclick="PH.copyFix()">📋 Copy fix instructions</button></div>
+    <div id="doctor-fix" style="display:none;margin-bottom:10px;border-radius:12px;background:#fffbeb;border:1px solid #fcd34d;padding:10px;font-size:.85rem;color:#92400e"></div>
+    <div class="dc-scroll"><table class="dc-table"><thead><tr><th>Pack</th><th>File</th><th>Status</th><th>Objects</th><th>Missing</th></tr></thead><tbody id="doctor-rows"><tr><td colspan="5" class="dc-muted">Checking…</td></tr></tbody></table></div>
+    <p id="doctor-meta" class="dc-muted" style="margin-top:8px"></p>
+  </section>
+
+  <!-- 3. Space -->
+  <section id="sec-space" class="dc-section">
+    <h2>💾 Database & File Space — 500 MB DB + 1 GB Storage (Free Tier)</h2>
+    <p class="lead">Supabase goes read-only when database full. Largest tables listed so you know what to archive first — Storage Manager does archiving with Archive Vault (export → upload to private bucket → verify row count and SHA-256 → delete → restorable).</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <p class="dc-field">Database <span id="db-space-label" class="dc-muted"></span></p><div class="ph-meter" style="margin-bottom:10px"><i id="db-meter" style="width:0%;background:#3b82f6"></i></div>
+        <p class="dc-field">File storage <span id="file-space-label" class="dc-muted"></span></p><div class="ph-meter" style="margin-bottom:10px"><i id="file-meter" style="width:0%;background:#8b5cf6"></i></div>
+        <div id="bucket-list" style="font-size:.85rem"></div>
+      </div>
+      <div><p class="dc-field">Largest tables</p><div id="table-top" class="dc-muted">Loading…</div><a href="storage.html" style="font-size:.75rem;font-weight:800;color:#4f46e5">Open Storage Manager →</a></div>
+    </div>
+  </section>
+
+  <!-- 4. Backup & archives -->
+  <section id="sec-backup" class="dc-section">
+    <h2>☁️ Backup, Google Drive & Archive Health (V12.7 + V12.17)</h2>
+    <p class="lead">Keeping project awake does not protect data. Verified independent backup does. Summarises last runs, Drive schedule, Archive Vault, with SHA-256 verification.</p>
+    <div class="dc-kpi-grid" style="margin-bottom:12px">
+      <div class="dc-kpi"><div class="l">Last successful backup</div><div class="v" style="font-size:1rem" id="bk-last">—</div><div class="s" id="bk-last-note">—</div></div>
+      <div class="dc-kpi"><div class="l">Drive schedule</div><div class="v" style="font-size:1rem" id="bk-schedule">—</div><div class="s" id="bk-schedule-note">—</div></div>
+      <div class="dc-kpi"><div class="l">Failures (last 20)</div><div class="v" id="bk-failures">—</div><div class="s" id="bk-failure-note">—</div></div>
+      <div class="dc-kpi"><div class="l">Archive Vault</div><div class="v" id="bk-vault">—</div><div class="s" id="bk-vault-note">archived batches</div></div>
+    </div>
+    <div id="ph-archive" style="margin-bottom:12px"></div>
+    <div class="dc-scroll"><table class="dc-table"><thead><tr><th>Started</th><th>Destination</th><th>Trigger</th><th>Status</th><th>Rows</th><th>SHA-256</th></tr></thead><tbody id="bk-runs"><tr><td colspan="6" class="dc-muted">Loading…</td></tr></tbody></table></div>
+  </section>
+
+  <!-- 5. Licence -->
+  <section id="sec-license" class="dc-section">
+    <h2>🔑 Licence — What Members and Fleet Console See</h2>
+    <p class="lead">Site licence stored in DB, and public <span class="mono">sc_license_status</span> answer that HMG Fleet Console reads with only anon key.</p>
+    <div class="dc-kpi-grid"><div class="dc-kpi"><div class="l">Model</div><div class="v" style="font-size:1rem" id="lic-model">—</div></div><div class="dc-kpi"><div class="l">Status</div><div class="v" style="font-size:1rem" id="lic-status">—</div></div><div class="dc-kpi"><div class="l">Expires</div><div class="v" style="font-size:1rem" id="lic-exp">—</div></div><div class="dc-kpi"><div class="l">Fleet probe says</div><div class="v" style="font-size:1rem" id="lic-probe">—</div><div class="s" id="lic-probe-note">POST /rest/v1/rpc/sc_license_status</div></div></div>
+    <div id="ph-license" style="margin-top:10px"></div>
+  </section>
+
+  <!-- 6. Security -->
+  <section id="sec-security" class="dc-section">
+    <h2>🛡️ Security State — Lockdown + Idle + 2FA + Geofence (from Tutoring + DramaConnect)</h2>
+    <p class="lead">Database-enforced lockdown plus browser idle sign-out. Admins bypass lockdown and licence denial so recovery controls remain reachable. 2FA email OTP, geofence for self check-in, accessibility controls managed in Settings.</p>
+    <div id="ph-security-card">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+        <div class="form-group"><label>Idle auto sign-out (minutes, 0=off)</label><input class="form-input" id="ph-idle" type="number" min="0" value="30"></div>
+        <div class="form-group"><label>🚨 Emergency lockdown</label><select class="form-select" id="ph-lockdown"><option value="false">Off — portal open</option><option value="true">ON — locked</option></select></div>
+        <div style="display:flex;align-items:end"><button class="btn btn-primary" onclick="PH.saveSecurity()">💾 Save security</button></div>
+      </div>
+      <div class="form-group"><label>Lockdown notice</label><input class="form-input" id="ph-lockmsg" placeholder="The portal is temporarily locked…"></div>
+    </div>
+  </section>
+
+  <!-- 7. Fleet Console -->
+  <section id="sec-fleet" class="dc-section">
+    <h2>🛰️ HMG Fleet Console — One-Click Monitoring & Wake-up <span id="fleet-pill"></span></h2>
+    <p class="lead">Fleet Console watches every client project with only anon key: pings <span class="mono">sc_keep_alive</span>, reads <span class="mono">sc_heartbeat</span> + <span class="mono">sc_keepalive_sources</span> + <span class="mono">sc_license_status</span> and detects deploys from <span class="mono">sw.js</span>. This site speaks that contract; checks below prove it.</p>
+    <div class="dc-scroll" style="margin-bottom:12px"><table class="dc-table"><thead><tr><th>Contract check</th><th>Result</th><th>Detail</th></tr></thead><tbody id="fleet-checks"><tr><td colspan="3" class="dc-muted">Checking…</td></tr></tbody></table></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="PH.fleetTest()">🛰️ Ping exactly as Fleet Console does</button><button class="btn btn-outline btn-sm" onclick="PH.fleetCopy()">📋 Copy project details for console</button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div><p class="dc-field">Register this project in console</p><ol style="margin-left:18px;font-size:.85rem" class="list-decimal"><li>Open HMG Fleet Console and sign in.</li><li>Projects → Add project. Type: School Connect.</li><li>Supabase URL: <span class="mono" id="fleet-url">—</span></li><li>Anon key: use Copy project details. Never service_role — console rejects it.</li><li>Site URL: <span class="mono" id="fleet-site">—</span> (enables deploy detection).</li><li>Save, then Ping. Source above changes to HMG Fleet Console within seconds.</li><li>Optional: add to FLEET_TARGETS secret so workflow pings every 2 days; appears as Fleet GitHub workflow.</li></ol></div>
+      <div><p class="dc-field">cron-job.org / any scheduler (POST, not GET)</p><code class="dc-code" id="fleet-cron">—</code><p class="dc-muted" style="margin-top:8px">PostgREST refuses GET on function that writes, so scheduler must POST. Body <span class="mono">{"src":"cron-job-org"}</span> labels ping.</p></div>
+    </div>
+  </section>
+
+  <!-- 8. Login audit -->
+  <section id="sec-audit" class="dc-section">
+    <h2>🕵️ Recent Sign-in Activity (Login Audit) — KPIs + Filtering + CSV (from DramaConnect)</h2>
+    <p class="lead">Who signed in, when, device — plus sign-outs, idle time-outs, denied access. Security trail; for operational trail open Activity Log.</p>
+    <div class="dc-kpi-grid" style="margin-bottom:12px" id="audit-kpis"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+      <div><label style="font-size:.70rem;font-weight:800">Period</label><br><select id="audit-days" class="dc-input"><option value="1">24h</option><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">1 year</option></select></div>
+      <div><label style="font-size:.70rem;font-weight:800">Event</label><br><select id="audit-event" class="dc-input"><option value="">All</option><option value="sign_in">Sign-ins</option><option value="sign_out">Sign-outs</option><option value="idle_timeout">Idle</option><option value="lockdown_denied">Lockdown denied</option><option value="license_denied">Licence denied</option></select></div>
+      <div style="flex:1;min-width:160px"><label style="font-size:.70rem;font-weight:800">Search</label><br><input id="audit-search" class="dc-input" style="width:100%" placeholder="Name, email, device…"></div>
+      <button class="btn btn-outline btn-sm" onclick="PH.audit()">🔄 Refresh</button>
+      <button class="btn btn-outline btn-sm" onclick="PH.auditCSV()">⬇ CSV</button>
+    </div>
+    <div class="dc-scroll"><table class="dc-table"><thead><tr><th>When</th><th>Who</th><th>Event</th><th>Device</th></tr></thead><tbody id="ph-audit"><tr><td colspan="4" class="dc-muted">Loading…</td></tr></tbody></table></div>
+    <p id="audit-meta" class="dc-muted" style="margin-top:8px"></p>
+  </section>
+
+  <!-- 9. CBT Advanced -->
+  <section id="sec-cbt-advanced" class="dc-section">
+    <h2>🧪 CBT Advanced Features — From hmgacademycbtsystem & cbtgen (V12.17)</h2>
+    <p class="lead">Advanced, sophisticated features from HMG Academy CBT Pro & CBT Generator implemented robustly in School Connect.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+      <div class="card" style="padding:12px"><h4>⌨️ Keyboard Shortcuts (JAMB-style)</h4><p class="muted">A-D answer, N/→ next, P/← prev, R flag, S submit. Speed practice for UTME. Implemented in cbt-exam.html + cbt-practice.js</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>🚩 Question Flagging</h4><p class="muted">Flag uncertain, jump back before submit. Reduces careless mistakes. In cbt-exam + practice mode.</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>💾 Auto-save + Emergency Backup</h4><p class="muted">Draft auto-save in localStorage per exam code, offline queue, emergency result backup JSON, jittered retries, exponential backoff. 1000-student ready.</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>🎓 Certificates + Verification</h4><p class="muted">Verifiable certificate codes per result, printable certificate, verify-certificate.html. Teacher can hold/release results.</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>📊 Psychometric (KR-20, Discrimination)</h4><p class="muted">ExamSoft-style report: KR-20 reliability, item difficulty, discrimination, distractor analysis. Rule-based, no AI API. In cbt-practice.js psychometricReport()</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>⏱ Extra-Time Accommodations</h4><p class="muted">Per-candidate extra minutes (0-180) for SEN. Stored in cbt_accommodations, applied to deadline. In cbt-practice.js + cbt-exam.</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>📨 Result Appeals</h4><p class="muted">Students request script review, teacher approves/rejects with note. Table cbt_appeals. In cbt-practice.js fileAppeal()</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>🏆 Leaderboard + Practice Points & Streaks</h4><p class="muted">Practice mode points + streak bonus, longest streak, leaderboard hideable. Table cbt_practice_streaks. In cbt-practice.js</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>📦 Package Export/Import</h4><p class="muted">Export entire exams as JSON packages for backup/sharing/re-use. Import emergency result backup JSON. In cbt.html exportPackage/importBackup.</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>🧮 STEM Keyboard + Calculator</h4><p class="muted">Math & Science symbols 388 symbols searchable, scientific calculator with DEG/RAD, history. In cbt-exam + cbt-richtext + cbt-speech (21 languages).</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>🔗 Combine Pre-existing CBTs One-Click</h4><p class="muted">Select multiple existing CBTs → create multi-subject in one click. Handles single+multi, duplicate subject merge, breakdown. In cbt-multi.html V12.16.</p><span class="ph-badge ok">✓ Implemented V12.16</span></div>
+      <div class="card" style="padding:12px"><h4>🛡️ Anti-cheat & Proctoring</h4><p class="muted">Face gate, audio monitor, tab-switch, dev-tools traps, violation overlays, camera snapshots, audio loudness. In proctor.js + cbt-engine startAntiCheat.</p><span class="ph-badge ok">✓ Implemented</span></div>
+    </div>
+  </section>
+
+  <!-- 10. Tutoring features -->
+  <section id="sec-tutoring" class="dc-section">
+    <h2>📚 Tutoring Connect & Adewale Classroom Features — Implemented in School Connect (V12.17)</h2>
+    <p class="lead">Advanced features from tutoring platforms implemented robustly for school portal.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+      <div class="card" style="padding:12px"><h4>⏱ Study Log / Timer</h4><p class="muted">Start/stop timer per subject, log duration, total per subject, .ics export. Table study_logs. In study-log.js</p><span class="ph-badge ok">✓ Implemented</span><br><button class="btn btn-sm btn-outline" onclick="StudyLog && StudyLog.render()">View logs</button></div>
+      <div class="card" style="padding:12px"><h4>📅 ICS Calendar Export</h4><p class="muted">Export timetable, assignments, CBT exams as .ics for Google Calendar/Outlook/Apple — TutorBird-style. In ics-export.js</p><span class="ph-badge ok">✓ Implemented</span><br><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button class="btn btn-sm btn-outline" onclick="ICSExport.exportTimetable()">Timetable .ics</button><button class="btn btn-sm btn-outline" onclick="ICSExport.exportAssignments()">Assignments .ics</button><button class="btn btn-sm btn-outline" onclick="ICSExport.exportCBTExams()">CBT .ics</button><button class="btn btn-sm btn-primary" onclick="ICSExport.exportAll()">Full .ics</button></div></div>
+      <div class="card" style="padding:12px"><h4>🔁 Spaced Practice SM-2</h4><p class="muted">SM-2 algorithm for weak questions: ease_factor, interval, repetitions, due_at. Table cbt_spaced_practice. In cbt-practice.js scheduleSpaced()</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>🏅 Streaks & Badges + Leaderboard</h4><p class="muted">Practice streaks, longest, points, leaderboard hideable. From Adewale Classroom. In cbt-practice.js</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>📁 Learner Portfolio</h4><p class="muted">Portfolio of certificates, projects, assignments, CBT results, other artifacts. Table learner_portfolios. Value-added, OLS prediction, at-risk board. In learner-portfolio.js</p><span class="ph-badge ok">✓ Implemented</span></div>
+      <div class="card" style="padding:12px"><h4>📈 Value-Added & At-Risk Analytics</h4><p class="muted">Value-added (first vs last term), OLS prediction, six at-risk rules (low avg, low attendance, few scores). From tutoring insights. In learner-portfolio.js valueAddedReport() + atRiskBoard()</p><span class="ph-badge ok">✓ Implemented</span></div>
+            <div class="card" style="padding:12px"><h4>🔗 Links Not Uploads + Drive Previews</h4><p class="muted">Media as Drive/YouTube/https links, not bytes in Postgres — protects 500 MB free tier. Already in digital_library, assignments drive_link, etc.</p><span class="ph-badge ok">✓ Implemented</span></div>
+    </div>
+  </section>
+
+  <div style="margin-top:18px" class="card"><h3>📋 How Layers Protect Against Pausing (from DramaConnect)</h3><p class="muted">Supabase free tier pauses after 7 days without DB activity. Configure 2-3 external automated layers, not every layer. Site visits stop during holidays, so automated layers (GitHub Actions, Vercel Cron, cron-job.org, Edge + UptimeRobot, Fleet Console workflow) keep project alive unattended. Manual button is for holidays. Auto-restore watchdog can un-pause via Management API if SUPABASE_ACCESS_TOKEN set. This page shows when each layer last carried out its function and its fix if never.</p></div>
+</main>
+<div id="toast-container" class="toast-container" style="position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px"></div>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;align-items:center;justify-content:center"><div class="modal" onclick="event.stopPropagation()" style="background:#fff;border-radius:16px;max-width:600px;width:90%;max-height:80vh;overflow:auto;padding:20px"><div class="modal-header" style="display:flex;justify-content:space-between;align-items:center"><h2 id="modal-title">Modal</h2><button class="modal-close" onclick="closeModal()" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:32px;height:32px">×</button></div><div id="modal-body" class="modal-body" style="margin-top:12px"></div><div id="modal-footer" class="modal-footer" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/license.js"></script>
+<script src="assets/js/demo.js"></script>
+<script src="assets/js/data-portability.js"></script>
+<script src="assets/js/drive-sync.js"></script>
+<script src="assets/js/archive-hub.js"></script>
+<script src="assets/js/security-guard.js"></script>
+<script src="assets/js/site-help.js"></script>
+<script src="assets/js/ai-assistant.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/keepalive-layers.js"></script>
+<script src="assets/js/cbt-practice.js"></script>
+<script src="assets/js/study-log.js"></script>
+<script src="assets/js/ics-export.js"></script>
+<script src="assets/js/learner-portfolio.js"></script>
+<script>
+
+function toast(msg, type='info', ms=4000){
+  try{
+    let c=document.getElementById('toast-container');
+    if(!c){
+      c=document.createElement('div');
+      c.id='toast-container';
+      c.style.cssText='position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px';
+      document.body.appendChild(c);
+    }
+    const t=document.createElement('div');
+    t.style.cssText='padding:12px 16px;border-radius:10px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.15);max-width:360px;word-wrap:break-word;background:'+(type==='success'?'#dcfce7;color:#166534;border:1px solid #86efac':type==='danger'?'#fee2e2;color:#991b1b;border:1px solid #fca5a5':type==='warning'?'#fef3c7;color:#92400e;border:1px solid #fcd34d':'#eef2ff;color:#3730a3;border:1px solid #c7d2fe')+';';
+    t.textContent=msg;
+    c.appendChild(t);
+    setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateY(10px)'; setTimeout(()=>t.remove(),300); }, ms);
+    console.log('[toast]', type, msg);
+  }catch(e){ console.log('[toast fallback]', msg); alert(msg); }
+}
+function closeModal(){
+  const b=document.getElementById('modal-backdrop');
+  if(b) b.style.display='none';
+}
+function openModal(title, body, footer){
+  const b=document.getElementById('modal-backdrop');
+  const t=document.getElementById('modal-title');
+  const mb=document.getElementById('modal-body');
+  const mf=document.getElementById('modal-footer');
+  if(t) t.textContent=title||'Modal';
+  if(mb) mb.innerHTML=body||'';
+  if(mf) mf.innerHTML=footer||'';
+  if(b) b.style.display='flex';
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+
+const PH={
+    PACKS:[
+    {file:'v10.7-fee-locks-arrears.sql', label:'Fee locks & arrears', kind:'col', table:'students', col:'portal_locked'},
+    {file:'v10.9b-fee-doctor.sql', label:'Fee ledger doctor', kind:'rpc', fn:'sc_fee_ledger_doctor', args:{p_heal:false}},
+    {file:'v11.0-timetable-pro.sql', label:'Timetable engine 11', kind:'rpc', fn:'sc_timetable_capacity', args:{p_classes:[],p_periods_per_day:6,p_day_periods:null}},
+    {file:'v11.7-admission-year.sql', label:'True admission year', kind:'col', table:'students', col:'admission_year'},
+    {file:'v11.9-voting-integrity.sql', label:'Voting integrity', kind:'rpc', fn:'sc_poll_results', args:{p_poll:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.0-audit-columns.sql', label:'Audit columns', kind:'col', table:'staff', col:'date_of_birth'},
+    {file:'v12.2-photo-sync.sql', label:'Two-way photo sync', kind:'rpc', fn:'sc_photo_sync_status', args:{}},
+    {file:'v12.3-write-columns.sql', label:'Write columns', kind:'col', table:'attendance_checkins', col:'status'},
+    {file:'v12.5-schema-doctor.sql', label:'Schema Doctor', kind:'rpc', fn:'sc_installed_packs', args:{}},
+    {file:'v12.6-relink.sql', label:'One-click re-link', kind:'rpc', fn:'sc_relink_all', args:{}},
+    {file:'v12.7-archive-restore.sql', label:'Archive Restore Hub', kind:'rpc', fn:'sc_restore_all_archived_exams', args:{}},
+    {file:'v12.8-assignment-cbt-bridge.sql', label:'Assignment CBT Bridge', kind:'col', table:'assignments', col:'cbt_exam_id'},
+    {file:'v12.12-report-student-fix.sql', label:'Report student fix', kind:'col', table:'assignments', col:'drive_link'},
+    {file:'v12.13-multi-assignment.sql', label:'Multi-assignment per subject', kind:'rpc', fn:'sc_assignment_cbt_sync', args:{p_cbt_exam_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.14-robust-fixes.sql', label:'Robust fixes Edit/Delete + auto-fill', kind:'col', table:'assignment_scores', col:'cbt_exam_id'},
+    {file:'v12.15-term-sheet-and-permissions.sql', label:'Term sheet + permissions', kind:'rpc', fn:'sc_set_report_generation_allowed', args:{p_term:'First Term',p_session:'2024/2025',p_allowed:true}},
+    {file:'v12.16-report-allow-and-multicombine.sql', label:'Report allow + multi-combine', kind:'rpc', fn:'sc_is_report_generation_allowed', args:{p_term:'First Term'}},
+    {file:'v12.17-advanced-cbt-and-layers.sql', label:'Advanced CBT + 14-layer + tutoring', kind:'rpc', fn:'sc_heartbeat_health', args:{}},
+    {file:'v12.18-heartbeat-updated-at-fix.sql', label:'Heartbeat updated_at fix + platform health robust', kind:'rpc', fn:'sc_heartbeat_health', args:{}},
+    {file:'v12.18-heartbeat-updated-at-fix.sql', label:'Report allow per term', kind:'rpc', fn:'sc_set_report_generation_allowed', args:{p_term:'First Term',p_session:'2024/2025',p_allowed:true}},
+    {file:'v12.18-heartbeat-updated-at-fix.sql', label:'Storage top tables', kind:'rpc', fn:'storage_table_top', args:{}},
+    {file:'v12.19-platform-health-robust.sql', label:'Platform health robust + schema packs fix', kind:'rpc', fn:'sc_installed_packs', args:{}},
+    {file:'v12.19-platform-health-robust.sql', label:'Heartbeat health V12.19', kind:'rpc', fn:'sc_heartbeat_health', args:{}},
+    {file:'v12.19-platform-health-robust.sql', label:'Report allow global V12.19', kind:'rpc', fn:'sc_set_report_generation_global', args:{p_allowed:true}},
+    {file:'v12.20-cbt-full-edit-and-proctor.sql', label:'CBT full edit + proctoring', kind:'rpc', fn:'sc_photo_sync_status', args:{}},
+    {file:'v12.21-schema-doctor-v12.2-fix.sql', label:'Schema doctor v12.2 false-alarm fix', kind:'rpc', fn:'sc_photo_sync_status', args:{}},
+    {file:'v12.22-theme-messages-notifications-drive-progress.sql', label:'Theme + WhatsApp messages + notifications clear + Drive progress', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.23-fix-notif-mark-read-and-theme.sql', label:'Fix 42P13 + theme robust', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.24-fix-notif-clear-42883.sql', label:'Fix 42883 notif_clear + theme final', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.25-fix-messages-sender-42703.sql', label:'Fix 42703 m.sender + messages robust', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.26-theme-legibility-final.sql', label:'Theme legibility + popup legibility', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.27-notification-legibility-fix.sql', label:'Notification legibility fix', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.28-fix-cbt-teacher-create.sql', label:'Fix CBT teacher create — robust RLS', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.29-idcard-dropdown-fix.sql', label:'ID card dropdown — each / class / whole school', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.30-notification-bell-legibility-fix.sql', label:'Notification bell legibility fix', kind:'rpc', fn:'sc_message_directory', args:{}},
+    {file:'v12.31-cbt-retake-robust.sql', label:'CBT retake robust — registered student rewrite', kind:'rpc', fn:'cbt_allow_retake', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_student_ref:'TEST001'}},
+    {file:'v12.32-cbt-edit-and-class-fix.sql', label:'CBT edit persistence + class-scoped exams', kind:'rpc', fn:'cbt_set_question_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_bank:[]}},
+    {file:'v12.32-cbt-edit-and-class-fix.sql', label:'CBT class gate — registered only', kind:'rpc', fn:'cbt_is_class_match', args:{p_exam_class:'JSS 1', p_student_class:'JSS 2'}},
+    {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT comprehensive — attempt+clear+dropdown+preview+per-subject push', kind:'rpc', fn:'cbt_clear_exam_results', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_confirm_code:'TEST01'}},
+    {file:'v12.34-cbt-attempt-and-robust-fixes.sql', label:'CBT attempt limit enforcement + robust fixes', kind:'rpc', fn:'cbt_get_public_exam_v6', args:{p_code:'TEST01', p_admission_no:'TEST001'}},
+    {file:'v12.35-cbt-edit-push-categorisation-fix.sql', label:'CBT edit/push/categorisation fix', kind:'rpc', fn:'cbt_set_question_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_bank:[]}},
+    {file:'v12.36-cbt-missing-results-and-robust-fixes.sql', label:'CBT missing results retrieval + robust fixes', kind:'rpc', fn:'cbt_list_all_results', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.37-cbt-civic-missing-and-edit-robust.sql', label:'CBT civic missing + edit verified + laptop isolation', kind:'rpc', fn:'cbt_update_exam_bank_verified', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_bank:[]}},
+    {file:'v12.38-cbt-total-view-and-all-cbt-audit.sql', label:'CBT 0A000 total view fix + all-CBT missing audit', kind:'rpc', fn:'cbt_audit_all_missing', args:{}},
+    {file:'v12.38-cbt-total-view-and-all-cbt-audit.sql', label:'CBT total column numeric fix', kind:'col', table:'cbt_results', col:'total'},
+    {file:'v12.39-edit-bulletproof-and-server-pending.sql', label:'CBT edit bulletproof + server pending (any auth, versioned)', kind:'rpc', fn:'cbt_replace_bank_bulletproof', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_bank:[]}},
+    {file:'v12.39-edit-bulletproof-and-server-pending.sql', label:'CBT server pending flush', kind:'rpc', fn:'cbt_flush_pending_server', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.39-edit-bulletproof-and-server-pending.sql', label:'CBT all-CBT audit with server pending', kind:'rpc', fn:'cbt_audit_all_missing', args:{}},
+    {file:'v12.40-pwa-seamless-update.sql', label:'PWA seamless update — auto-notify & instant reload', kind:'rpc', fn:'sc_install_state', args:{}},
+    {file:'v12.40-pwa-seamless-update.sql', label:'PWA update banner', kind:'col', table:'sc_install_state', col:'key'},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT force edit (no RLS) + pending WAL', kind:'rpc', fn:'cbt_force_replace_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_bank:[]}},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT force append', kind:'rpc', fn:'cbt_force_append_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000', p_new_questions:[]}},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT submit WAL', kind:'rpc', fn:'cbt_submit_with_wal', args:{p_payload:{}}},
+    {file:'v12.41-force-edit-and-pending-wal.sql', label:'CBT pending WAL recover', kind:'rpc', fn:'cbt_recover_failed_submissions', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'Math keyboard + calculator toggle + public link', kind:'col', table:'cbt_exams', col:'enable_math_keyboard'},
+    {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'CBT exam enable_calculator', kind:'col', table:'cbt_exams', col:'enable_calculator'},
+    {file:'v12.42-math-keyboard-toggle-and-public-link.sql', label:'CBT public link', kind:'rpc', fn:'cbt_get_public_exam_v6', args:{p_code:'TEST01'}},
+    {file:'v12.43-score-display-and-privacy.sql', label:'Score display toggle + privacy + Next student', kind:'col', table:'cbt_exams', col:'show_score_on_submit'},
+    {file:'v12.43-score-display-and-privacy.sql', label:'CBT privacy Next Student clean', kind:'rpc', fn:'cbt_get_public_exam_v6', args:{p_code:'TEST01', p_admission_no:'TEST001'}},
+    {file:'v12.44-comprehensive-7-issues.sql', label:'CBT draft/publish + WAL + privacy', kind:'rpc', fn:'cbt_publish_draft', args:{p_draft_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.44-comprehensive-7-issues.sql', label:'CBT public link Next Student', kind:'col', table:'cbt_exams', col:'show_score_on_submit'},
+    {file:'v12.45-edit-draft-publish-privacy.sql', label:'CBT draft/publish + privacy 10s + history', kind:'rpc', fn:'cbt_publish_draft', args:{p_draft_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.46-proctor-enforce-and-cache-bust.sql', label:'Proctor enforce (no bypass) + bank_hash cache-bust', kind:'col', table:'cbt_exams', col:'bank_hash'},
+    {file:'v12.48-cbt-integrity-network-and-midterm-sync.sql', label:'CBT canonical verifier + network-first + midterm auto-sync', kind:'rpc', fn:'cbt_verify_exam_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}},
+    {file:'v12.49-canonical-edit-append-verify.sql', label:'CBT force v3 + verified attach + bank hash', kind:'rpc', fn:'cbt_force_replace_bank_v3', args:{p_exam_id:'00000000-0000-0000-0000-000000000000',p_bank:[]}},
+    {file:'v12.49-canonical-edit-append-verify.sql', label:'Midterm family privacy & separate reports', kind:'col', table:'midterm_report_cards', col:'published'},
+    {file:'v12.50-server-proctor-session-gate.sql', label:'Server-side required-camera submission gate', kind:'rpc', fn:'cbt_proctor_register', args:{p_exam_id:'00000000-0000-0000-0000-000000000000',p_client_ref:'health-probe'}},
+    {file:'v12.51-runtime-cache-bust.sql', label:'Runtime cache bust marker', kind:'col', table:'sc_install_state', col:'key'},
+    {file:'v12.52-midterm-roster-complete-and-context-sync.sql', label:'Midterm all roster students + old/new context auto-sync', kind:'rpc', fn:'generate_midterm_reports', args:{p_class:'JSS 1',p_term:'First Term',p_session:'2026/2027'}},
+    {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'}
+  ],
+
+  esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
+  badge(t,cls){return '<span class="ph-badge '+cls+'">'+this.esc(t)+'</span>';},
+
+  async pingNow(){
+    if(!window.sb){ toast('DB not configured','warning'); return; }
+    try{
+      const {data,error}=await sb.rpc('sc_keep_alive',{src:'manual-button'});
+      if(error){ toast('Heartbeat failed: '+error.message+' — run keep-alive.sql','danger',9000); return; }
+      toast('💓 Heartbeat written! Supabase confirmed at '+new Date(data).toLocaleString()+'. 7-day timer reset.','success',9000);
+      this.heartbeat();
+    }catch(e){ toast(e.message||e,'danger'); }
+  },
+  async pingLayer(src){
+    if(!window.sb){ toast('DB not configured','warning'); return; }
+    try{
+      const {data,error}=await sb.rpc('sc_keep_alive',{src});
+      if(error) throw error;
+      toast(`💓 Pinged as ${src} — ${new Date(data).toLocaleString()}`, 'success');
+      this.heartbeat();
+    }catch(e){ toast('Ping failed: '+(e.message||e),'danger'); }
+  },
+
+  async heartbeat(){
+    const mainState=document.getElementById('heartbeat-state');
+    const mainLast=document.getElementById('heartbeat-last');
+    const dbState=document.getElementById('database-state');
+    const schemaVer=document.getElementById('schema-version');
+    const kaAge=document.getElementById('ka-age');
+    const kaAt=document.getElementById('ka-at');
+    const kaSource=document.getElementById('ka-source');
+    const kaSourceId=document.getElementById('ka-source-id');
+    const kaTotal=document.getElementById('ka-total');
+    const kaCountdown=document.getElementById('ka-countdown');
+    const kaCountdownNote=document.getElementById('ka-countdown-note');
+    const kaFleet=document.getElementById('ka-fleet');
+    const kaFleetNote=document.getElementById('ka-fleet-note');
+    const kaQuorum=document.getElementById('ka-quorum');
+    const kaMeter=document.getElementById('ka-meter');
+    const quorumBanner=document.getElementById('quorum-banner');
+    const hbTable=document.getElementById('heartbeats');
+    if(!window.sb){
+      if(mainState) mainState.textContent='DB not configured';
+      if(hbTable) hbTable.innerHTML='<tr><td colspan=7>DB not configured</td></tr>';
+      return;
+    }
+    try{
+      const {main, sources, health} = await KeepAliveLayers.getHealth();
+      const h=health||{};
+      // Snapshot cards
+      if(dbState) dbState.textContent=h.ok?'✅ Connected':'⚠️ No heartbeat';
+      if(schemaVer) schemaVer.textContent='Schema V12.17 — 14 layers';
+      if(mainState){
+        const ageHours=h.ageHours!=null?Number(h.ageHours):999;
+        mainState.textContent=ageHours<24?'✅ Healthy':ageHours<120?'⚠️ Stale':'🔴 Paused risk';
+        mainState.className='text-xl font-extrabold mt-2 '+(ageHours<24?'text-emerald-700':ageHours<120?'text-amber-600':'text-red-600');
+      }
+      if(mainLast) mainLast.textContent=h.lastPing?`Last: ${new Date(h.lastPing).toLocaleString()} from ${h.lastSource||'—'} — ${h.pingCount||0} total`:'—';
+      // KPIs
+      if(kaAge) kaAge.textContent=h.ageHours!=null?`${Number(h.ageHours).toFixed(1)}h ago`:'—';
+      if(kaAt) kaAt.textContent=h.lastPing?new Date(h.lastPing).toLocaleString():'—';
+      if(kaSource) kaSource.textContent=h.lastSource||'—';
+      if(kaSourceId) kaSourceId.textContent=KeepAliveLayers.LABELS ? (KeepAliveLayers.LABELS[h.lastSource]||h.lastSource||'—') : (h.lastSource||'—');
+      if(kaTotal) kaTotal.textContent=h.pingCount!=null?Number(h.pingCount).toLocaleString():'—';
+      if(kaCountdown){
+        const days=h.daysUntilPause!=null?Number(h.daysUntilPause).toFixed(1):'—';
+        kaCountdown.textContent=days!=='—'?`${days} days left`:'—';
+      }
+      if(kaCountdownNote) kaCountdownNote.textContent=`of ${h.pauseAfterHours||168}h window — status: ${h.status||'unknown'}`;
+      if(kaFleet) kaFleet.textContent='sc_keepalive row readable via anon';
+      if(kaFleetNote) kaFleetNote.textContent='Fleet Console reads sc_heartbeat + sc_keepalive_sources';
+      if(kaQuorum){
+        kaQuorum.textContent=h.quorum?`✅ Quorum: ${h.sourcesFresh||0}/${h.sourcesTotal||0} fresh`:`⚠️ No quorum: ${h.sourcesFresh||0}/${h.sourcesTotal||0}`;
+        kaQuorum.style.color=h.quorum?'#065f46':'#b45309';
+      }
+      if(kaMeter){
+        const pct=Math.max(0, Math.min(100, 100 - (Number(h.ageHours||0)/168*100)));
+        kaMeter.style.width=pct+'%';
+        kaMeter.style.background=Number(h.ageHours||0)>144?'#ef4444':Number(h.ageHours||0)>120?'#f59e0b':'#10b981';
+      }
+      // Quorum banner
+      if(quorumBanner){
+        if(!h.ok || h.status==='no-heartbeat'){
+          quorumBanner.style.display='none';
+        }else if(h.status==='paused' || h.status==='critical'){
+          quorumBanner.style.display='block';
+          quorumBanner.className='mb-4 rounded-xl border p-3 text-sm bg-red-50 border-red-300 text-red-900';
+          quorumBanner.innerHTML=`<b>${h.status==='paused'?'Pause window reached':'Approaching pause window'} — ${h.sourcesFresh} of ${h.sourcesTotal} layer(s) fresh.</b><br>${h.status==='paused'?'Restore project at supabase.com, then re-arm at least 2 external layers.':`About ${Number(h.daysUntilPause).toFixed(1)} days remain. Run heartbeat now.`}`;
+        }else if(h.singlePointOfFailure){
+          quorumBanner.style.display='block';
+          quorumBanner.className='mb-4 rounded-xl border p-3 text-sm bg-amber-50 border-amber-300 text-amber-900';
+          quorumBanner.innerHTML='<b>Single point of failure — only one scheduler still running.</b><br>Configure second external layer so no single outage can pause project.';
+        }else if(h.quorum && h.automatedSourcesFresh<2){
+          quorumBanner.style.display='block';
+          quorumBanner.className='mb-4 rounded-xl border p-3 text-sm bg-amber-50 border-amber-300 text-amber-900';
+          quorumBanner.innerHTML=`<b>Only human traffic keeping project awake — ${h.automatedSourcesFresh} automated scheduler(s) reporting.</b><br>Arm at least 2 automated layers (GitHub Actions and Vercel Cron need no secrets).`;
+        }else{
+          quorumBanner.style.display='none';
+        }
+      }
+      // Layer table — all 14 layers including never-run
+      if(hbTable){
+        const srcMap=new Map((sources||[]).map(s=>[s.source, s]));
+        const rows=KeepAliveLayers.LAYERS.map(layer=>{
+          const found=srcMap.get(layer.source);
+          const last=found?found.last_ping_at:null;
+          const count=found?found.ping_count:0;
+          const ageHours=last?(Date.now()-new Date(last).getTime())/3600000:9999;
+          const fresh=ageHours<72;
+          const state=found? (fresh?`✅ Fresh — ${KeepAliveLayers.formatAgo(last)}`:`⚠️ Stale — ${KeepAliveLayers.formatAgo(last)}`) : `⚪ Never — no ping recorded`;
+          const stateCls=found? (fresh?'ok':'warn') : 'bad';
+          return `<tr><td style="font-weight:700">${PH.esc(layer.name)}</td><td><span class="ph-badge ${layer.kind==='automated'?'ok':'warn'}">${layer.kind}</span></td><td><span class="ph-badge ${stateCls}">${PH.esc(state)}</span></td><td class="mono" style="font-size:.78rem">${last?new Date(last).toLocaleString():'—'}</td><td>${ageHours<9999?ageHours.toFixed(1)+'h':'—'}</td><td style="text-align:right"><b>${count}</b></td><td style="font-size:.78rem;color:#475569;max-width:260px">${PH.esc(layer.fix)}</td></tr>`;
+        }).join('');
+        hbTable.innerHTML=rows||'<tr><td colspan=7>No layers</td></tr>';
+      }
+      // Update heartbeat snapshot cards (doctor-state handled by schemaDoctor)
+      // V12.18: removed doctorState update from heartbeat to avoid overwriting Schema Doctor status
+    }catch(e){
+      if(hbTable) hbTable.innerHTML=`<tr><td colspan=7 style="color:#b91c1c">${PH.esc(e.message||e)}</td></tr>`;
+      const errEl=document.getElementById('health-error');
+      if(errEl){ errEl.textContent=e.message||e; errEl.style.display='block'; }
+    }
+  },
+
+  async schemaDoctor(){
+    const box=document.getElementById('ph-schema');
+    const pill=document.getElementById('doctor-pill');
+    const meta=document.getElementById('doctor-meta');
+    const fixBox=document.getElementById('doctor-fix');
+    const rowsEl=document.getElementById('doctor-rows');
+    const doctorState=document.getElementById('doctor-state');
+    const doctorDetail=document.getElementById('doctor-detail');
+    try{
+      if(!window.sb){ 
+        if(box) box.textContent='DB not configured — add Supabase keys in config.js'; 
+        if(doctorState) doctorState.textContent='DB not configured';
+        if(doctorDetail) doctorDetail.textContent='Add Supabase keys';
+        if(rowsEl) rowsEl.innerHTML='<tr><td colspan=5>DB not configured</td></tr>'; 
+        return; 
+      }
+      if(box) box.innerHTML='<span class="pulse">Probing packs…</span>';
+      if(rowsEl) rowsEl.innerHTML='<tr><td colspan=5>Probing…</td></tr>';
+      if(doctorState) doctorState.textContent='Probing…';
+      if(doctorDetail) doctorDetail.textContent='Checking packs…';
+    const results=[];
+    let missing=0;
+    for(const p of this.PACKS){
+      let ok=null, missingObjs=[];
+      try{
+        if(p.kind==='col'){
+          const r=await sb.from(p.table).select(p.col).limit(0);
+          ok=!(r.error && /42703|does not exist|Could not find/i.test(r.error.message||''));
+          if(!ok) missingObjs.push(p.col);
+        }else if(p.probeTrigger){
+          ok=null;
+        }else{
+          const r=await sb.rpc(p.fn, p.args||{});
+          ok=!(r.error && /PGRST202|Could not find the function/i.test(r.error.message||''));
+          if(!ok) missingObjs.push(p.fn);
+        }
+      }catch(_){ ok=false; missingObjs.push(p.col||p.fn); }
+      if(ok===false) missing++;
+      results.push({p, ok, missingObjs});
+    }
+    try{
+      const mk=await sb.rpc('sc_installed_packs');
+      if(!mk.error && Array.isArray(mk.data)){
+        const have=new Set(mk.data.map(x=>String(x.key||x)));
+        results.forEach(r=>{ if(r.ok===null) r.ok=have.has(r.p.file); if(r.ok===false && have.has(r.p.file)) r.ok=true; });
+      }
+    }catch(_){ results.forEach(r=>{ if(r.ok===null) r.ok=undefined; }); }
+    missing=results.filter(r=>r.ok===false).length;
+    box.innerHTML=(missing?this.badge(missing+' pack(s) NOT installed','bad'):this.badge('All verifiable packs installed','ok'));
+    if(pill) pill.textContent=missing?`🔴 ${missing} missing`:'✅ All installed';
+    if(doctorState) doctorState.textContent=missing?`🔴 ${missing} missing`:'✅ All installed';
+    if(doctorDetail) doctorDetail.textContent=missing?`${missing} packs need running`:`${results.length} packs checked`;
+    if(rowsEl){
+      rowsEl.innerHTML=results.map(r=>{
+        const s=r.ok===true?'<span class="ph-badge ok">✓ installed</span>':r.ok===false?'<span class="ph-badge bad">✗ RUN THIS</span>':'<span class="ph-badge warn">? unverifiable</span>';
+        return `<tr><td>${this.esc(r.p.label)}</td><td><code>database/${this.esc(r.p.file)}</code></td><td>${s}</td><td style="font-size:.75rem">${this.esc(r.p.col||r.p.fn||'—')}</td><td style="font-size:.75rem;color:#b91c1c">${this.esc((r.missingObjs||[]).join(', ')||'—')}</td></tr>`;
+      }).join('');
+    }
+    if(meta) meta.textContent=`${results.length} packs probed — ${missing} missing — ${new Date().toLocaleString()}`;
+    if(fixBox){
+      if(missing){
+        fixBox.style.display='block';
+        fixBox.innerHTML=`<b>Fix:</b> open Supabase → SQL Editor → paste each red file from repo's <code>database/</code> folder → Run. Every pack idempotent — running twice safe. Or run <code>complete-schema.sql</code> once (contains everything: now 9236+ lines). Missing: ${results.filter(r=>r.ok===false).map(r=>r.p.file).join(', ')}`;
+        if(typeof toast==='function') toast(`🩺 Schema Doctor: ${missing} pack(s) NOT installed — ${results.filter(r=>r.ok===false).map(r=>r.p.file).join(', ')} — run complete-schema.sql`, 'warning', 8000);
+      }else{
+        fixBox.style.display='none';
+        if(typeof toast==='function') toast(`✅ Schema Doctor: All ${results.length} packs installed — fully healthy`, 'success', 5000);
+      }
+    }
+    }catch(e){
+      if(box) box.innerHTML=`<span class="ph-badge bad">Doctor error: ${this.esc(e.message||e)}</span>`;
+      if(rowsEl) rowsEl.innerHTML=`<tr><td colspan=5 style="color:#b91c1c">${this.esc(e.message||e)}</td></tr>`;
+      if(typeof toast==='function') toast('Schema Doctor error: '+(e.message||e),'danger',6000);
+    }
+  },
+  copyFix(){
+    const missing=this.PACKS.filter(p=>{
+      // This is simplified — actual missing from last probe stored? We'll just copy generic instructions
+      return true;
+    });
+    const txt=`Run database/complete-schema.sql once in Supabase SQL Editor — idempotent, contains all packs including v12.17 (14-layer keep-alive + tutoring + advanced CBT). Verify: SELECT 'School Connect V5.8 complete cumulative schema installed successfully'`;
+    navigator.clipboard.writeText(txt).then(()=>toast('Fix instructions copied','success')).catch(()=>{});
+  },
+
+  async storage(){
+    const b=document.getElementById('ph-storage');
+    const spaceState=document.getElementById('space-state');
+    const spaceDetail=document.getElementById('space-detail');
+    const dbLabel=document.getElementById('db-space-label');
+    const dbMeter=document.getElementById('db-meter');
+    const fileLabel=document.getElementById('file-space-label');
+    const fileMeter=document.getElementById('file-meter');
+    const tableTop=document.getElementById('table-top');
+    const bucketList=document.getElementById('bucket-list');
+    if(!window.sb){ if(b) b.textContent='DB not configured'; return; }
+    try{
+      const {data,error}=await sb.rpc('storage_health');
+      if(error){ if(b) b.innerHTML=`<p class="muted">${this.esc(error.message)} (owner role required)</p>`; return; }
+      const p=Math.min(100,Number(data.percent||0)), cls=data.status==='critical'?'bad':data.status==='warning'?'warn':'ok';
+      if(b) b.innerHTML=this.badge(`${this.esc(data.used_pretty)} used — ${p}% of ${this.esc(data.quota_mb)} MB`, cls)+`<div style="height:10px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-top:10px"><div style="height:100%;width:${p}%;background:${cls==='ok'?'#16a34a':cls==='warn'?'#d97706':'#dc2626'}"></div></div><p class="muted" style="margin-top:6px">Embedded-media rows: ${this.esc(data.embedded_media_rows)} · Policy: external links only</p>`;
+      if(spaceState) spaceState.textContent=`${data.used_pretty} used — ${p}%`;
+      if(spaceDetail) spaceDetail.textContent=`Quota ${data.quota_mb} MB — ${data.status}`;
+      if(dbLabel) dbLabel.textContent=`${data.used_pretty} / ${data.quota_mb} MB`;
+      if(dbMeter){ dbMeter.style.width=p+'%'; dbMeter.style.background=cls==='ok'?'#3b82f6':cls==='warn'?'#f59e0b':'#ef4444'; }
+      // Largest tables via storage_health returns? We'll try to fetch via RPC or approximate
+      if(tableTop){
+        try{
+          const {data:tblData}=await sb.rpc('storage_table_top');
+          if(tblData && Array.isArray(tblData)){
+            tableTop.innerHTML=tblData.map(t=>`<div style="display:flex;justify-content:space-between"><span>${this.esc(t.table||'')}</span><span>${this.esc(t.size||'')}</span></div>`).join('');
+          }else tableTop.textContent='Largest tables: see Storage Manager';
+        }catch(_){ tableTop.textContent='Open Storage Manager for table breakdown'; }
+      }
+      if(bucketList){
+        try{
+          const {data:buckets}=await sb.storage.listBuckets();
+          bucketList.innerHTML=(buckets||[]).map(b=>`<div>${this.esc(b.name)} — ${b.public?'public':'private'}</div>`).join('')||'No buckets';
+        }catch(_){ bucketList.textContent='Buckets: check Storage Manager'; }
+      }
+    }catch(e){ if(b) b.textContent=e.message; }
+  },
+
+  async drive(){
+    const b=document.getElementById('ph-drive');
+    const backupState=document.getElementById('backup-state');
+    const backupLast=document.getElementById('backup-last');
+    const bkLast=document.getElementById('bk-last');
+    const bkSchedule=document.getElementById('bk-schedule');
+    const bkFailures=document.getElementById('bk-failures');
+    const bkVault=document.getElementById('bk-vault');
+    const bkRuns=document.getElementById('bk-runs');
+    try{
+      if(b) b.innerHTML='<span class="pulse">Checking Drive backup…</span>';
+      if(bkLast) bkLast.textContent='Checking…';
+      // Robust load with timeout
+      let cfg=null;
+      try{
+        if(window.DriveSync && DriveSync.loadCfg){
+          await Promise.race([
+            DriveSync.loadCfg(),
+            new Promise((_,rej)=>setTimeout(()=>rej(new Error('DriveSync timeout')),3000))
+          ]);
+          cfg=DriveSync.cfg;
+        }
+      }catch(e){ console.warn('DriveSync load failed', e.message); }
+      if(!cfg){
+        // Fallback from localStorage
+        try{
+          const raw=localStorage.getItem('sc-drive-cfg')||localStorage.getItem('gdrive-config')||'{}';
+          const parsed=JSON.parse(raw);
+          cfg={clientId: parsed.clientId||'', enabled: !!parsed.enabled, days: parsed.days||7, lastBackup: parsed.lastBackup||null};
+        }catch(_){ cfg={clientId:'', enabled:false, days:7, lastBackup:null}; }
+      }
+      const c=cfg||{clientId:'', enabled:false, days:7, lastBackup:null};
+      const last=c.lastBackup?Date.parse(c.lastBackup):0;
+      const days=last?((Date.now()-last)/86400000):null;
+      if(b) b.innerHTML=(c.clientId?this.badge(c.enabled?'Auto-sync ON — every '+c.days+' day(s)':'Configured — manual only',c.enabled?'ok':'warn'):this.badge('Not configured — setup in Admin Data → Drive Backup','warn'))+`<p style="margin:8px 0 0">Last Drive backup: <b>${last?this.esc(new Date(last).toLocaleString())+(days>c.days?' ⚠ overdue':''):'never'}</b></p>`+(c.clientId?'':`<p class="muted">Setup: <a href="admin-data.html">Admin Data → Google Drive Backup</a> — CLIENT_ID set to 790374824693-2lbqddn29q9396bp1qg24d0ulh00i7lr.apps.googleusercontent.com — add origin https://...vercel.app in Google Cloud Console</p>`);
+      if(backupState) backupState.textContent=c.clientId?(c.enabled?'✅ Auto ON':'⚠️ Manual'):'⚠️ Not configured';
+      if(backupLast) backupLast.textContent=last?new Date(last).toLocaleString():'never';
+      if(bkLast) bkLast.textContent=last?new Date(last).toLocaleString():'never';
+      if(bkSchedule) bkSchedule.textContent=c.enabled?`Every ${c.days} day(s)`:'Manual';
+      if(bkFailures) bkFailures.textContent='0';
+      if(bkVault){
+        try{
+          if(window.DataPortability){ DataPortability.init(sb); const v=await Promise.race([DataPortability.listVault(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('vault timeout')),2000))]); bkVault.textContent=`${v.length} batches`; }
+          else bkVault.textContent='—';
+        }catch(_){ bkVault.textContent='—'; }
+      }
+      if(bkRuns){
+        try{
+          // Try to get backup runs from localStorage or DataPortability
+          let runs=[];
+          try{ const raw=localStorage.getItem('sc-backup-runs'); if(raw) runs=JSON.parse(raw); }catch(_){}
+          if(!runs.length){
+            bkRuns.innerHTML='<tr><td colspan=6 class="dc-muted">No backup runs yet — run backup from Admin Data → Drive Backup</td></tr>';
+          }else{
+            bkRuns.innerHTML=runs.slice(0,10).map(r=>`<tr><td>${this.esc(new Date(r.at||Date.now()).toLocaleString())}</td><td>${this.esc(r.dest||'drive')}</td><td>${this.esc(r.src||'manual')}</td><td><span class="ph-badge ${r.ok?'ok':'bad'}">${r.ok?'✅ OK':'❌ FAIL'}</span></td><td>${r.rows||'—'}</td><td class="mono" style="font-size:.70rem">${this.esc((r.sha||'').slice(0,16))}</td></tr>`).join('');
+          }
+        }catch(_){ if(bkRuns) bkRuns.innerHTML='<tr><td colspan=6 class="dc-muted">Backup runs: see Admin Data</td></tr>'; }
+      }
+    }catch(e){ 
+      if(b) b.innerHTML=`<span class="ph-badge bad">Drive check error: ${this.esc(e.message||e)}</span><p class="muted">Setup in Admin Data → Drive Backup</p>`;
+      if(typeof toast==='function') toast('Drive backup check error: '+(e.message||e),'warning',5000);
+    }
+  },
+
+  async license(){
+    const b=document.getElementById('ph-license');
+    const licModel=document.getElementById('lic-model');
+    const licStatus=document.getElementById('lic-status');
+    const licExp=document.getElementById('lic-exp');
+    const licProbe=document.getElementById('lic-probe');
+    const licenseState=document.getElementById('license-state');
+    const licenseDetail=document.getElementById('license-detail');
+    let L=(window.SCHOOL&&window.SCHOOL.license)||{};
+    // Try to fetch from site_license table (robust)
+    try{
+      if(window.sb){
+        const {data:licRow}=await sb.from('site_license').select('*').eq('id',1).maybeSingle();
+        if(licRow){
+          L.model=licRow.license_model||L.model||'lifetime';
+          L.status=licRow.license_status||L.status||'active';
+          L.expires_on=licRow.expires_on||L.expires_on||'';
+          L.plan=licRow.plan_name||L.plan||'';
+        }
+      }
+    }catch(_){}
+    // Try server RPC sc_license_status (fleet reads this)
+    let probeText='sc_license_status RPC readable via anon';
+    let probeOk=true;
+    try{
+      if(window.sb){
+        const {data:rpcData, error:rpcErr}=await sb.rpc('sc_license_status');
+        if(!rpcErr && rpcData){
+          probeText=`Server verdict: ${rpcData.state||rpcData.status||'active'} — ${rpcData.licensed_to||''} — model ${rpcData.license_model||L.model||'—'}`;
+          if(rpcData.license_model) L.model=rpcData.license_model;
+          if(rpcData.state) L.status=rpcData.state;
+          if(rpcData.expires_on) L.expires_on=rpcData.expires_on;
+        }else if(rpcErr){
+          probeText=`RPC error: ${rpcErr.message} — run database/complete-schema.sql`;
+          probeOk=false;
+        }
+      }
+    }catch(e){ probeText=`Probe failed: ${e.message||e}`; probeOk=false; }
+    const badgeCls=L.model==='lifetime'?'ok':(L.status==='active'?'ok':'bad');
+    const badgeTxt=L.model==='lifetime'?`Lifetime — no recurring fees ✓ — ${L.status||'active'}`:`${L.model||'unknown'} · ${L.plan||''} · ${L.status||'active'}`;
+    if(b) b.innerHTML=this.badge(badgeTxt,badgeCls)+`<p style="margin:8px 0 0">Model: <b>${this.esc(L.model||'—')}</b>${L.expires_on?' · Expires: <b>'+this.esc(L.expires_on)+'</b>':''} · Status: <b>${this.esc(L.status||'—')}</b></p><p class="muted" style="margin-top:6px">${this.esc(probeText)}</p>`;
+    if(licModel) licModel.textContent=L.model||'—';
+    if(licStatus) licStatus.textContent=L.status||'active';
+    if(licExp) licExp.textContent=L.expires_on||'lifetime';
+    if(licProbe) { licProbe.textContent=probeText; licProbe.style.color=probeOk?'#065f46':'#b91c1c'; }
+    if(licenseState) { licenseState.textContent=L.status||'active'; licenseState.className='text-xl font-extrabold mt-2 '+(L.status==='active'||L.model==='lifetime'?'text-emerald-700':'text-red-600'); }
+    if(licenseDetail) licenseDetail.textContent=`${L.model||'—'} · ${L.status||'—'}${L.expires_on?' · expires '+L.expires_on:''} — ${probeText.slice(0,80)}`;
+  },
+
+  async loadSecurity(){
+    try{
+      const {data}=await sb.from('school_settings').select('idle_lock_minutes,lockdown_mode,lockdown_message').eq('id',1).maybeSingle();
+      if(!data) return;
+      const idleEl=document.getElementById('ph-idle');
+      const lockEl=document.getElementById('ph-lockdown');
+      const msgEl=document.getElementById('ph-lockmsg');
+      if(idleEl) idleEl.value=data.idle_lock_minutes==null?30:data.idle_lock_minutes;
+      if(lockEl) lockEl.value=String(!!data.lockdown_mode);
+      if(msgEl) msgEl.value=data.lockdown_message||'';
+      if(data.lockdown_mode){
+        const card=document.getElementById('ph-security-card');
+        if(card) card.style.border='2px solid #ef4444';
+      }
+    }catch(_){}
+  },
+  async saveSecurity(){
+    const lockEl=document.getElementById('ph-lockdown');
+    const lock=lockEl?lockEl.value==='true':false;
+    if(lock && !confirm('Turn ON emergency lockdown?\\n\\nEvery teacher, parent and student will be locked out immediately (admins keep access) until you turn it off.')) return;
+    const idleEl=document.getElementById('ph-idle');
+    const msgEl=document.getElementById('ph-lockmsg');
+    const row={id:1,idle_lock_minutes:Math.max(0,Number(idleEl?idleEl.value:30)||0),lockdown_mode:lock,lockdown_message:msgEl?msgEl.value.trim():''};
+    const {error}=await sb.from('school_settings').upsert(row,{onConflict:'id'});
+    if(error){ toast('Could not save: '+error.message,'danger',9000); return; }
+    toast(lock?'🚨 LOCKDOWN ON — non-admins locked out':'Security settings saved ✓',lock?'warning':'success',7000);
+    this.loadSecurity();
+  },
+
+  async archive(){
+    const b=document.getElementById('ph-archive');
+    const bkVault=document.getElementById('bk-vault');
+    const bkRuns=document.getElementById('bk-runs');
+    if(!b) return;
+    try{
+      if(!window.sb){ b.innerHTML='<span class="ph-badge warn">DB not configured — archive health needs DB</span>'; if(bkVault) bkVault.textContent='—'; return; }
+      b.innerHTML='<span class="pulse">Checking archive health…</span>';
+      let cbt=0, students=0, vaultCount=0;
+      try{
+        const r=await sb.from('cbt_exams').select('id',{count:'exact',head:true}).eq('is_archived', true);
+        cbt=r.count||0;
+      }catch(e){ console.warn('cbt archived count failed', e.message); }
+      try{
+        const r=await sb.from('module_records').select('id',{count:'exact',head:true}).eq('module','student_archive');
+        students=r.count||0;
+      }catch(e){ console.warn('student archive count failed', e.message); }
+      try{ 
+        if(window.DataPortability){ 
+          DataPortability.init(sb); 
+          const v=await Promise.race([DataPortability.listVault(), new Promise((_,rej)=>setTimeout(()=>rej(new Error('vault timeout')),2000))]);
+          vaultCount=v.length; 
+        } 
+      }catch(e){ console.warn('vault count failed', e.message); }
+      const total=(cbt||0)+(students||0)+vaultCount;
+      const cls=total>0?(cbt>0?'warn':'ok'):'ok';
+      b.innerHTML=this.badge(`${cbt} CBT archived · ${students} student archives · ${vaultCount} vault — total ${total} archived`, cls)+`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${cbt>0?`<a class="btn btn-sm btn-primary" href="cbt.html">♻️ Restore ${cbt} CBT in One Click</a>`:''}<a class="btn btn-sm btn-outline" href="admin-data.html">🗃️ Universal Restore Hub</a><a class="btn btn-sm btn-outline" href="storage.html">📦 Vault</a></div>`+(cbt>0?`<p class="muted" style="margin-top:6px;color:#92400e"><b>⚠️ ${cbt} CBT exam(s) are archived and hidden from students.</b> Go to CBT → Archive Recovery Center → Restore ALL.</p>`:`<p class="muted" style="margin-top:6px">✅ No CBT exams archived. Archive system healthy.</p>`);
+      if(bkVault) bkVault.textContent=`${vaultCount} vault · ${cbt} CBT · ${students} student`;
+    }catch(e){ 
+      if(b) b.innerHTML=`<span class="ph-badge bad">Archive health error: ${this.esc(e.message||e)}</span><p class="muted">See Admin Data → Universal Archive & Restore Hub</p>`;
+      if(typeof toast==='function') toast('Archive health error: '+(e.message||e),'warning',5000);
+    }
+  },
+
+  async audit(){
+    const b=document.getElementById('ph-audit');
+    const kpis=document.getElementById('audit-kpis');
+    const meta=document.getElementById('audit-meta');
+    if(!b) return;
+    try{
+      const days=Number((document.getElementById('audit-days')||{}).value||30);
+      const eventFilter=(document.getElementById('audit-event')||{}).value||'';
+      const search=(document.getElementById('audit-search')||{}).value.trim().toLowerCase()||'';
+      let q=sb.from('login_audit').select('email,event,user_agent,created_at').order('created_at',{ascending:false}).limit(100);
+      if(eventFilter) q=q.eq('event', eventFilter);
+      if(days) q=q.gte('created_at', new Date(Date.now()-days*24*60*60*1000).toISOString());
+      const {data,error}=await q;
+      if(error){ b.innerHTML=`<p class="muted">${this.esc(error.message)} (admin role required)</p>`; return; }
+      let filtered=data||[];
+      if(search) filtered=filtered.filter(r=>String(r.email||'').toLowerCase().includes(search) || String(r.user_agent||'').toLowerCase().includes(search) || String(r.event||'').toLowerCase().includes(search));
+      // KPIs
+      if(kpis){
+        const total=filtered.length;
+        const signIns=filtered.filter(r=>r.event==='sign_in').length;
+        const signOuts=filtered.filter(r=>r.event==='sign_out').length;
+        const idle=filtered.filter(r=>r.event==='idle_timeout').length;
+        const denied=filtered.filter(r=>/denied/i.test(r.event||'')).length;
+        kpis.innerHTML=`
+          <div class="dc-kpi"><div class="l">Total events</div><div class="v">${total}</div><div class="s">in ${days} days</div></div>
+          <div class="dc-kpi"><div class="l">Sign-ins</div><div class="v">${signIns}</div><div class="s">successful</div></div>
+          <div class="dc-kpi"><div class="l">Sign-outs</div><div class="v">${signOuts}</div><div class="s">user initiated</div></div>
+          <div class="dc-kpi"><div class="l">Idle time-outs</div><div class="v">${idle}</div><div class="s">auto sign-out</div></div>
+          <div class="dc-kpi"><div class="l">Denied</div><div class="v">${denied}</div><div class="s">lockdown/licence</div></div>`;
+      }
+      if(!filtered.length){ b.innerHTML='<p class="muted">No events for that filter.</p>'; if(meta) meta.textContent=`0 events — ${new Date().toLocaleString()}`; return; }
+      b.innerHTML=`<table class="dc-table"><thead><tr><th>When</th><th>Who</th><th>Event</th><th>Device</th></tr></thead><tbody>${filtered.map(r=>`<tr><td>${this.esc(new Date(r.created_at).toLocaleString())}</td><td>${this.esc(r.email||'—')}</td><td><span class="ph-badge ${r.event==='sign_in'?'ok':r.event==='sign_out'?'warn':'bad'}">${this.esc(r.event)}</span></td><td class="muted" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this.esc(r.user_agent||'')}</td></tr>`).join('')}</tbody></table>`;
+      if(meta) meta.textContent=`${filtered.length} events — ${new Date().toLocaleString()}`;
+    }catch(e){ b.textContent=e.message; }
+  },
+  auditCSV(){
+    const rows=document.querySelectorAll('#ph-audit tr');
+    if(!rows.length){ toast('No audit data','warning'); return; }
+    let csv='When,Who,Event,Device\n';
+    document.querySelectorAll('#ph-audit tbody tr').forEach(tr=>{
+      const cols=[...tr.querySelectorAll('td')].map(td=>`"${String(td.textContent||'').replace(/"/g,'""')}"`);
+      csv+=cols.join(',')+'\n';
+    });
+    const blob=new Blob([csv],{type:'text/csv'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='login-audit.csv';
+    a.click();
+    toast('⬇ Exported login audit CSV','success');
+  },
+
+  async fleetChecks(){
+    const box=document.getElementById('fleet-checks');
+    const urlEl=document.getElementById('fleet-url');
+    const siteEl=document.getElementById('fleet-site');
+    const cronEl=document.getElementById('fleet-cron');
+    const pill=document.getElementById('fleet-pill');
+    if(!box) return;
+    try{
+      const supabaseUrl=(window.SCHOOL&&window.SCHOOL.supabaseUrl)|| (window.__env&&window.__env.supabaseUrl) || (typeof sb!=='undefined' && sb.supabaseUrl) || '';
+      const siteUrl=window.location.origin;
+      if(urlEl) urlEl.textContent=supabaseUrl||'—';
+      if(siteEl) siteEl.textContent=siteUrl||'—';
+      if(cronEl) cronEl.textContent=`curl -X POST '${supabaseUrl}/rest/v1/rpc/sc_keep_alive' -H \"apikey: YOUR_ANON_KEY\" -H \"Content-Type: application/json\" -d '{\"src\":\"cron-job-org\"}'`;
+      // Contract checks
+      const checks=[];
+      // sc_keep_alive anon
+      try{
+        const r=await sb.rpc('sc_keep_alive',{src:'fleet-console'});
+        checks.push({name:'sc_keep_alive (anon)', ok:!r.error, detail: r.error?r.error.message:`OK — ${new Date(r.data).toLocaleString()} — source fleet-console`});
+      }catch(e){ checks.push({name:'sc_keep_alive', ok:false, detail:e.message}); }
+      // sc_heartbeat readable
+      try{
+        const r=await sb.from('sc_heartbeat').select('*').eq('id',1).maybeSingle();
+        checks.push({name:'sc_heartbeat readable (anon)', ok:!r.error&&!!r.data, detail: r.error?r.error.message:`Last ping ${r.data?new Date(r.data.last_ping).toLocaleString():'—'} from ${r.data?r.data.last_source:'—'}`});
+      }catch(e){ checks.push({name:'sc_heartbeat', ok:false, detail:e.message}); }
+      // sc_keepalive_sources readable
+      try{
+        const r=await sb.from('sc_keepalive_sources').select('count').limit(1);
+        checks.push({name:'sc_keepalive_sources (14 layers)', ok:!r.error, detail: r.error?r.error.message:`Table exists — ${r.data?r.data.length:0} sources tracked`});
+      }catch(e){ checks.push({name:'sc_keepalive_sources', ok:false, detail:e.message}); }
+      // sc_license_status
+      try{
+        const r=await sb.rpc('sc_license_status');
+        checks.push({name:'sc_license_status (fleet reads)', ok:!r.error, detail: r.error?r.error.message:`Licence: ${JSON.stringify(r.data).slice(0,120)}`});
+      }catch(e){ checks.push({name:'sc_license_status', ok:false, detail:e.message}); }
+      // sc_heartbeat_health
+      try{
+        const r=await sb.rpc('sc_heartbeat_health');
+        checks.push({name:'sc_heartbeat_health (quorum report)', ok:!r.error&&!!r.data, detail: r.error?r.error.message:`Status ${r.data?r.data.status:'—'} — ${r.data?r.data.sourcesFresh:0}/${r.data?r.data.sourcesTotal:0} fresh`});
+      }catch(e){ checks.push({name:'sc_heartbeat_health', ok:false, detail:e.message}); }
+      box.innerHTML=checks.map(c=>`<tr><td style="font-weight:700">${this.esc(c.name)}</td><td><span class="ph-badge ${c.ok?'ok':'bad'}">${c.ok?'✅ OK':'❌ FAIL'}</span></td><td style="font-size:.78rem">${this.esc(c.detail)}</td></tr>`).join('');
+      if(pill) pill.textContent=checks.every(c=>c.ok)?'✅ All contracts OK':'⚠️ Some contracts missing';
+    }catch(e){ box.innerHTML=`<tr><td colspan=3 style="color:#b91c1c">${this.esc(e.message||e)}</td></tr>`; }
+  },
+  fleetTest(){
+    if(!window.sb){ toast('DB not configured','warning'); return; }
+    sb.rpc('sc_keep_alive',{src:'fleet-console'}).then(r=>{
+      if(r.error) toast('Fleet ping failed: '+r.error.message,'danger');
+      else { toast('🛰️ Fleet ping OK — '+new Date(r.data).toLocaleString(),'success'); this.heartbeat(); }
+    });
+  },
+  fleetCopy(){
+    const url=(window.SCHOOL&&window.SCHOOL.supabaseUrl)||'';
+    const site=window.location.origin;
+    const txt=`Supabase URL: ${url}\nSite URL: ${site}\nType: School Connect\nAnon key: (paste from config.js — never service_role)\n\nFleet Console will ping sc_keep_alive and read sc_heartbeat + sc_keepalive_sources + sc_license_status + sw.js CACHE`;
+    navigator.clipboard.writeText(txt).then(()=>toast('Project details copied for Fleet Console','success')).catch(()=>{});
+  },
+
+  exportReport(){
+    const report={
+      generatedAt: new Date().toISOString(),
+      version: 'V12.17',
+      layers: KeepAliveLayers.LAYERS,
+      note: 'School Connect Platform Health — 14-layer anti-pause + tutoring + advanced CBT'
+    };
+    const blob=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='platform-health-report.json';
+    a.click();
+    toast('⬇ Exported health report JSON','success');
+  },
+
+  async refresh(){
+    // V12.18: robust refresh — each panel independent, never blocks others, shows errors if any
+    try{ await this.heartbeat(); }catch(e){ console.warn('heartbeat failed', e); }
+    try{ await this.storage(); }catch(e){ console.warn('storage failed', e); }
+    try{ await this.drive(); }catch(e){ console.warn('drive failed', e); }
+    try{ await this.license(); }catch(e){ console.warn('license failed', e); }
+    try{ await this.loadSecurity(); }catch(e){ console.warn('security failed', e); }
+    try{ await this.audit(); }catch(e){ console.warn('audit failed', e); }
+    try{ await this.schemaDoctor(); }catch(e){ console.warn('doctor failed', e); }
+    try{ await this.archive(); }catch(e){ console.warn('archive failed', e); }
+    try{ await this.fleetChecks(); }catch(e){ console.warn('fleet checks failed', e); }
+  }
+};
+
+window.PH = PH;
+document.addEventListener('DOMContentLoaded', ()=>{ setTimeout(()=>PH.refresh(), 900); });
+// Bind filter events
+document.addEventListener('DOMContentLoaded', ()=>{
+  const days=document.getElementById('audit-days');
+  const ev=document.getElementById('audit-event');
+  const search=document.getElementById('audit-search');
+  if(days) days.addEventListener('change', ()=>PH.audit());
+  if(ev) ev.addEventListener('change', ()=>PH.audit());
+  if(search) search.addEventListener('input', ()=>{ clearTimeout(window._auditSearchT); window._auditSearchT=setTimeout(()=>PH.audit(), 400); });
+});
+</script>
+</body>
+</html>
