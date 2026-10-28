@@ -1,0 +1,656 @@
+/* ====================================================================
+   CBT Engine — School Connect v2
+   Robust question normalisation, CSV parsing, anti-cheat, grading helpers,
+   calculator and math keyboard. No AI API.
+   ==================================================================== */
+const CBT = {
+  QUESTION_TYPES_17: ['mcq','multi_select','true_false','fill_blank','short_answer','essay','numeric','matching','ordering','drag_drop','hotspot','comprehension','case_study','image_based','audio_based','video_based','math_equation'],
+  /* V10.3: the full advanced family (Tutoring Connect parity). Structured
+     types render with purpose-built controls via assets/js/cbt-types.js and
+     grade with per-row partial credit server-side (database/v10.3). */
+  QUESTION_TYPES_ADVANCED: ['cloze','multi_numeric','categorization','matrix','hot_text','code','assertion_reason','likert','timeline','error_spotting','classification','scenario_mcq','data_interpretation','graph_read','oral_prompt','peer_review','true_false_justify','map_label','code_output','citation'],
+  _sb: null,
+  calcState: { mode: 'basic', memory: 0, display: '' },
+
+  init(supabaseClient) {
+    this._sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null);
+    // V12.42: Do NOT bind toolbar here — it will be bound only when exam actually starts (Exam.render)
+    // This prevents toolbar showing on entry page (enter code/ID) when student hasn't started CBT yet
+    if (document.getElementById('cbt-list') && window.CBTUI) { try { CBTUI.refresh(); } catch(e) { console.warn('CBTUI.refresh failed:', e); } }
+  },
+  destroyFloatingToolbar(){ try{ const t=document.getElementById('cbt-floating-toolbar'); if(t) t.remove(); const c=document.getElementById('cbt-calculator'); if(c) c.remove(); const k=document.getElementById('cbt-math-keyboard'); if(k) k.remove(); }catch(_){} },
+
+  bindFloatingToolbar() {
+    // V12.42: Only during actual CBT, not on entry page; respect per-exam toggles
+    try{
+      // Entry page has no Exam.data or no questions — don't show toolbar there (Issue 5)
+      const examData = (typeof Exam !== 'undefined' && Exam.data) ? Exam.data : (window.Exam && window.Exam.data ? window.Exam.data : null);
+      if(!examData || !examData.code) return; // No exam loaded yet (entry page)
+      const qs = (typeof Exam !== 'undefined' && Exam.qs) ? Exam.qs() : [];
+      if(!qs || !qs.length) return; // Exam not started (still on entry)
+      if(typeof Exam !== 'undefined' && Exam._done) return; // Already submitted
+    }catch(_){}
+    if (document.getElementById('cbt-floating-toolbar')) return;
+    // Check per-exam toggles (default true for backward compat)
+    let showMath=true, showCalc=true;
+    try{
+      const ed=(typeof Exam!=='undefined'&&Exam.data)?Exam.data:null;
+      if(ed){
+        // New columns enable_math_keyboard / enable_calculator, fallback to anti_cheat_config
+        if(ed.enable_math_keyboard===false) showMath=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.math_keyboard===false) showMath=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.enable_math_keyboard===false) showMath=false;
+        if(ed.enable_calculator===false) showCalc=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.calculator===false) showCalc=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.scientific_calculator===false) showCalc=false;
+        else if(ed.anti_cheat_config && ed.anti_cheat_config.enable_calculator===false) showCalc=false;
+      }
+    }catch(_){}
+    if(!showMath && !showCalc) return; // Both disabled — no toolbar
+    const toolbar = document.createElement('div');
+    toolbar.id = 'cbt-floating-toolbar';
+    toolbar.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;gap:8px;flex-direction:column;align-items:flex-end;';
+    let html='';
+    if(showCalc) html+='<button onclick="CBT.toggleCalculator()" style="background:linear-gradient(135deg,#0506ae,#964eec);color:white;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(79,70,229,0.4)">🧮 Calculator</button>';
+    if(showMath) html+='<button onclick="CBT.toggleMathKeyboard()" style="background:linear-gradient(135deg,#059669,#10b981);color:white;border:none;border-radius:50px;padding:12px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 15px rgba(5,150,105,0.4)">⌨️ Math Keyboard</button>';
+    toolbar.innerHTML = html;
+    document.body.appendChild(toolbar);
+  },
+
+  normalizeQuestion(q, idx) {
+    q = q || {};
+    const canonKey = k => String(k||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const keyMap = Object.keys(q).reduce((m,k)=>{m[canonKey(k)]=k;return m;},{});
+    const pick = (...names) => { for(const name of names){const k=keyMap[canonKey(name)];if(k!=null&&q[k]!=null)return q[k];} return undefined; };
+    // ENTERPRISE V6 (issue 12): normalise every spelling — true/false, true-false,
+    // tf, boolean, truefalse — to the canonical 'true_false' so options render.
+    let type = String(pick('type','question_type','questionType') || 'mcq').toLowerCase().replace(/[\s\/\\-]+/g,'_');
+    if (['tf','boolean','truefalse','true_or_false','yes_no','yesno'].includes(type)) type = 'true_false';
+    if (['multiplechoice','multiple_choice','single_choice','singlechoice','objective'].includes(type)) type = 'mcq';
+    if (['mrq','multiple_response','multiple_responses','multiple_select','multiselect','checkbox','checkboxes'].includes(type)) type = 'multi_select';
+    if (['number','integer','decimal','calculation'].includes(type)) type = 'numeric';
+    if (['short','text','free_text'].includes(type)) type = 'short_answer';
+    const rawOptions=pick('options','choices','alternatives','answers');
+    let options = Array.isArray(rawOptions) ? rawOptions.slice() : [];
+    if (!options.length && rawOptions && typeof rawOptions === 'object') options=Object.values(rawOptions);
+    if (!options.length && typeof rawOptions === 'string' && rawOptions.trim()) {
+      try { const parsed=JSON.parse(rawOptions); if(Array.isArray(parsed)) options=parsed.slice(); }
+      catch(_) { options=rawOptions.split(/\s*[|;]\s*/).filter(Boolean); }
+    }
+    options=options.map(o=>o&&typeof o==='object'?(o.text??o.label??o.value??JSON.stringify(o)):String(o));
+    // Read one naming family at a time. Canonical key lookup accepts A,
+    // Option A, option_a, choiceA and legacy spreadsheet spellings.
+    if (!options.length) {
+      for (const keys of [['a','option_a','opt_a','choice_a','option1'],['b','option_b','opt_b','choice_b','option2'],['c','option_c','opt_c','choice_c','option3'],['d','option_d','opt_d','choice_d','option4'],['e','option_e','opt_e','choice_e','option5']]) {
+        const value=pick(...keys); if(value!=null && String(value).trim()!=='') options.push(String(value));
+      }
+    }
+    // FIX V3: If options still empty but answer is a number, try choices/alternatives
+    if (!options.length && (q.choices || q.alternatives)) {
+      const src = q.choices || q.alternatives;
+      if (Array.isArray(src)) options = src.map(String);
+    }
+    // FIX V3: If type looks like MCQ but no options, force type to mcq and try harder
+    if (!options.length && ['mcq','multiple_choice','multi','choice'].includes(String(q.type||q.question_type||'').toLowerCase())) {
+      // Last resort: check numbered keys 1,2,3,4
+      [1,2,3,4,5].forEach(k => { if (q[k] != null && String(q[k]).trim() !== '') options.push(String(q[k])); });
+    }
+    if (type === 'true_false') options = ['True','False'];  // always exactly True/False (issue 12)
+    let answer = pick('answer','correct','correct_answer','correctAnswer','correct answer','answer_key','answerKey','correct_option','correctOption','key');
+    if(answer && typeof answer==='object' && !Array.isArray(answer)) answer=answer.value??answer.answer??answer.key??answer.text??answer.label;
+    if(type==='multi_select' && typeof answer==='string') answer=answer.split(/\s*[,;|]\s*/).filter(Boolean);
+    return {
+      id: pick('id') || ('q' + (idx + 1)),
+      _orig_index: pick('_orig_index','orig_index') != null ? Number(pick('_orig_index','orig_index')) : idx,
+      type,
+      question: pick('question','prompt','text','question_text','questionText') || '',
+      options,
+      answer,
+      correct: answer,
+      explanation: pick('explanation','reason','solution') || '',
+      mark: Number(pick('mark','marks','score','points') || 1) || 1,
+      section: pick('section','subject_section','subject','exam_subject') || '',
+      subject: pick('subject','section','subject_section','exam_subject') || '',
+      difficulty: pick('difficulty','level') || '',
+      tolerance: pick('tolerance','accept','margin') || '',
+      accepted_answers: pick('accept','accepted_answers','alternatives') || '',
+      passage: pick('passage','context','case_text','comprehension') || '',
+      media_url: pick('media_url','media','image_url','image','audio_url','video_url') || '',
+      /* V10.3: structured-type payloads (Tutoring Connect parity). `items`
+         carries matching pairs / ordering lists / matrix rows / numeric
+         parts / hot-text chunks; `pool` and `blanks` are the sanitised
+         render shapes the V10.3 server getter emits for candidates. */
+      items: pick('items','pairs') ?? null,
+      pairs: pick('pairs') ?? null,
+      pool: pick('pool') ?? null,
+      blanks: pick('blanks') ?? null,
+      unit: pick('unit') || '',
+      mrq_aon: pick('mrq_aon','mrqaon','all_or_nothing') ?? null,
+      distractors: pick('distractors') || '',
+      metadata: pick('metadata') || null
+    };
+  },
+
+  prepareForStudent(exam) {
+    if (!exam) return exam;
+    let qs = exam._questions || exam.questions || exam.csv_data || [];
+    if (typeof qs === 'string') { try { qs = JSON.parse(qs); } catch(e) { qs = []; } }
+    qs = (qs || []).map((q,i) => this.normalizeQuestion(q,i));
+    // ENTERPRISE V13/V5: if an older/browser CSV path lost per-question
+    // section values, recover subject tabs from the multi-subject builder's
+    // anti_cheat_config.subject_breakdown metadata. This is a second safety net
+    // so tabs still appear for students.
+    const cfg = exam && exam.anti_cheat_config ? exam.anti_cheat_config : {};
+    const breakdown = Array.isArray(cfg.subject_breakdown) ? cfg.subject_breakdown : [];
+    if (breakdown.length > 1) {
+      const isMulti = exam && String(exam.subject||'').toLowerCase().startsWith('multi-subject');
+      if (new Set(qs.map(q => q.section || q.subject || 'General')).size <= 1 || isMulti) {
+      breakdown.forEach(b => {
+        const start = Number(b.start) || 0;
+        const end = b.end != null ? Number(b.end) : (start + (Number(b.count) || 0) - 1);
+        for (let i = start; i <= end && i < qs.length; i++) {
+          if (qs[i]) { qs[i].section = b.name || ('Subject ' + (breakdown.indexOf(b)+1)); qs[i].subject = qs[i].section; }
+        }
+      });
+      }
+    }
+    // Final safety net: if sections are still missing but question-level subject metadata exists under alternate keys, copy it in now.
+    qs = qs.map((q,i) => {
+      if (!(q.section || q.subject)) {
+        const raw = (exam && ((exam._questions && exam._questions[i]) || (exam.questions && exam.questions[i]) || (Array.isArray(exam.csv_data) && exam.csv_data[i]))) || {};
+        const sec = raw.section || raw.subject || raw.subject_section || raw.exam_subject || '';
+        if (sec) { q.section = sec; q.subject = sec; }
+      }
+      return q;
+    });
+    // ENTERPRISE V6 (issue 13): UTME-style multi-subject exams must keep each
+    // subject's questions GROUPED — never mixed together randomly. Randomise
+    // and select_count now operate WITHIN each subject section.
+    const sections = [...new Set(qs.map(q => q.section || q.subject || 'General'))];
+    if (sections.length > 1) {
+      const perSection = Math.max(0, Number(exam.select_count) || 0); // per-subject cap in multi mode
+      let grouped = [];
+      sections.forEach(sec => {
+        let block = qs.filter(q => (q.section || q.subject || 'General') === sec);
+        if (exam.randomise) block = this.shuffle(block);
+        if (perSection > 0) block = block.slice(0, perSection);
+        grouped = grouped.concat(block);
+      });
+      qs = grouped;
+    } else {
+      if (exam.randomise) qs = this.shuffle(qs);
+      if (exam.select_count && Number(exam.select_count) > 0) qs = qs.slice(0, Number(exam.select_count));
+    }
+    exam._questions = qs;
+    exam.questions = qs;
+    return exam;
+  },
+
+  shuffle(arr) { const a = arr.slice(); for (let i=a.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; },
+
+  gradeSubmission(exam, answers) {
+    const qs = (exam && (exam._questions || exam.questions)) || [];
+    let score = 0, total = 0, correct = 0, wrong = 0, skipped = 0;
+    qs.forEach((q,i) => {
+      const mark = Number(q.mark || q.score || q.points || 1) || 1; total += mark;
+      const given = answers ? answers[i] : null;
+      // FIX V3: More lenient skip detection — only skip if truly empty
+      if (given == null || given === undefined) { skipped++; return; }
+      if (typeof given === 'string' && given.trim() === '') { skipped++; return; }
+      if (Array.isArray(given) && given.length === 0) { skipped++; return; }
+      /* V10.3: structured types earn per-row partial credit in the client
+         preview too, mirroring the canonical server engine. Anything the
+         advanced grader does not own returns null and falls back here. */
+      let frac = null;
+      try { if (window.CBTTypes && CBTTypes.handles && CBTTypes.handles(q)) { const g = CBTTypes.grade(q, given); if (g && !g.pending && !g.unmarkable) frac = g.fraction; } } catch(_) {}
+      if (frac != null) {
+        if (frac >= 0.999) { score += mark; correct++; }
+        else if (frac <= 0.001) { score -= Number(exam.negative_mark || 0) || 0; wrong++; }
+        else { score += Math.round(mark * frac * 100) / 100; wrong++; }
+        return;
+      }
+      const ok = this.isCorrect(q, given);
+      if (ok) { score += mark; correct++; }
+      else { score -= Number(exam.negative_mark || 0) || 0; wrong++; }
+    });
+    if (score < 0) score = 0;
+    const percent = total ? Math.round((score / total) * 10000) / 100 : 0;
+    const grade = percent >= 75 ? 'A' : percent >= 60 ? 'B' : percent >= 50 ? 'C' : percent >= 40 ? 'D' : 'F';
+    return { score: Math.round(score*100)/100, total, percent, grade, correct, wrong, skipped };
+  },
+
+  isCorrect(q, given) {
+    const norm = v => String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g,' ');
+    const ans = q.answer != null ? q.answer : q.correct;
+    const opts = (q.options || []).map(norm);
+    const canonicalOption = v => {
+      const x=norm(v);
+      if (/^[a-z]$/.test(x)) { const i=x.charCodeAt(0)-97; if(opts[i]!=null)return opts[i]; }
+      return x;
+    };
+    const tokens = v => {
+      if (Array.isArray(v)) return v.map(canonicalOption).filter(Boolean);
+      if (v && typeof v === 'object') return Object.values(v).map(canonicalOption).filter(Boolean);
+      let s=String(v==null?'':v).trim();
+      if (/^\s*\[/.test(s)) { try { const p=JSON.parse(s); if(Array.isArray(p))return p.map(canonicalOption).filter(Boolean); } catch(_){} }
+      return s.split(/\s*[,;|]\s*/).map(canonicalOption).filter(Boolean);
+    };
+    if (String(q.type||'').toLowerCase()==='multi_select') {
+      const a=[...new Set(tokens(ans))].sort(), gset=[...new Set(tokens(given))].sort();
+      return a.length>0 && a.length===gset.length && a.every((x,i)=>x===gset[i]);
+    }
+    let g = norm(given);
+    // For non-multi questions an answer array means accepted alternatives.
+    if (Array.isArray(ans)) return ans.map(norm).includes(g);
+    if (q.type === 'numeric') {
+      const tol = Math.abs(Number(q.tolerance)) || 0.0001;
+      return Math.abs(Number(given) - Number(ans)) <= tol;
+    }
+    const a = norm(ans);
+    if (a === g) return true;
+    // FIX V3: Handle numeric answer indices (0=A, 1=B, 2=C, 3=D)
+    const ansNum = Number(ans);
+    if (!isNaN(ansNum) && ansNum >= 0 && ansNum <= 9) {
+      const letterFromNum = String.fromCharCode(97 + ansNum); // 0→'a', 1→'b', etc.
+      if (g === letterFromNum) return true;
+      const opts = (q.options || []).map(norm);
+      if (opts[ansNum] && opts[ansNum] === g) return true;
+    }
+    // FIX V3: Handle student giving a number (0-3) as answer
+    const gNum = Number(given);
+    if (!isNaN(gNum) && gNum >= 0 && gNum <= 9) {
+      const letterFromGNum = String.fromCharCode(97 + gNum);
+      if (letterFromGNum === a) return true;
+    }
+    // ENTERPRISE V6 (issue 12 grading): students answer option questions with a
+    // LETTER (A/B/C/D) while teachers may store the answer as the option TEXT
+    // (e.g. "True") — or vice-versa. Accept both directions.
+    if (opts.length) {
+      const letterToText = (x) => (x.length === 1 && x >= 'a' && x <= 'z') ? opts[x.charCodeAt(0) - 97] : undefined;
+      const textToLetter = (x) => { const i = opts.indexOf(x); return i >= 0 ? String.fromCharCode(97 + i) : undefined; };
+      if (letterToText(g) !== undefined && letterToText(g) === a) return true;
+      if (letterToText(a) !== undefined && letterToText(a) === g) return true;
+      if (textToLetter(g) !== undefined && textToLetter(g) === a) return true;
+      // FIX: Also check if answer is the option INDEX (0,1,2,3)
+      const ansNum = Number(ans);
+      if (!isNaN(ansNum) && ansNum >= 0 && ansNum < opts.length) {
+        if (g === String.fromCharCode(97 + ansNum)) return true; // given='a', answer=0
+        if (g === opts[ansNum]) return true; // given=option text, answer=index
+      }
+      // FIX: Check if given is the option INDEX
+      const gNum = Number(given);
+      if (!isNaN(gNum) && gNum >= 0 && gNum < opts.length) {
+        if (String.fromCharCode(97 + gNum) === a) return true;
+        if (opts[gNum] === a) return true;
+      }
+    }
+    // FIX: Last resort — check if given matches any option by position
+    if (opts.length && g.length === 1 && g >= 'a' && g <= 'e') {
+      const idx = g.charCodeAt(0) - 97;
+      if (idx < opts.length && opts[idx] === a) return true;
+    }
+    return false;
+  },
+
+  startAntiCheat(cfg, onFlag) {
+    cfg = cfg || {}; let count = 0; const log = [];
+    const flag = type => { count++; log.push({type, at:new Date().toISOString()}); if (onFlag) onFlag(type, count); };
+    if (cfg.watermark !== false && !document.getElementById('cbt-watermark')) { const wm=document.createElement('div'); wm.id='cbt-watermark'; wm.textContent=((window.SC_PROFILE&&SC_PROFILE.full_name)||'Candidate')+' · '+(window.fmtDMYT?fmtDMYT(new Date()):new Date().toLocaleString()); wm.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:9997;opacity:.08;font-size:32px;font-weight:900;color:#111;display:flex;align-items:center;justify-content:center;transform:rotate(-28deg);'; document.body.appendChild(wm); }
+    const handlers = [];
+    if (cfg.window_blur !== false) { const h=()=>flag('window_blur'); window.addEventListener('blur',h); handlers.push(['blur',h]); }
+    if (cfg.copy_paste !== false) {
+      ['copy','paste','cut'].forEach(ev => { const h=e=>{ e.preventDefault(); flag(ev); }; document.addEventListener(ev,h); handlers.push([ev,h,document]); });
+    }
+    if (cfg.right_click !== false) { const h=e=>{ e.preventDefault(); flag('right_click'); }; document.addEventListener('contextmenu',h); handlers.push(['contextmenu',h,document]); }
+    if (cfg.fullscreen !== false && document.documentElement.requestFullscreen) { try { document.documentElement.requestFullscreen().catch(()=>{}); } catch(e) {} const h=()=>{ if(!document.fullscreenElement) flag('fullscreen_exit'); }; document.addEventListener('fullscreenchange',h); handlers.push(['fullscreenchange',h,document]); }
+    if (cfg.devtools !== false) { const h=e=>{ if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&['I','J','C'].includes(String(e.key).toUpperCase()))){ e.preventDefault(); flag('devtools_key'); } }; document.addEventListener('keydown',h); handlers.push(['keydown',h,document]); }
+    return { log, stop(){ handlers.forEach(([ev,h,target]) => (target||window).removeEventListener(ev,h)); const wm=document.getElementById('cbt-watermark'); if(wm) wm.remove(); } };
+  },
+
+  // ENTERPRISE V14 (issue 44): the manager list deliberately EXCLUDES the two
+  // heavy jsonb question columns (csv_data/questions). A school with 100 exams
+  // × a 200 KB question bank used to download ~20 MB on every page open; the
+  // slim list is a few KB. Full rows are still fetched per-exam whenever the
+  // teacher edits, previews, exports or appends questions.
+  async listExams() { if (!this._sb) return {data:null,error:{message:'Database not configured'}}; const all=[];for(let from=0;from<5000;from+=500){const r=await this._sb.from('cbt_exams').select('id,code,title,subject,class,term,session,assessment_type,report_column,max_score,duration,duration_min,attempt_limit,select_count,randomise,negative_mark,exam_mode,is_open,is_archived,is_entrance,pass_mark,release_results,anti_cheat_config,certificate_enabled,start_at,close_at,teacher_id,created_at,updated_at').order('created_at',{ascending:false}).range(from,from+499);if(r.error)return r;all.push(...(r.data||[]));if(!r.data||r.data.length<500)break;}return{data:all,error:null}; },
+  async createExam(exam) {
+    if (!this._sb) return {data:null,error:{message:'Database not configured'}};
+    exam = exam || {};
+    exam.code = (exam.code || this._generateCode(6)).toUpperCase();
+    exam.created_at = new Date().toISOString();
+    /* V10.4 ROOT-CAUSE FIX (reported: "new row violates row-level security
+       policy for table cbt_exams"): teacher_id was stamped from SC_PROFILE,
+       which loads ASYNCHRONOUSLY after sign-in. A fast click sent
+       teacher_id = NULL, and the RLS insert policy (teacher_id = auth.uid())
+       failed even for the right teacher. Now the authenticated user id is
+       fetched directly from the session as a guaranteed fallback. */
+    if (!exam.teacher_id && window.SC_PROFILE && SC_PROFILE.id) exam.teacher_id = SC_PROFILE.id;
+    if (!exam.teacher_id) {
+      try { const u = await this._sb.auth.getUser(); if (u && u.data && u.data.user) exam.teacher_id = u.data.user.id; } catch(_) {}
+    }
+    exam.anti_cheat_config = Object.assign({tab_switch:true,window_blur:true,copy_paste:true,right_click:true,fullscreen:true,watermark:true,devtools:true,max_violations:5}, exam.anti_cheat_config || {});
+    const bank=(Array.isArray(exam.csv_data)&&exam.csv_data.length)?exam.csv_data:((Array.isArray(exam.questions)&&exam.questions.length)?exam.questions:[]);
+    if(bank.length){exam.csv_data=bank;exam.questions=bank;}
+    /* V10.4: random 6-char codes can collide with an existing exam (unique
+       constraint) — regenerate and retry instead of surfacing a cryptic
+       duplicate-key error to the teacher. */
+    let res = await this._sb.from('cbt_exams').insert(exam).select().single();
+    for (let attempt = 0; attempt < 3 && res.error && /duplicate key|cbt_exams_code_key|unique/i.test(String(res.error.message||'')); attempt++) {
+      exam.code = this._generateCode(6).toUpperCase();
+      res = await this._sb.from('cbt_exams').insert(exam).select().single();
+    }
+    /* V10.4: translate the raw RLS rejection into the actual causes and the
+       fixes, instead of leaving the teacher staring at "row-level security". */
+    if (res.error && /row-level security|42501/i.test(String(res.error.message||'') + String(res.error.code||''))) {
+      const who = (window.SC_PROFILE && (SC_PROFILE.full_name || SC_PROFILE.email)) || 'your account';
+      res.error = { ...res.error, message:
+        'The database refused this exam for ' + who + ' (row-level security). Likely causes, in order:\n' +
+        '1) Your school database has not run database/v10.4-cbt-multisubject-rls.sql — required for MULTI-SUBJECT packages created by teachers (admin: run it once in Supabase).\n' +
+        '2) The subject "' + (exam.subject||'') + '" is not assigned to you on the Subjects page (admin can assign it, or an admin account can create the exam).\n' +
+        '3) Your profile had not finished loading — wait two seconds after sign-in and try again.\n' +
+        'Admins are never blocked; ask an admin to create it if urgent.' };
+    }
+    return res;
+  },
+  _generateCode(len) { const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<len;i++) r+=chars.charAt(Math.floor(Math.random()*chars.length)); return r; },
+
+  advancedPromptTemplate(subject, klass, topic, count) {
+    subject = subject || 'Mathematics'; klass = klass || 'SSS 1'; topic = topic || 'Selected topic'; count = count || 40;
+    return `You are an expert examination setter. Generate ${count} high-quality CBT questions for ${subject}, ${klass}, topic: ${topic}.\n\nReturn ONLY a CSV with these headers exactly:\nquestion,type,a,b,c,d,answer,explanation,mark,difficulty,topic,tolerance,section\n\nRules:\n1. Use a balanced mix of question types where appropriate: mcq, true_false, fill_blank, numeric, short_answer, multi_select, matching, ordering, comprehension.\n2. For MCQ, put four options in a,b,c,d and answer as the exact option text or letter.\n3. For numeric, put the numeric answer in answer and tolerance in tolerance.\n4. Keep explanations concise and educational.\n5. Avoid ambiguous questions.\n6. Align difficulty to the class level.\n7. Do not include markdown, numbering outside the CSV, or extra commentary.`;
+  },
+
+  validateQuestionBank(questions) {
+    /* V10.3: code / oral / peer-review join essay in the teacher-marked
+       family, and structured types (matching, ordering, matrix…) count a
+       populated Items/Pairs column as their answer key — matching the
+       server-side keyed check in database/v10.3.
+       V10.6 ROOT-CAUSE FIX (reported: cloze/ordering rows with perfect Items
+       keys rejected as "correct answer key is missing"): this check used to
+       lean on window.CBTTypes.parseList — but cbt.html / cbt-multi.html do
+       not load cbt-types.js, so the fallback silently never ran and every
+       structured row failed validation. The engine now carries its OWN
+       items reader and alias map, so validation is self-sufficient on every
+       page. */
+    const manualTypes=new Set(['essay','long_answer','file_upload','code','oral_prompt','peer_review']);
+    const structuredTypes=new Set(['matching','ordering','categorization','matrix','multi_numeric','cloze','hot_text']);
+    const LOCAL_ALIAS={mrq:'multi_select',tf:'true_false',short:'short_answer',fill_blank:'cloze',fill:'cloze',gap_fill:'cloze',gapfill:'cloze',classification:'categorization',sorting:'categorization',grouping:'categorization',likert:'matrix',grid:'matrix',drag_drop:'ordering',dragdrop:'ordering',timeline:'ordering',sequence:'ordering',sequencing:'ordering',ranking:'ordering',error_spotting:'hot_text',hottext:'hot_text',multinumeric:'multi_numeric',multi_part_numeric:'multi_numeric',oral_prompt:'essay',peer_review:'essay',long_answer:'essay',code_output:'code',dropdown:'dropdown',select:'dropdown',pick_one:'dropdown',choose_one:'dropdown',hotspot:'image_based',map_label:'image_based'};
+    const canon=t=>{const x=String(t||'mcq').toLowerCase().replace(/[\s\/\\-]+/g,'_');return (window.CBTTypes&&CBTTypes.ALIAS&&CBTTypes.ALIAS[x])||LOCAL_ALIAS[x]||x;};
+    const localParseList=v=>{ if(v==null||v==='')return[]; if(Array.isArray(v))return v; if(typeof v==='object')return Object.values(v);
+      const s=String(v).trim();
+      if(s.charAt(0)==='['||s.charAt(0)==='{'){try{const p=JSON.parse(s);return Array.isArray(p)?p:[p];}catch(_){}}
+      return s.split(/\s*[|;]\s*/).filter(Boolean); };
+    const errors=[],warnings=[];
+    (questions||[]).forEach((raw,i)=>{
+      const q=this.normalizeQuestion(raw,i), label='Question '+(i+1), ct=canon(q.type);
+      if(!String(q.question||'').trim()) errors.push(label+': question text is missing.');
+      let missing=q.answer==null || (typeof q.answer==='string'&&!q.answer.trim()) || (Array.isArray(q.answer)&&!q.answer.length);
+      if(missing && structuredTypes.has(ct)){
+        const its=localParseList(q.items!=null&&q.items!==''?q.items:q.pairs);
+        if(its.length) missing=false;
+      }
+      if(missing && !manualTypes.has(ct)) errors.push(label+': correct answer key is missing. Check the CorrectAnswer column (or the Items/Pairs column for structured types).');
+      if(['mcq','true_false','multi_select'].includes(ct) && q.options.length<2) errors.push(label+': at least two options are required for '+q.type+'.');
+      if(manualTypes.has(ct)&&missing) warnings.push(label+': requires manual review and is excluded from automatic percentage.');
+    });
+    return {ok:errors.length===0,errors,warnings,question_count:(questions||[]).length,engine_version:'v5.1'};
+  },
+
+  parseCSV(csv) {
+    if (!csv || !csv.trim()) return [];
+    const rows = this.parseCSVRows(csv).filter(r => r.some(v => String(v == null ? '' : v).trim()));
+    if (!rows.length) return [];
+    const canon = h => String(h==null?'':h).replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+    /* V9.6 (#2) ROOT CAUSE of "Add at least one question CSV" on PASTED text:
+       the parser demanded ≥2 rows and blindly consumed row 1 as a header.
+       Raw CSV pasted WITHOUT a header row (the common case when copying
+       straight from Excel/Notepad) lost its first question — and a single
+       pasted question produced ZERO. Now we DETECT whether row 1 is really
+       a header (contains recognisable column names); when it is not, every
+       row is data and the standard positional layout applies
+       (question,a,b,c,d,answer,explanation,type,mark). */
+    const probe = rows[0].map(canon);
+    const headerWords = ['question','prompt','text','answer','correct','correctanswer','optiona','a','b','c','d','type','mark','marks'];
+    const looksHeader = probe.filter(x => headerWords.includes(x)).length >= 2;
+    const head = looksHeader ? probe : [];
+    const idx = name => head.indexOf(canon(name));
+    const dataRows = looksHeader ? rows.slice(1) : rows;
+    if (!dataRows.length) return [];
+    const questions = [];
+    dataRows.forEach((vals, i) => {
+      if (!vals.some(v => String(v||'').trim())) return;
+      const get = (...names) => { for (const n of names) { const k=idx(n); if(k>=0) return vals[k] || ''; } return ''; };
+      const q = {
+        question: get('question','prompt','text') || vals[0] || '',
+        a: get('a','option_a','option a') || vals[1] || '', b: get('b','option_b','option b') || vals[2] || '', c: get('c','option_c','option c') || vals[3] || '', d: get('d','option_d','option d') || vals[4] || '',
+        answer: get('answer','correct','correct_answer','correct answer','correctanswer','answer_key','answerkey','correct_option','correctoption','key') || vals[5] || '',
+        explanation: get('explanation','reason','solution') || vals[6] || '',
+        type: get('type','question_type','questiontype') || vals[7] || 'mcq',
+        mark: Number(get('mark','marks','score','points') || 1) || 1,
+        difficulty: get('difficulty','level') || '',
+        topic: get('topic','lesson') || '',
+        tolerance: get('tolerance') || '',
+        section: get('section','subject','subject_section','exam_subject') || '',
+        subject: get('subject','section','subject_section','exam_subject') || '',
+        passage: get('passage','context','case_text','comprehension') || '',
+        media_url: get('media_url','media','image_url','image','audio_url','video_url') || '',
+        /* V10.3: the 17-column contract (Tutoring Connect parity) —
+           Question,A,B,C,D,CorrectAnswer,Explanation,Type,Tolerance,Unit,
+           Accept,MRQ_AON,Pairs,Items,Difficulty,Tags,Section. JSON lives in
+           Pairs/Items with doubled inner quotes; parseCSVRows already
+           unescapes them, cbt-types.js parses the JSON lazily. */
+        unit: get('unit') || '',
+        accept: get('accept','accepted_answers','alternatives') || '',
+        mrq_aon: get('mrq_aon','mrqaon','all_or_nothing') || '',
+        pairs: get('pairs') || '',
+        items: get('items') || '',
+        tags: get('tags') || ''
+      };
+      if (!q.tolerance && !q.items && !q.pairs) q.tolerance = get('accept') && /^[0-9.]+$/.test(get('accept')) ? get('accept') : q.tolerance;
+      questions.push(this.normalizeQuestion(q, i));
+    });
+    return questions;
+  },
+  parseCSVRows(text) {
+    const rows=[]; let row=[], cur='', q=false;
+    for (let i=0;i<text.length;i++) { const ch=text[i], nx=text[i+1];
+      if (ch==='"' && q && nx==='"') { cur+='"'; i++; }
+      else if (ch==='"') q=!q;
+      else if (ch===',' && !q) { row.push(cur); cur=''; }
+      else if ((ch==='\n'||ch==='\r') && !q) { if(ch==='\r'&&nx==='\n') i++; row.push(cur); rows.push(row); row=[]; cur=''; }
+      else cur+=ch;
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  },
+
+  toggleCalculator() {
+    // V12.42: Check per-exam toggle first, then page
+    try{
+      const ed=(typeof Exam!=='undefined'&&Exam.data)?Exam.data:null;
+      if(ed && ed.enable_calculator===false){ if(typeof toast==='function') toast('Calculator is disabled for this exam (tutor setting).', 'info', 4000); return; }
+      if(ed && ed.anti_cheat_config && (ed.anti_cheat_config.calculator===false||ed.anti_cheat_config.scientific_calculator===false)) { if(typeof toast==='function') toast('Calculator is disabled for this exam.', 'info', 4000); return; }
+    }catch(_){}
+    const page = (location.pathname.split('/').pop() || '').replace('.html','');
+    if (!['cbt-exam','cbt_exam','cbt-multi','cbt_multi','cbt'].includes(page)) {
+      if (typeof toast === 'function') toast('Calculator is only available during CBT exams.', 'info', 4000);
+      return;
+    }
+    const existing=document.getElementById('cbt-calculator'); if(existing){existing.remove();return;} const calc=document.createElement('div'); calc.id='cbt-calculator'; calc.style.cssText='position:fixed;bottom:90px;right:20px;background:white;border:2px solid #e2e8f0;border-radius:16px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,.15);z-index:10000;width:300px;max-width:94vw;font-family:sans-serif;'; this._renderCalculatorHTML(calc); document.body.appendChild(calc); },
+  /* V10.6 (#2): FULL scientific calculator. Adds asin/acos/atan, powers (xʸ),
+     eˣ, 10ˣ, 1/x, x!, |x|, mod, e, DEG/RAD toggle, Ans recall and a working
+     memory set (MC/MR/M+/M−). Expressions are evaluated by a SAFE tokenising
+     parser — no eval(). */
+  _renderCalculatorHTML(calc) {
+    const st=this.calcState; st.deg=(st.deg!==false);
+    const basic=['7','8','9','÷','4','5','6','×','1','2','3','−','0','.','⌫','+'];
+    const sci1=['sin','cos','tan','π','√','asin','acos','atan','e','xʸ'];
+    const sci2=['x²','x³','ln','log','10ˣ','eˣ','1/x','x!','|x|','mod'];
+    const sci3=['sinh','cosh','tanh','ⁿ√','EXP','g','c','Nₐ','R','h'];
+    const mem=['MC','MR','M+','M−','Ans','(' ,')','%',st.deg?'DEG':'RAD','C'];
+    const btn=(b,extra)=>'<button onclick="CBT.calcInput(\''+b.replace(/'/g,"\\'")+'\')" style="padding:9px 4px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:13px;font-weight:700;cursor:pointer'+(extra||'')+'">'+b+'</button>';
+    calc.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><strong>🧮 Calculator</strong><span><button onclick="CBT.toggleCalcMode()" class="btn btn-sm btn-outline">'+(st.mode==='basic'?'Basic ▸ Sci':'Scientific')+'</button> <button onclick="document.getElementById(\'cbt-calculator\').remove()" class="btn btn-sm btn-outline">×</button></span></div>'+
+      '<input id="calc-display" value="'+String(st.display||'').replace(/"/g,'&quot;')+'" style="width:100%;font-size:22px;padding:10px;text-align:right;margin-bottom:4px;border:1px solid #cbd5e1;border-radius:8px" inputmode="none">'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:#64748b;margin-bottom:8px"><span>'+(st.deg?'DEG':'RAD')+' · M='+(st.memory||0)+'</span><span>Ans='+(st.ans!=null?st.ans:'—')+'</span></div>'+
+      (st.mode==='scientific'
+        ? '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci1.map(b=>btn(b)).join('')+'</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci2.map(b=>btn(b)).join('')+'</div><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+sci3.map(b=>btn(b)).join('')+'</div>'
+        : '')+
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">'+mem.map(b=>btn(b)).join('')+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">'+basic.map(b=>btn(b)).join('')+'</div>'+
+      '<div style="display:flex;gap:8px;margin-top:8px"><button onclick="CBT.calcInput(\'CE\')" style="flex:1;padding:10px;border:1px solid #fca5a5;color:#b91c1c;border-radius:8px;background:#fef2f2;font-weight:800">CE</button><button onclick="CBT.calcEquals()" style="flex:2;padding:10px;border:0;border-radius:8px;background:linear-gradient(135deg,#0506ae,#964eec);color:#fff;font-weight:800;font-size:16px">=</button></div>';
+  },
+  toggleCalcMode(){ this.calcState.mode=this.calcState.mode==='basic'?'scientific':'basic'; const c=document.getElementById('cbt-calculator'); if(c)this._renderCalculatorHTML(c); },
+  calcInput(v){ const d=document.getElementById('calc-display'); if(!d)return; const st=this.calcState;
+    const fns={sin:1,cos:1,tan:1,asin:1,acos:1,atan:1,ln:1,log:1};
+    if(v==='⌫')d.value=d.value.slice(0,-1);
+    else if(v==='C'||v==='CE'){d.value='';}
+    else if(v==='DEG'||v==='RAD'){st.deg=!st.deg;this._renderCalculatorHTML(document.getElementById('cbt-calculator'));return;}
+    else if(v==='MC'){st.memory=0;this._renderCalculatorHTML(document.getElementById('cbt-calculator'));return;}
+    else if(v==='MR')d.value+=String(st.memory||0);
+    else if(v==='M+'||v==='M−'){const cur=this.calcEval(d.value);if(cur!=null&&isFinite(cur)){st.memory=(Number(st.memory)||0)+(v==='M+'?cur:-cur);this._renderCalculatorHTML(document.getElementById('cbt-calculator'));}return;}
+    else if(v==='Ans')d.value+=String(st.ans!=null?st.ans:0);
+    else if(v==='π')d.value+='π';
+    else if(v==='e')d.value+='e';
+    else if(v==='√')d.value+='√(';
+    else if(fns[v])d.value+=v+'(';
+    else if(v==='x²')d.value+='^2';
+    else if(v==='x³')d.value+='^3';
+    else if(v==='xʸ')d.value+='^';
+    else if(v==='10ˣ')d.value+='10^';
+    else if(v==='eˣ')d.value+='e^';
+    else if(v==='1/x')d.value='1/('+(d.value||'0')+')';
+    else if(v==='x!')d.value+='!';
+    else if(v==='|x|')d.value='abs('+(d.value||'0')+')';
+    else if(v==='mod')d.value+=' mod ';
+    else if(v==='sinh'||v==='cosh'||v==='tanh')d.value+=v+'(';
+    else if(v==='ⁿ√')d.value+='^(1/';
+    else if(v==='EXP')d.value+='E';
+    else if(v==='g')d.value+='(9.80665)';
+    else if(v==='c')d.value+='(299792458)';
+    else if(v==='Nₐ')d.value+='(6.02214076E23)';
+    else if(v==='R')d.value+='(8.314462618)';
+    else if(v==='h')d.value+='(6.62607015E-34)';
+    else if(v==='−')d.value+='-';
+    else d.value+=v;
+    st.display=d.value;
+  },
+  calcClear(){ const d=document.getElementById('calc-display'); if(d){d.value='';this.calcState.display='';} },
+  /* SAFE expression evaluator — tokeniser + shunting-yard, no eval(). */
+  calcEval(expr){
+    try{
+      let s=String(expr||'').replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/π/g,'('+Math.PI+')').replace(/\be\b/g,'('+Math.E+')').replace(/√/g,'sqrt').replace(/\bmod\b/gi,'%').replace(/(\d+(?:\.\d+)?)%(?!\d)/g,'($1/100)');
+      const deg=this.calcState.deg!==false;
+      const toRad=x=>deg?x*Math.PI/180:x, fromRad=x=>deg?x*180/Math.PI:x;
+      const F={sin:x=>Math.sin(toRad(x)),cos:x=>Math.cos(toRad(x)),tan:x=>Math.tan(toRad(x)),asin:x=>fromRad(Math.asin(x)),acos:x=>fromRad(Math.acos(x)),atan:x=>fromRad(Math.atan(x)),sinh:x=>Math.sinh(x),cosh:x=>Math.cosh(x),tanh:x=>Math.tanh(x),ln:x=>Math.log(x),log:x=>Math.log10(x),sqrt:x=>Math.sqrt(x),cbrt:x=>Math.cbrt(x),abs:x=>Math.abs(x)};
+      const fact=n=>{if(n<0||n!==Math.floor(n)||n>170)return NaN;let r=1;for(let i=2;i<=n;i++)r*=i;return r;};
+      const toks=[];let i=0;
+      while(i<s.length){const c=s[i];
+        if(/\s/.test(c)){i++;continue;}
+        if(/[0-9.]/.test(c)){let j=i;while(j<s.length&&/[0-9.eE]/.test(s[j])){if((s[j]==='e'||s[j]==='E')&&!/[0-9+\-]/.test(s[j+1]||''))break;if((s[j]==='e'||s[j]==='E')&&/[+\-]/.test(s[j+1]||''))j++;j++;}toks.push({t:'n',v:parseFloat(s.slice(i,j))});i=j;continue;}
+        if(/[a-z]/i.test(c)){let j=i;while(j<s.length&&/[a-z]/i.test(s[j]))j++;const name=s.slice(i,j).toLowerCase();if(F[name]){toks.push({t:'f',v:name});i=j;continue;}throw Error('fn');}
+        if('+-*/%^()!'.includes(c)){toks.push({t:c==='('?'(':c===')'?')':'o',v:c});i++;continue;}
+        throw Error('tok');
+      }
+      // unary minus → 0 - x
+      const out=[],ops=[];const prec={'+':1,'-':1,'*':2,'/':2,'%':2,'^':3,'!':4};const rightAssoc={'^':1};
+      let prev=null;
+      const popTo=(p,ra)=>{while(ops.length){const top=ops[ops.length-1];if(top.t==='o'&&(prec[top.v]>p||(prec[top.v]===p&&!ra)))out.push(ops.pop());else if(top.t==='f')out.push(ops.pop());else break;}};
+      for(const tk of toks){
+        if(tk.t==='n'){out.push(tk);prev=tk;continue;}
+        if(tk.t==='f'){ops.push(tk);prev=tk;continue;}
+        if(tk.t==='('){ops.push(tk);prev=tk;continue;}
+        if(tk.t===')'){while(ops.length&&ops[ops.length-1].t!=='(')out.push(ops.pop());if(!ops.length)throw Error('paren');ops.pop();if(ops.length&&ops[ops.length-1].t==='f')out.push(ops.pop());prev={t:'n'};continue;}
+        if(tk.v==='!'){out.push({t:'o',v:'!'});prev=tk;continue;}
+        if(tk.v==='-'&&(!prev||prev.t==='o'||prev.t==='(')){out.push({t:'n',v:0});ops.push({t:'o',v:'-'});prev=tk;continue;}
+        popTo(prec[tk.v],!!rightAssoc[tk.v]);ops.push(tk);prev=tk;
+      }
+      while(ops.length){const top=ops.pop();if(top.t==='(')throw Error('paren');out.push(top);}
+      const stck=[];
+      for(const tk of out){
+        if(tk.t==='n'){stck.push(tk.v);continue;}
+        if(tk.t==='f'){const a=stck.pop();stck.push(F[tk.v](a));continue;}
+        if(tk.v==='!'){const a=stck.pop();stck.push(fact(a));continue;}
+        const b=stck.pop(),a=stck.pop();
+        stck.push(tk.v==='+'?a+b:tk.v==='-'?a-b:tk.v==='*'?a*b:tk.v==='/'?a/b:tk.v==='%'?a%b:Math.pow(a,b));
+      }
+      const r=stck.pop();
+      return (typeof r==='number'&&isFinite(r))?Math.round(r*1e10)/1e10:null;
+    }catch(_){return null;}
+  },
+  calcEquals(){ const d=document.getElementById('calc-display'); if(!d)return; const r=this.calcEval(d.value); if(r==null){d.value='Error';this.calcState.display='';return;} d.value=String(r); this.calcState.display=d.value; this.calcState.ans=r; const info=document.getElementById('cbt-calculator'); if(info)this._renderCalculatorHTML(info); const nd=document.getElementById('calc-display'); if(nd)nd.value=String(r); },
+  calcMemoryClear(){ this.calcState.memory=0; },
+  /* V10.6 (#2) ROOT-CAUSE FIX: insertMathSymbol read document.activeElement —
+     but CLICKING the keyboard button steals focus from the answer box, so
+     activeElement was the BUTTON and nothing was ever inserted. The engine
+     now remembers the last focused INPUT/TEXTAREA on the page (focusin
+     tracker) and keyboard buttons use mousedown+preventDefault so focus
+     never leaves the answer field in the first place. */
+  _lastAnswerField:null,
+  _trackAnswerFocus(){
+    if(this._focusTrackerOn)return; this._focusTrackerOn=true;
+    document.addEventListener('focusin',(e)=>{
+      const t=e.target;
+      if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA')&&!t.readOnly&&t.id!=='calc-display'&&!t.closest('#cbt-math-keyboard')&&!t.closest('#cbt-calculator'))CBT._lastAnswerField=t;
+    });
+  },
+  toggleMathKeyboard(){
+    try{
+      const ed=(typeof Exam!=='undefined'&&Exam.data)?Exam.data:null;
+      if(ed && ed.enable_math_keyboard===false){ if(typeof toast==='function') toast('Math keyboard is disabled for this exam (tutor setting).', 'info', 4000); return; }
+      if(ed && ed.anti_cheat_config && ed.anti_cheat_config.math_keyboard===false){ if(typeof toast==='function') toast('Math keyboard is disabled for this exam.', 'info', 4000); return; }
+    }catch(_){}
+    const page = (location.pathname.split('/').pop() || '').replace('.html','');
+    if (!['cbt-exam','cbt_exam','cbt-multi','cbt_multi','cbt'].includes(page)) {
+      if (typeof toast === 'function') toast('Math keyboard is only available during CBT exams.', 'info', 4000);
+      return;
+    }
+    const existing=document.getElementById('cbt-math-keyboard'); if(existing){existing.remove();return;}
+    this._trackAnswerFocus();
+    const kb=document.createElement('div'); kb.id='cbt-math-keyboard';
+    kb.style.cssText='position:fixed;bottom:160px;right:20px;background:white;border:2px solid #e2e8f0;border-radius:16px;padding:14px;box-shadow:0 20px 50px rgba(0,0,0,.15);z-index:10000;max-width:380px;max-height:60vh;overflow:auto';
+    /* V10.6 (#2): expanded symbol set — operators, comparisons, powers/roots,
+       fractions, Greek letters, set/logic, arrows, geometry, chemistry. */
+    const groups=[
+      ['Operators',['+','−','×','÷','±','=','≠','≈','<','>','≤','≥','∝','%','‰']],
+      ['Powers & roots',['²','³','⁴','ⁿ','^','√','∛','x²','x³','xⁿ','⁰','¹','⁻¹']],
+      ['Fractions',['½','⅓','¼','⅔','¾','⅕','⅛','/','⁄']],
+      ['Greek',['α','β','γ','δ','Δ','θ','λ','μ','π','ρ','σ','Σ','τ','φ','ω','Ω']],
+      ['Algebra & calculus',['ƒ','∫','∂','∞','∑','∏','!','|x|','→','⇒','⇌','∴','∵']],
+      ['Set & logic',['∈','∉','⊂','⊆','∪','∩','∅','∧','∨','¬']],
+      ['Geometry',['°','∠','⊥','∥','≅','~','△','□','⊙']],
+      ['Science',['·','⁺','⁻','₀','₁','₂','₃','₄','ₓ','℃','℉','Å','µ']],
+      ['Functions',['sin','cos','tan','log','ln','exp','lim','f(x)','√(',')²','mod']],
+      ['Vectors & more',['→','←','↑','↓','↔','⇌','⇒','⇔','∇','∮','∝','∦','‖','∗','⊕','⊗']],
+      ['Statistics',['x̄','σ','σ²','μ','Σx','n!','ⁿCᵣ','ⁿPᵣ','P(A)','χ²','±']]
+    ];
+    kb.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><strong>⌨️ Math Keyboard</strong><button onclick="document.getElementById(\'cbt-math-keyboard\').remove()" style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;width:28px;height:28px;cursor:pointer">×</button></div>'+
+      '<p style="font-size:12px;color:#64748b;margin:6px 0">Tap inside an answer box, then tap symbols — they insert at the cursor.</p>'+
+      groups.map(g=>'<div style="font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#94a3b8;margin:8px 0 3px">'+g[0]+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+g[1].map(s=>'<button data-sym="'+s.replace(/"/g,'&quot;')+'" style="min-width:34px;height:34px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:15px;cursor:pointer">'+s+'</button>').join('')+'</div>').join('');
+    /* mousedown + preventDefault = the answer field NEVER loses focus. */
+    kb.addEventListener('mousedown',(e)=>{const b=e.target.closest('[data-sym]');if(b){e.preventDefault();CBT.insertMathSymbol(b.getAttribute('data-sym'));}});
+    document.body.appendChild(kb);
+  },
+  insertMathSymbol(sym){
+    if(sym==='x²')sym='²';else if(sym==='x³')sym='³';else if(sym==='xⁿ')sym='ⁿ';else if(sym==='|x|')sym='| |';
+    let a=document.activeElement;
+    if(!(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&!a.readOnly&&a.id!=='calc-display'))a=this._lastAnswerField;
+    if(a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA')&&document.contains(a)&&!a.readOnly){
+      const st=(a.selectionStart!=null?a.selectionStart:a.value.length), en=(a.selectionEnd!=null?a.selectionEnd:st);
+      a.value=a.value.slice(0,st)+sym+a.value.slice(en);
+      try{a.setSelectionRange(st+sym.length,st+sym.length);}catch(_){}
+      a.focus();
+      a.dispatchEvent(new Event('input',{bubbles:true}));
+      a.dispatchEvent(new Event('change',{bubbles:true}));
+    } else if(typeof toast==='function') toast('Tap inside an answer field first, then tap a symbol.','info');
+  }
+};
+
+
+window.CBTUI = window.CBTUI || {
+  async refresh(){ const box=document.getElementById('cbt-list'); if(!box) return; const res=await CBT.listExams(); if(res.error){box.innerHTML='<div class="card">Could not load exams: '+esc(res.error.message)+'</div>';return;} const data=res.data||[]; box.innerHTML=data.length?data.map(e=>'<div class="card"><h3>'+esc(e.title||'Untitled')+'</h3><p>'+esc(e.subject||'')+' · '+esc(e.class||'')+' · Code: <b>'+esc(e.code||'')+'</b></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-outline" onclick="CBTUI.open(\''+e.code+'\')">Open exam link</button><button class="btn btn-sm btn-outline" onclick="CRUD.renderList(\'cbt\')">Manage in table</button></div></div>').join(''):'<div class="card">No CBT exams yet. Click + Add new or use the CBT manager form to create one.</div>'; },
+  open(code){ location.href='cbt-exam.html?code='+encodeURIComponent(code||''); },
+  newExam(){ if(window.CRUD) CRUD.openForm('cbt'); },
+  downloadTemplate(){ const csv='question,type,a,b,c,d,answer,explanation,mark,difficulty,topic,tolerance,section\nWhat is 2+2?,mcq,3,4,5,6,4,2+2 equals 4,1,easy,Arithmetic,\n'; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='school-connect-cbt-template.csv'; a.click(); }
+};
+
+document.addEventListener('DOMContentLoaded' , function(){ CBT.init((typeof sb !== 'undefined' ? sb : (window.sb || null))); setTimeout(function(){ if(window.CBTUI&&CBTUI.refresh) CBTUI.refresh(); },300); });
+window.CBT = CBT;

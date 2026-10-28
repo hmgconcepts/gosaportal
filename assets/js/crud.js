@@ -1,0 +1,2896 @@
+/* ====================================================================
+   crud.js — School Connect generic CRUD engine
+   --------------------------------------------------------------------
+   Turns every module page into a REAL working list + add/edit/delete
+   screen backed by Supabase. Replaces the old placeholder
+   "Form will be generated for ..." behaviour. 100% free, no AI.
+
+   SCHEMA[moduleId] = { table, title, cols:[{key,label,type,options?,required?}] }
+   - type: text | textarea | number | date | datetime | select | checkbox | email | tel
+   ==================================================================== */
+const CRUD = {
+  sb: null,
+  WRITE_RULES: {
+    // Admin/Super Admin is always full read/write in canWrite(). These rules define
+    // non-admin write capability only; read access is controlled by app.js + RLS.
+    students:[],
+    staff:[], parents:[], parent_child:[],
+    classes:[], subjects:[], attendance:['staff','teacher'],
+    results:['staff','teacher'], academic_records:['staff','teacher'], report_cards:['staff','teacher'],
+    cbt:['staff','teacher'], cbt_prompts:['staff','teacher'], assignments:['staff','teacher'],
+    timetable:[], timetable_generator:[], exam_timetable:[], sow:['staff','teacher'],
+    lesson_plans:['staff','teacher'], announcements:[], events:[],
+    gallery:[], library:[], digital_library:['staff','teacher'],
+    eresources:['staff','teacher'], directory:[], broadcast:[],
+    complaints:['staff','teacher','parent','student'], inbox:['staff','teacher','parent','student'], /* V6.3 #14: students can also write in-app messages */
+    messages:['staff','teacher','parent','student'], leave:['staff','teacher'], visitors:['staff','teacher'],
+    hostel:[], transport:[], certificates:[],
+    behaviour:['staff','teacher'], conduct:['staff','teacher'], health:['staff','teacher'],
+    support_plans:['staff','teacher'], diary:['staff','teacher'], checkin:['staff','teacher'],
+    rubrics:['staff','teacher'], counselling:['staff','teacher'], substitutions:[], /* V6.3 #11: staff read-only; admin approves/creates cover */
+    helpdesk:['staff','teacher','parent','student'], book_request:['staff','teacher','student'],
+    // Admin-only write modules
+    academic_setup:[], approvals:[], admin_data:[], analytics:[], finance:[], hr:[], payroll:[],
+    staff_loans:[], staff_bonus:[], appraisals:[], inventory:[], compliance:[], activity_log:[],
+    storage:[], settings:[], promotion:[], alumni:[], financial_aid:[], donations:[], payments_online:[],
+    admissions:[], admission_links:[], exam_registrations:['staff','teacher'], departments:[], front_desk:[], document_builder:[], fleet_tracking:[], facility_booking:[],
+    menu:[], cafeteria:[], idcards:[], flyer:[], school_calendar:[], lost_found:[], parent_meeting:[],
+    /* V6.3 #10: every staff/teacher has read/write on domain traits & report comments
+       (RLS still keeps each teacher to rows they authored; admin overrides). */
+    affective_traits:['staff','teacher'], psychomotor_traits:['staff','teacher'], report_comments:['staff','teacher'],
+    /* V7.0 #1: fees & payments are READ-ONLY for ordinary staff/teachers.
+       Admin tier (incl. BURSAR, principal, head teacher, proprietor) keeps full
+       read/write — enforced here AND by the fee RLS policies. */
+    fees:[], fee_payments:[]
+  },
+  init(supabaseClient) { this.sb = supabaseClient || (typeof sb !== 'undefined' ? sb : null); },
+
+  /* Field schema per module. Only columns a human edits are listed; the DB
+     fills ids/timestamps/generated columns automatically. */
+  SCHEMA: {
+    students: { table:'students', title:'Student', cols:[
+      {key:'full_name',label:'Full name',type:'text',required:true},
+      {key:'user_id',label:'Student login account (optional)',type:'ref',refTable:'profiles',refValue:'full_name',refExtra:['email'],refStore:'id',refFilter:{role:'student'},searchable:true,help:"Link this student record to the student account so My Profile/My Results work."},
+      {key:'admission_no',label:'Admission No',type:'text',readonly:true,help:'AUTO-GENERATED on save — leave blank',placeholder:'(auto)'},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'arm',label:'Arm',type:'text'},
+      {key:'gender',label:'Gender',type:'select',options:['male','female']},
+      {key:'date_of_birth',label:'Date of birth',type:'date'},
+      {key:'admission_year',label:'Admission year (actual year the student joined the school)',type:'number',help:'V11.7: printed on the lifetime ID card. For pre-existing students this is the year they REALLY joined — often earlier than the year in the auto admission number. Leave blank if unknown (the card then omits it).'},
+      {key:'guardian_name',label:'Guardian name',type:'text'},
+      {key:'guardian_phone',label:'Guardian phone',type:'tel'},
+      {key:'guardian_email',label:'Guardian email',type:'email'},
+      {key:'photo_url',label:'Student photo (Google Drive link)',type:'text',help:'V12.3: paste a Drive share link — no upload (saves storage). Shows on the lifetime ID card on EVERY portal; the student can also set it themselves on My Profile (both entry points stay in sync automatically).'},
+      {key:'address',label:'Address',type:'textarea'},
+      {key:'campus',label:'Campus',type:'text'},
+      {key:'status',label:'Status',type:'select',options:['active','inactive','graduated']}
+    ]},
+    staff: { table:'staff', title:'Staff', cols:[
+      {key:'full_name',label:'Full name',type:'text',required:true},
+      {key:'user_id',label:'Staff/teacher login account (optional)',type:'ref',refTable:'profiles',refValue:'full_name',refExtra:['email','role'],refStore:'id',searchable:true,help:'Link this staff record to the correct staff or teacher login. This link is required for the teacher profile signature to appear on assigned class report cards.'},
+      {key:'staff_no',label:'Staff No',type:'text',readonly:true,help:'AUTO-GENERATED on save — leave blank',placeholder:'(auto)'},
+      {key:'email',label:'Email',type:'email'},
+      {key:'phone',label:'Phone',type:'tel'},
+      {key:'staff_type',label:'Staff type',type:'select',options:['teaching','non-teaching']},
+      {key:'role',label:'Role / Designation',type:'text',help:'e.g. Class teacher, Bursar, Registrar'},
+      {key:'department',label:'Department',type:'ref',refTable:'departments',refValue:'name'},
+      {key:'subject_taught',label:'Subject(s) taught',type:'ref',refTable:'subjects',refValue:'name',refStore:'value',help:'Leave blank for non-teaching staff'},
+      {key:'qualification',label:'Highest qualification',type:'select',options:['SSCE','OND','HND','NCE','B.Sc','B.Ed','B.A','PGDE','M.Sc','M.Ed','M.A','Ph.D','Other']},
+      {key:'gender',label:'Gender',type:'select',options:['male','female']},
+      {key:'religion',label:'Religion',type:'select',options:['Christianity','Islam','Traditional','Other']},
+      {key:'marital_status',label:'Marital status',type:'select',options:['single','married','divorced','widowed']},
+      {key:'dob_day',label:'Birth day',type:'select',options:['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31'],help:'For privacy, staff DOB stores day & month only (no year)'},
+      {key:'dob_month',label:'Birth month',type:'select',options:['January','February','March','April','May','June','July','August','September','October','November','December']},
+      {key:'address',label:'Address',type:'textarea'},
+      {key:'photo_url',label:'Photo (Google Drive / link)',type:'text',help:'Paste a Drive link — no upload (saves storage)'},
+      {key:'part_time',label:'Part-time',type:'checkbox'},
+      {key:'leave_balance',label:'Leave balance',type:'number'},
+      {key:'status',label:'Status',type:'select',options:['active','inactive']}
+    ]},
+    classes: { table:'classes', title:'Class', cols:[
+      {key:'name',label:'Class name',type:'text',required:true},
+      {key:'arm',label:'Arm',type:'text'},
+      {key:'level',label:'Level',type:'select',options:['Pre-Nursery','Nursery','Primary','JSS','SSS','Other']},
+      {key:'class_teacher',label:'Class teacher (pick from staff)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',refFilter:{staff_type:'teaching'}},
+      {key:'capacity',label:'Capacity',type:'number'},
+      {key:'next_term_fees',label:'Next term fee bill amount',type:'number'},
+      {key:'next_term_fees_currency',label:'Currency',type:'select',options:['₦', '$', '£', '€']},
+      {key:'next_term_fees_note',label:'Next term fees payment note',type:'text'}
+    ]},
+    subjects: { table:'subjects', title:'Subject', cols:[
+      {key:'name',label:'Subject',type:'text',required:true},
+      {key:'code',label:'Code',type:'text'},
+      {key:'department',label:'Department',type:'ref',refTable:'departments',refValue:'name'},
+      {key:'level',label:'Level',type:'select',options:['Nursery','Primary','JSS','SSS','All']},
+      {key:'teacher',label:'Subject teacher (pick from staff)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',refFilter:{staff_type:'teaching'},help:'Maps this subject to a teacher'},
+      /* V9.9 (#4): map the subject to the CLASSES taking it — powers the
+         Auto-Timetable wizard's wrong-class alerts and the exam auto-spread. */
+      {key:'classes',label:'Classes taking this subject',type:'multiref',refTable:'classes',refValue:'name',help:'Tick every class that takes this subject. The Auto-Timetable wizard warns when a class outside this list is ticked.'}
+    ]},
+    attendance: { table:'attendance', title:'Attendance', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,autofill:{student_name:'full_name',class:'class'}},
+      {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'date',label:'Date',type:'date',required:true},
+      {key:'status',label:'Status',type:'select',options:['present','absent','late','excused']},
+      {key:'time_in',label:'Time in',type:'time'}
+    ]},
+    results: { table:'results', title:'Result / Subject Score Sheet Row', cols:[
+      {key:'student_id',label:'Student (pick from registered list)',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,autofill:{student_name:'full_name',class:'class'}},
+      {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value',required:true},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'ca1',label:'CA1',type:'number'},{key:'ca2',label:'CA2',type:'number'},
+      {key:'ca3',label:'CA3',type:'number'},{key:'exam',label:'Exam',type:'number'},
+      {key:'grade',label:'Grade',type:'text',help:'auto-suggested from total'},{key:'remark',label:'Remark',type:'text'}
+    ]},
+    exam_timetable: { table:'exam_timetable', title:'Exam paper', cols:[
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
+      {key:'exam_date',label:'Date',type:'date'},
+      {key:'start_time',label:'Start',type:'text'},
+      {key:'end_time',label:'End',type:'text'},
+      {key:'venue',label:'Venue',type:'text'},
+      {key:'invigilator',label:'Invigilator',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value'},
+      {key:'paper',label:'Paper',type:'text'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'}
+    ]},
+    timetable: { table:'timetable', title:'Timetable slot', cols:[
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'day',label:'Day',type:'select',options:['Monday','Tuesday','Wednesday','Thursday','Friday']},
+      {key:'period',label:'Period',type:'text'},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
+      {key:'teacher',label:'Teacher',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value'},
+      {key:'room',label:'Room',type:'text'},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'},{key:'term',label:'Term',type:'lookup',lookupKind:'term'}
+    ]},
+    sow: { table:'scheme_of_work', title:'Scheme of Work', help:'V10.1: two-step verification — the TEACHER confirms a topic was taught, then the ADMIN affirms it (✔✔). Unaffirmed confirmations stay visibly pending.', cols:[
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'week',label:'Week',type:'number'},{key:'topic',label:'Topic',type:'text',required:true},
+      {key:'status',label:'Status',type:'select',options:['pending','covered','uncovered']},
+      {key:'confirmed',label:'Taught this week (teacher confirms)',type:'checkbox'},
+      {key:'admin_affirmed',label:'Admin affirmation (✔✔ verified taught)',type:'checkbox',adminOnly:true,help:'Only the admin tier sees/ticks this — affirms the teacher\'s confirmation after checking (diary, students, spot check).'},
+      {key:'teacher',label:'Teacher',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value'}
+    ]},
+    assignments: { table:'assignments', title:'Assignment', cols:[
+      {key:'title',label:'Title',type:'text',required:true,help:'Assignment title — e.g., Homework 1: Algebra, Essay: My Holiday. For CBT assignments, auto-filled from CBT exam title.'},
+      {key:'description',label:'Description',type:'textarea',help:'Brief task description for students. For CBT assignments, auto-filled with purpose and instructions.'},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name',required:true},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value',required:true},
+      {key:'due_date',label:'Due date',type:'date',required:true},
+      {key:'drive_link',label:'Drive link / CBT link',type:'text',help:'For physical assignments: paste Google Drive link to resources (optional). For CBT assignments: auto-filled as ./cbt-exam.html?code=CODE — students click to take it. Auto-managed for CBT.'},
+      {key:'is_cbt',label:'CBT Assignment? (auto-managed)',type:'checkbox',adminOnly:true,readonly:true,form:false,list:true,help:'V12.8-12.9: auto-ticked when mirrored from CBT assignment exam. Clearly differentiates 🟢 CBT assignments (multiple per term, cumulative) from 🔵 Mid-term CAs and 🔴 Terminal exams. Do not tick manually — set via CBT page. Hidden from Add new form because CBT assignments auto-fill from CBT page.'},
+      {key:'source',label:'Source (auto-managed)',type:'select',options:['manual','cbt_assignment','cbt_mirror'],adminOnly:true,readonly:true,form:false,list:false,help:'V12.9: manual=physical/paper, cbt_assignment=auto-mirrored from CBT. Auto-filled, not for manual editing. Hidden from Add new — not needed, auto-managed.'},
+      {key:'cbt_exam_id',label:'Linked CBT Exam ID (auto-managed)',type:'text',adminOnly:true,readonly:true,form:false,list:false,help:'V12.9: auto-filled with cbt_exams.id when is_cbt. Powers auto-fill of scores when Score class clicked. Not redundant — enables multiple CBT assignments per term to accumulate separately. Hidden from Add new form.'}
+    ]},
+    library: { table:'library', title:'Book', cols:[
+      {key:'title',label:'Title',type:'text',required:true},{key:'author',label:'Author',type:'text'},
+      {key:'isbn',label:'ISBN',type:'text'},{key:'category',label:'Category',type:'text'},
+      {key:'copies',label:'Copies',type:'number'},{key:'lent',label:'Lent',type:'number'},
+      {key:'drive_link',label:'Drive link',type:'text'}
+    ]},
+    conduct: { table:'conduct', title:'Conduct record', cols:[
+      {key:'student_name',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class'],refStore:'value',groupBy:'class',searchable:true},
+      {key:'type',label:'Type',type:'select',options:['merit','demerit','incident']},
+      {key:'description',label:'Description',type:'textarea'},{key:'reporter',label:'Reporter',type:'text'},
+      {key:'date',label:'Date',type:'date'}
+    ]},
+    health: { table:'health', title:'Health record', cols:[
+      {key:'student_name',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class'],refStore:'value',groupBy:'class',searchable:true},
+      {key:'complaint',label:'Complaint',type:'text'},
+      {key:'treatment',label:'Treatment',type:'textarea'},{key:'date',label:'Date',type:'date'},
+      {key:'recorded_by',label:'Recorded by',type:'text'}
+    ]},
+    promotion: { table:'promotions', title:'Promotion', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,autofill:{student_name:'full_name',from_class:'class',department:'department'}},
+      {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
+      {key:'from_class',label:'From class',type:'text'},
+      {key:'to_class',label:'To class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'department',label:'Department (auto)',type:'text',help:'V7.7: auto-copied from the student; filter the table by it'},
+      {key:'average',label:'Term average %',type:'number',help:'auto-filled by Auto-promote'},
+      {key:'action',label:'Action',type:'select',options:['promote','graduate','repeat','pending','delete']},
+      {key:'status',label:'Status',type:'select',options:['draft','approved','applied']},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'},{key:'term',label:'Term',type:'lookup',lookupKind:'term'}
+    ]},
+    digital_library: { table:'digital_library', title:'Digital Book / Reading', cols:[
+      {key:'title',label:'Book / Resource title',type:'text',required:true},
+      {key:'author',label:'Author',type:'text'},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
+      {key:'class',label:'Assigned class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'read_link',label:'Read link (Google Drive / web)',type:'text',required:true,help:'Paste a Drive/web link — no upload (saves storage)'},
+      {key:'teacher',label:'Set by (teacher)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',refFilter:{staff_type:'teaching'}},
+      {key:'instructions',label:'Reading instructions',type:'textarea'},
+      {key:'has_quiz',label:'Has comprehension questions',type:'checkbox'},
+      {key:'max_score',label:'Max score (counts to grade)',type:'number',help:'e.g. 10 — added to results as CA'},
+      {key:'due_date',label:'Due date',type:'date'}
+    ]},
+    fees: { table:'fee_payments', title:'Fee payment', help:'V9.4: pick the student and the SYSTEM fills the total due (class fee structure + any previous-term arrears) and computes the balance live as you type the amount paid — no manual maths, no typing errors.', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,required:true,autofill:{student_name:'full_name'}},
+      {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
+      {key:'fee_total',label:'Total due (auto — class fee structure + arrears)',type:'number',readonly:true,help:'Pulled automatically when the student is picked: current-term bill from the Class Fee Structure MINUS what is already paid this term PLUS previous-term arrears (including any manually-entered opening arrears). Admin can still adjust after unlock (double-click).'},
+      {key:'opening_arrears',label:'Opening arrears — debt from BEFORE School Connect (optional)',type:'number',computeOnly:true,help:'V10.7: for schools that adopted School Connect mid-session. Enter the student\'s outstanding balance from previous terms that were never captured here. Saved ON THE STUDENT RECORD (not this payment) and automatically added to every future total-due, dashboard and receipt until cleared. Enter 0 to clear it.'},
+      {key:'opening_arrears_note',label:'Opening arrears note (e.g. "2nd Term 2025/2026 balance")',type:'text',computeOnly:true,help:'Shown to the family in the fee breakdown so they know exactly what the old debt covers.'},
+      {key:'amount_paid',label:'Amount paid now',type:'number',required:true},
+      {key:'balance',label:'Remaining balance (computed)',type:'number',readonly:true,help:'Always total due − amount paid. Computed live — never typed.'},
+      {key:'method',label:'Method',type:'select',options:['cash','transfer','pos','online']},
+      {key:'reference',label:'Reference',type:'text'},{key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'}
+    ]},
+    payments_online: { table:'payment_intents', title:'Online Fee Payment', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,required:true},
+      {key:'amount',label:'Amount',type:'number',required:true},
+      {key:'provider',label:'Provider',type:'select',options:['paystack','flutterwave','bank_transfer']},
+      {key:'reference',label:'Reference',type:'text'},{key:'checkout_url',label:'Checkout URL',type:'text'},{key:'status',label:'Status',type:'select',options:['pending','paid','failed','cancelled']}
+    ]},
+    finance: { table:'finance_entries', title:'Finance entry', cols:[
+      {key:'type',label:'Type',type:'select',options:['income','expense']},
+      {key:'category',label:'Category',type:'text'},{key:'amount',label:'Amount',type:'number',required:true},
+      {key:'description',label:'Description',type:'textarea'},{key:'date',label:'Date',type:'date'}
+    ]},
+    leave: { table:'leave_requests', title:'Leave request', help:'Staff submit leave requests (they start as PENDING). Only an administrator can approve or reject — the database enforces this and stamps who decided and when.', cols:[
+      {key:'type',label:'Type',type:'select',options:['sick','casual','earned','study','maternity']},
+      {key:'start_date',label:'Start',type:'date'},{key:'end_date',label:'End',type:'date'},
+      {key:'days',label:'Days',type:'number'},{key:'reason',label:'Reason',type:'textarea'},
+      {key:'status',label:'Status (admin decides)',type:'select',options:['pending','approved','rejected'],adminOnly:true,help:'Staff requests are always submitted as pending; only admin can change this.'}
+    ]},
+    visitors: { table:'visitors', title:'Visitor', cols:[
+      {key:'full_name',label:'Name',type:'text',required:true},{key:'phone',label:'Phone',type:'tel'},
+      {key:'purpose',label:'Purpose',type:'text'},{key:'host',label:'Host',type:'text'},{key:'badge_no',label:'Badge No',type:'text'}
+    ]},
+    transport: { table:'transport', title:'Transport route', cols:[
+      {key:'route_name',label:'Route',type:'text',required:true},{key:'driver',label:'Driver',type:'text'},
+      {key:'vehicle_no',label:'Vehicle No',type:'text'},{key:'capacity',label:'Capacity',type:'number'}
+    ]},
+    announcements: { table:'announcements', title:'Announcement', cols:[
+      {key:'title',label:'Title',type:'text',required:true},{key:'body',label:'Body',type:'textarea'},
+      {key:'priority',label:'Priority',type:'select',options:['normal','high','urgent']},
+      {key:'pinned',label:'Pinned',type:'checkbox'},
+      {key:'audience',label:'Audience',type:'lookup',lookupKind:'audience'}
+    ]},
+    events: { table:'events', title:'Event', cols:[
+      {key:'title',label:'Title',type:'text',required:true},{key:'description',label:'Description',type:'textarea'},
+      {key:'date',label:'Date',type:'date'},{key:'venue',label:'Venue',type:'text'},{key:'organiser',label:'Organiser',type:'text'}
+    ]},
+    complaints: { table:'complaints', title:'Complaint / Grievance', help:'Anyone (parent, student, staff) can lodge a complaint. It is routed to the admin team, tracked through statuses and closed with a resolution note. Attach evidence with a Drive link.', cols:[
+      {key:'type',label:'Category',type:'select',options:['academic','welfare','bullying','fees/billing','facility','staff conduct','transport','other']},
+      {key:'subject',label:'Subject (short summary)',type:'text',plain:true,required:true},
+      {key:'body',label:'Full details — what happened, when, who was involved',type:'textarea',required:true},
+      {key:'attachment_link',label:'Evidence link (photo/doc on Google Drive — optional)',type:'text',help:'Paste a Drive/web link. No upload needed.'},
+      {key:'urgency',label:'Urgency',type:'select',options:['low','normal','high','critical']},
+      {key:'status',label:'Status (admin decides)',type:'select',options:['submitted','reviewing','in_progress','resolved','rejected'],adminOnly:true,help:'Complaints are always submitted as "submitted"; only admin moves the status.'},
+      {key:'assigned_to',label:'Assigned to (admin only)',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',adminOnly:true},
+      {key:'resolution',label:'Resolution note (admin fills when closing)',type:'textarea',adminOnly:true}
+    ]},
+    gallery: { table:'gallery', title:'Gallery item', cols:[
+      {key:'album',label:'Album',type:'text'},{key:'caption',label:'Caption',type:'text'},
+      {key:'media_url',label:'Media URL',type:'text',required:true},
+      {key:'media_type',label:'Type',type:'select',options:['image','video','youtube']}
+    ]},
+    eresources: { table:'eresources', title:'E-Resource', cols:[
+      {key:'title',label:'Title',type:'text',required:true},{key:'description',label:'Description',type:'textarea'},
+      {key:'subject',label:'Subject',type:'text'},{key:'class',label:'Class',type:'text'},
+      {key:'term',label:'Term',type:'text'},{key:'drive_link',label:'Drive link',type:'text'}
+    ]},
+    birthdays: { table:'birthdays', title:'Birthday', help:'Track birthdays for students, staff AND parents. Change the Type dropdown to Student/Staff/Parent, then pick the person from the correct list or type their name manually.', cols:[
+      {key:'type',label:'Type (choose first — changes the person picker)',type:'select',options:['student','staff','parent'],required:true},
+      {key:'person_name',label:'Person name (or pick from list)',type:'text',required:true,help:'Type a name or use the picker below for auto-fill.'},
+      {key:'student_ref',label:'Pick Student (for student birthdays)',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','date_of_birth'],refStore:'value',autofill:{person_name:'full_name',date:'date_of_birth',class:'class'},help:'Only for student type — auto-fills name, DOB and class.'},
+      {key:'staff_ref',label:'Pick Staff (for staff birthdays)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['dob_day','dob_month','role'],refStore:'value',autofill:{person_name:'full_name'},help:'Only for staff type — auto-fills name.'},
+      {key:'parent_ref',label:'Pick Parent (for parent birthdays)',type:'ref',refTable:'parents',refValue:'full_name',refStore:'value',autofill:{person_name:'full_name'},help:'Only for parent type — auto-fills name.'},
+      {key:'date',label:'Date of birth',type:'date'},{key:'class',label:'Class / Role',type:'text'}
+    ]},
+    departments: { table:'departments', title:'Department', cols:[
+      {key:'name',label:'Name',type:'text',required:true},{key:'head',label:'Head',type:'text'}
+    ]},
+    /* ENTERPRISE FINAL V2 (#21): comprehensive admission application. */
+    admissions: { table:'admissions', title:'Admission Application', help:'Full applicant record: bio-data, origin, previous school, guardian, medical and documents. Extra fields are stored safely in data{} even on older databases.', cols:[
+      {key:'full_name',label:'Applicant full name (surname first)',type:'text',required:true},
+      {key:'dob',label:'Date of birth',type:'date'},
+      {key:'gender',label:'Gender',type:'select',options:['male','female']},
+      {key:'data.nationality',label:'Nationality',type:'text'},
+      {key:'data.state_origin',label:'State of origin',type:'text'},
+      {key:'data.lga',label:'LGA / County',type:'text'},
+      {key:'data.religion',label:'Religion',type:'select',options:['Christianity','Islam','Traditional','Other']},
+      {key:'data.home_address',label:'Home address',type:'textarea'},
+      {key:'data.blood_group',label:'Blood group',type:'select',options:['A+','A-','B+','B-','AB+','AB-','O+','O-','Unknown']},
+      {key:'data.genotype',label:'Genotype',type:'select',options:['AA','AS','SS','AC','Unknown']},
+      {key:'data.medical_conditions',label:'Known medical conditions / allergies',type:'textarea'},
+      {key:'data.previous_school',label:'Previous school attended',type:'text'},
+      {key:'data.previous_class',label:'Last class completed',type:'text'},
+      {key:'data.reason_for_leaving',label:'Reason for leaving previous school',type:'text'},
+      {key:'applying_for_class',label:'Class applying for',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'data.entry_term',label:'Entry term',type:'lookup',lookupKind:'term'},
+      {key:'data.entry_session',label:'Entry session',type:'lookup',lookupKind:'session'},
+      {key:'parent_name',label:'Parent / Guardian full name',type:'text'},
+      {key:'data.parent_relationship',label:'Relationship',type:'select',options:['father','mother','guardian','sponsor','other']},
+      {key:'data.parent_occupation',label:'Parent occupation',type:'text'},
+      {key:'parent_email',label:'Parent email',type:'email'},
+      {key:'parent_phone',label:'Parent phone',type:'tel'},
+      {key:'data.parent_phone_alt',label:'Alternative phone',type:'tel'},
+      {key:'data.emergency_contact',label:'Emergency contact (name & phone)',type:'text'},
+      {key:'data.photo_link',label:'Passport photo (Drive link)',type:'text',help:'Share as “anyone with the link”'},
+      {key:'data.birth_cert_link',label:'Birth certificate (Drive link)',type:'text'},
+      {key:'data.last_result_link',label:'Last result / transcript (Drive link)',type:'text'},
+      {key:'data.special_needs',label:'Special needs / support required',type:'textarea'},
+      {key:'data.how_heard',label:'How did you hear about us?',type:'select',options:['referral','social media','website','flyer','drive-past','event','other']},
+      {key:'status',label:'Status',type:'select',options:['submitted','reviewing','accepted','enrolled','rejected']}
+    ]},
+
+    /* ENTERPRISE FINAL V2 (#22): external examination registrations —
+       SSCE (WAEC/NECO), UTME/JAMB, IGCSE, Common Entrance, BECE, others. */
+    exam_registrations: { table:'module_records', generic:true, module:'exam_registrations', title:'External Exam Registration', help:'Register candidates for SSCE (WAEC/NECO), UTME/JAMB, IGCSE, Common Entrance, BECE and more.', cols:[
+      {key:'data.exam_type',label:'Examination',type:'select',options:['WAEC SSCE','NECO SSCE','UTME (JAMB)','IGCSE (Cambridge)','Common Entrance (NCEE)','BECE (Junior WAEC)','GCE','NABTEB','Other'],required:true},
+      {key:'title',label:'Candidate Full Name',type:'text',required:true},
+      {key:'data.student_id',label:'Link to student record',type:'ref',refTable:'students',refValue:'full_name',refStore:'id',searchable:true,autofill:{'data.dob':'date_of_birth','data.gender':'gender'}},
+      {key:'data.dob',label:'Date of Birth',type:'date'},
+      {key:'data.gender',label:'Gender',type:'select',options:['male','female']},
+      {key:'data.nin',label:'NIN (National Identity Number)',type:'text'},
+      {key:'data.exam_year',label:'Exam Year',type:'number',default:new Date().getFullYear()},
+      {key:'data.subjects',label:'Subjects (comma-separated)',type:'textarea',help:'e.g. English, Mathematics, Physics...'},
+      {key:'data.jamb_profile_code',label:'JAMB Profile Code / Number',type:'text'},
+      {key:'data.course_choice_1',label:'1st Choice Course (UTME)',type:'text'},
+      {key:'data.institution_1',label:'1st Choice Institution',type:'text'},
+      {key:'data.course_choice_2',label:'2nd Choice Course (UTME)',type:'text'},
+      {key:'data.institution_2',label:'2nd Choice Institution',type:'text'},
+      {key:'data.centre',label:'Exam Centre',type:'text'},
+      {key:'data.exam_no',label:'Exam/Reg Number',type:'text'},
+      {key:'amount',label:'Fee Paid',type:'number'},
+      {key:'status',label:'Status',type:'select',options:['collecting-details','paid','processing','registered','completed']}
+    ]},
+
+    /* AFFECTIVE & PSYCHOMOTOR DOMAINS (v9) */
+    affective_traits: { table:'affective_traits', title:'Affective Domain', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refStore:'id',groupBy:'class',searchable:true,required:true},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term',required:true},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session',required:true},
+      {key:'data.punctuality',label:'Punctuality',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.neatness',label:'Neatness',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.politeness',label:'Politeness',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.honesty',label:'Honesty',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.leadership',label:'Leadership',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.cooperation',label:'Cooperation',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.attentiveness',label:'Attentiveness',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']}
+    ]},
+    psychomotor_traits: { table:'psychomotor_traits', title:'Psychomotor Domain', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refStore:'id',groupBy:'class',searchable:true,required:true},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term',required:true},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session',required:true},
+      {key:'data.handwriting',label:'Handwriting',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.verbal_fluency',label:'Verbal Fluency',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.sports',label:'Games & Sports',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.crafts',label:'Crafts / Handiwork',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.drawing',label:'Drawing / Painting',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']},
+      {key:'data.music',label:'Music / Singing',type:'select',options:['5 - Excellent','4 - Very Good','3 - Good','2 - Fair','1 - Poor']}
+    ]},
+    report_comments: { table:'report_comments', title:'Report Card Comments', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refStore:'id',groupBy:'class',searchable:true,required:true},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term',required:true},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session',required:true},
+      {key:'class_teacher_comment',label:'Class Teacher\'s Comment',type:'textarea'},
+      {key:'principal_comment',label:'Principal\'s Comment',type:'textarea'},
+      {key:'next_term_begins',label:'Next Term Begins',type:'date'}
+    ]},
+    hr: { table:'payroll', title:'Salary / Payslip', alias:'payroll', help:'V10.1: bonuses + loan repayments auto-pull on staff pick.', cols:[
+      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true,autofill:{}},
+      {key:'month',label:'Month',type:'select',options:['January','February','March','April','May','June','July','August','September','October','November','December'],required:true},
+      {key:'year',label:'Year',type:'number',default:new Date().getFullYear()},
+      {key:'basic',label:'Basic salary',type:'number',required:true},
+      {key:'allowances',label:'Allowances',type:'number'},
+      {key:'bonus',label:'Bonus / Incentive',type:'number'},
+      {key:'overtime',label:'Overtime pay',type:'number'},
+      {key:'tax',label:'Tax (PAYE)',type:'number'},
+      {key:'pension',label:'Pension',type:'number'},
+      {key:'loan_deduction',label:'Loan repayment',type:'number'},
+      {key:'other_deductions',label:'Other deductions',type:'number'},
+      {key:'net_pay',label:'Net pay (computed by database)',type:'number',readonly:true,computeOnly:true,help:'Auto: basic+allowances+bonus+overtime − tax/pension/loan/other'},
+      {key:'method',label:'Payment method',type:'select',options:['bank transfer','cash','cheque','mobile money']},
+      {key:'status',label:'Status',type:'select',options:['draft','approved','paid']}
+    ]},
+    hostel: { table:'hostel_allocations', title:'Hostel allocation', cols:[
+      {key:'block',label:'Block',type:'text'},{key:'room',label:'Room',type:'text'},{key:'bed',label:'Bed',type:'text'},
+      {key:'status',label:'Status',type:'select',options:['active','vacated']}
+    ]},
+    alumni: { table:'alumni', title:'Alumnus', cols:[
+      {key:'full_name',label:'Name',type:'text',required:true},{key:'graduation_year',label:'Graduation year',type:'number'},
+      {key:'last_class',label:'Last class',type:'text'},{key:'current_occupation',label:'Occupation',type:'text'},
+      {key:'email',label:'Email',type:'email'},{key:'phone',label:'Phone',type:'tel'}
+    ]},
+    inventory: { table:'inventory', title:'Inventory item', cols:[
+      {key:'item_name',label:'Item',type:'text',required:true},{key:'asset_tag',label:'Asset tag / serial',type:'text'},{key:'category',label:'Category',type:'text'},
+      {key:'quantity',label:'Quantity',type:'number'},{key:'unit_cost',label:'Unit cost',type:'number'},{key:'location',label:'Location',type:'text'},
+      {key:'condition',label:'Condition',type:'select',options:['new','excellent','good','fair','needs repair','retired']},
+      {key:'last_audit',label:'Last audit',type:'date'},{key:'next_audit',label:'Next audit',type:'date'}
+    ]},
+    lesson_plans: { table:'lesson_plans', title:'Lesson plan', help:'V10.1 VETTING WORKFLOW: teacher drafts → submits → admin reviews with written feedback → ✅ approved or ✏️ needs-changes (teacher revises and resubmits). Feedback and reviewer stamp travel with the plan.', cols:[
+      {key:'teacher',label:'Teacher',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',searchable:true},{key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},{key:'week',label:'Week',type:'number'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'objectives',label:'Objectives',type:'textarea'},{key:'content',label:'Content',type:'textarea'},
+      {key:'resources',label:'Resources',type:'textarea'},
+      {key:'status',label:'Status',type:'select',options:['draft','submitted','approved','needs-changes']},
+      {key:'review_feedback',label:'Admin review feedback (vetting)',type:'textarea',adminOnly:true,help:'Written vetting notes for the teacher — required when returning as needs-changes.'},
+      {key:'reviewed_by',label:'Reviewed by (auto)',type:'text',readonly:true,adminOnly:true}
+    ]},
+    behaviour: { table:'behaviour_points', title:'Behaviour point', cols:[
+      {key:'student_name',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class'],refStore:'value',groupBy:'class',searchable:true},
+      {key:'points',label:'Points',type:'number'},
+      {key:'reason',label:'Reason',type:'text'},{key:'badge',label:'Badge',type:'text'}
+    ]},
+    support_plans: { table:'support_plans', title:'Support plan', cols:[
+      {key:'need_type',label:'Need type',type:'text'},{key:'intervention',label:'Intervention',type:'textarea'},
+      {key:'goal',label:'Goal',type:'text'},{key:'review_date',label:'Review date',type:'date'},
+      {key:'outcome',label:'Outcome',type:'text'},{key:'status',label:'Status',type:'select',options:['active','review','closed']}
+    ]},
+    donations: { table:'donations', title:'Donation', cols:[
+      {key:'campaign',label:'Campaign',type:'text'},{key:'donor_name',label:'Donor',type:'text'},
+      {key:'donor_email',label:'Donor email',type:'email'},{key:'amount',label:'Amount',type:'number',required:true},
+      {key:'method',label:'Method',type:'text'},{key:'note',label:'Note',type:'text'},
+      {key:'anonymous',label:'Anonymous',type:'checkbox'}
+    ]},
+    substitutions: { table:'substitutions', title:'Substitution', cols:[
+      {key:'date',label:'Date',type:'date'},{key:'absent_teacher',label:'Absent teacher',type:'text'},
+      {key:'substitute_teacher',label:'Substitute',type:'text'},{key:'class',label:'Class',type:'text'},
+      {key:'subject',label:'Subject',type:'text'},{key:'period',label:'Period',type:'text'},
+      {key:'reason',label:'Reason / handover note',type:'textarea'},
+      {key:'status',label:'Status',type:'select',options:['planned','done','cancelled']}
+    ]},
+    helpdesk: { table:'helpdesk_tickets', title:'Help-desk ticket', cols:[
+      {key:'category',label:'Category',type:'select',options:['IT / computer','network / internet','electrical','plumbing','furniture','building / maintenance','equipment','security','cleaning','admin request','other']},{key:'subject',label:'Ticket title (short summary of the issue)',type:'text',plain:true,required:true},
+      {key:'body',label:'Details',type:'textarea'},
+      {key:'priority',label:'Priority',type:'select',options:['low','normal','high','urgent']},
+      {key:'status',label:'Status',type:'select',options:['open','in_progress','resolved','closed']}
+    ]},
+    directory: { table:'profiles', title:'Person', cols:[
+      {key:'full_name',label:'Name',type:'text',required:true},
+      {key:'email',label:'Email',type:'email',readonly:true,help:'Email login address (cannot be edited)'},
+      {key:'role',label:'Role',type:'select',options:['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher','parent','student'],required:true},
+      {key:'status',label:'Status',type:'select',options:['pending','approved','suspended','rejected'],required:true},
+      {key:'phone',label:'Phone',type:'text'}
+    ]},
+    activity_log: { table:'activity_log', title:'Activity', readOnly:true, cols:[
+      {key:'created_at',label:'When',type:'text'},
+      {key:'actor_email',label:'Who',type:'text'},
+      {key:'action',label:'Action',type:'text'},
+      {key:'entity',label:'Module/Table',type:'text'},
+      {key:'entity_id',label:'Record',type:'text'}
+    ]},
+    cbt: { table:'cbt_exams', title:'CBT Exam / Assessment', cols:[
+      {key:'title',label:'Exam title',type:'text',required:true},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value',required:true},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'assessment_type',label:'Assessment type',type:'select',options:['exam','test','assignment','project','quiz','ca','practical']},
+      {key:'is_entrance',label:'Entrance / placement assessment',type:'checkbox'},
+      {key:'pass_mark',label:'Entrance pass mark (%)',type:'number'},
+      {key:'report_column',label:'Report-card column',type:'select',options:['Project','CA1','CA2','CBT Exam','Paper Exam','Exam','Practical']},
+      {key:'max_score',label:'Max score contribution',type:'number',help:'Score to scale into report card, e.g. 20 for CBT Exam.'},
+      {key:'duration',label:'Duration (minutes)',type:'number'},
+      {key:'attempt_limit',label:'Attempt limit',type:'number'},
+      {key:'select_count',label:'Select N questions (0 = all)',type:'number'},
+      {key:'randomise',label:'Randomise questions',type:'checkbox'},
+      {key:'negative_mark',label:'Negative mark per wrong answer',type:'number'},
+      {key:'exam_mode',label:'Exam mode',type:'select',options:['open','anonymous','registered'],help:'Open: anyone with link, no login. Anonymous: candidates hide identity, results anonymized. Registered: only logged-in students of assigned class.'},
+      {key:'is_open',label:'Open for candidates',type:'checkbox'},
+      {key:'release_results',label:'Release results instantly',type:'checkbox'},
+      {key:'instructions',label:'Candidate instructions',type:'textarea'},
+      {key:'csv_data',label:'Question bank JSON',type:'textarea',help:'Use CBT page CSV import for best results. Supports 17 question types.'}
+    ]},
+    admission_links: { table:'admission_links', title:'Admission / Entrance Link', cols:[
+      {key:'title',label:'Link title',type:'text',required:true},
+      {key:'token',label:'Token / slug',type:'text',help:'Leave blank if your SQL trigger/RPC generates one.'},
+      {key:'class_applied',label:'Class applied for',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'exam_code',label:'Entrance CBT code',type:'text'},
+      {key:'active',label:'Active',type:'checkbox'},
+      {key:'expires_at',label:'Expires at',type:'datetime'},
+      {key:'notes',label:'Notes',type:'textarea'}
+    ]},
+    report_cards: { table:'report_cards', title:'Report Card', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,autofill:{student_name:'full_name',class:'class'}},
+      {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'teacher_comment',label:'Teacher comment',type:'textarea'},
+      {key:'head_comment',label:'Head comment',type:'textarea'},
+      {key:'attendance_present',label:'Attendance present',type:'number'},
+      {key:'attendance_total',label:'Attendance total',type:'number'},
+      {key:'position',label:'Position',type:'number'},
+      {key:'published',label:'Published',type:'checkbox'}
+    ]},
+    academic_records: { table:'academic_print_records', title:'Academic Record / Broadsheet', cols:[
+      {key:'record_type',label:'Record type',type:'select',options:['student_record_card','class_broadsheet','subject_broadsheet'],required:true},
+      {key:'title',label:'Title',type:'text',required:true},
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
+      {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value'},
+      {key:'term',label:'Term',type:'lookup',lookupKind:'term'},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'}
+    ]},
+    certificates: { table:'certificates', title:'Certificate', cols:[
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true},
+      {key:'type',label:'Certificate type',type:'select',options:['completion','graduation','merit','testimonial','transfer','custom']},
+      {key:'serial_no',label:'Serial No',type:'text'},
+      {key:'issued_on',label:'Issued on',type:'date'},
+      {key:'signed_by',label:'Signed by',type:'text'}
+    ]},
+    parents: { table:'parents', title:'Parent / Guardian Registry', cols:[
+      {key:'full_name',label:'Full Name',type:'text',required:true},
+      {key:'date_of_birth',label:'Date of birth (for birthday list)',type:'date'},
+      {key:'email',label:'Email Address',type:'email'},
+      {key:'phone',label:'Phone Number',type:'text'},
+      {key:'occupation',label:'Occupation',type:'text'},
+      {key:'address',label:'Home Address',type:'text'},
+      {key:'status',label:'Status',type:'select',options:['active','pending','suspended']}
+    ]},
+    parent_child: { table:'parent_child', listTable:'parent_child_view', listOrder:'parent_name', title:'Parent–Child Link', help:'Link a parent ACCOUNT to a student RECORD. One parent can be linked to many children; the same pair can only be linked once. Use the Unlink button on a row to remove a link.', listCols:[
+      {key:'parent_name',label:'Parent',type:'text'},{key:'parent_email',label:'Parent Email',type:'text'},
+      {key:'student_name',label:'Student',type:'text'},{key:'student_class',label:'Class',type:'text'},
+      {key:'relationship',label:'Relationship',type:'text'},{key:'verified',label:'Verified',type:'checkbox'}
+    ], cols:[
+      {key:'parent_id',label:'Parent account',type:'ref',refTable:'profiles',refValue:'full_name',refExtra:['email'],refStore:'id',refFilter:{role:'parent'},searchable:true,required:true},
+      {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,required:true},
+      {key:'relationship',label:'Relationship',type:'select',options:['father','mother','guardian','sponsor','other']},
+      {key:'verified',label:'Verified',type:'checkbox'}
+    ]},
+
+    /* ===== Issue 5: Staff HR / Payroll suite (salary, bonus, loans, appraisal) ===== */
+    payroll: { table:'payroll', title:'Salary / Payslip', help:'V10.1: picking the staff member AUTO-PULLS their approved bonuses and active-loan monthly repayment; net pay is computed by the database. Review and save.', cols:[
+      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true,autofill:{}},
+      {key:'month',label:'Month',type:'select',options:['January','February','March','April','May','June','July','August','September','October','November','December'],required:true},
+      {key:'year',label:'Year',type:'number',default:new Date().getFullYear()},
+      {key:'basic',label:'Basic salary',type:'number',required:true},
+      {key:'allowances',label:'Allowances',type:'number',help:'Housing, transport, etc.'},
+      {key:'bonus',label:'Bonus / Incentive',type:'number'},
+      {key:'overtime',label:'Overtime pay',type:'number'},
+      {key:'tax',label:'Tax (PAYE)',type:'number'},
+      {key:'pension',label:'Pension',type:'number'},
+      {key:'loan_deduction',label:'Loan repayment (this month)',type:'number'},
+      {key:'other_deductions',label:'Other deductions',type:'number'},
+      {key:'net_pay',label:'Net pay (auto)',type:'number',readonly:true,computeOnly:true,help:'Generated by database/payroll logic; not typed manually.'},
+      {key:'method',label:'Payment method',type:'select',options:['bank transfer','cash','cheque','mobile money']},
+      {key:'status',label:'Status',type:'select',options:['draft','approved','paid']}
+    ]},
+    staff_loans: { table:'staff_loans', title:'Staff loan / advance', cols:[
+      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true},
+      {key:'loan_type',label:'Type',type:'select',options:['salary advance','personal loan','emergency','cooperative']},
+      {key:'principal',label:'Amount borrowed',type:'number',required:true},
+      {key:'monthly_repayment',label:'Monthly repayment (EMI)',type:'number'},
+      {key:'months',label:'Repayment months',type:'number'},
+      {key:'amount_repaid',label:'Amount repaid so far',type:'number'},
+      {key:'date_taken',label:'Date taken',type:'date'},
+      {key:'status',label:'Status',type:'select',options:['active','completed','defaulted','written-off']},
+      {key:'notes',label:'Notes',type:'textarea'}
+    ]},
+    staff_bonus: { table:'staff_bonus', title:'Bonus / Allowance award', cols:[
+      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true},
+      {key:'bonus_type',label:'Type',type:'select',options:['performance','13th month','holiday','long-service','referral','other']},
+      {key:'amount',label:'Amount',type:'number',required:true},
+      {key:'reason',label:'Reason / Citation',type:'textarea'},
+      {key:'award_date',label:'Award date',type:'date'},
+      {key:'status',label:'Status',type:'select',options:['pending','approved','paid']}
+    ]},
+    appraisals: { table:'staff_appraisals', title:'Staff appraisal', cols:[
+      {key:'staff_name',label:'Staff (pick from list)',type:'ref',refTable:'staff',refValue:'full_name',refExtra:['role'],refStore:'value',searchable:true,required:true},
+      {key:'period',label:'Appraisal period',type:'text',help:'e.g. 2025/2026 Term 1'},
+      {key:'punctuality',label:'Punctuality (1-10)',type:'number'},
+      {key:'teaching_quality',label:'Teaching quality (1-10)',type:'number'},
+      {key:'student_results',label:'Student results (1-10)',type:'number'},
+      {key:'teamwork',label:'Teamwork (1-10)',type:'number'},
+      {key:'conduct',label:'Conduct & ethics (1-10)',type:'number'},
+      {key:'total_score',label:'Total / Grade (auto)',type:'text',help:'auto-computed average & band'},
+      {key:'recommendation',label:'Recommendation',type:'select',options:['promote','retain','train','warn','commend']},
+      {key:'comments',label:'Appraiser comments',type:'textarea'},
+      {key:'appraiser',label:'Appraised by',type:'ref',refTable:'staff',refValue:'full_name',refStore:'value',searchable:true}
+    ]},
+    school_fees: { table:'class_fee_structure', title:'Class / Department Fee Structure', help:'Define current-term and next-term bills by class, arm and department. The matching next-term bill is printed automatically on each student report card; previous balances come from fee payment records.', cols:[
+      {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name',required:true},
+      {key:'arm',label:'Arm / Stream (select from dropdown — no typing)',type:'lookup',lookupKind:'arm',help:'Pick from existing arms (A/B/C/D) — created in Academic Setup > Lookups. No manual typing — prevents typos.'},
+      {key:'department',label:'Department / Section',type:'ref',refTable:'departments',refValue:'name',refStore:'value',help:'Optional: Nursery, Primary, Junior Secondary, Science, Arts, Boarding, etc.'},
+      {key:'term',label:'Term scope',type:'select',options:['Current Term','Next Term'],default:'Current Term',required:true,help:'V10: "Current Term" = the bill students owe NOW (drives Total-due auto-fill on Fees & Payments and the dashboards). "Next Term" = the advance bill printed on report cards. New schools: just enter Current Term — Next Term is optional and can come later.'},
+      {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'tuition',label:'Tuition fee',type:'number'},
+      {key:'exam_fee',label:'Exam / assessment fee',type:'number'},
+      {key:'development',label:'Development / PTA levy',type:'number'},
+      {key:'transport',label:'Transport fee',type:'number'},
+      {key:'boarding',label:'Boarding / hostel fee',type:'number'},
+      {key:'other_fee',label:'Other compulsory fee',type:'number'},
+      {key:'discount',label:'Discount amount',type:'number'},
+      {key:'total',label:'Total bill (COMPUTED automatically)',type:'number',readonly:true,help:'V9.4: the system sums tuition + exam + development + transport + boarding + other − discount, live as you type AND again in the database — manual maths errors are impossible. Schools that bill one lump sum: leave components at 0 and double-click to type the grand total.'},
+      {key:'due_date',label:'Due date',type:'date'},
+      {key:'next_term_begins',label:'Next term begins',type:'date'},
+      {key:'note',label:'Payment note / bank instruction',type:'textarea'}
+    ]},
+    school_products: { table:'school_products', title:'School Product', cols:[
+      {key:'name',label:'Product name',type:'text',required:true},
+      {key:'category',label:'Category',type:'select',options:['Uniform','Textbook','Exercise Book','Stationery','Bag','Other'],required:true},
+      {key:'price',label:'Price',type:'number'},
+      {key:'size_option',label:'Size / Options (e.g. M, L, XL or 40-leaves)',type:'text'},
+      {key:'stock_note',label:'Stock status / Note',type:'text'}
+    ]},
+    status_manager: { table:'role_status_log', title:'Role & Status Manager', help:'Clear, unambiguous workflow: pick an existing platform user from dropdown (no typing), system auto-fills previous role and email. Assign new role, choose action, save. Every change is audited (who changed, when, why). First-time admin guide: 1) Select person. 2) Review auto-filled previous role. 3) Pick new role & action. 4) Add reason. 5) Save — profile updates instantly + activity log recorded.', cols:[
+      {key:'person_id',label:'Select Person (from existing platform users — dropdown)',type:'ref',refTable:'profiles',refValue:'full_name',refExtra:['email','role','status'],refStore:'id',searchable:true,required:true,help:'Dropdown of all registered users — mandatory. Auto-fills name and previous role below — no manual typing.',autofill:{person_name:'full_name',previous_role:'role'}},
+      {key:'person_name',label:'Person full name (auto-filled from selection)',type:'text',readonly:true,help:'Auto-filled; you can manually override only if creating audit for non-user'},
+      {key:'previous_role',label:'Previous / Current role (auto-filled)',type:'text',readonly:true,help:'Auto-filled from selected profile — shows role before change'},
+      {key:'new_role',label:'New role to assign',type:'select',options:['super_admin','admin','principal','proprietor','head_teacher','staff','teacher','parent','student','bursar'],required:true,help:'Choose the target role'},
+      {key:'action',label:'Action type',type:'select',options:['promote','demote','convert','suspend','reactivate','deactivate'],required:true,help:'Why changing? Promote, convert, suspend, etc.'},
+      {key:'reason',label:'Reason for change (audit)',type:'textarea',help:'Explain reason for audit trail — e.g. Appointment letter reference'},
+      {key:'changed_by',label:'Authorized by (auto)',type:'text',help:'Leave blank — auto-filled with current admin name'}
+    ]}
+  },
+
+  fid(key){ return String(key).replace(/[^a-z0-9_-]/gi,'_'); },
+  formatDate(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d)) return v; return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); },
+
+  /* ---- Generic (module_records-backed) modules: every previously "no form"
+     module (issue 8) now has a working Add/Edit/Delete screen. The shared
+     columns (title/body/status/ref_date/amount) cover most needs; extra fields
+     go into data{}. ---- */
+  GENERIC: {
+    messages:    { title:'Message',      cols:[['title','Subject','text',true],['body','Message','textarea'],['recipient_id','Recipient account (optional)','ref-profiles'],['audience','Audience','select',['private','all','staff','parent','student']],['data.to','To (name/role)','text']] },
+    inbox:       { title:'Inbox message',cols:[['title','Subject','text',true],['body','Message','textarea'],['recipient_id','Recipient account (optional)','ref-profiles'],['audience','Audience','select',['private','all','staff','parent','student']],['data.from','From','text'],['status','Status','select',['unread','read','archived']]] },
+    broadcast:   { title:'Result Broadcast',cols:[['title','Title','text',true],['body','Message','textarea'],['data.channel','Channel','select',['whatsapp','email','sms','in-app']],['data.audience','Audience','lookup','audience']] },
+    reports:     { title:'Report',       cols:[['title','Report title','text',true],['data.type','Type','text'],['body','Summary / notes','textarea'],['ref_date','Date','date']] },
+    school_calendar:{ title:'Calendar event',cols:[['title','Event','text',true],['ref_date','Date','date',true],['body','Details','textarea'],['data.category','Category','select',['holiday','exam','mid-term','term-start','term-end','event']]] },
+    lost_found:  { title:'Lost & Found item',cols:[['title','Item','text',true],['data.kind','Kind','select',['lost','found']],['body','Description','textarea'],['data.location','Location','text'],['ref_date','Date','date'],['status','Status','select',['open','claimed','returned']]] },
+    parent_meeting:{ title:'PTA Meeting',cols:[['title','Topic','text',true],['ref_date','Date','date',true],['data.time','Time','time'],['data.venue','Venue','text'],['body','Agenda / minutes','textarea']] },
+    book_request:{ title:'Book request', cols:[['title','Book title','text',true],['data.student','Student','ref-students'],['status','Status','select',['requested','reserved','issued','returned']],['ref_date','Date','date']] },
+    lms:         { title:'LMS course/lesson',cols:[['title','Title','text',true],['data.subject','Subject','ref-subjects'],['data.class','Class','ref-classes'],['body','Content / description','textarea'],['data.video','Video/Drive link','text']] },
+    gamification:{ title:'Reward / badge',cols:[['title','Badge/Reward','text',true],['data.student','Student','ref-students'],['amount','Points','number'],['body','Reason','textarea']] },
+    cafeteria:   { title:'Cafeteria item',cols:[['title','Item','text',true],['amount','Price','number'],['data.category','Category','select',['breakfast','snack','lunch','drink']],['body','Notes','textarea']] },
+    financial_aid:{ title:'Scholarship/Aid',cols:[['title','Scheme','text',true],['data.student','Student','ref-students'],['amount','Amount/Waiver','number'],['status','Status','select',['applied','approved','renewed','ended']],['body','Notes','textarea']] },
+    front_desk:  { title:'Front-desk log',cols:[['title','Subject','text',true],['data.kind','Type','select',['call','dispatch','walk-in','inquiry']],['body','Details','textarea'],['data.contact','Contact','text'],['ref_date','Date','date']] },
+    career_counseling:{ title:'Career record',cols:[['title','Title','text',true],['data.student','Student','ref-students'],['body','Guidance / offers','textarea'],['data.university','University/Placement','text']] },
+    document_builder:{title:'Custom Document',help:'Choose a preset or enter any custom document type; select the correct institutional signatory.',cols:[['title','Document title / subject','text',true],['data.type','Document type preset','select',['hall ticket','bonafide certificate','recommendation letter','transfer letter','testimonial','invitation letter','fee clearance','admission letter','appointment letter','memorandum','certificate','custom']],['data.custom_type','Custom document type (if not listed above)','text'],['data.reference','Reference number','text'],['data.student','For student','ref-students'],['data.class','Class','ref-classes'],['data.term','Term','lookup','term'],['data.session','Session','lookup','session'],['data.recipient','Recipient / addressee','text'],['data.signatory_role','Official signatory','select',['Principal','Proprietor','Examination Officer','Head Teacher','Custom']],['data.custom_signatory_name','Custom signatory name','text'],['data.custom_signatory_title','Custom designation','text'],['body','Body — tokens [NAME] [CLASS] [TERM] [SESSION] [DATE] [REFERENCE] [SCHOOL] [PRINCIPAL] [PROPRIETOR] [EXAM_OFFICER]','textarea',true],['status','Status','select',['draft','reviewed','approved','final','issued','revoked']]] },
+    fleet_tracking:{ title:'Fleet log',cols:[['title','Vehicle/Route','text',true],['data.driver','Driver','text'],['body','Notes / location','textarea'],['ref_date','Date','date']] },
+    facility_booking:{ title:'Facility booking',cols:[['title','Facility','text',true],['ref_date','Date','date',true],['data.time','Time','time'],['data.bookedby','Booked by','text'],['status','Status','select',['requested','approved','cancelled']]] },
+    compliance:  { title:'Compliance item',cols:[['title','Item','text',true],['data.category','Category','select',['accreditation','fire drill','inspection','statutory']],['ref_date','Date','date'],['status','Status','select',['pending','passed','failed','due']],['body','Notes','textarea']] },
+    payments_online:{ title:'Online payment',cols:[['title','Reference','text',true],['data.student','Student','ref-students'],['amount','Amount','number',true],['data.provider','Provider','select',['paystack','flutterwave','bank_transfer']],['status','Status','select',['pending','paid','failed','cancelled']]],},
+    /* update v4: international-standard additions */
+    rubrics:     { title:'Grading rubric (standards-based)',cols:[['title','Skill / standard','text',true],['data.subject','Subject','ref-subjects'],['data.class','Class','ref-classes'],['data.criteria','Criteria (one per line)','textarea'],['data.scale','Scale','select',['1-4 (Beginning–Exceeding)','A-F','1-10','Pass/Merit/Distinction']],['body','Descriptor / notes','textarea']] },
+    transcripts: { title:'Transcript / academic record',cols:[['data.student','Student','ref-students'],['title','Session / year','text',true],['data.term','Term','lookup','term'],['data.gpa','GPA / Average','text'],['body','Subjects & grades (summary)','textarea'],['data.remark','Cumulative remark','text']] },
+    transfer_cert:{ title:'Transfer / leaving certificate',cols:[['data.student','Student','ref-students'],['title','Certificate No','text',true],['data.last_class','Last class','ref-classes'],['data.reason','Reason for leaving','select',['relocation','graduation','transfer','withdrawal','other']],['ref_date','Date of leaving','date'],['data.conduct','Conduct','select',['excellent','good','satisfactory','fair']],['body','Remarks','textarea']] },
+    counselling: { title:'Counselling / wellbeing session',cols:[['data.student','Student','ref-students'],['title','Topic','text',true],['data.counsellor','Counsellor','text'],['ref_date','Date','date'],['body','Notes (confidential)','textarea'],['status','Status','select',['open','ongoing','closed','referred']]] }
+  },
+
+  /* Resolve a module to a normalized definition. Generic modules are backed by
+     the shared module_records table; their compact [key,label,type,...] tuples
+     are expanded into full column objects with relational helpers. */
+  canonicalId(moduleId){
+    const map = {'academic-records':'academic_records','admin-data':'admin_data','report-cards':'report_cards','cbt-prompts':'cbt_prompts','cbt-exam':'cbt_exam','timetable-generator':'timetable_generator','student-profile':'student_profile','feature-guide':'feature_guide','verify-certificate':'verify_certificate'};
+    return map[moduleId] || String(moduleId || '').replace(/-/g,'_');
+  },
+
+  registeredField(c){c=Object.assign({},c);const k=String(c.key||'').split('.').pop();if(String(c.type||'text')!=='text')return c;if(c.plain)return c; // FIX HD-01: plain:true opts a text field out of auto ref/lookup conversion (e.g. help-desk ticket 'subject' is a title, NOT an academic subject)
+if(['class','student_class','candidate_class','last_class'].includes(k))Object.assign(c,{type:'ref',refTable:'classes',refValue:'name',refStore:'value'});else if(k==='term')Object.assign(c,{type:'lookup',lookupKind:'term'});else if(k==='session')Object.assign(c,{type:'lookup',lookupKind:'session'});else if(['subject','subject_name'].includes(k))Object.assign(c,{type:'ref',refTable:'subjects',refValue:'name',refStore:'value'});else if(k==='department')Object.assign(c,{type:'ref',refTable:'departments',refValue:'name',refStore:'value'});else if(k==='arm')Object.assign(c,{type:'lookup',lookupKind:'arm'});else if(k==='campus')Object.assign(c,{type:'lookup',lookupKind:'campus'});return c;},
+  def(moduleId){
+    const key=this.canonicalId(moduleId);if(this.SCHEMA[key]){const d=this.SCHEMA[key];return Object.assign({},d,{cols:(d.cols||[]).map(c=>this.registeredField(c))});}
+    const g = this.GENERIC[key] || this.GENERIC[moduleId];
+    if (!g) return null;
+    const cols = g.cols.map(t => {
+      const [key, label, type, extra, extra2] = t;
+      const c = { key, label, type: type || 'text' };
+      if (type === 'select') c.options = extra;
+      else if (type === 'lookup') c.lookupKind = extra;
+      else if (type === 'ref-students') { c.type='ref'; c.refTable='students'; c.refValue='full_name'; c.refStore='value'; }
+      else if (type === 'ref-classes') { c.type='ref'; c.refTable='classes'; c.refValue='name'; }
+      else if (type === 'ref-subjects') { c.type='ref'; c.refTable='subjects'; c.refValue='name'; c.refStore='value'; }
+      else if (type === 'ref-profiles') { c.type='ref'; c.refTable='profiles'; c.refValue='full_name'; c.refExtra=['email','role']; c.refStore='id'; c.searchable=true; }
+      if (extra === true || extra2 === true) c.required = true;
+      return this.registeredField(c);
+    });
+    return { table:'module_records', title:g.title, generic:true, module:(this.canonicalId(moduleId)), cols };
+  },
+
+  /* FIX v9: canWrite — use SC_PROFILE.role as fallback for async timing */
+
+  /* V7.1 #4: OWNERSHIP at the UI level. For teacher-owned academic modules,
+     a row authored by ANOTHER teacher shows a 🔒 badge instead of Edit/Delete
+     for ordinary staff (admins keep full override). RLS remains the hard gate —
+     this just stops teachers clicking buttons that would be rejected anyway. */
+  OWNER_FIELDS: { results:'teacher_id', attendance:'recorded_by', assignments:'posted_by', sow:'teacher_id',
+    scheme_of_work:'teacher_id', lesson_plans:'teacher_id', cbt:'teacher_id', cbt_exams:'teacher_id',
+    affective_traits:'teacher_id', psychomotor_traits:'teacher_id', report_comments:'teacher_id',
+    digital_library:'teacher_id', eresources:'uploaded_by', conduct:'recorded_by_id',
+    behaviour:'awarded_by', behaviour_points:'awarded_by', support_plans:'created_by', diary:'created_by', student_diary:'created_by' },
+  rowLockedForMe(moduleId, row, role, uid) {
+    try {
+      const r = String(role||'').toLowerCase();
+      if (!['staff','teacher'].includes(r)) return false;              // admins & family roles unaffected here
+      const key = this.canonicalId(moduleId);
+      const fld = this.OWNER_FIELDS[key];
+      if (!fld) return false;
+      const owner = row[fld] ?? (row.data && row.data[fld]);
+      return !!owner && !!uid && String(owner) !== String(uid);        // unowned/legacy rows stay claimable
+    } catch(_) { return false; }
+  },
+  canWrite(moduleId) {
+    // Use both App.currentRole and SC_PROFILE.role as fallbacks
+    // This ensures role is always available, even before async profile load
+    /* V8.3 #1: ADMIN CONTROL IS NEVER LOST TO A RACE. Before auth resolves,
+       App.currentRole is 'guest' — which used to make every page render
+       read-only for admins on first paint. The cached profile (same device,
+       last session) now breaks the tie, exactly like report-cards does. */
+    let role = String(
+      (window.App && App.currentRole) ||
+      (window.SC_PROFILE && SC_PROFILE.role) ||
+      document.body.dataset.currentRole ||
+      ''
+    ).toLowerCase().replace(/\s+/g,'_');
+    if (!role || role === 'guest') {
+      try { const c = JSON.parse(localStorage.getItem('sc-cached-profile') || 'null'); if (c && c.role) role = String(c.role).toLowerCase().replace(/\s+/g,'_'); } catch(_) {}
+    }
+    const key = this.canonicalId(moduleId);
+    const allow = this.WRITE_RULES[key];
+    const owners=['super_admin','superadmin','admin','administrator','owner','director','proprietor'];if(owners.includes(role)||(window.App&&App.isOwnerRole&&App.isOwnerRole(role)))return true;if(['principal','head_teacher','headteacher','bursar'].includes(role))return !!(window.App&&App.canWriteModule&&App.canWriteModule(key,role));
+    /* V12.4 ORDER FIX (pass 72): the admin's SAVED write map now takes
+       precedence over the default rules. The old order returned false on an
+       empty default rule BEFORE the map was read — so enabling Write for
+       staff in the Page Access Manager could never work for students and 54
+       other modules (and canWriteByAccess didn't even exist — see app.js).
+       An explicit admin decision in the manager is exactly that: explicit.
+       PostgreSQL RLS remains the final enforcement — a module whose policies
+       genuinely forbid staff still refuses at the database, map or no map. */
+    if (window.App && App.canWriteByAccess) { const mapped = App.canWriteByAccess(key, role); if (mapped !== null) return mapped; }
+    // No admin decision saved → the shipped defaults apply. An explicit empty rule is a hard admin-only boundary
+    // by default (V12.4: the admin's SAVED map above may open it deliberately; RLS remains the final gate).
+    if (Array.isArray(allow) && allow.length===0) return false;
+    if (!allow) return false;
+    return allow.includes(role);
+  },
+
+  /* Render the list table for a module page */
+  /* FIX v9: renderList now supports role-based filtering
+     - Students see only their own data (filtered by student_id)
+     - Parents see only their linked children's data
+     - Staff/Admin see all data (no filter)
+  */
+  // The last visible records are session-scoped by user/role/module; never use a shared cache.
+  invalidateTableCaches(moduleId){try{const key=':'+String(moduleId)+':';Object.keys(sessionStorage).filter(k=>k.startsWith('sc-table-cache:')&&(k.includes(key)||k.includes(':'+this.canonicalId(moduleId)+':'))).forEach(k=>sessionStorage.removeItem(k));}catch(_){}},
+
+  stableTableCacheKey(moduleId, suffix='') {
+    const uid = (window.SC_PROFILE && SC_PROFILE.id) || 'guest';
+    const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.App && App.currentRole) || 'guest';
+    return 'sc-table-cache:' + role + ':' + uid + ':' + moduleId + ':' + suffix;
+  },
+
+  async renderList(moduleId, options = {}) {
+    const d = this.def(moduleId);
+    const key = this.canonicalId(moduleId);
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(key + '-table');
+    if (!tableEl) return;
+    this.ensurePortableButton(moduleId);
+    if (!d) { tableEl.querySelector('thead').innerHTML = '<tr><th>Not available</th></tr>'; return; }
+    if (!this.sb) {
+      tableEl.querySelector('thead').innerHTML = '<tr><th>Database not configured</th></tr>';
+      tableEl.querySelector('tbody').innerHTML = '<tr><td>Add your Supabase keys in assets/js/config.js</td></tr>';
+      return;
+    }
+
+    // Get current user and role for filtering
+    let currentUserId = window.SC_PROFILE?.id || null;
+    let currentRole = String(window.SC_PROFILE?.role || window.App?.currentRole || '').toLowerCase();
+    /* V6.5 FIX #2 (root cause of "students see other students' payments"):
+       renderList fires on DOMContentLoaded, which often BEATS the async auth/
+       profile resolution. With no profile, the student/parent client filter was
+       silently skipped and the table showed every row RLS allowed (old
+       databases with legacy permissive policies allowed everything).
+       Fix: for privacy-scoped modules, WAIT for the profile before rendering —
+       and if it still cannot be resolved, render NOTHING rather than everything. */
+    const privacyScoped = ['fees','fee_payments','payment_history','payments_online','results','report_cards','attendance','certificates','idcards','health','conduct','behaviour'];
+    if (!currentUserId && privacyScoped.includes(this.canonicalId(moduleId))) {
+      this._privWait = (this._privWait || {});
+      const attempts = this._privWait[moduleId] = (this._privWait[moduleId] || 0) + 1;
+      if (attempts <= 20) { setTimeout(() => this.renderList(moduleId, options), 700); return; }
+      // Profile never resolved (broken session): fail CLOSED for privacy.
+      tableEl.querySelector('tbody').innerHTML = '<tr><td colspan="9">Could not confirm who is signed in — private records stay hidden. Refresh the page or sign in again.</td></tr>';
+      return;
+    }
+    if (currentUserId) this._privWait = {};
+    const isStudent = currentRole === 'student';
+    const isParent = currentRole === 'parent';
+
+    // Non-admin data scoping: never show another learner/family's private records.
+    // strictStudentModules = one learner only; classAssignedModules = class-wide resources like assignments/e-resources.
+    const strictStudentModules = ['results', 'attendance', 'fees', 'report_cards', 'certificates', 'payments_online'];
+    // Identity documents are also learner-owned, but kept separate so fee/payment scoping stays explicit and regression-testable.
+    const identityScopedModules = ['idcards'];
+    const strictStudentLikeModules = strictStudentModules.concat(identityScopedModules);
+    const classAssignedModules = ['assignments', 'eresources', 'digital_library', 'library_borrowers', 'timetable'];
+    const messageModules = ['messages', 'inbox', 'complaints', 'helpdesk'];
+    const studentOwnedModules = strictStudentLikeModules.concat(classAssignedModules, messageModules);
+    const parentViewModules = strictStudentLikeModules.concat(['assignments', 'messages', 'inbox', 'complaints', 'helpdesk']);
+    const requestedStudentId = new URLSearchParams(location.search).get('student') || '';
+    const cacheKey = this.stableTableCacheKey(moduleId, requestedStudentId || 'all');
+
+    // Build query with role-based filtering
+    const listTable = d.listTable || d.table;
+    const listCols = d.listCols || d.cols;
+    const orderCol = d.listOrder || (d.listTable ? 'id' : 'created_at');
+    let query = d.generic
+      ? this.sb.from(listTable).select('*').eq('module', d.module).order(orderCol, { ascending: false }).limit(500)
+      : this.sb.from(listTable).select('*').order(orderCol, { ascending: false }).limit(500);
+
+    // Role-based filtering is applied after fetching because different tables use
+    // either student_id, student_name or class-level fields. Supabase RLS remains the
+    // final security layer.
+
+    let { data, error } = await query;
+    // ENTERPRISE V6 (issue 17): some views (e.g. parent_child_view on older
+    // schemas) lack the order column — retry unordered instead of erroring.
+    if (error && /column .* does not exist/i.test(error.message || '')) {
+      const rq = d.generic
+        ? this.sb.from(listTable).select('*').eq('module', d.module).limit(500)
+        : this.sb.from(listTable).select('*').limit(500);
+      ({ data, error } = await rq);
+    }
+    const cols = d.listCols || d.cols;
+    const writable = this.canWrite(moduleId) && (!d.readOnly || (window.App && App.isAdminRole && App.isAdminRole(currentRole)));
+    /* V7.6 #2: ADMIN BULK MODE — admin-tier users get row checkboxes + a bulk
+       bar (delete selected / select page) on high-volume admin modules like
+       Promotion. Works together with the search box and column filters. */
+    const bulkable = writable && this.BULK_MODULES.includes(key) && window.App && App.isAdminRole && App.isAdminRole(currentRole);
+    const cellVal = (row, c) => c.key.indexOf('data.') === 0 ? ((row.data || {})[c.key.slice(5)]) : row[c.key];
+    // V12.13: assignments — student Take button needs Actions column even when not writable (student portal) — fixes Take not showing beside every CBT assignment
+    const needsActions = writable || (moduleId === 'assignments');
+    const head = '<tr>' + (bulkable ? '<th style="width:34px"><input type="checkbox" title="Select all visible" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',this.checked)"></th>' : '') + cols.map(c => '<th>' + esc(c.label) + '</th>').join('') + (needsActions ? '<th>Actions</th>' : '') + '</tr>';
+    tableEl.querySelector('thead').innerHTML = head;
+    const tb = tableEl.querySelector('tbody');
+    if (error) {
+      let cached = null; try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch(_) {}
+      if(cached&&cached.html&&Date.now()-Number(cached.at||0)<60000){tb.innerHTML=cached.html+'<tr><td colspan="'+(cols.length+(writable?1:0))+'" style="color:#b45309;background:#fffbeb">Live refresh failed; showing a cache less than one minute old. It will not be reused after that to prevent deleted records reappearing. '+esc(error.message)+'</td></tr>';return;}
+      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '">' + esc(error.message) + '</td></tr>'; return;
+    }
+
+    // Additional filtering for students and parents - get linked IDs/names and filter data
+    let filteredData = data || [];
+    if (isStudent && studentOwnedModules.includes(key) && currentUserId) {
+      try {
+        const { data: st } = await this.sb.from('students').select('id,full_name,class,admission_no,user_id').eq('user_id', currentUserId).maybeSingle();
+        if (!st) {
+          /* V7.1: profile not linked to a students row — still show content
+             addressed to ALL students (audience) or the whole school (blank
+             class). Personal modules (fees/results/report cards…) stay empty. */
+          const forAud=(r)=>{const a=String(r.audience||(r.data&&r.data.audience)||'').toLowerCase();return ['all','student','students','everyone','public'].includes(a);};
+          const wide=(r)=>{const c=r.class??r.student_class??(r.data&&r.data.class);return c==null||String(c).trim()===''||['all','general','school'].includes(String(c).trim().toLowerCase());};
+          filteredData = strictStudentLikeModules.includes(key) ? [] :
+            (classAssignedModules.includes(key) ? (data||[]).filter(wide) : (data||[]).filter(forAud));
+        }
+        else {
+          const stName = String(st.full_name || '').toLowerCase();
+          const stClass = String(st.class || '').toLowerCase();
+          const stAdm = String(st.admission_no || '').toLowerCase();
+          const ownRecord = (r) => r.student_id === st.id || r.student_id_ref === st.id || r.person_id === st.id || r.user_id === currentUserId ||
+            (r.student_name && String(r.student_name).toLowerCase() === stName) ||
+            (r.admission_no && String(r.admission_no).toLowerCase() === stAdm) ||
+            (r.data && r.data.student && String(r.data.student).toLowerCase() === stName) ||
+            (r.data && r.data.student_name && String(r.data.student_name).toLowerCase() === stName) ||
+            (r.data && r.data.admission_no && String(r.data.admission_no).toLowerCase() === stAdm) ||
+            (r.data && r.data.person_id && String(r.data.person_id) === String(st.id));
+          const classRecord = (r) => (r.class && String(r.class).toLowerCase() === stClass) ||
+            (r.student_class && String(r.student_class).toLowerCase() === stClass) ||
+            (r.data && r.data.class && String(r.data.class).toLowerCase() === stClass);
+          /* V7.0 #3/#4: AUDIENCE-aware matching. School-wide resources (blank class)
+             and messages addressed to 'all'/'student' are FOR this student even
+             though no personal link exists — show them instead of "not linked". */
+          const forAudience = (r) => { const a = String(r.audience || (r.data && r.data.audience) || '').toLowerCase(); return a === 'all' || a === 'student' || a === 'students' || a === 'everyone' || a === 'public'; };
+          const schoolWide = (r) => { const c = r.class ?? r.student_class ?? (r.data && r.data.class); return c == null || String(c).trim() === '' || ['all','general','school'].includes(String(c).trim().toLowerCase()); };
+          const myMessage = (r) => forAudience(r) || r.created_by === currentUserId || r.submitted_by === currentUserId || r.recipient_id === currentUserId ||
+            (r.data && (r.data.recipient_id === currentUserId || String(r.data.to || '').toLowerCase().includes(stName) || String(r.data.student || '').toLowerCase() === stName || String(r.data.admission_no || '').toLowerCase() === stAdm));
+          filteredData = (data || []).filter(r => strictStudentLikeModules.includes(key) ? ownRecord(r) : (classAssignedModules.includes(key) ? (ownRecord(r) || classRecord(r) || schoolWide(r)) : myMessage(r)));
+        }
+      } catch(e) { console.warn('Student filter failed:', e); filteredData = []; }
+    }
+    if (isParent && parentViewModules.includes(key) && currentUserId) {
+      try {
+        const { data: links } = await this.sb.from('parent_child').select('student_id').eq('parent_id', currentUserId);
+        if (links && links.length > 0) {
+          let childIds = links.map(l => l.student_id).filter(Boolean);
+          if (requestedStudentId && childIds.includes(requestedStudentId)) childIds = [requestedStudentId];
+          const { data: kids } = await this.sb.from('students').select('id,full_name,class,admission_no').in('id', childIds).then(r=>r, ()=>({data:[]}));
+          const childNames = (kids || []).map(k => String(k.full_name || '').toLowerCase()).filter(Boolean);
+          const childClasses = (kids || []).flatMap(k => [k.class]).map(x => String(x || '').toLowerCase()).filter(Boolean);
+          const childAdm = (kids || []).map(k => String(k.admission_no || '').toLowerCase()).filter(Boolean);
+          const childOwn = (r) => childIds.includes(r.student_id) || childIds.includes(r.student_id_ref) || childIds.includes(r.person_id) ||
+            (r.student_name && childNames.includes(String(r.student_name).toLowerCase())) ||
+            (r.admission_no && childAdm.includes(String(r.admission_no).toLowerCase())) ||
+            (r.data && r.data.student && childNames.includes(String(r.data.student).toLowerCase())) ||
+            (r.data && r.data.student_name && childNames.includes(String(r.data.student_name).toLowerCase())) ||
+            (r.data && r.data.person_id && childIds.includes(String(r.data.person_id)));
+          const childClass = (r) => (r.class && childClasses.includes(String(r.class).toLowerCase())) ||
+            (r.student_class && childClasses.includes(String(r.student_class).toLowerCase())) ||
+            (r.data && r.data.class && childClasses.includes(String(r.data.class).toLowerCase()));
+          const forAudienceP = (r) => { const a = String(r.audience || (r.data && r.data.audience) || '').toLowerCase(); return a === 'all' || a === 'parent' || a === 'parents' || a === 'everyone' || a === 'public'; };
+          const schoolWideP = (r) => { const c = r.class ?? r.student_class ?? (r.data && r.data.class); return c == null || String(c).trim() === '' || ['all','general','school'].includes(String(c).trim().toLowerCase()); };
+          const myMessage = (r) => forAudienceP(r) || r.created_by === currentUserId || r.submitted_by === currentUserId || r.recipient_id === currentUserId || (r.data && (r.data.recipient_id === currentUserId || childNames.includes(String(r.data.student || '').toLowerCase()) || childNames.includes(String(r.data.student_name || '').toLowerCase())));
+          filteredData = (data || []).filter(r => strictStudentLikeModules.includes(key) ? childOwn(r) : (key === 'assignments' ? (childOwn(r) || childClass(r) || schoolWideP(r)) : (messageModules.includes(key) ? myMessage(r) : (childOwn(r) || childClass(r) || schoolWideP(r)))));
+        } else {
+          /* V7.1: no children linked yet — still show audience/'all'/parent
+             messages and school-wide notices; personal modules stay empty. */
+          const forAudP=(r)=>{const a=String(r.audience||(r.data&&r.data.audience)||'').toLowerCase();return ['all','parent','parents','everyone','public'].includes(a);};
+          filteredData = strictStudentLikeModules.includes(key) ? [] :
+            (messageModules.includes(key) ? (data||[]).filter(forAudP) :
+             (data||[]).filter(r=>{const c=r.class??r.student_class??(r.data&&r.data.class);return c==null||String(c).trim()===''||['all','general','school'].includes(String(c).trim().toLowerCase());}));
+        }
+      } catch(e) { console.warn('Parent filter failed:', e); filteredData = []; }
+    }
+
+    /* V7.6 #4: DEMO SHOWCASE FALLBACK — on demo deployments an empty table
+       (fresh database, seeds not run) renders built-in SAMPLE rows clearly
+       marked as such, so a prospective client NEVER meets a blank page.
+       Nothing is written to the database; privacy-scoped and learner-owned
+       modules never fake data; unauthenticated visitors get it too. */
+    let demoGhost = false;
+    /* V7.9 #2: ghost sample rows are for ADMIN/STAFF/visitor showcase only.
+       A signed-in STUDENT/PARENT must never see fabricated rows on class-scoped
+       modules — random ghost classes looked exactly like "students can see
+       other classes' assignments". Role-scoped emptiness is the truthful UI. */
+    if ((!filteredData || !filteredData.length) && window.SCHOOL && SCHOOL.demo && SCHOOL.demo.enabled &&
+        !isStudent && !isParent &&
+        !privacyScoped.includes(key) && !strictStudentLikeModules.includes(key)) {
+      try { const ghost = this.demoShowcaseRows(moduleId, d); if (ghost.length) { filteredData = ghost; demoGhost = true; } } catch(_) {}
+    }
+
+    // FIX V2.1 — Persistent table: never clear existing rows when filtered result is empty.
+    // This resolves issue #1 where parent/student pages flashed data then disappeared.
+    // Strategy: keep cached HTML or existing DOM, show informative banner above table.
+    /* V10.9 (#1) ROOT-CAUSE FIX (reported: "deleted/edited fee payments still
+       reflect at the student's portal"): this anti-flash persistence KEPT the
+       cached/existing rows whenever the role-filtered list came back EMPTY —
+       which is exactly the state after the bursar deletes a student's only
+       payment row(s). The student then stared at ghost money rows forever.
+       LEDGER-TRUTH modules (fees, online payments, results, report cards)
+       now always render the fresh database truth once the query has
+       SUCCEEDED and the viewer's identity is resolved: empty means empty,
+       and the stale cache entry is destroyed so it can never resurrect.
+       The anti-flash keep only applies while identity is still resolving. */
+    if (!filteredData || !filteredData.length) {
+      const LEDGER_TRUTH = ['fees','payments_online','results','report_cards','finance'];
+      const identityReady = !!(window.App && App._roleResolved) || !!(window.SC_PROFILE && SC_PROFILE.role);
+      if (LEDGER_TRUTH.includes(key) && identityReady) {
+        try { sessionStorage.removeItem(cacheKey); } catch(_) {}
+        const wrapT = tableEl.closest('.table-wrap') || tableEl.parentNode;
+        const oldInfo = wrapT ? wrapT.querySelector('.sc-table-persist-info') : null;
+        if (oldInfo) oldInfo.remove();
+        const emptyMsg = (isParent || isStudent)
+          ? 'ℹ️ No records here right now. If a payment or result was corrected by the school, this list updates instantly — what you see IS the current official record.'
+          : 'No records yet.' + (writable ? ' Click “+ Add new”.' : '');
+        tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '" style="color:var(--gray-500);padding:20px;text-align:center" class="empty-msg">' + emptyMsg + '</td></tr>';
+        try { CRUD.injectTableSearch(moduleId, tableEl, 0); } catch(_) {}
+        return;
+      }
+      let cached = null;
+      try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null'); } catch(_) {}
+      const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+      let infoBox = wrap ? wrap.querySelector('.sc-table-persist-info') : null;
+      if (!infoBox && wrap) {
+        infoBox = document.createElement('div');
+        infoBox.className = 'sc-table-persist-info';
+        infoBox.style.cssText = 'background:#eff6ff;border:1px solid #bfdbfe;padding:12px 14px;border-radius:10px;margin-bottom:14px;color:#1e40af;font-size:.9rem;line-height:1.5';
+        wrap.insertBefore(infoBox, wrap.firstChild);
+      }
+      const dataCount = (data || []).length;
+      let msg = '';
+      if (isParent) {
+        msg = dataCount > 0
+          ? (strictStudentLikeModules.includes(key) ? `ℹ️ <strong>No children are linked to your account yet.</strong> Ask the admin to link you on <em>Parents → Parent–Child Link</em> — one minute. School-wide notices still reach you meanwhile.` : `ℹ️ Nothing addressed to you yet — school-wide and parent notices appear here automatically.`)
+          : 'ℹ️ No records yet — Ask admin to create records and link your children via Parents page.';
+      } else if (isStudent) {
+        msg = dataCount > 0
+          ? (strictStudentLikeModules.includes(key) ? `ℹ️ <strong>Your account is not yet linked to a student record.</strong> Ask the admin to open <em>Students</em>, edit your record and set its <em>Linked account</em> — one minute. School-wide notices still reach you meanwhile.` : `ℹ️ Nothing addressed to you yet — new class or school-wide items appear here automatically.`)
+          : 'ℹ️ No records yet.';
+      } else {
+        msg = dataCount > 0
+          ? `ℹ️ Database has ${dataCount} record(s) but none match the current filter. Showing previously cached records if available.`
+          : 'No records yet.' + (writable ? ' Click “+ Add new”.' : '');
+      }
+      if (infoBox) infoBox.innerHTML = msg;
+
+      if (cached && cached.html) {
+        tb.innerHTML = cached.html;
+        // inject search again
+        try { CRUD.injectTableSearch(moduleId, tableEl, (dataCount || 0)); } catch(_) {}
+        return;
+      }
+      // If table already has real rows (not loading placeholder), keep them
+      const existingHasRows = tb.querySelectorAll('tr').length > 0 && !tb.querySelector('tr td')?.textContent?.includes('No records yet');
+      const existingHTML = tb.innerHTML;
+      const hasRealRows = existingHTML && !existingHTML.includes('No records yet') && !existingHTML.includes('pulse') && existingHTML.trim().length > 20;
+      if (hasRealRows) {
+        // Keep existing rows, do not clear
+        return;
+      }
+      tb.innerHTML = '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '" style="color:var(--gray-500);padding:20px;text-align:center" class="empty-msg">' + msg + '</td></tr>';
+      return;
+    }
+    
+    const isLinkCol = (key) => /(_link|link|media_url|photo_url|video|image|thumbnail|read_link|drive)$/i.test(key) || /^(media_url|read_link|drive_link|photo_url)$/i.test(key);
+    const renderedRows = filteredData.map(row => {
+      const bulkCb = bulkable ? '<td>' + (row._ghost ? '' : '<input type="checkbox" class="sc-bulk-cb" value="' + esc(String(row.id)) + '" onclick="CRUD.bulkBarRefresh(\'' + moduleId + '\')">') + '</td>' : '';
+      const dataCells = cols.map(c => {
+        let v = cellVal(row, c);
+        if (c.key === 'is_cbt'){
+          v = v ? '<span class="badge" style="background:#dcfce7;color:#166534;border:1px solid #86efac">🟢 CBT Assignment</span>' : '<span class="badge" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0">📄 Physical</span>';
+          return '<td>'+String(v||'')+'</td>';
+        } else if (c.type === 'checkbox') v = v ? '✓' : '';
+        if (c.type === 'multiref' && Array.isArray(v)) v = v.join(', ');
+        if (v && (c.type === 'date' || c.type === 'datetime' || /(^|_)(date|dob|created_at|issued_on|due_date|ref_date)$/i.test(c.key))) v = CRUD.formatDate(v);
+        if (c.key === 'is_cbt'){
+          return '<td>'+String(v||'')+'</td>';
+        }
+        if (v && isLinkCol(c.key) && window.Super && Super.media) {
+          const k = Super.media.kind(String(v));
+          if (k !== 'none' && k !== 'link') return '<td>' + Super.media.thumb(String(v), { w: 96, h: 64 }) + '</td>';
+          return '<td><a href="' + esc(String(v)) + '" target="_blank" rel="noopener">🔗 link</a></td>';
+        }
+        return '<td>' + esc(String(v == null ? '' : v)).slice(0, 80) + '</td>';
+      }).join('');
+      // V12.14: assignments — Take assignment button ONLY for student/parent portal, Edit/Delete restored for admin/tutor (fix dropped features)
+      // Fixes: Take appearing in teacher/admin + Take not showing beside every CBT assignment for student + Edit/Delete missing in admin/tutor
+      let actionCell='';
+      if(moduleId === 'assignments'){
+        if(isStudent || isParent){
+          // Student/parent portal: Take Assignment button for every CBT assignment in table (robust, all-inclusive, self-contained, seamless)
+          const takeBtn = (row.is_cbt || row.cbt_exam_id) ?
+            '<a class="btn btn-sm btn-primary ap-take-cbt" href="'+esc(row.drive_link||'./cbt-exam.html?code='+(row.cbt_exam_id||''))+'" target="_blank" title="Take this CBT assignment — auto-marked, multiple per term cumulative per subject">🖥️ Take Assignment</a> ' :
+            (row.drive_link ? '<a class="btn btn-sm btn-outline" href="'+esc(row.drive_link)+'" target="_blank" title="View assignment resources">🔗 View Assignment</a> ' : '<span class="badge" style="background:#f1f5f9;color:#475569">📄 Physical — no link</span> ');
+          actionCell = '<td style="white-space:nowrap">'+takeBtn+'</td>';
+        }else if(writable){
+          const badge = row.is_cbt ? '<span class="badge" style="background:#dcfce7;color:#166534;border:1px solid #86efac">🟢 CBT Assignment</span> ' : '<span class="badge" style="background:#f1f5f9;color:#475569">📄 Physical</span> ';
+          // Respect teacher ownership lock (same as other modules) but ALWAYS show Edit/Delete for admin/owner
+          if(CRUD.rowLockedForMe(moduleId, row, currentRole, currentUserId)){
+            actionCell = '<td style="white-space:nowrap">'+badge+'<span class="badge" title="Entered by another teacher — only that teacher or an admin can change it">🔒 another teacher\'s record</span> <span class="mut" style="font-size:.70rem">Score via button</span></td>';
+          }else{
+            actionCell = '<td style="white-space:nowrap">'+badge+
+              '<button class="btn btn-sm btn-outline" onclick="CRUD.openForm(\''+moduleId+'\',\''+row.id+'\')">Edit</button> '+
+              '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\''+moduleId+'\',\''+row.id+'\')">Delete</button> '+
+              '<span class="mut" style="font-size:.70rem;margin-left:4px">Score via button</span></td>';
+          }
+        }else{
+          actionCell = '<td></td>';
+        }
+      }else{
+        if(!writable) actionCell='';
+        else if(row._ghost) actionCell='<td><span class="badge" style="background:#fef9c3;color:#a16207" title="Built-in demo preview — load the real sample data from Admin Data to edit">🎬 sample</span></td>';
+        else {
+          actionCell='<td style="white-space:nowrap">' +
+            (moduleId === 'students' ? '<a class="btn btn-sm btn-primary" href="student-profile.html?student=' + row.id + '">Dashboard</a> ' : '') +
+            (moduleId === 'students' && window.App && App.isAdminRole && App.isAdminRole(currentRole) ?
+              '<button class="btn btn-sm ' + (row.portal_locked ? 'btn-primary' : 'btn-outline') + '" style="' + (row.portal_locked ? 'background:#dc2626;border-color:#dc2626' : 'color:#dc2626;border-color:#fca5a5') + '" onclick="CRUD.toggleStudentLock(\'' + row.id + '\',\'portal\',' + (row.portal_locked ? 'false' : 'true') + ',\'' + esc(String(row.full_name||'').replace(/'/g,'')) + '\')" title="' + (row.portal_locked ? 'Portal is LOCKED — click to restore access' : 'Lock this student (and their parents) out of the portal') + '">' + (row.portal_locked ? '🔒 Locked' : '🔓 Lock portal') + '</button> ' +
+              '<button class="btn btn-sm btn-outline" style="' + (row.report_locked ? 'background:#f59e0b;border-color:#f59e0b;color:#fff' : 'color:#b45309;border-color:#fcd34d') + '" onclick="CRUD.toggleStudentLock(\'' + row.id + '\',\'report\',' + (row.report_locked ? 'false' : 'true') + ',\'' + esc(String(row.full_name||'').replace(/'/g,'')) + '\')" title="' + (row.report_locked ? 'Report card is HIDDEN — click to restore' : 'Hide this student\'s report card / results') + '">' + (row.report_locked ? '🧾 Report hidden' : '🧾 Hide report') + '</button> ' : '') +
+            (moduleId === 'staff' ? '<a class="btn btn-sm btn-primary" href="teacher-overview.html?staff=' + row.id + '">Teacher overview</a> ' : '') +
+            (moduleId === 'parent_child' ? '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'parent_child\',\'' + row.id + '\')">Unlink</button> ' : '') +
+            ((moduleId === 'payroll' || moduleId === 'hr') ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printPayslip(\'' + row.id + '\')">Payslip</button> ' : '') +
+            (moduleId === 'fees' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printReceipt(\'' + row.id + '\')">Print E-Receipt</button> ' : '') +
+            (moduleId === 'admissions' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.previewAdmission(\'' + row.id + '\')">Preview</button> ' : '') +
+            (moduleId === 'document_builder' ? '<button class="btn btn-sm btn-primary" onclick="CRUD.printDocument(\'' + row.id + '\')">🖨 Print</button> ' : '') +
+            (CRUD.rowLockedForMe(moduleId, row, currentRole, currentUserId)
+              ? '<span class="badge" title="Entered by another teacher — only that teacher or an admin can change it">🔒 another teacher\'s record</span>'
+              : '<button class="btn btn-sm btn-outline" onclick="CRUD.openForm(\'' + moduleId + '\',\'' + row.id + '\')">Edit</button> ' +
+                '<button class="btn btn-sm btn-outline" onclick="CRUD.remove(\'' + moduleId + '\',\'' + row.id + '\')">Delete</button>') +
+          '</td>';
+        }
+      }
+      return '<tr data-id="' + esc(String(row.id == null ? '' : row.id)) + '">' + bulkCb + dataCells + actionCell + '</tr>';
+    }).join('');
+
+    tb.innerHTML = renderedRows;
+    if (demoGhost) {
+      tb.innerHTML += '<tr><td colspan="' + (cols.length + (writable ? 1 : 0) + (typeof bulkable!=='undefined'&&bulkable ? 1 : 0)) + '" style="background:#fefce8;color:#a16207;font-size:.82rem;font-weight:700">🎬 Built-in sample preview — this table is empty in the demo database. Sign in as the demo Admin and click “Load sample data” (Admin Data page) to make these rows real and editable.</td></tr>';
+    }
+    if (!demoGhost) try { sessionStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), html: renderedRows })); } catch(_) {}
+    // re-apply role visibility to the freshly-rendered action buttons
+    if (window.App && App.applyVisibilityTokens) try { App.applyVisibilityTokens(App.currentRole || (window.SC_PROFILE && SC_PROFILE.role) || ''); } catch (e) {}
+    // ENHANCEMENT (#2): inject a live instant-search box above every module
+    // table so recipients can find any record instantly. Persists the query.
+    CRUD.injectTableSearch(moduleId, tableEl, filteredData.length);
+    /* V7.6 #2: column FILTER dropdowns (class / action / status / term /
+       session / department…) built from the actual data — one-click slicing
+       on promotion and every other big admin table. */
+    try { CRUD.injectColumnFilters(moduleId, tableEl, cols, filteredData, bulkable ? 1 : 0); } catch(_) {}
+    /* V10.6 (#5): sticky headers + frozen identity column on EVERY module
+       table — Students, Staff, Results, Fees, all of them. */
+    try { CRUD.applyStickyTable(tableEl); } catch(_) {}
+  },
+
+  /* =====================================================================
+     V10.6 (#5): STICKY TABLE ENGINE — applied to every CRUD module table
+     (and reusable by any page via CRUD.applyStickyTable(table)).
+       • The header row(s) FREEZE at the top while records scroll under
+         them (vertical stickiness inside the .table-wrap scroll area).
+       • The first data column (the identity column — Full name for
+         Students & Profiles, etc.) FREEZES at the left while the other
+         columns scroll horizontally, so on a phone you always know WHOSE
+         row you are reading. A checkbox bulk column stays with it.
+       • Pure CSS position:sticky — zero scroll listeners, native-smooth
+         on mobile; a shadow edge appears when the frozen column is
+         actually covering scrolled content.
+     ===================================================================== */
+  applyStickyTable(tableEl) {
+    if (!tableEl || tableEl.dataset.scSticky) return;
+    const wrap = tableEl.closest('.table-wrap');
+    if (!wrap) return;
+    tableEl.dataset.scSticky = '1';
+    // one-time global stylesheet
+    if (!document.getElementById('sc-sticky-table-css')) {
+      const st = document.createElement('style');
+      st.id = 'sc-sticky-table-css';
+      st.textContent =
+        '.sc-sticky-wrap{max-height:70vh;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;position:relative}' +
+        '.sc-sticky-wrap thead th{position:sticky;top:0;z-index:5;background:var(--gray-100,#f1f5f9);box-shadow:0 1px 0 var(--gray-300,#cbd5e1)}' +
+        '.sc-sticky-wrap thead tr:nth-child(2) th{top:var(--sc-h1,42px)}' +
+        '.sc-sticky-wrap td.sc-col-pin,.sc-sticky-wrap th.sc-col-pin{position:sticky;left:0;z-index:3;background:var(--white,#fff)}' +
+        '.sc-sticky-wrap thead th.sc-col-pin{z-index:6;background:var(--gray-100,#f1f5f9)}' +
+        '.sc-sticky-wrap td.sc-col-pin2,.sc-sticky-wrap th.sc-col-pin2{position:sticky;z-index:3;background:var(--white,#fff)}' +
+        '.sc-sticky-wrap thead th.sc-col-pin2{z-index:6;background:var(--gray-100,#f1f5f9)}' +
+        '.sc-sticky-wrap.sc-x-scrolled td.sc-col-edge,.sc-sticky-wrap.sc-x-scrolled th.sc-col-edge{box-shadow:2px 0 6px -2px rgba(15,23,42,.25)}' +
+        '[data-theme="dark"] .sc-sticky-wrap td.sc-col-pin,[data-theme="dark"] .sc-sticky-wrap td.sc-col-pin2{background:#0f172a}' +
+        '[data-theme="dark"] .sc-sticky-wrap thead th.sc-col-pin,[data-theme="dark"] .sc-sticky-wrap thead th.sc-col-pin2{background:#111c30}' +
+        '@media(max-width:640px){.sc-sticky-wrap{max-height:75vh}.sc-sticky-wrap td.sc-col-pin,.sc-sticky-wrap th.sc-col-pin{max-width:46vw;overflow:hidden;text-overflow:ellipsis}}';
+      document.head.appendChild(st);
+    }
+    wrap.classList.add('sc-sticky-wrap');
+    // Two-row headers (e.g. the Page Access & Permission Manager): the second
+    // row sticks right below the first.
+    try {
+      const h1 = tableEl.querySelector('thead tr:first-child th');
+      if (h1 && tableEl.querySelectorAll('thead tr').length > 1) {
+        wrap.style.setProperty('--sc-h1', (h1.getBoundingClientRect().height || 42) + 'px');
+      }
+    } catch(_) {}
+    // Pin the identity column: if col 1 is a bulk-select checkbox column,
+    // pin it AND col 2 (offset by the checkbox width); else pin col 1.
+    try {
+      const firstRow = tableEl.querySelector('tbody tr');
+      const headCells = tableEl.querySelectorAll('thead tr:first-child th');
+      let bulk = false;
+      if (firstRow) {
+        const td1 = firstRow.querySelector('td');
+        bulk = !!(td1 && td1.querySelector('input[type="checkbox"]') && String(td1.textContent||'').trim()==='');
+      }
+      const pin = (cell, cls) => { if (cell) cell.classList.add(cls); };
+      tableEl.querySelectorAll('tr').forEach(tr => {
+        const cells = tr.children;
+        if (!cells.length) return;
+        if (bulk) {
+          pin(cells[0], 'sc-col-pin');
+          if (cells.length > 1) { pin(cells[1], 'sc-col-pin2'); cells[1].classList.add('sc-col-edge'); }
+        } else {
+          pin(cells[0], 'sc-col-pin'); cells[0].classList.add('sc-col-edge');
+        }
+      });
+      if (bulk) {
+        // second pinned column needs a left offset = width of the checkbox col
+        const w = (firstRow && firstRow.children[0] ? firstRow.children[0].getBoundingClientRect().width : 44);
+        tableEl.querySelectorAll('.sc-col-pin2').forEach(c => { c.style.left = w + 'px'; });
+      }
+      // shadow only when horizontally scrolled
+      wrap.addEventListener('scroll', () => {
+        wrap.classList.toggle('sc-x-scrolled', wrap.scrollLeft > 2);
+      }, { passive: true });
+    } catch(_) {}
+  },
+
+  /* V7.6 #4: built-in demo showcase rows. Pure client-side "ghost" records for
+     DEMO deployments only — rendered when a table is empty so prospects always
+     see a working page. Generated from the module's own column schema so every
+     module (present and future) gets believable rows without maintenance. */
+  demoShowcaseRows(moduleId, d) {
+    const key = this.canonicalId(moduleId);
+    const NAMES=['Adaeze Nwosu','Ibrahim Musa','Chidera Obi','Funmilayo Ajayi','Emeka Eze'];
+    const STAFF=['Funke Alabi','Ikechukwu Eze','Halima Bello'];
+    const CLASSES=['JSS 1','JSS 2','JSS 3','SS 1','SS 2','SS 3'];
+    const SUBJECTS=['Mathematics','English Language','Basic Science','Civic Education','Biology'];
+    const TITLES={
+      payroll:['June salary run','July salary run','August salary run'],
+      hr:['June salary run','July salary run','August salary run'],
+      inventory:['HP ProBook laptop','Epson projector','Science microscope'],
+      library:['Things Fall Apart','New General Mathematics','Essential Biology'],
+      assignments:['Essay: My Role Model','Equations Worksheet','States of Matter Poster'],
+      behaviour:['Star Leader award','Helping Hand award','Perfect punctuality'],
+      support_plans:['Reading fluency plan','Numeracy confidence plan','Speech support plan'],
+      helpdesk:['Projector not displaying','Leaking tap in junior block','Faulty lab socket'],
+      admission_links:['2026/2027 JSS 1 Entrance','SS 1 Transfer Window','Nursery Intake'],
+      default:['Sample record one','Sample record two','Sample record three']
+    };
+    const titles=TITLES[key]||TITLES.default;
+    const today=(n)=>new Date(Date.now()+ (n||0)*86400000).toISOString().slice(0,10);
+    const cols=(d&&(d.listCols||d.cols))||[];
+    const rows=[];
+    for(let i=0;i<3;i++){
+      const row={id:'ghost-'+key+'-'+i,_ghost:true,created_at:new Date().toISOString(),data:{}};
+      cols.forEach(c=>{
+        const k=String(c.key||''); const kk=k.split('.').pop(); let v;
+        if(/^(title|item_name|subject_line)$/.test(kk)||kk==='name') v=titles[i%titles.length];
+        else if(/student|full_name/.test(kk)&&!/id$/.test(kk)) v=NAMES[i%NAMES.length];
+        else if(/staff|teacher|awarded_by|recorded_by|counsellor/.test(kk)&&!/id$/.test(kk)) v=STAFF[i%STAFF.length];
+        else if(kk==='to_class') v=CLASSES[Math.min((i*2)+1,CLASSES.length-1)];
+        else if(kk==='class'||/class$/.test(kk)) v=CLASSES[(i*2)%CLASSES.length];
+        else if(/subject/.test(kk)) v=SUBJECTS[i%SUBJECTS.length];
+        else if(/average|percent|score|points/.test(kk)) v=[78,64,85][i%3];
+        else if(/quantity|copies|months|year_count/.test(kk)) v=[12,25,8][i%3];
+        else if(c.type==='number'||/amount|price|fee|salary|basic|net_pay|principal/.test(kk)) v=[25000,150000,80000][i%3];
+        else if(c.type==='date'||/date$/.test(kk)) v=today(i*3-3);
+        else if(c.type==='select'&&Array.isArray(c.options)&&c.options.length) v=c.options[i%c.options.length];
+        else if(c.type==='checkbox') v=i===0;
+        else if(/description|body|reason|notes|goal|intervention/.test(kk)) v='Illustrative demo text so the page never looks empty — load the real sample pack from Admin Data.';
+        else if(/term$/.test(kk)) v='Third Term';
+        else if(/session$/.test(kk)) v='2025/2026';
+        else if(/status/.test(kk)) v=['active','open','approved'][i%3];
+        else v='';
+        if(k.indexOf('data.')===0) row.data[kk]=v; else row[k]=v;
+      });
+      rows.push(row);
+    }
+    return rows;
+  },
+
+  /* V7.6 #2: column filter dropdowns. For every low-cardinality column
+     (class, action, status, term, session, department, category, method…)
+     a dropdown appears beside the search box; picking values slices the
+     table instantly (client-side, combinable with the search text). */
+  FILTER_KEYS: ['class','from_class','to_class','action','status','term','session','department','category','method','audience','priority','role','staff_type','month','year','subject','need_type','loan_type'],
+  injectColumnFilters(moduleId, tableEl, cols, rows, cbOffset) {
+    if (!tableEl || !rows || rows.length < 2) return;
+    const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+    if (!wrap) return;
+    let host = wrap.querySelector('.sc-col-filters');
+    if (host) host.remove();                    // rebuild on every render (fresh data)
+    const cellVal = (row, c) => c.key.indexOf('data.') === 0 ? ((row.data || {})[c.key.slice(5)]) : row[c.key];
+    const defs = [];
+    const numDefs = [];
+    cols.forEach((c, idx) => {
+      const kk = String(c.key || '').split('.').pop();
+      if (this.NUMERIC_FILTER_KEYS.includes(kk)) { numDefs.push({ idx: idx + (cbOffset || 0), label: c.label || kk }); return; }
+      if (!this.FILTER_KEYS.includes(kk)) return;
+      const vals = [...new Set(rows.map(r => { const v = cellVal(r, c); return v == null ? '' : String(v); }).filter(v => v !== ''))];
+      if (vals.length >= 2 && vals.length <= 30) defs.push({ idx: idx + (cbOffset || 0), label: c.label || kk, vals: vals.sort() });
+    });
+    if (!defs.length && !numDefs.length) return;
+    host = document.createElement('div');
+    host.className = 'sc-col-filters';
+    host.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px';
+    host.innerHTML = '<span style="font-size:.8rem;color:var(--gray-500,#64748b);font-weight:700">Filter:</span>' + defs.map(d =>
+      '<select class="form-select sc-col-filter" data-col="' + d.idx + '" style="max-width:170px;padding:7px 10px;font-size:.85rem">' +
+      '<option value="">' + esc(d.label) + ': all</option>' + d.vals.map(v => '<option value="' + esc(v.toLowerCase()) + '">' + esc(v) + '</option>').join('') + '</select>').join('') +
+      numDefs.map(d =>
+        '<span style="display:inline-flex;gap:4px;align-items:center;font-size:.8rem;color:var(--gray-600,#475569)">' + esc(d.label) +
+        ' <select class="form-select sc-num-op" data-col="' + d.idx + '" style="width:64px;padding:7px 6px;font-size:.85rem"><option value="">—</option><option value="gte">≥</option><option value="lte">≤</option></select>' +
+        ' <input class="form-input sc-num-val" data-col="' + d.idx + '" type="number" placeholder="mark" style="width:84px;padding:7px 8px;font-size:.85rem"></span>').join('') +
+      '<button class="btn btn-sm btn-outline sc-col-filter-reset" style="padding:7px 12px">✕ Reset</button>';
+    const searchBox = wrap.querySelector('.sc-table-search');
+    wrap.insertBefore(host, searchBox ? searchBox.nextSibling : (wrap.querySelector('table') || tableEl));
+    const apply = () => {
+      const active = [...host.querySelectorAll('.sc-col-filter')].map(s => ({ col: Number(s.dataset.col), v: s.value })).filter(f => f.v);
+      const nums = [...host.querySelectorAll('.sc-num-op')].map(s => {
+        const val = host.querySelector('.sc-num-val[data-col="' + s.dataset.col + '"]');
+        return { col: Number(s.dataset.col), op: s.value, n: val && val.value !== '' ? Number(val.value) : null };
+      }).filter(f => f.op && f.n != null && !isNaN(f.n));
+      let shown = 0;
+      tableEl.querySelectorAll('tbody tr').forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length < 2) return;                      // banner/info rows
+        let hit = active.every(f => tds[f.col] && tds[f.col].textContent.trim().toLowerCase() === f.v);
+        if (hit && nums.length) hit = nums.every(f => {
+          const raw = tds[f.col] ? parseFloat(String(tds[f.col].textContent).replace(/[^0-9.\-]/g, '')) : NaN;
+          if (isNaN(raw)) return false;
+          return f.op === 'gte' ? raw >= f.n : raw <= f.n;
+        });
+        tr.dataset.scFiltered = hit ? '' : '1';
+        tr.style.display = hit ? '' : 'none';
+        if (hit) shown++;
+      });
+      const count = wrap.querySelector('.sc-table-count');
+      if (count && (active.length || nums.length)) count.textContent = shown + ' match filters';
+    };
+    host.querySelectorAll('.sc-col-filter').forEach(s => s.addEventListener('change', apply));
+    host.querySelectorAll('.sc-num-op').forEach(s => s.addEventListener('change', apply));
+    host.querySelectorAll('.sc-num-val').forEach(s => s.addEventListener('input', apply));
+    host.querySelector('.sc-col-filter-reset').addEventListener('click', () => {
+      host.querySelectorAll('.sc-col-filter').forEach(s => s.value = '');
+      host.querySelectorAll('.sc-num-op').forEach(s => s.value = '');
+      host.querySelectorAll('.sc-num-val').forEach(s => s.value = '');
+      apply();
+    });
+  },
+  NUMERIC_FILTER_KEYS: ['average','score','percent','total_score','points','amount','net_pay'],
+
+  /* V7.6 #2: modules where admins routinely need multi-row housekeeping.
+     Promotion drafts especially: an auto-promote run creates one row per
+     student, so clearing a bad run row-by-row was unusable. */
+  BULK_MODULES: ['students','promotion','results','attendance','activity_log','admissions','alumni','behaviour','inventory','library','announcements','events','birthdays','visitors','exam_registrations','helpdesk','complaints'],
+  bulkToggleAll(moduleId, checked) {
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    if (!tableEl) return;
+    tableEl.querySelectorAll('tbody .sc-bulk-cb').forEach(cb => { const tr = cb.closest('tr'); if (!tr || tr.style.display !== 'none') cb.checked = checked; });
+    this.bulkBarRefresh(moduleId);
+  },
+  bulkSelected(moduleId) {
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    if (!tableEl) return [];
+    return [...tableEl.querySelectorAll('tbody .sc-bulk-cb:checked')].map(cb => cb.value).filter(Boolean);
+  },
+  bulkBarRefresh(moduleId) {
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    if (!tableEl) return;
+    const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+    const n = this.bulkSelected(moduleId).length;
+    let bar = wrap.querySelector('.sc-bulk-bar');
+    if (!n) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'sc-bulk-bar';
+      bar.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;margin-bottom:12px';
+      bar.innerHTML = '<b class="sc-bulk-count" style="color:#b91c1c"></b>' +
+        /* V10.7 (#6): fee-discipline bulk actions on the Students table. */
+        (this.canonicalId(moduleId) === 'students'
+          ? '<button class="btn btn-sm btn-outline" style="border-color:#dc2626;color:#b91c1c" onclick="CRUD.bulkStudentLock(\'portal\',true)">🔒 Lock portal</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'portal\',false)">🔓 Restore portal</button>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="CRUD.bulkStudentLock(\'report\',true)">🧾 Hide report cards</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'report\',false)">🧾 Restore report cards</button>'
+          : '') +
+        '<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#b91c1c" onclick="CRUD.bulkDelete(\'' + moduleId + '\')">🗑 Delete selected</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',false)">Clear selection</button>';
+      wrap.insertBefore(bar, wrap.firstChild);
+    }
+    bar.querySelector('.sc-bulk-count').textContent = n + ' selected';
+  },
+  async bulkDelete(moduleId) {
+    const d = this.def(moduleId); if (!d || !this.sb) return;
+    const role = String((window.SC_PROFILE || {}).role || '').toLowerCase();
+    if (!(window.App && App.isAdminRole && App.isAdminRole(role))) { toast('Bulk delete is admin-only.', 'warning'); return; }
+    const ids = this.bulkSelected(moduleId);
+    if (!ids.length) { toast('Tick at least one row first.', 'info'); return; }
+    if (!confirm('Delete ' + ids.length + ' selected record(s) permanently? This cannot be undone.')) return;
+    let removed = 0, failed = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const slice = ids.slice(i, i + 100);
+      let q = this.sb.from(d.table).delete().in('id', slice);
+      if (d.generic) q = q.eq('module', d.module);
+      const { error } = await q;
+      if (error) { failed += slice.length; console.warn('[bulkDelete]', error.message); } else removed += slice.length;
+    }
+    toast(removed + ' record(s) deleted' + (failed ? ' · ' + failed + ' failed (RLS/permissions)' : '') + '.', failed ? 'warning' : 'success', 7000);
+    const wrap = (document.getElementById(moduleId + '-table') || {}).closest ? (document.getElementById(moduleId + '-table').closest('.table-wrap')) : null;
+    if (wrap) { const bar = wrap.querySelector('.sc-bulk-bar'); if (bar) bar.remove(); }
+    await this.renderList(moduleId);
+  },
+
+  /** Instant per-table search — enhances EVERY CRUD module page at once. */
+  injectTableSearch(moduleId, tableEl, rowCount) {
+    if (!tableEl) return;
+    const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
+    if (!wrap || wrap.querySelector('.sc-table-search')) {
+      // already injected — just refresh the count
+      const count = wrap.querySelector('.sc-table-count');
+      if (count) count.textContent = rowCount + ' record' + (rowCount === 1 ? '' : 's');
+      return;
+    }
+    const box = document.createElement('div');
+    box.className = 'sc-table-search';
+    box.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px';
+    const saved = '';
+    try { /* q lives for the session per module */ } catch(_) {}
+    box.innerHTML =
+      '<input class="form-input sc-table-q" placeholder="🔍 Search this table…" ' +
+      'style="flex:1;min-width:200px;max-width:420px;padding:9px 12px;border:1px solid var(--gray-200,#e2e8f0);border-radius:10px;font-size:.9rem" ' +
+      'data-module="' + moduleId + '">' +
+      '<span class="sc-table-count" style="font-size:.8rem;color:var(--gray-500,#64748b);font-weight:700">' + rowCount + ' record' + (rowCount === 1 ? '' : 's') + '</span>';
+    wrap.insertBefore(box, wrap.firstChild === tableEl ? tableEl : (wrap.querySelector('table') || tableEl));
+    const q = box.querySelector('.sc-table-q');
+    q.addEventListener('input', function () {
+      const term = this.value.trim().toLowerCase();
+      const rows = tableEl.querySelectorAll('tbody tr');
+      let shown = 0;
+      rows.forEach(function (r) {
+        if (r.querySelector('.pulse')) return;            // skip loading / error rows
+        const match = !term || r.textContent.toLowerCase().indexOf(term) !== -1;
+        r.style.display = match ? '' : 'none';
+        if (match) shown++;
+      });
+      const count = box.querySelector('.sc-table-count');
+      if (count) count.textContent = term ? (shown + ' of ' + rows.length + ' match') : (rowCount + ' record' + (rowCount === 1 ? '' : 's'));
+    });
+  },
+
+  /* Open the add/edit modal with a REAL form */
+  /* ---- option-source cache so dropdowns load once per form ---- */
+  _optCache: {},
+  dedupeOptions(options) { const seen=new Set(); return (options||[]).filter(o=>{ const label=String(o.label==null?'':o.label).replace(/\s+/g,' ').trim().toLowerCase(); const value=String(o.value==null?'':o.value).trim().toLowerCase(); const key=label||value; if(!key) return false; if(seen.has(key)) return false; seen.add(key); return true; }); },
+
+  async loadOptions(c) {
+    // c.type 'ref'    -> {refTable, refValue(col used as text), refExtra?}
+    // c.type 'lookup' -> {lookupKind}
+    if (!this.sb) return [];
+    try {
+      if (c.type === 'ref') {
+        const extra = c.refExtra || [];
+        const grpCols = c.groupBy ? [c.groupBy] : [];
+        const allExtra = Array.from(new Set(extra.concat(grpCols)));
+        const cols = ['id', c.refValue].concat(allExtra).join(',');
+        let q = this.sb.from(c.refTable).select(cols).order(c.refValue, { ascending: true }).limit(2000);
+        // refFilter: only show matching rows (e.g. only teaching staff as class teachers)
+        if (c.refFilter) Object.keys(c.refFilter).forEach(k => { try { q = q.eq(k, c.refFilter[k]); } catch (e) {} });
+        const { data } = await q;
+        return this.dedupeOptions((data || []).map(r => ({
+          value: c.refStore === 'id' ? r.id : r[c.refValue],
+          label: r[c.refValue] + (extra.length && r[extra[0]] ? ' (' + r[extra[0]] + ')' : ''),
+          group: c.groupBy ? (r[c.groupBy] || 'Unassigned') : null,
+          row: r
+        })));
+      }
+      if (c.type === 'lookup') {
+        const { data } = await this.sb.from('lookups').select('value').eq('kind', c.lookupKind).order('position');
+        return this.dedupeOptions((data || []).map(r => ({ value: r.value, label: r.value })));
+      }
+    } catch (e) { /* table may be empty/missing */ }
+    return this.dedupeOptions((c.options || []).map(o => ({ value: o, label: o })));
+  },
+
+  isOwnedByCurrent(row) {
+    if (!row) return true;
+    const uid = window.SC_PROFILE?.id || '';
+    const uname = String(window.SC_PROFILE?.full_name || '').toLowerCase();
+    const checks = [row.teacher_id, row.posted_by, row.recorded_by_id, row.created_by, row.submitted_by, row.generated_by, row.assignee, row.uploaded_by, row.awarded_by, row.updated_by, row.recorded_by];
+    if (checks.some(v => v && uid && String(v) === String(uid))) return true;
+    if (row.teacher && uname && String(row.teacher).toLowerCase() === uname) return true;
+    if (row.recorded_by && uname && String(row.recorded_by).toLowerCase() === uname) return true;
+    if (row.data && row.data.created_by && uid && String(row.data.created_by) === String(uid)) return true;
+    return false;
+  },
+
+  hasOwnershipMarker(row) {
+    if (!row) return false;
+    return !!(row.teacher_id || row.posted_by || row.recorded_by_id || row.created_by || row.submitted_by || row.generated_by || row.assignee || row.uploaded_by || row.awarded_by || row.updated_by || row.teacher || row.recorded_by || (row.data && row.data.created_by));
+  },
+
+  async openForm(moduleId, id) {
+    const d = this.def(moduleId);
+    if (!d) { toast('This module has no editable form.', 'warning'); return; }
+    if (!this.canWrite(moduleId)) { toast('Read-only for your role on this page.', 'warning', 5000); return; }
+    if (!this.sb) { toast('Database not configured (add Supabase keys in assets/js/config.js).', 'warning', 6000); return; }
+    let row = {};
+    if (id) { const { data,error } = await this.sb.from(d.table).select('*').eq('id', id).maybeSingle();if(error||!data){toast('Access denied or record unavailable. Teachers can edit only records assigned to their subject/class and owned by them.','danger',8000);return;}row=data; }
+    if (window.App && !App.isAdminRole(App.currentRole) && row && this.hasOwnershipMarker(row) && !this.isOwnedByCurrent(row)) {
+      toast('Access Denied: You can read this record, but only the creator/assigned owner or an admin can edit it.', 'danger', 7000);
+      return;
+    }
+    // Pre-load any ref/lookup/select option sources
+    const getVal = (k) => k.indexOf('data.') === 0 ? ((row.data || {})[k.slice(5)]) : row[k];
+    const fields = [];
+    for (const c of d.cols) {
+      // V12.9: auto-managed fields (is_cbt, source, cbt_exam_id) should NOT appear in Add new form — they are auto-filled via CBT page trigger
+      // Only needed fields (Title, Description, Class, Subject, Due date, Drive link) are shown for manual assignments
+      if (c.form === false) continue;
+      // V6.3: columns marked adminOnly are hidden from non-admin users entirely
+      // (e.g. leave-request status — only admin approves/rejects; RLS enforces it too).
+      if (c.adminOnly && !(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) continue;
+      const rv = getVal(c.key);
+      const val = rv != null ? rv : (c.default != null ? c.default : '');
+      const req = c.required ? ' required' : '';
+      let field;
+      if (c.type === 'textarea') {
+        field = '<textarea class="form-input" id="cf-' + CRUD.fid(c.key) + '" rows="2"' + req + '>' + esc(val) + '</textarea>';
+      } else if (c.type === 'multiref') {
+        /* V9.9: checkbox list from a ref table, stored as text[] */
+        const opts = await this.loadOptions({ type:'ref', refTable:c.refTable, refValue:c.refValue, refStore:'value' });
+        const cur = Array.isArray(val) ? val.map(String) : (typeof val==='string'&&val? val.replace(/[{}"]/g,'').split(',').map(s=>s.trim()).filter(Boolean) : []);
+        field = '<div id="cf-' + CRUD.fid(c.key) + '" data-multiref="1" style="display:flex;gap:8px 14px;flex-wrap:wrap;border:1px solid var(--gray-200);border-radius:10px;padding:8px 10px">' +
+          (opts.length ? opts.map(o => '<label style="font-weight:500"><input type="checkbox" class="cf-mr" value="' + esc(o.value) + '"' + (cur.includes(String(o.value)) ? ' checked' : '') + '> ' + esc(o.label) + '</label>').join('') : '<span style="color:var(--gray-500);font-size:.85rem">No records in ' + esc(c.refTable) + ' yet.</span>') + '</div>';
+      } else if (c.type === 'ref' || c.type === 'lookup' || c.type === 'select') {
+        const opts = this.dedupeOptions((c.type === 'select') ? (c.options || []).map(o => ({ value: o, label: o })) : await this.loadOptions(c));
+        const onchg = (c.type === 'ref' && c.autofill) ? ' onchange="CRUD.onRefChange(\'' + moduleId + '\',\'' + c.key + '\',this)"' : '';
+        const optHtml = (o) => '<option value="' + esc(o.value) + '"' + (String(val) === String(o.value) ? ' selected' : '') + (o.row ? ' data-row=\'' + esc(JSON.stringify(o.row)) + '\'' : '') + '>' + esc(o.label) + '</option>';
+        let inner;
+        if (c.groupBy && opts.some(o => o.group)) {
+          // Group options by class (issue 11) for compact, easy navigation.
+          const groups = {};
+          opts.forEach(o => { const g = o.group || 'Unassigned'; (groups[g] = groups[g] || []).push(o); });
+          inner = Object.keys(groups).sort().map(g => '<optgroup label="' + esc(g) + '">' + groups[g].map(optHtml).join('') + '</optgroup>').join('');
+        } else {
+          inner = opts.map(optHtml).join('');
+        }
+        const selId = 'cf-' + CRUD.fid(c.key);
+        const selectHtml = '<select class="form-select" id="' + selId + '"' + onchg + '><option value="">— select —</option>' + inner + '</select>';
+        if (c.groupBy && c.searchable && opts.some(o => o.group)) {
+          // Issue 7: pick a class first, then only that class's students show;
+          // plus a search box to find a student by typing a few letters.
+          const classes = Array.from(new Set(opts.map(o => o.group || 'Unassigned'))).sort();
+          const classFilter = '<select class="form-select" style="margin-bottom:6px" onchange="CRUD.filterRefByClass(\'' + selId + '\',this.value)"><option value="">— all classes —</option>' + classes.map(g => '<option>' + esc(g) + '</option>').join('') + '</select>';
+          const searchBox = '<input class="form-input" style="margin-bottom:6px" placeholder="🔎 type a few letters of the name…" oninput="CRUD.filterRefBySearch(\'' + selId + '\',this.value)">';
+          field = '<div data-ref-wrap="' + selId + '">' + classFilter + searchBox + selectHtml + '</div>';
+        } else {
+          field = selectHtml;
+        }
+      } else if (c.type === 'checkbox') {
+        field = '<label style="display:inline-flex;gap:8px;align-items:center"><input type="checkbox" id="cf-' + CRUD.fid(c.key) + '"' + (val ? ' checked' : '') + '> ' + esc(c.label) + '</label>';
+      } else if (c.type === 'time') {
+        field = '<input class="form-input" id="cf-' + CRUD.fid(c.key) + '" type="time" value="' + esc(val) + '"' + req + '>';
+      } else {
+        field = '<input class="form-input" id="cf-' + CRUD.fid(c.key) + '" type="' + (c.type || 'text') + '" value="' + esc(val) + '"' + (c.readonly ? ' readonly' : '') + req + (c.placeholder ? ' placeholder="' + esc(c.placeholder) + '"' : '') + '>';
+      }
+      const labelHtml = (c.type === 'checkbox') ? '' : '<label>' + esc(c.label) + (c.required ? ' *' : '') + (c.help ? ' <span style="color:var(--gray-500);font-weight:400;font-size:.8rem">— ' + esc(c.help) + '</span>' : '') + '</label>';
+      fields.push('<div class="form-group">' + labelHtml + field + '</div>');
+    }
+    openModal((id ? 'Edit ' : 'Add ') + d.title, fields.join(''),
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="CRUD.save(\'' + moduleId + '\',' + (id ? '\'' + id + '\'' : 'null') + ')">Save</button>');
+    try { if (window.App && App.dedupeAllSelects) App.dedupeAllSelects(); } catch (_) {}
+    /* V7.4 #4: NEW records auto-select the CURRENT term & session everywhere —
+       no more typing the same period on every form. (Edits keep stored values;
+       every auto-choice remains editable.)
+       V7.5 #4 extends this: today's date, current month/year and the signed-in
+       staff member's own name are also pre-filled on NEW records. */
+    if (!id) setTimeout(() => { try { this.autofillPeriod(); this.autofillToday(); } catch(_) {} }, 250);
+    /* V9.4 (#8): class fee structure — live total as components are typed. */
+    if (this.canonicalId(moduleId) === 'school_fees') setTimeout(() => { try {
+      const parts = ['tuition','exam_fee','development','transport','boarding','other_fee','discount'];
+      const totEl = document.getElementById('cf-' + CRUD.fid('total'));
+      if (!totEl) return;
+      const recompute = () => {
+        let sum = 0;
+        parts.forEach(k => { const el = document.getElementById('cf-' + CRUD.fid(k)); if (el) sum += (k === 'discount' ? -1 : 1) * (Number(el.value) || 0); });
+        if (sum !== 0) totEl.value = Math.max(0, sum).toFixed(2);
+      };
+      parts.forEach(k => { const el = document.getElementById('cf-' + CRUD.fid(k)); if (el) el.addEventListener('input', recompute); });
+      totEl.ondblclick = () => { totEl.readOnly = false; totEl.focus(); if (typeof toast === 'function') toast('Total unlocked — for lump-sum schools that do not itemise components.', 'info', 5000); };
+      recompute();
+    } catch(_) {} }, 300);
+    /* V8.5 #3: LIVE net-pay preview on the payroll form — earnings minus ALL
+       deductions recompute as the bursar types, so the figure is verifiably
+       right before saving (the DB trigger remains the authority on save). */
+    if (['payroll','hr'].includes(this.canonicalId(moduleId))) setTimeout(() => { try {
+      const F=['basic','allowances','bonus','overtime','tax','pension','loan_deduction','other_deductions'];
+      const netEl=document.getElementById('cf-net_pay'); if(!netEl) return;
+      const recompute=()=>{ const v=k=>Number((document.getElementById('cf-'+k)||{}).value)||0;
+        const net=Math.max(0,(v('basic')+v('allowances')+v('bonus')+v('overtime'))-(v('tax')+v('pension')+v('loan_deduction')+v('other_deductions')));
+        netEl.value=net; netEl.style.fontWeight='800'; netEl.style.color=net>0?'#166534':'#b91c1c'; };
+      F.forEach(k=>{ const el=document.getElementById('cf-'+k); if(el) el.addEventListener('input',recompute); });
+      recompute();
+    } catch(_) {} }, 300);
+  },
+
+  /* When a ref dropdown with autofill changes (e.g. pick a student), copy
+     extra fields like the student's name and DOB into the form (issues 1 & 10). */
+
+  /* V7.4 #3: class-ladder intelligence. Natural-sorts the registered classes
+     (JSS 1 < JSS 2 < ... < SS 3) and returns the next rung, or null when the
+     student is in the final class (=> graduate). */
+  _classLadder: null,
+  async classLadder(){
+    if (this._classLadder) return this._classLadder;
+    try {
+      const { data } = await this.sb.from('classes').select('name').limit(200);
+      const names=[...new Set((data||[]).map(x=>String(x.name||'').trim()).filter(Boolean))];
+      const tok=(s)=>{const m=String(s).toUpperCase().match(/^([A-Z]*)\s*(\d+)/)||[];return {p:m[1]||String(s).toUpperCase(),n:Number(m[2]||0)};};
+      const rank=(s)=>{const t=tok(s);const stage={'KG':0,'NUR':1,'NURSERY':1,'PRY':2,'PRIMARY':2,'BASIC':2,'JSS':3,'JS':3,'SS':4,'SSS':4}[t.p];return (stage==null?9:stage)*100+t.n;};
+      names.sort((a,b)=>rank(a)-rank(b)||a.localeCompare(b));
+      this._classLadder=names; return names;
+    } catch(_) { return []; }
+  },
+  async nextClassOf(cls){
+    const ladder=await this.classLadder();
+    const i=ladder.findIndex(x=>x.toLowerCase()===String(cls||'').trim().toLowerCase());
+    if(i<0) return null;
+    return (i>=ladder.length-1) ? '__last__' : ladder[i+1];
+  },
+  /* V7.4 #4: current academic period, cached — used to auto-select term/session
+     everywhere a form leaves them blank. */
+  _curPeriod: null,
+  async currentPeriod(){
+    if (this._curPeriod) return this._curPeriod;
+    try { const { data } = await this.sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();
+      this._curPeriod = data || {}; } catch(_) { this._curPeriod = {}; }
+    return this._curPeriod;
+  },
+  /* Auto-select current term/session in an open form when fields are empty. */
+  async autofillPeriod(){
+    try {
+      const cp = await this.currentPeriod(); if (!cp || (!cp.term && !cp.session)) return;
+      [['term',cp.term],['session',cp.session]].forEach(([k,v])=>{
+        if(!v) return;
+        const el=document.getElementById('cf-'+CRUD.fid(k)); if(!el||el.value) return;
+        if(el.tagName==='SELECT'&&![...el.options].some(o=>o.value===v)) el.add(new Option(v,v));
+        el.value=v;
+      });
+    } catch(_) {}
+  },
+  /* V7.5 #4: platform-wide "never type what the system already knows".
+     On every NEW form: today's date fills empty *record-date* fields (never
+     birthdays, due/review/next dates), the current month/year fill payroll-style
+     fields, and staff-authored forms pre-pick the signed-in staff member's own
+     name. Every auto-choice stays fully editable. */
+  autofillToday(){
+    try {
+      const today = new Date().toISOString().slice(0,10);
+      const SAFE = ['date','ref_date','award_date','date_taken','payment_date','visit_date','checkin_date','entry_date','issue_date','start_date','date_of_leaving'];
+      SAFE.forEach(k => {
+        const el = document.getElementById('cf-'+CRUD.fid(k));
+        if (el && el.type === 'date' && !el.value) el.value = today;
+      });
+      const mEl = document.getElementById('cf-month');
+      if (mEl && mEl.tagName === 'SELECT' && !mEl.value) {
+        const mName = new Date().toLocaleString('en-GB',{month:'long'});
+        if ([...mEl.options].some(o=>o.value===mName)) mEl.value = mName;
+      }
+      const yEl = document.getElementById('cf-year');
+      if (yEl && !yEl.value) yEl.value = new Date().getFullYear();
+      /* Staff self-identification: leave requests, lesson plans, diaries etc.
+         pre-pick the signed-in teacher in a 'staff_name' ref when empty. */
+      const meName = String((window.SC_PROFILE||{}).full_name||'').trim();
+      const role = String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if (meName && ['staff','teacher'].includes(role)) {
+        ['staff_name','teacher','recorded_by'].forEach(k=>{
+          const el = document.getElementById('cf-'+CRUD.fid(k)); if(!el||el.value) return;
+          if (el.tagName==='SELECT') { const hit=[...el.options].find(o=>String(o.value).toLowerCase()===meName.toLowerCase()); if(hit) el.value=hit.value; }
+          else if (el.tagName==='INPUT') el.value = meName;
+        });
+      }
+    } catch(_) {}
+  },
+  /* V7.5 #1: remember the last student an admin worked with, so ID-card and
+     report-card pages opened from ANY route (profile button, sidebar link)
+     can auto-load that student without retyping. */
+  rememberStudent(s){
+    try { if (s && (s.admission_no || s.full_name)) sessionStorage.setItem('sc_last_student',
+      JSON.stringify({ adm:s.admission_no||'', name:s.full_name||'', cls:s.class||'', at:Date.now() })); } catch(_) {}
+  },
+  lastStudent(maxAgeMin){
+    try { const j=JSON.parse(sessionStorage.getItem('sc_last_student')||'null');
+      if (j && (Date.now()-(j.at||0)) < (maxAgeMin||30)*60000) return j; } catch(_) {}
+    return null;
+  },
+  onRefChange(moduleId, key, sel) {
+    try {
+      const opt = sel.options[sel.selectedIndex];
+      const rowJson = opt && opt.getAttribute('data-row');
+      if (!rowJson) return;
+      const r = JSON.parse(rowJson);
+      const d = this.def(moduleId);
+      const c = d.cols.find(x => x.key === key);
+      if (c && c.autofill) Object.keys(c.autofill).forEach(targetKey => {
+        const srcCol = c.autofill[targetKey];
+        const el = document.getElementById('cf-' + CRUD.fid(targetKey));
+        if (el && r[srcCol] != null) el.value = r[srcCol];
+      });
+      /* V7.4 #3: PROMOTION smart-fill — picking the student completes the whole
+         row: To-class = next rung on the class ladder (or graduation on the
+         final class), Action, Status 'approved' and the current term/session.
+         The admin just reviews and saves. Every value stays editable. */
+      /* V9.4 (#9): FEE SMART-FILL — picking the student pulls the authoritative
+         total due from sc_student_fee_state (class-fee-structure bill − paid
+         this term + previous-term arrears), fills term/session with the current
+         period, and wires a live balance computation on the amount field. The
+         readonly total unlocks on double-click for edge-case overrides. */
+      /* V10.1 (#1): PAYROLL SMART-FILL — picking the staff member pulls their
+         APPROVED bonuses (sum → Bonus field) and ACTIVE loans' monthly
+         repayment (→ Loan repayment field) automatically; net pay is computed
+         by the database trigger. The admin just reviews and saves. */
+      if (['payroll','hr'].includes(this.canonicalId(moduleId)) && key === 'staff_name') {
+        (async () => {
+          try {
+            const name = sel.value; if (!name) return;
+            const [bon, loans] = await Promise.all([
+              this.sb.from('staff_bonus').select('amount,status,reason').ilike('staff_name', name).eq('status','approved').limit(50),
+              this.sb.from('staff_loans').select('monthly_repayment,principal,amount_repaid,repaid_from_payroll,status').ilike('staff_name', name).eq('status','active').limit(20)
+            ]);
+            const bonusEl = document.getElementById('cf-' + CRUD.fid('bonus'));
+            const loanEl = document.getElementById('cf-' + CRUD.fid('loan_deduction'));
+            const bonTotal = (bon.data||[]).reduce((a,b)=>a+(Number(b.amount)||0),0);
+            let monthly = 0, balance = 0;
+            (loans.data||[]).forEach(l => { monthly += Number(l.monthly_repayment)||0;
+              balance += Math.max(0,(Number(l.principal)||0)-(Number(l.amount_repaid)||0)-(Number(l.repaid_from_payroll)||0)); });
+            const bits = [];
+            if (bonusEl && bonTotal > 0 && !Number(bonusEl.value)) { bonusEl.value = bonTotal.toFixed(2); bits.push('🎁 approved bonuses ' + bonTotal.toLocaleString() + ' → Bonus'); }
+            if (loanEl && monthly > 0 && !Number(loanEl.value)) { const ded = Math.min(monthly, balance); loanEl.value = ded.toFixed(2); bits.push('🏦 monthly loan repayment ' + ded.toLocaleString() + ' → Loan deduction (balance ' + balance.toLocaleString() + ')'); }
+            if (bits.length && typeof toast === 'function') toast('💼 Auto-pulled for ' + name + ': ' + bits.join(' · ') + '. Net pay computes automatically — review and save.', 'info', 10000);
+            /* live net preview refresh if the page has one */
+            try { if (loanEl) loanEl.dispatchEvent(new Event('input')); if (bonusEl) bonusEl.dispatchEvent(new Event('input')); } catch(_) {}
+          } catch (_) {}
+        })();
+      }
+      if (this.canonicalId(moduleId) === 'fees' && key === 'student_id') {
+        (async () => {
+          try {
+            const totEl = document.getElementById('cf-' + CRUD.fid('fee_total'));
+            const paidEl = document.getElementById('cf-' + CRUD.fid('amount_paid'));
+            const balEl = document.getElementById('cf-' + CRUD.fid('balance'));
+            const stuId = sel.value;
+            if (!stuId || !totEl) return;
+            totEl.placeholder = 'Loading fee record…';
+            const fr = await this.sb.rpc('sc_student_fee_state', { p_student: stuId });
+            const f = (fr && fr.data) || {};
+            const recompute = () => { if (balEl) balEl.value = Math.max(0, (Number(totEl.value) || 0) - (Number(paidEl && paidEl.value) || 0)).toFixed(2); };
+            if (fr.error || f.ok === false) {
+              totEl.readOnly = false;
+              if (typeof toast === 'function') toast(fr.error ? 'Auto fee lookup needs the v9.4 database update — enter the total manually for now.' : (f.error || 'Fee lookup failed.'), 'warning', 8000);
+            } else if (f.matched === false || (Number(f.bill||0) === 0 && Number(f.total_due||0) === 0 && Number(f.paid||0) === 0)) {
+              /* V10 (#1): the RPC found NO fee structure for this student's
+                 class/term — say so loudly instead of quietly writing 0. */
+              totEl.readOnly = false; totEl.value = '';
+              totEl.placeholder = 'No fee structure found — enter manually';
+              if (typeof toast === 'function') toast('⚠️ No Class Fee Structure matched ' + (f.class||'this student\'s class') + ' for ' + (f.term||'the current term') + '. Check: (a) a CURRENT-term bill exists for the class on the 💳 Class Fee Structure page, (b) the class name spelling matches the student record, (c) the row is active. You can type the total manually for now.', 'warning', 12000);
+            } else {
+              const due = Number(f.total_due || 0);
+              totEl.value = due.toFixed(2);
+              const bits = ['bill ' + (f.currency||'₦') + Number(f.bill||0).toLocaleString()];
+              if (Number(f.paid||0) > 0) bits.push('already paid ' + (f.currency||'₦') + Number(f.paid).toLocaleString());
+              if (Number(f.arrears||0) > 0) bits.push('previous terms owing ' + (f.currency||'₦') + Number(f.arrears).toLocaleString());
+              if (Number(f.opening_arrears||0) > 0) bits.push('incl. pre-School-Connect balance ' + (f.currency||'₦') + Number(f.opening_arrears).toLocaleString());
+              if (typeof toast === 'function') toast('💰 Total due auto-filled: ' + (f.currency||'₦') + due.toLocaleString() + ' (' + bits.join(' · ') + '). Double-click the field to override.', 'info', 9000);
+              const tEl = document.getElementById('cf-' + CRUD.fid('term')), sEl = document.getElementById('cf-' + CRUD.fid('session'));
+              if (tEl && !tEl.value && f.term) tEl.value = f.term;
+              if (sEl && !sEl.value && f.session) sEl.value = f.session;
+            }
+            /* V10.7 (#5): show the student's saved OPENING ARREARS in the form
+               so the bursar can review/correct it; changed values save onto
+               the student record and recompute the live total. */
+            try {
+              const oaEl = document.getElementById('cf-' + CRUD.fid('opening_arrears'));
+              const onEl = document.getElementById('cf-' + CRUD.fid('opening_arrears_note'));
+              if (oaEl || onEl) {
+                const sr = await this.sb.from('students').select('opening_arrears,opening_arrears_note').eq('id', stuId).maybeSingle();
+                if (!sr.error && sr.data) {
+                  if (oaEl && oaEl.value === '') { oaEl.value = Number(sr.data.opening_arrears || 0) || ''; oaEl.dataset.scLoaded = String(Number(sr.data.opening_arrears || 0)); }
+                  if (onEl && !onEl.value) { onEl.value = sr.data.opening_arrears_note || ''; onEl.dataset.scLoaded = sr.data.opening_arrears_note || ''; }
+                }
+                if (oaEl && !oaEl._scWired) { oaEl._scWired = true;
+                  oaEl.addEventListener('input', () => {
+                    const base = Number(totEl.value) || 0;
+                    const was = Number(oaEl.dataset.scLoaded || 0);
+                    const now = Number(oaEl.value) || 0;
+                    /* live preview: adjust total by the CHANGE in opening arrears */
+                    totEl.value = Math.max(0, base - was + now).toFixed(2);
+                    oaEl.dataset.scLoaded = String(now);
+                    recompute();
+                  });
+                }
+              }
+            } catch(_) {}
+            /* V10.3 (#4) ROOT-CAUSE FIX: the double-click override used to be
+               saved into fee_payments.fee_total but sc_student_fee_state kept
+               recomputing the bill from the CLASS fee structure, so the
+               student dashboard ignored the adjusted figure. Now the unlock
+               remembers the auto value; if the admin actually CHANGES it, the
+               row is flagged total_overridden=true and the V10.3 RPC treats
+               that figure as this student's personal total due everywhere
+               (dashboard, receipts, family panel). */
+            totEl.dataset.scAutoTotal = totEl.value || '';
+            totEl.ondblclick = () => { totEl.readOnly = false; totEl.focus(); if (typeof toast === 'function') toast('Total due unlocked for manual override (admin discretion). If you change it, the new figure becomes this student\'s personal total due on their dashboard and receipts.', 'info', 7000); };
+            totEl.oninput = () => {
+              recompute();
+              const auto = Number(totEl.dataset.scAutoTotal || 0);
+              totEl.dataset.scOverridden = (!totEl.readOnly && Math.abs((Number(totEl.value) || 0) - auto) > 0.005) ? '1' : '';
+            };
+            if (paidEl) paidEl.oninput = recompute;
+            recompute();
+          } catch (_) {}
+        })();
+      }
+      if (this.canonicalId(moduleId) === 'promotion' && key === 'student_id') {
+        (async () => {
+          try {
+            const next = await this.nextClassOf(r.class);
+            const toEl = document.getElementById('cf-' + CRUD.fid('to_class'));
+            const actEl = document.getElementById('cf-' + CRUD.fid('action'));
+            const stEl = document.getElementById('cf-' + CRUD.fid('status'));
+            if (next === '__last__') {
+              if (actEl && !actEl.value) actEl.value = 'graduate';
+              if (toEl && !toEl.value) { if(toEl.tagName==='SELECT'&&![...toEl.options].some(o=>o.value==='GRADUATED'))toEl.add(new Option('GRADUATED','GRADUATED')); toEl.value='GRADUATED'; }
+              if (typeof toast==='function') toast(r.full_name+' is in the FINAL class ('+r.class+') — auto-set to GRADUATE. Change it if needed.','info',6000);
+            } else if (next) {
+              if (toEl && !toEl.value) { if(toEl.tagName==='SELECT'&&![...toEl.options].some(o=>o.value===next))toEl.add(new Option(next,next)); toEl.value=next; }
+              if (actEl && !actEl.value) actEl.value='promote';
+              if (typeof toast==='function') toast('Auto-filled: '+r.class+' → '+next+' (promote). Adjust if this student should repeat or graduate.','info',6000);
+            }
+            if (stEl && (!stEl.value || stEl.value==='draft')) stEl.value='approved';
+            await this.autofillPeriod();
+            /* V7.5 #3: the AVERAGE also fills itself — pulled live from this
+               student's results for the current period (falls back to any
+               period). No promotion field needs typing anymore. */
+            try {
+              const avgEl = document.getElementById('cf-' + CRUD.fid('average'));
+              if (avgEl && !avgEl.value) {
+                const cp = await this.currentPeriod();
+                let rq = this.sb.from('results').select('ca1,ca2,ca3,exam').eq('student_name', r.full_name);
+                if (cp && cp.term) rq = rq.eq('term', cp.term);
+                if (cp && cp.session) rq = rq.eq('session', cp.session);
+                let { data: rs } = await rq.limit(50);
+                if (!rs || !rs.length) ({ data: rs } = await this.sb.from('results').select('ca1,ca2,ca3,exam').eq('student_name', r.full_name).limit(50));
+                if (rs && rs.length) {
+                  const tots = rs.map(x => (Number(x.ca1)||0)+(Number(x.ca2)||0)+(Number(x.ca3)||0)+(Number(x.exam)||0));
+                  avgEl.value = Math.round((tots.reduce((a,b)=>a+b,0)/tots.length)*10)/10;
+                }
+              }
+            } catch(_) {}
+          } catch(_) {}
+        })();
+      }
+    } catch (e) {}
+  },
+
+  async save(moduleId, id) {
+    try { return await this._saveInner(moduleId, id); }
+    catch (e) {
+      // ENTERPRISE V11 (issue 11): never fail silently — every unexpected
+      // exception during save now surfaces as a visible error toast.
+      console.error('[CRUD.save] unexpected error:', e);
+      toast('Could not save: ' + (e && e.message ? e.message : 'unexpected error — see console'), 'danger', 8000);
+    }
+  },
+  async _saveInner(moduleId, id) {
+    const d = this.def(moduleId);
+    if (!this.canWrite(moduleId)) { toast('Read-only for your role on this page.', 'warning', 5000); return; }
+    if (!d || !this.sb) { toast('Database not configured.', 'warning'); return; }
+    const payload = {};
+    const dataObj = {};
+    let missing = '';
+    d.cols.forEach(c => {
+      const el = document.getElementById('cf-' + CRUD.fid(c.key)); if (!el) return;
+      /* V9.9: multiref reads its checkbox list into a text[] */
+      if (c.type === 'multiref') {
+        const arr = [...el.querySelectorAll('.cf-mr:checked')].map(x => x.value);
+        if (c.key.indexOf('data.') === 0) dataObj[c.key.slice(5)] = arr; else payload[c.key] = arr.length ? arr : null;
+        return;
+      }
+      let v = c.type === 'checkbox' ? el.checked : el.value;
+      if (c.type === 'number') v = v === '' ? null : Number(v);
+      if (c.type !== 'checkbox' && v === '') v = null;
+      if (c.required && (v === null || v === '')) missing = c.label;
+      if (c.computeOnly) return; // display-only helper field, not stored
+      if (c.key.indexOf('data.') === 0) dataObj[c.key.slice(5)] = v; else payload[c.key] = v;
+    });
+    if (missing) { toast(missing + ' is required.', 'warning'); return; }
+    if (d.generic) { payload.module = d.module; payload.data = dataObj; if (!payload.title && dataObj.title) payload.title = dataObj.title; if (!id && window.SC_PROFILE && SC_PROFILE.id) payload.created_by = SC_PROFILE.id;
+      /* V10.6 (#3) ROOT CAUSE of "Lost & Found never appears for students/
+         parents": module_records defaults audience='private', and the RLS
+         select policy hides private rows from non-staff. Community modules
+         are meant for the WHOLE school — stamp them 'all' so every role's
+         dashboard Live Feed and page lists can read them. */
+      const communityModules=['lost_found','parent_meeting','cafeteria','menu','school_calendar','gallery','surveys','broadcast'];
+      if (!payload.audience && communityModules.includes(d.module)) payload.audience='all';
+    }
+    if (!id && ['complaints','helpdesk_tickets'].includes(d.table) && window.SC_PROFILE && SC_PROFILE.id) payload.submitted_by = SC_PROFILE.id;
+    if (!id && d.table === 'health' && window.SC_PROFILE && SC_PROFILE.id) { payload.recorded_by_id = SC_PROFILE.id; if (!payload.recorded_by && SC_PROFILE.full_name) payload.recorded_by = SC_PROFILE.full_name; }
+    if (!id && ['academic_print_records','reports'].includes(d.table) && window.SC_PROFILE && SC_PROFILE.id) payload.generated_by = SC_PROFILE.id;
+    if(d.table==='report_comments'){payload.comment_source='manual';payload.comment_locked=true;payload.comment_band_id=null;payload.applied_percent=null;}
+    if(window.SC_PROFILE&&SC_PROFILE.id){if(d.table==='digital_library')payload.teacher_id=SC_PROFILE.id;if(d.table==='eresources')payload.uploaded_by=SC_PROFILE.id;if(d.table==='conduct')payload.recorded_by_id=SC_PROFILE.id;if(d.table==='behaviour_points')payload.awarded_by=SC_PROFILE.id;if(d.table==='support_plans')payload.created_by=SC_PROFILE.id;if(d.table==='student_diary')payload.created_by=SC_PROFILE.id;if(['affective_traits','psychomotor_traits','report_comments'].includes(d.table))payload.teacher_id=SC_PROFILE.id;if(d.table==='leave_requests'&&!payload.requested_by)payload.requested_by=SC_PROFILE.id;}
+    // V6/V4: teacher-owned academic records. Admin can supervise all, but subject teachers
+    // should not edit/delete another teacher's records.
+    if (window.SC_PROFILE && SC_PROFILE.id && !(window.App && App.isAdminRole && App.isAdminRole(App.currentRole))) {
+      const ownedTables = ['results','assignments','scheme_of_work','lesson_plans','cbt_exams','attendance','health','helpdesk_tickets','reports'];
+      if (ownedTables.includes(d.table)) {
+        if (!payload.teacher_id) payload.teacher_id = SC_PROFILE.id;
+        if (!payload.posted_by) payload.posted_by = SC_PROFILE.id;
+        if (!payload.recorded_by && d.table === 'attendance') payload.recorded_by = SC_PROFILE.id;
+        const hasTeacherCol = (d.cols || []).some(c => c.key === 'teacher');
+        if (!payload.teacher && SC_PROFILE.full_name && hasTeacherCol) payload.teacher = SC_PROFILE.full_name;
+      }
+    }
+    if (d.table === 'results' && !id) {
+      payload.assessment_source = payload.assessment_source || 'manual';
+    }
+    /* V8.6 #1 ROOT-CAUSE FIX (payroll net wrong AFTER save on some installs):
+       we used to NEVER send net_pay and trust the DB trigger — but databases
+       installed before the trigger existed (or with an older additive-only
+       version) stored a WRONG or stale net. Now the client sends the
+       CORRECTLY computed net (earnings − ALL deductions); on modern DBs the
+       trigger recomputes the identical figure, and on DBs where net_pay is a
+       GENERATED column the self-heal below strips it and retries. Every
+       database version now ends up with the right number. */
+    if (d.table === 'payroll') {
+      const pv = k => Number(payload[k]) || 0;
+      payload.net_pay = Math.max(0,
+        (pv('basic') + pv('allowances') + pv('bonus') + pv('overtime')) -
+        (pv('tax') + pv('pension') + pv('loan_deduction') + pv('other_deductions') + pv('deductions')));
+    }
+    /* V10.1 (#5/#6): audit stamps for SOW affirmation + lesson-plan vetting */
+    if(d.table==='scheme_of_work'&&payload.admin_affirmed&&window.SC_PROFILE){payload.affirmed_by=SC_PROFILE.full_name||SC_PROFILE.email||'';payload.affirmed_at=new Date().toISOString();}
+    if(d.table==='lesson_plans'&&window.SC_PROFILE&&window.App&&App.isAdminRole&&App.isAdminRole(App.currentRole)){
+      if(payload.review_feedback||['approved','needs-changes'].includes(String(payload.status||''))){payload.reviewed_by=SC_PROFILE.full_name||SC_PROFILE.email||'';payload.reviewed_at=new Date().toISOString();}}
+    if(d.table==='fee_payments'&&window.SC_PROFILE){if(!id&&!payload.received_by)payload.received_by=SC_PROFILE.id||null;if(!payload.received_by_name)payload.received_by_name=SC_PROFILE.full_name||SC_PROFILE.email||'';if(!payload.payment_date)payload.payment_date=new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});}
+    // ENTERPRISE V11 (issue 13): auto-compute fee balance when blank
+    if (d.table === 'fee_payments' && payload.balance == null && payload.fee_total != null) {
+      payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
+    }
+    /* V10.3 (#4): persist the DELIBERATE total-due override flag. Only set
+       when the admin double-click-unlocked the field AND changed the value —
+       an untouched auto-filled total keeps the class fee structure authority.
+       The self-healing save strips the column automatically on databases
+       that have not run database/v10.3 yet. */
+    if (d.table === 'fee_payments') {
+      try {
+        const totEl = document.getElementById('cf-' + this.fid('fee_total'));
+        if (totEl && totEl.dataset.scOverridden === '1') payload.total_overridden = true;
+      } catch(_) {}
+      /* V10.7 (#5): OPENING ARREARS live on the STUDENT record, not on this
+         payment row — write them there so every future fee lookup, dashboard
+         card and receipt includes the pre-School-Connect balance. Blank =
+         untouched; explicit 0 clears the debt. Self-heals on databases that
+         have not run database/v10.7 (column missing → clear guidance). */
+      try {
+        const oaEl = document.getElementById('cf-' + this.fid('opening_arrears'));
+        const onEl = document.getElementById('cf-' + this.fid('opening_arrears_note'));
+        const stuId = payload.student_id;
+        if (stuId && oaEl && String(oaEl.value).trim() !== '') {
+          const patch = { opening_arrears: Number(oaEl.value) || 0 };
+          if (onEl) patch.opening_arrears_note = onEl.value || '';
+          const ur = await this.sb.from('students').update(patch).eq('id', stuId);
+          if (ur.error && /opening_arrears/.test(ur.error.message || '')) {
+            toast('Opening-arrears needs a one-time database update — admin: run database/v10.7-fee-locks-arrears.sql. The payment itself still saves.', 'warning', 10000);
+          } else if (!ur.error && patch.opening_arrears > 0) {
+            toast('🧾 Opening arrears of ' + patch.opening_arrears.toLocaleString() + ' saved on the student record — it now joins every total-due computation until cleared (enter 0 to clear).', 'info', 9000);
+          }
+        }
+      } catch(_) {}
+    }
+    // ENTERPRISE FINAL V2 (#8): normalise balance to a number when present
+    if (d.table === 'fee_payments' && payload.balance != null) payload.balance = Number(payload.balance) || 0;
+    // Issue 5: auto-compute appraisal average score + band
+    if (d.table === 'staff_appraisals') {
+      const keys = ['punctuality', 'teaching_quality', 'student_results', 'teamwork', 'conduct'];
+      const vals = keys.map(k => Number(payload[k])).filter(v => !isNaN(v));
+      if (vals.length) {
+        const avg = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+        const band = avg >= 8 ? 'Excellent' : avg >= 6.5 ? 'Very Good' : avg >= 5 ? 'Good' : avg >= 4 ? 'Fair' : 'Needs Improvement';
+        payload.total_score = avg + '/10 — ' + band;
+      }
+    }
+    // (res declared below by the self-healing save wrapper)
+    
+    // Admission/staff IDs are generated only by PostgreSQL triggers from the
+    // saved school_settings format. Browser-side generation formerly used stale
+    // config.js acronyms (e.g. GSA) and ignored GOSA/YYYY/NNNN settings.
+    if(d.table==='students'&&!id)delete payload.admission_no;
+    if(d.table==='staff'&&!id)delete payload.staff_no;
+    // Auto-fill changed_by for role_status_log
+    if (d.table === 'role_status_log' && !payload.changed_by) {
+      try { payload.changed_by = (window.SC_PROFILE && SC_PROFILE.full_name) || (window.SC_PROFILE && SC_PROFILE.email) || ''; } catch(_){}
+    }
+
+
+    /* V10.9 (#1): PRE-SAVE ENTRY GUARDS for fee payments — catch the classic
+       recording errors BEFORE they enter the ledger:
+         a) zero / negative / non-numeric amount → hard block;
+         b) same student + same amount already recorded TODAY → double-entry
+            confirm (the #1 real-world duplicate: a double-click or a retry
+            after a slow save);
+         c) implausibly large amount (>10× the current bill) → typo confirm. */
+    if (!id && d.table === 'fee_payments') {
+      const amt = Number(payload.amount_paid);
+      if (!isFinite(amt) || amt <= 0) { toast('⛔ Amount paid must be a positive number. To CORRECT an earlier entry, edit or delete that entry instead of adding a negative one — the ledger recomputes itself.', 'warning', 10000); return; }
+      if (payload.student_id) {
+        try {
+          const today = new Date(); today.setHours(0,0,0,0);
+          const dup = await this.sb.from('fee_payments').select('id,amount_paid,created_at').eq('student_id', payload.student_id).eq('amount_paid', amt).gte('created_at', today.toISOString()).limit(3);
+          if (!dup.error && dup.data && dup.data.length) {
+            if (!confirm('⚠️ POSSIBLE DOUBLE ENTRY\n\nA payment of ' + amt.toLocaleString() + ' for this SAME student was already recorded TODAY (' + dup.data.length + ' time' + (dup.data.length>1?'s':'') + ').\n\nRecord it again anyway?')) return;
+          }
+          const tot = Number(payload.fee_total || 0);
+          if (tot > 0 && amt > tot * 10) {
+            if (!confirm('⚠️ UNUSUALLY LARGE AMOUNT\n\nYou are recording ' + amt.toLocaleString() + ' against a bill of ' + tot.toLocaleString() + ' — more than 10× the total due. Is this a typo (extra zero)?\n\nSave anyway?')) return;
+          }
+        } catch(_) {}
+      }
+    }
+    // parent_child duplicate guard: show a friendly message instead of Supabase unique constraint error.
+    if (!id && d.table === 'parent_child' && payload.parent_id && payload.student_id) {
+      const ex = await this.sb.from('parent_child').select('id').eq('parent_id', payload.parent_id).eq('student_id', payload.student_id).maybeSingle().then(r=>r, ()=>({data:null}));
+      if (ex.data) { toast('This parent is already linked to this child. Choose another child or update the existing link.', 'warning', 7000); return; }
+    }
+    const sharedTables = []; // Shared visibility never implies shared edit/delete ownership.
+    if (id && window.App && !App.isAdminRole(App.currentRole) && !sharedTables.includes(d.table)) {
+      const { data: row } = await this.sb.from(d.table).select('*').eq('id', id).maybeSingle();
+      if (row && this.hasOwnershipMarker(row) && !this.isOwnedByCurrent(row)) {
+        toast('Access Denied: You can read this record, but only the creator/assigned owner or an admin can modify it.', 'danger', 7000);
+        return;
+      }
+    }
+    // Free-tier guard: operational records store external links, never embedded
+    // file/base64 payloads. CSV/JSON imports are parsed locally and only rows save.
+    const packed=JSON.stringify(payload);if(/data:(?:image|video|audio|application)\//i.test(packed)||/;base64,/i.test(packed)){toast('Direct/embedded file data is disabled. Upload the file to Google Drive or another external host and paste its public link.','danger',9000);return;}
+    const runSave=async(pl)=>{if(id)return await this.sb.from(d.table).update(pl).eq('id',id).select('id').maybeSingle();if(d.table==='students')return await this.sb.from(d.table).insert(pl).select('id,admission_no').single();if(d.table==='staff')return await this.sb.from(d.table).insert(pl).select('id,staff_no').single();return await this.sb.from(d.table).insert(pl);};
+    let res = await runSave(payload);
+    // ENTERPRISE V6 (issues 16, 26, 32, 35): self-healing writes. If the target
+    // database is missing a column (older schema), strip the unknown column —
+    // for module_records tables tuck it into data{} instead — and retry.
+    let guard = 0;
+    while (res.error && guard < 6) {
+      /* V8.7: PostgreSQL uses DIFFERENT wordings for generated columns —
+         INSERT: 'cannot insert a non-DEFAULT value into column "x"'
+         UPDATE: 'column "x" can only be updated to DEFAULT'
+         Both now self-heal (strip the column and retry). */
+      const m = String(res.error.message || '').match(/find the '([A-Za-z0-9_]+)' column|column "?([A-Za-z0-9_]+)"? (?:of|does not exist)|non-DEFAULT value into column "?([A-Za-z0-9_]+)"?|column "?([A-Za-z0-9_]+)"? can only be updated to DEFAULT/i);
+      const bad = m && (m[1] || m[2] || m[3] || m[4]);
+      if (!bad || !(bad in payload)) break;
+      if (d.generic || d.table === 'module_records') { payload.data = payload.data || {}; payload.data[bad] = payload[bad]; }
+      console.warn('[CRUD] Column "' + bad + '" missing in DB — retrying without it. Run database/update-v6-schema.sql to add it permanently.');
+      delete payload[bad]; guard++;
+      res = await runSave(payload);
+    }
+    if (res.error) { toast(res.error.message, 'danger', 6000); return; }
+    if (window.App && App.logActivity) App.logActivity(id ? 'update' : 'create', d.table, id || d.title);
+    /* V10.8 (#2): EDITING a fee payment (wrong amount, wrong student) goes
+       stale on every later row of that student's term. Recompute the whole
+       term ledger after any fee save — inserts included (a backdated entry
+       shifts later snapshots too). The DB trigger mirrors this server-side;
+       calling it here too gives instant feedback + a corrected outstanding
+       figure, and warns clearly on databases missing v10.8. */
+    if (d.table === 'fee_payments' && payload.student_id) {
+      const rr = await this.recomputeFeeLedger(payload.student_id, payload.term, payload.session);
+      if (rr && rr.ok && Number(rr.rows||0) > 0) toast('🧮 Ledger recomputed for the term: ' + rr.rows + ' payment row(s) re-aligned · grand total ' + Number(rr.grand_total||0).toLocaleString() + ' · outstanding ' + Number(rr.outstanding||0).toLocaleString() + '.', 'info', 9000);
+      /* V10.9 (#1): post-save overpayment sentinel — if this entry pushed the
+         term's paid ABOVE the reconstructed bill, tell the bursar right now
+         (wrong amount / wrong student), not at end-of-term reconciliation. */
+      if (rr && rr.ok && Number(rr.grand_total||0) > 0 && Number(rr.paid||0) > Number(rr.grand_total||0)) {
+        toast('⚠️ OVERPAYMENT: this student\'s recorded payments (' + Number(rr.paid).toLocaleString() + ') now EXCEED the term bill (' + Number(rr.grand_total).toLocaleString() + ') by ' + (Number(rr.paid)-Number(rr.grand_total)).toLocaleString() + '. Check for a typo or a payment recorded on the wrong student — the 🩺 Fee Ledger Doctor lists it too.', 'warning', 14000);
+      }
+    }
+    try {
+      if (!id && window.Notifications && Notifications.create) {
+        if (moduleId === 'announcements') {
+          await Notifications.create({ title: '📢 New Announcement: ' + (payload.title || d.title), body: payload.body || '', url: 'announcements.html', audience: payload.audience || 'all', channels: ['inapp','push'] });
+        }
+        if (moduleId === 'inbox' || moduleId === 'messages') {
+          // ENTERPRISE V11 (issue 16): deliver to the CHOSEN audience — a
+          // specific recipient gets a private notification; 'all'/role
+          // audiences broadcast accordingly. Previously hard-coded to 'all'
+          // yet stored the message as private → recipients saw nothing.
+          const aud = payload.recipient_id ? 'private' : (payload.audience || 'all');
+          const note = { title: '💬 New Message: ' + (payload.title || d.title), body: (payload.body || '').slice(0,160), url: 'inbox.html', audience: aud, channels: ['inapp','push'] };
+          if (payload.recipient_id) note.recipient_id = payload.recipient_id;
+          await Notifications.create(note);
+        }
+        // ENTERPRISE V6 (issue 8): every dashboard-worthy module now fires an
+        // in-app + push notification so students/parents/staff see it at once.
+        const notifyMap = {
+          events:         { icon:'🎭', label:'New Event',            url:'events.html' },
+          broadcast:      { icon:'📨', label:'Result Broadcast',     url:'broadcast.html' },
+          surveys:        { icon:'📋', label:'New Survey',           url:'surveys.html' },
+          cafeteria:      { icon:'🍽️', label:'Cafeteria Update',     url:'cafeteria.html' },
+          menu:           { icon:'🍽️', label:'Meal Menu Update',     url:'menu.html' },
+          lost_found:     { icon:'🔍', label:'Lost & Found',         url:'lost_found.html' },
+          parent_meeting: { icon:'👥', label:'PTA Meeting',          url:'parent_meeting.html', audience:'parent' },
+          hostel:         { icon:'🛏️', label:'Hostel Update',        url:'hostel.html' },
+          assignments:    { icon:'📝', label:'New Assignment',       url:'assignments.html', audience:'student' },
+          school_calendar:{ icon:'📅', label:'Calendar Update',      url:'school_calendar.html' },
+          digital_library:{ icon:'📚', label:'New Reading',          url:'digital_library.html', audience:'student' },
+          results:        { icon:'📊', label:'Result Update',        url:'results.html', audience:'parent' },
+          fees:           { icon:'💰', label:'Fee/Payment Update',    url:'fees.html', audience:'parent' },
+          report_cards:   { icon:'🧾', label:'Report Card Update',   url:'report-cards.html', audience:'parent' },
+          cbt:            { icon:'🧪', label:'CBT/Exam Update',       url:'cbt-exam.html', audience:'student' },
+          entrance:       { icon:'🎯', label:'Assessment Update',    url:'entrance.html', audience:'student' },
+          attendance:     { icon:'📋', label:'Attendance Update',    url:'attendance.html', audience:'parent' }
+        };
+        const nm = notifyMap[this.canonicalId(moduleId)] || notifyMap[moduleId];
+        if (nm) {
+          await Notifications.create({ title: nm.icon + ' ' + nm.label + ': ' + (payload.title || d.title), body: (payload.body || '').slice(0, 160), url: nm.url, audience: nm.audience || (payload.audience || 'all'), channels: ['inapp','push'] });
+        }
+      }
+    } catch(e) { console.warn('Notification hook skipped:', e.message || e); }
+    this.invalidateTableCaches(moduleId);
+    closeModal();
+    if (!id && (moduleId === 'students' || moduleId === 'staff')) {
+      const email = moduleId === 'students' ? payload.guardian_email : payload.email;
+      if (email) {
+        const role = moduleId === 'students' ? 'student/parent' : 'staff';
+        const invite = 'Login invitation for '+(payload.full_name||d.title)+'\nEmail: '+email+'\nRole: '+role+'\nOpen login.html → Request access → use this email → create password → admin approves in Approvals.';
+        try { navigator.clipboard && navigator.clipboard.writeText(invite); } catch(e) {}
+        toast('✅ Saved'+(res.data?.admission_no?' · Admission No: '+res.data.admission_no:res.data?.staff_no?' · Staff ID: '+res.data.staff_no:'')+'. Login invitation copied. The user must request access, then admin approves.','success',8000);
+      }else toast('✅ Saved'+(res.data?.admission_no?' · Admission No: '+res.data.admission_no:res.data?.staff_no?' · Staff ID: '+res.data.staff_no:'')+'. Add an email to generate login invitation details.','success',6000);
+    } else toast('✅ Saved.', 'success');
+    this.renderList(moduleId);
+  },
+
+  /* ENTERPRISE V6 (issue 31): print a Custom Document on school letterhead.
+     Replaces [NAME], [CLASS], [DATE] placeholders, adds logo, address and the
+     principal's signature automatically. */
+  async printDocument(id) {
+    if (!this.sb) return;
+    const { data: doc } = await this.sb.from('module_records').select('*').eq('id', id).maybeSingle();
+    if (!doc) { toast('Document not found', 'warning'); return; }
+    const d=doc.data||{},sc=window.SCHOOL||{},st=window.SC_SETTINGS||{},docType=(d.custom_type||d.type||doc.title||'Official Document').trim();
+    let studentName = d.student || '', studentClass = '';
+    if (studentName) {
+      try { const { data: stu } = await this.sb.from('students').select('full_name,class').ilike('full_name', studentName).maybeSingle(); if (stu) { studentName = stu.full_name; studentClass = stu.class || ''; } } catch(_){}
+    }
+    const today = CRUD.formatDate(new Date().toISOString());
+    let body = String(doc.body || '').replace(/\[NAME\]/g, studentName || '[NAME]').replace(/\[CLASS\]/g, studentClass || '[CLASS]').replace(/\[DATE\]/g, today);
+    const role=d.signatory_role||'Principal',people={Principal:[st.principal_name||localStorage.getItem('sc-principal-name')||'Principal',st.signature_url||localStorage.getItem('sc-signature-url')||'','Principal',st.principal_signature_bg_removed!==false],Proprietor:[st.proprietor_name||localStorage.getItem('sc-proprietor-name')||'Proprietor',st.proprietor_signature_url||localStorage.getItem('sc-proprietor-signature')||'','Proprietor',st.proprietor_signature_bg_removed!==false],'Examination Officer':[st.examination_officer_name||localStorage.getItem('sc-exam-officer-name')||'Examination Officer',st.examination_officer_signature_url||localStorage.getItem('sc-exam-officer-signature')||'','Examination Officer',st.examination_officer_signature_bg_removed!==false],Custom:[d.custom_signatory_name||'Authorised Signatory','',d.custom_signatory_title||'Authorised Signatory',true]};const who=people[role]||[role,'',role,true],rawSig=who[1],sig=(window.SCSignature?await SCSignature.prepare(rawSig,who[3]):(window.Super&&Super.idcard?Super.idcard.driveDirect(rawSig):rawSig)),pn=who[0];let tokens={'[NAME]':studentName,'[CLASS]':studentClass,'[TERM]':d.term||'','[SESSION]':d.session||'','[DATE]':today,'[REFERENCE]':d.reference||'','[SCHOOL]':sc.name||'School','[PRINCIPAL]':st.principal_name||'Principal','[PROPRIETOR]':st.proprietor_name||'Proprietor','[EXAM_OFFICER]':st.examination_officer_name||'Examination Officer'};Object.keys(tokens).forEach(k=>body=body.split(k).join(tokens[k]));const sign='<div style="margin-top:34px;text-align:right">'+(sig?'<img src="'+esc(sig)+'" style="max-width:150px;max-height:70px;object-fit:contain;'+(who[3]?'mix-blend-mode:multiply;filter:contrast(1.3)':'')+'"><br>':'')+'<b>'+esc(pn)+'</b><br><span style="font-size:.8rem">'+esc(who[2])+'</span></div>';
+    const html = '<div style="max-width:720px;margin:0 auto;font-family:Georgia,serif;color:#111">' +
+      '<div style="display:flex;align-items:center;gap:14px;border-bottom:3px double ' + (sc.primary || '#1e2a5e') + ';padding-bottom:12px;margin-bottom:6px">' +
+      '<img src="assets/img/logo.' + (sc.logoExt || 'svg') + '" style="width:70px;height:70px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+      '<div><h1 style="margin:0;color:' + (sc.primary || '#1e2a5e') + '">' + esc(sc.name || 'School') + '</h1>' +
+      '<div style="font-size:.82rem;color:#334155">' + esc(sc.address || '') + (sc.phone ? ' · Tel: ' + esc(sc.phone) : '') + (sc.email ? ' · ' + esc(sc.email) : '') + '</div>' +
+      (sc.motto ? '<div style="font-size:.78rem;font-style:italic;color:#7c2d12">Motto: ' + esc(sc.motto) + '</div>' : '') + '</div></div>' +
+      '<div style="text-align:right;font-size:.85rem">Date: ' + esc(today) + '</div>' +
+      (d.recipient ? '<p style="margin:14px 0 4px"><b>To:</b> ' + esc(d.recipient) + '</p>' : '') +
+      '<h2 style="text-align:center;text-decoration:underline;margin:22px 0 14px;font-size:1.15rem;letter-spacing:1px">' + esc(docType.toUpperCase()) + '</h2>' +
+      '<div style="line-height:1.9;white-space:pre-wrap;text-align:justify">' + esc(body) + '</div>' + sign +
+      '<p style="margin-top:30px;font-size:.68rem;color:#94a3b8;text-align:center">Generated electronically by ' + esc(sc.name || '') + ' · School Connect</p></div>';
+    const w = window.open('', '_blank');
+    if (!w) { toast('Popup blocked! Please allow popups.', 'warning'); return; }
+    w.document.open();
+    w.document.write('<!DOCTYPE html><html><head><title>' + esc(doc.title || 'Document') + '</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"></head><body style="padding:34px">' + html + '<script>window.onload=function(){setTimeout(function(){window.print()},250)};<\/script></body></html>');
+    w.document.close(); w.focus();
+  },
+
+  /* ENTERPRISE V8 (issue 9): letterheaded PDF export of one admission form. */
+  async printAdmissionPDF(id) {
+    if (!this.sb) return;
+    const { data: a } = await this.sb.from('admissions').select('*').eq('id', id).maybeSingle();
+    if (!a) { toast('Application not found', 'warning'); return; }
+    const sc = window.SCHOOL || {}; const d = a.data || {};
+    const rows = Object.entries(Object.assign({}, d, a)).filter(([k]) => !['data','id'].includes(k))
+      .map(([k, v]) => '<tr><th style="text-align:left;padding:7px;border:1px solid #cbd5e1;background:#f1f5f9;width:220px">' + esc(k.replace(/_/g, ' ').toUpperCase()) + '</th><td style="padding:7px;border:1px solid #cbd5e1">' + esc(v == null ? '' : (/date|dob|created/i.test(k) ? CRUD.formatDate(v) : String(v))) + '</td></tr>').join('');
+    const html = '<div style="max-width:720px;margin:0 auto;font-family:Georgia,serif;color:#111">' +
+      '<div style="display:flex;align-items:center;gap:14px;border-bottom:3px double ' + (sc.primary || '#1e2a5e') + ';padding-bottom:12px;margin-bottom:14px">' +
+      '<img src="assets/img/logo.' + (sc.logoExt || 'svg') + '" style="width:64px;height:64px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+      '<div><h1 style="margin:0;color:' + (sc.primary || '#1e2a5e') + ';font-size:1.3rem">' + esc(sc.name || 'School') + '</h1>' +
+      '<div style="font-size:.8rem;color:#334155">ADMISSION APPLICATION FORM · ' + esc(a.status || 'submitted').toUpperCase() + '</div></div></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:.9rem">' + rows + '</table>' +
+      '<p style="margin-top:24px;font-size:.7rem;color:#94a3b8;text-align:center">Generated ' + CRUD.formatDate(new Date().toISOString()) + ' · ' + esc(sc.name || '') + ' · School Connect</p></div>';
+    this._printWindow('Admission — ' + (a.full_name || ''), html);
+  },
+
+  /* ENTERPRISE V8 (issue 7): shared print-window helper — <base href> + wait-for-images
+     so any exported document prints complete with logos/photos. Browser's
+     "Save as PDF" destination turns every print into a PDF (100% free). */
+  _printWindow(title, bodyHtml) {
+    const w = window.open('', '_blank');
+    if (!w) { toast('Popup blocked! Please allow popups.', 'warning'); return; }
+    w.document.open();
+    w.document.write('<!DOCTYPE html><html><head><title>' + esc(title) + '</title><base href="' + document.baseURI.replace(/[^/]*$/, '') + '"></head><body style="padding:24px">' + bodyHtml +
+      '<script>window.onload=function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}})};<\/script></body></html>');
+    w.document.close(); w.focus();
+  },
+
+  /* ENTERPRISE V8 (issue 7): bulk-print ALL admission applications (one per page). */
+  async bulkPrintAdmissions() {
+    if (!this.sb) return;
+    const { data } = await this.sb.from('admissions').select('*').order('created_at', { ascending: false }).limit(500);
+    if (!data || !data.length) { toast('No applications to print.', 'warning'); return; }
+    const sc = window.SCHOOL || {};
+    const one = (a) => { const d = a.data || {};
+      const rows = Object.entries(Object.assign({}, d, a)).filter(([k]) => !['data','id'].includes(k))
+        .map(([k, v]) => '<tr><th style="text-align:left;padding:6px;border:1px solid #cbd5e1;background:#f1f5f9;width:200px">' + esc(k.replace(/_/g, ' ').toUpperCase()) + '</th><td style="padding:6px;border:1px solid #cbd5e1">' + esc(v == null ? '' : String(v)) + '</td></tr>').join('');
+      return '<div style="page-break-after:always;font-family:Georgia,serif"><h2 style="color:' + (sc.primary || '#1e2a5e') + '">' + esc(sc.name || 'School') + ' — Admission Form: ' + esc(a.full_name || '') + '</h2><table style="width:100%;border-collapse:collapse;font-size:.88rem">' + rows + '</table></div>'; };
+    this._printWindow('All Admission Applications', data.map(one).join(''));
+  },
+
+  async previewAdmission(id) {
+    if (!this.sb) return;
+    const { data: a } = await this.sb.from('admissions').select('*').eq('id', id).maybeSingle();
+    if (!a) { toast('Application not found', 'warning'); return; }
+    const d = a.data || {};
+    const rows = Object.entries(Object.assign({}, d, a)).filter(([k])=>!['data'].includes(k)).map(([k,v]) => '<tr><th style="text-align:left;padding:6px;border:1px solid #e2e8f0">'+esc(k.replace(/_/g,' '))+'</th><td style="padding:6px;border:1px solid #e2e8f0">'+esc(v==null?'':String(v))+'</td></tr>').join('');
+    openModal('Admission Application Preview', '<div class="table-wrap"><table style="width:100%;border-collapse:collapse">'+rows+'</table></div>', '<button class="btn btn-outline" onclick="CRUD.printAdmissionPDF(\''+id+'\')">📄 Export PDF</button><button class="btn btn-primary" onclick="closeModal()">Close</button>');
+  },
+
+  async printReceipt(id) {
+    if (!this.sb) return;
+    const { data: f } = await this.sb.from('fee_payments').select('*').eq('id', id).maybeSingle();
+    if (!f) return;
+    let stu = null;
+    try { if (f.student_id) { const r = await this.sb.from('students').select('full_name,class,admission_no').eq('id', f.student_id).maybeSingle(); stu = r.data; } } catch(_) {}
+    const sc = window.SCHOOL || {}, stg = window.SC_SETTINGS || {};
+    const cur = sc.currency || '₦';
+    const fmtMoney = n => cur + Number(n || 0).toLocaleString();
+    const rawSig = localStorage.getItem('sc-signature-url') || stg.signature_url || sc.signatureUrl || sc.signature_url || '';
+    const sig = (window.Super && Super.idcard && Super.idcard.driveDirect) ? Super.idcard.driveDirect(rawSig) : rawSig;
+    const pn = localStorage.getItem('sc-principal-name') || stg.principal_name || sc.principalName || sc.principal_name || 'Bursar / Principal';
+    const total = Number(f.fee_total || 0) || 0;
+    const paid = Number(f.amount_paid || 0) || 0;
+    const bal = Math.max(0, (f.balance != null ? Number(f.balance) : (total ? total - paid : 0)) || 0);
+    // Persist auto-computed balance back to DB so every record and future e-receipt reflects it.
+    try { if (f.balance == null || Number(f.balance) !== bal) await this.sb.from('fee_payments').update({ balance: bal }).eq('id', id); } catch(_) {}
+    const rdate = CRUD.formatDate(f.created_at || new Date().toISOString());
+    const logo = '<img src="assets/img/logo.' + (sc.logoExt || 'svg') + '" class="logo" onerror="this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'logo\',textContent:\'' + esc((sc.shortName||sc.name||'S').slice(0,2).toUpperCase()) + '\'}))">';
+    const row = (k, v) => '<div class="row"><span>' + esc(k) + '</span><b>' + v + '</b></div>';
+    const html = '<div class="receipt">' +
+      '<div class="rh">' + logo + '<div style="text-align:center"><h2>' + esc(sc.name || 'School') + '</h2><p class="sub">' + esc(sc.address || '') + (sc.phone ? ' · ' + esc(sc.phone) : '') + (sc.email ? ' · ' + esc(sc.email) : '') + '</p><p class="sub" style="letter-spacing:3px;font-weight:800">OFFICIAL E-RECEIPT</p></div></div>' +
+      row('Receipt No.', esc(f.reference || ('RCP-' + String(f.id || '').slice(0, 8).toUpperCase()))) +
+      row('Date', esc(rdate)) +
+      row('Student', esc((stu && stu.full_name) || f.student_name || '') + ((stu && stu.class) ? ' (' + esc(stu.class) + ')' : '')) +
+      ((stu && stu.admission_no) ? row('Admission No.', esc(stu.admission_no)) : '') +
+      row('Term / Session', esc(f.term || '-') + ' · ' + esc(f.session || '-')) +
+      row('Payment Method', esc(f.method || '-') + (f.reference ? ' · Ref: ' + esc(f.reference) : '')) +
+      (total ? row('Total Fee for Term', fmtMoney(total)) : '') +
+      '<div class="paid"><div style="font-size:.75rem;color:#334155">AMOUNT PAID</div><div class="amt">' + fmtMoney(paid) + '</div></div>' +
+      (bal === 0 ? '<div class="bal full">Remaining Balance: ' + cur + '0 — FULLY PAID ✔</div>' : '<div class="bal">Remaining Balance: <b>' + fmtMoney(bal) + '</b></div>') +
+      '<div class="sig">' + (sig ? '<img src="' + esc(sig) + '" referrerpolicy="no-referrer" style="max-width:150px;max-height:60px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)">' : '<span class="script">' + esc((pn||'').split(/\s+/).map(x=>x[0]||'').join('').slice(0,3) || 'Sign') + '</span>') + '<div style="border-top:1px solid #111;width:180px;margin:2px auto 0;padding-top:2px"><b>' + esc(pn) + '</b> — Bursar / Principal</div></div>' +
+      '<p class="note">This is an official computer-generated e-receipt. It carries the school logo, authorised signature, and is valid without a physical stamp. Official E-Receipt · Licensed Platform.</p></div>';
+    const css = '<style>body{font-family:Arial,sans-serif;color:#111;background:#f1f5f9;margin:0;padding:18px;display:flex;justify-content:center}.receipt{width:520px;max-width:100%;border:2px solid #111;padding:26px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.15)}.rh{display:flex;align-items:center;justify-content:center;gap:12px;border-bottom:2px solid #111;padding-bottom:10px}.logo{width:58px;height:58px;border-radius:12px;background:linear-gradient(135deg,#1e2a5e,#4f46e5);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.5rem;object-fit:contain}h2{margin:0;font-size:1.15rem}.sub{margin:2px 0 0;font-size:.72rem;color:#334155}.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #cbd5e1;font-size:.9rem}.row b{color:#0f172a;text-align:right}.paid{background:#f0fdf4;border:1px dashed #16a34a;border-radius:10px;padding:10px;text-align:center;margin-top:12px}.paid .amt{font-size:1.5rem;font-weight:900;color:#16a34a}.bal{background:#fef2f2;border:1px dashed #dc2626;border-radius:10px;padding:8px;text-align:center;margin-top:8px;font-size:.9rem}.bal b{color:#dc2626;font-size:1.1rem}.full{background:#f0fdf4;border:1px solid #16a34a;color:#16a34a;font-weight:800}.sig{margin-top:22px;text-align:center;font-size:.8rem}.sig .script{font-family:\'Segoe Script\',cursive;font-size:1.3rem;color:#1e2a5e}.note{margin-top:12px;font-size:.62rem;color:#94a3b8;text-align:center}@media print{body{background:#fff;padding:0}.receipt{box-shadow:none}}</style>';
+    const w = window.open('', '_blank');
+    if (!w) { toast('Popup blocked! Please allow popups.', 'warning'); return; }
+    w.document.open();
+    w.document.write('<!DOCTYPE html><html><head><title>E-Receipt</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'">' + css + '</head><body>' + html + '<script>window.onload=function(){var i=[].slice.call(document.images),n=i.length;if(!n)return window.print();var d=function(){if(--n<=0)setTimeout(function(){window.print()},300)};i.forEach(function(m){if(m.complete)d();else{m.onload=d;m.onerror=d}});setTimeout(function(){window.print()},2200)};<\/script></body></html>');
+    w.document.close(); w.focus();
+  },
+  /* =====================================================================
+     V10.7 (#6): FEE-DISCIPLINE LOCKS — one click per student, or bulk on
+     the current selection. Two independent locks:
+       portal → the student AND their parents cannot enter the portal at
+                all (bold message screen + RLS report protection);
+       report → the portal stays open but the report card / results are
+                hidden with a bold message where the card would be.
+     Server enforced (sc_set_student_locks is admin-tier only + RLS), so
+     these buttons can never be spoofed from the console.
+     ===================================================================== */
+  async toggleStudentLock(studentId, kind, lock, name) {
+    if (!this.sb) return;
+    const label = kind === 'portal' ? 'PORTAL ACCESS' : 'REPORT CARD';
+    let message = '';
+    if (lock) {
+      const def = kind === 'portal'
+        ? 'Access to the school portal has been suspended because of outstanding school fees. Please contact the school bursary to resolve this.'
+        : 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.';
+      message = prompt('Lock ' + label + ' for ' + (name || 'this student') + '?\n\nThis BOLD message will be shown to the student/parents (edit it if needed):', def);
+      if (message == null) return;   // cancelled
+    } else if (!confirm('Restore ' + label + ' for ' + (name || 'this student') + '?')) return;
+    const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: [studentId], p_kind: kind, p_locked: lock, p_message: message || '' });
+    if (r.error || !r.data || r.data.ok === false) {
+      const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Lock update failed';
+      if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v10.7-fee-locks-arrears.sql once in Supabase.', 'warning', 12000);
+      else toast(msg, 'danger', 9000);
+      return;
+    }
+    if (window.App && App.logActivity) App.logActivity(lock ? 'lock' : 'unlock', 'students', kind + ':' + (name || studentId));
+    toast(lock
+      ? '🔒 ' + label + ' locked for ' + (name || 'the student') + '. They will see the bold message ' + (kind === 'portal' ? 'at sign-in (parents included), and their report data is server-blocked too.' : 'in place of their report card.')
+      : '🔓 ' + label + ' restored for ' + (name || 'the student') + '.', lock ? 'warning' : 'success', 9000);
+    this.invalidateTableCaches('students');
+    this.renderList('students');
+  },
+  /* Bulk: lock/unlock every currently-selected row on the Students table. */
+  async bulkStudentLock(kind, lock) {
+    const ids = this.bulkSelected('students');
+    if (!ids.length) { toast('Tick at least one student first (use the checkboxes).', 'warning', 6000); return; }
+    const label = kind === 'portal' ? 'PORTAL ACCESS' : 'REPORT CARD';
+    let message = '';
+    if (lock) {
+      const def = kind === 'portal'
+        ? 'Access to the school portal has been suspended because of outstanding school fees. Please contact the school bursary to resolve this.'
+        : 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.';
+      message = prompt('Lock ' + label + ' for ' + ids.length + ' selected student(s)?\n\nThis BOLD message will be shown to each of them (edit it if needed):', def);
+      if (message == null) return;
+    } else if (!confirm('Restore ' + label + ' for ' + ids.length + ' selected student(s)?')) return;
+    const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: ids, p_kind: kind, p_locked: lock, p_message: message || '' });
+    if (r.error || !r.data || r.data.ok === false) {
+      const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Bulk lock failed';
+      if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v10.7-fee-locks-arrears.sql once in Supabase.', 'warning', 12000);
+      else toast(msg, 'danger', 9000);
+      return;
+    }
+    if (window.App && App.logActivity) App.logActivity(lock ? 'bulk-lock' : 'bulk-unlock', 'students', kind + ':' + r.data.updated);
+    toast((lock ? '🔒 Locked ' : '🔓 Restored ') + r.data.updated + ' student(s) — ' + label + '.', lock ? 'warning' : 'success', 9000);
+    this.invalidateTableCaches('students');
+    this.renderList('students');
+  },
+
+  async remove(moduleId, id) {
+    const d = this.def(moduleId);
+    if (!this.canWrite(moduleId)) { toast('Read-only for your role on this page.', 'warning', 5000); return; }
+    /* V7.1 #6: student deletion is a full lifecycle event — explain it clearly. */
+    if (this.canonicalId(moduleId) === 'students') {
+      if (!confirm('Delete this student?\n\nWhat happens:\n• The full record is archived automatically for record-tracking (Admin Data → module_records → student_archive).\n• Their leftover scores, punctuality and roster rows are removed, so old report sheets can never resurface.\n• The admission number becomes available for reuse.\n\nThis needs the latest database update (complete-schema.sql). Proceed?')) return;
+    }
+    if (!d || !this.sb) return;
+    // ENTERPRISE V6 (issue 15): library books are SHARED resources — any staff
+    // member with write access may delete them; ownership lock only applies to
+    // personal academic records (results, lesson plans, CBT…).
+    const sharedTables = []; // Shared visibility never implies shared edit/delete ownership.
+    if (window.App && !App.isAdminRole(App.currentRole) && !sharedTables.includes(d.table)) {
+      const { data: row } = await this.sb.from(d.table).select('*').eq('id', id).maybeSingle();
+      if (row && this.hasOwnershipMarker(row) && !this.isOwnedByCurrent(row)) {
+        toast('Access Denied: You can read this record, but only the creator/assigned owner or an admin can delete it.', 'danger', 7000);
+        return;
+      }
+    }
+    /* V9.0: deleting a PERSON from the Directory is a whole-account event.
+       The old path deleted only the profiles row, which (a) hit FK errors from
+       audit tables (activity_log_actor_id_fkey) and (b) left a ghost login in
+       auth.users that blocked the email from ever signing up again.
+       sc_delete_user() removes the login + profile in one transaction, clears
+       author pointers (ON DELETE SET NULL, v9.0 SQL) and frees the email. */
+    if (d.table === 'profiles') {
+      if (!confirm('Delete this person?\n\nWhat happens:\n• Their LOGIN ACCOUNT is removed too, so the same email can register again later.\n• History rows they wrote (activity log, records) are KEPT — only the author link is cleared.\n• This cannot be undone.\n\nProceed?')) return;
+      const { data: msg, error: rpcErr } = await this.sb.rpc('sc_delete_user', { p_user: id });
+      if (rpcErr) {
+        if (/could not find|does not exist|schema cache/i.test(rpcErr.message || '')) {
+          toast('Database update needed: run database/v9.0-user-lifecycle.sql (or complete-schema.sql) in the Supabase SQL Editor, then retry.', 'danger', 10000);
+        } else { toast(rpcErr.message, 'danger', 8000); }
+        return;
+      }
+      this.invalidateTableCaches(moduleId);
+      if (window.App && App.logActivity) App.logActivity('delete', 'profiles+auth', id);
+      toast(String(msg || 'Account fully deleted.'), 'success', 7000);
+      await this.renderList(moduleId);
+      return;
+    }
+    if (!confirm('Delete this ' + d.title.toLowerCase() + '?')) return;
+    /* V10.8 (#2): deleting a FEE PAYMENT must heal the student's whole term
+       ledger (later rows snapshot totals/balances that go stale). Capture the
+       row context BEFORE the delete, then call the recompute RPC afterwards —
+       the DB trigger does this too, but the explicit call also works on
+       databases that have not run v10.8, degrades with clear guidance, and
+       lets us show the corrected outstanding figure in the toast. */
+    let feeCtx = null;
+    if (d.table === 'fee_payments') {
+      try { const fr = await this.sb.from('fee_payments').select('student_id,term,session,amount_paid,student_name').eq('id', id).maybeSingle(); feeCtx = fr.data || null; } catch(_) {}
+      if (feeCtx && !confirm('Delete this payment of ' + Number(feeCtx.amount_paid||0).toLocaleString() + (feeCtx.student_name ? ' for ' + feeCtx.student_name : '') + '?\n\nThe platform will automatically RECOMPUTE every remaining payment row for this student\'s term — totals, balances, receipts and the family dashboard all adjust instantly.')) return;
+    }
+    const { data:deleted,error } = await this.sb.from(d.table).delete().eq('id', id).select('id');
+    if (error) { toast(error.message, 'danger'); return; }if(!deleted||!deleted.length){toast('Nothing was deleted. You may not own this subject/class record.','danger',7000);return;}
+    this.invalidateTableCaches(moduleId);
+    if(window.App&&App.logActivity)App.logActivity('delete',d.table,id);
+    if (feeCtx && feeCtx.student_id) {
+      const rr = await this.recomputeFeeLedger(feeCtx.student_id, feeCtx.term, feeCtx.session);
+      toast('🧾 Payment deleted' + (rr && rr.ok ? ' — ledger recomputed: ' + Number(rr.rows||0) + ' row(s) adjusted, outstanding now ' + Number(rr.outstanding||0).toLocaleString() + '.' : ' — ledger recompute pending (see warning).'), 'success', 9000);
+      await this.renderList(moduleId);
+      return;
+    }
+    toast('Deleted permanently and verified.','success');await this.renderList(moduleId);
+  },
+
+  /* V10.8 (#2): recompute a student's fee snapshots for one term. Server-side
+     RPC preferred (atomic, matches the DB trigger); clear guidance if the
+     database has not run v10.8 yet. */
+  async recomputeFeeLedger(studentId, term, session) {
+    if (!this.sb || !studentId) return null;
+    try {
+      const r = await this.sb.rpc('sc_recompute_fee_rows', { p_student: studentId, p_term: term || '', p_session: session || '' });
+      if (r.error) {
+        if (/sc_recompute_fee_rows|schema cache|function/i.test(String(r.error.message||''))) toast('Ledger self-healing needs a one-time database update — admin: run database/v10.8-fee-recompute.sql in Supabase. Until then, re-check this student\'s other payment rows manually.', 'warning', 12000);
+        else toast(r.error.message, 'warning', 8000);
+        return null;
+      }
+      return r.data || null;
+    } catch(_) { return null; }
+  },
+
+  /* Issue 10: bulk-import student birthdays from the students table */
+  async importBirthdays() {
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    // ENTERPRISE V6 (issue 29): import STUDENT + STAFF + PARENT birthdays.
+    // Staff DOB is stored privacy-safe as day+month only — we synthesize a
+    // sortable date (year 2000) so they appear in the month groups.
+    const [studRes, staffRes, staffDm, parentRes, adminRes, adminDm, existingRes] = await Promise.all([
+      this.sb.from('students').select('full_name,class,date_of_birth').not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('staff').select('full_name,role,date_of_birth').not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('staff').select('full_name,role,dob_day,dob_month').not('dob_month', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('parents').select('full_name,occupation,date_of_birth').not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('profiles').select('full_name,role,date_of_birth').in('role',['super_admin','admin','principal','proprietor','head_teacher','bursar']).not('date_of_birth', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('profiles').select('full_name,role,dob_day,dob_month').in('role',['super_admin','admin','principal','proprietor','head_teacher','bursar']).not('dob_month', 'is', null).then(r=>r, ()=>({data:[]})),
+      this.sb.from('birthdays').select('person_name').then(r=>r, ()=>({data:[]}))
+    ]);
+    const have = new Set((existingRes.data || []).map(b => b.person_name));
+    const rows = [];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    (studRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'student', date:s.date_of_birth, class:s.class }); have.add(s.full_name); } });
+    (staffRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'staff', date:s.date_of_birth, class:s.role||'Staff' }); have.add(s.full_name); } });
+    (staffDm.data||[]).forEach(s => { const mi = months.indexOf(s.dob_month); if(!have.has(s.full_name) && mi >= 0) { rows.push({ person_name:s.full_name, type:'staff', date:'2000-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(s.dob_day)||1).padStart(2,'0'), class:s.role||'Staff' }); have.add(s.full_name); } });
+    (parentRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'parent', date:s.date_of_birth, class:s.occupation||'Parent' }); have.add(s.full_name); } });
+    (adminRes.data||[]).forEach(s => { if(!have.has(s.full_name)) { rows.push({ person_name:s.full_name, type:'admin', date:s.date_of_birth, class:s.role||'Admin' }); have.add(s.full_name); } });
+    (adminDm.data||[]).forEach(s => { const mi = months.indexOf(s.dob_month); if(!have.has(s.full_name) && mi >= 0) { rows.push({ person_name:s.full_name, type:'admin', date:'2000-'+String(mi+1).padStart(2,'0')+'-'+String(parseInt(s.dob_day)||1).padStart(2,'0'), class:s.role||'Admin' }); have.add(s.full_name); } });
+    if (!rows.length) { toast('All available student, staff, parent and admin birthdays are already imported.', 'info'); return; }
+    const { error } = await this.sb.from('birthdays').insert(rows);
+    if (error) { toast(error.message, 'danger'); return; }
+    toast('✅ Imported ' + rows.length + ' birthday record(s).', 'success'); this.renderList('birthdays');
+  },
+
+  /* Issue 7: filter a grouped student <select> by class (hides other optgroups). */
+  filterRefByClass(selId, cls) {
+    const sel = document.getElementById(selId); if (!sel) return;
+    Array.from(sel.querySelectorAll('optgroup')).forEach(g => {
+      g.style.display = (!cls || g.label === cls) ? '' : 'none';
+      Array.from(g.children).forEach(o => { o.style.display = g.style.display; o.disabled = (g.style.display === 'none'); });
+    });
+    sel.value = '';
+  },
+  /* Issue 7: filter the student <select> by typed letters of the name. */
+  filterRefBySearch(selId, term) {
+    const sel = document.getElementById(selId); if (!sel) return;
+    term = (term || '').toLowerCase();
+    Array.from(sel.options).forEach(o => {
+      if (!o.value) return;
+      const show = !term || o.textContent.toLowerCase().indexOf(term) !== -1;
+      o.style.display = show ? '' : 'none'; o.disabled = !show;
+    });
+    Array.from(sel.querySelectorAll('optgroup')).forEach(g => {
+      const anyVisible = Array.from(g.children).some(o => o.style.display !== 'none');
+      g.style.display = anyVisible ? '' : 'none';
+    });
+  },
+
+  /* Issue 14: show birthdays grouped by birth MONTH with name + class. */
+  async renderBirthdaysByMonth() {
+    const box = document.getElementById('birthdays-bymonth'); if (!box) return;
+    if (!this.sb) { box.innerHTML = '<p>Database not configured.</p>'; return; }
+    const { data } = await this.sb.from('birthdays').select('person_name,class,date,type').limit(5000);
+    if (!data || !data.length) { box.innerHTML = '<div class="card"><p style="color:var(--gray-500)">No birthdays yet — click “Import birthdays” to pull admin, staff, parent and student birth details.</p></div>'; return; }
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const byMonth = {}; months.forEach(m => byMonth[m] = []);
+    data.forEach(b => {
+      if (!b.date) return;
+      const mi = parseInt(String(b.date).slice(5, 7), 10) - 1;
+      if (mi >= 0 && mi < 12) byMonth[months[mi]].push(b);
+    });
+    box.innerHTML = '<div class="card" style="margin-bottom:16px"><h3 style="margin-top:0">🎂 Birthdays by month</h3><div class="grid grid-2">' +
+      months.map(m => {
+        const list = byMonth[m].sort((a, b) => String(a.date).slice(8) - String(b.date).slice(8));
+        return '<div style="border:1px solid var(--gray-200);border-radius:10px;padding:10px;margin-bottom:8px">' +
+          '<strong style="color:var(--primary)">' + m + '</strong> <span style="color:var(--gray-500)">(' + list.length + ')</span>' +
+          (list.length ? '<ul style="margin:6px 0 0;padding-left:18px;line-height:1.6">' + list.map(b => '<li>' + esc(b.person_name) + ' <span style="color:var(--gray-500)">— ' + esc(b.class || b.type || '') + ' (day ' + String(b.date).slice(8, 10) + ')</span></li>').join('') + '</ul>' : '<p style="color:var(--gray-400);margin:6px 0 0;font-size:.85rem">—</p>') +
+          '</div>';
+      }).join('') + '</div></div>';
+  },
+
+  /* Issue 8: pull Digital-Library reading scores into Results so they count
+     toward the report card. Adds each unmatched reading score as a CA-style
+     result row (or you can push to a chosen CA column). */
+  async pullReadingScoresToResults(opts) {
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    opts = opts || {};
+    const { data: scores } = await this.sb.from('reading_scores').select('*').eq('pushed_to_results', false).limit(5000);
+    if (!scores || !scores.length) { toast('No new reading scores to pull.', 'info'); return; }
+    let ok = 0;
+    for (const s of scores) {
+      // scale reading score to the chosen CA max (default 10)
+      const caMax = Number(opts.caMax || 10);
+      const scaled = s.max_score ? Math.round((Number(s.score) / Number(s.max_score)) * caMax * 10) / 10 : Number(s.score);
+      const row = { student_name: s.student_name, subject: s.subject, class: s.class, term: opts.term || null, session: opts.session || null };
+      row[opts.column || 'ca3'] = scaled;
+      const { error } = await this.sb.from('results').insert(row);
+      if (!error) { await this.sb.from('reading_scores').update({ pushed_to_results: true }).eq('id', s.id); ok++; }
+    }
+    if (window.App && App.logActivity) App.logActivity('pull-reading-scores', 'results', ok + ' rows');
+    toast('✅ Pulled ' + ok + ' reading score(s) into Results (column ' + (opts.column || 'ca3') + ').', 'success', 6000);
+    this.renderList('results');
+  },
+
+  /* ============================================================
+     ENTERPRISE V6 (issue 25): END-OF-SESSION CLASS MIGRATION.
+     After third-term exams, admin opens Promotion page → "Promote whole
+     class". Every student in the FROM class is moved to the TO class in ONE
+     action (their results/fees history stays attached to their student id).
+     Repeat-list students can be excluded by unticking them.
+     ============================================================ */
+  async promoteWholeClass() {
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    const [{ data: classes }, { data: lookups }] = await Promise.all([this.sb.from('classes').select('name').order('name'), this.sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position')]);
+    const opts = (classes || []).map(c => '<option>' + esc(c.name) + '</option>').join('');
+    const terms = [...new Set((lookups||[]).filter(x=>x.kind==='term').map(x=>x.value).filter(Boolean))];
+    const sessions = [...new Set((lookups||[]).filter(x=>x.kind==='session').map(x=>x.value).filter(Boolean))];
+    const termOpts = (terms.length?terms:['First Term','Second Term','Third Term']).map(v=>'<option>'+esc(v)+'</option>').join('');
+    const sessionOpts = (sessions.length?sessions:['2025/2026','2026/2027']).map(v=>'<option>'+esc(v)+'</option>').join('');
+    openModal('🎓 End-of-Session Class Migration',
+      '<p style="color:var(--gray-600)">Move every student from one class to the next after the 3rd-term exams. Results, fees and records remain attached to each student automatically.</p>' +
+      '<div class="grid grid-2"><div class="form-group"><label>From class</label><select id="pm-from" class="form-select" onchange="CRUD._pmLoad()"><option value="">— select —</option>' + opts + '</select></div>' +
+      '<div class="form-group"><label>To class (next class)</label><select id="pm-to" class="form-select"><option value="">— select —</option>' + opts + '<option value="__graduated__">🎓 Graduated / Alumni</option></select></div></div>' +
+      '<div id="pm-list" style="max-height:260px;overflow:auto;border:1px solid var(--gray-200);border-radius:8px;padding:8px;margin-top:6px"><p style="color:var(--gray-500)">Pick a “From class” to load its students…</p></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CRUD._pmApply()">Promote selected →</button>');
+  },
+  async _pmLoad() {
+    const from = document.getElementById('pm-from').value; const box = document.getElementById('pm-list');
+    if (!from) { box.innerHTML = ''; return; }
+    const { data } = await this.sb.from('students').select('id,full_name,admission_no').eq('class', from).order('full_name').limit(1000);
+    box.innerHTML = (data && data.length)
+      ? '<label style="display:block;font-weight:700;margin-bottom:6px"><input type="checkbox" checked onchange="document.querySelectorAll(\'.pm-stu\').forEach(c=>c.checked=this.checked)"> Select all (' + data.length + ')</label>' +
+        data.map(st => '<label style="display:block;padding:3px 0"><input type="checkbox" class="pm-stu" value="' + st.id + '" checked> ' + esc(st.full_name) + ' <span style="color:var(--gray-500)">' + esc(st.admission_no || '') + '</span></label>').join('')
+      : '<p style="color:var(--gray-500)">No students in that class.</p>';
+  },
+  async _pmApply() {
+    const from = document.getElementById('pm-from').value, to = document.getElementById('pm-to').value;
+    if (!from || !to) { toast('Choose both classes.', 'warning'); return; }
+    const ids = [...document.querySelectorAll('.pm-stu:checked')].map(c => c.value);
+    if (!ids.length) { toast('No students selected.', 'warning'); return; }
+    if (!confirm('Promote ' + ids.length + ' student(s) from ' + from + ' to ' + (to === '__graduated__' ? 'Alumni (graduated)' : to) + '?')) return;
+    let ok = 0;
+    /* V7.3: stamp each promotion row with the REAL student identity + current
+       period so the report card can find and print the decision. */
+    let curTerm='', curSession='';
+    try { const cp = await this.sb.from('academic_periods').select('term,session').eq('is_current', true).maybeSingle(); if (cp.data) { curTerm = cp.data.term || ''; curSession = cp.data.session || ''; } } catch(_) {}
+    for (const id of ids) {
+      const patch = to === '__graduated__' ? { status: 'graduated' } : { class: to };
+      let stu = null; try { const r = await this.sb.from('students').select('full_name').eq('id', id).maybeSingle(); stu = r.data; } catch(_) {}
+      const { error } = await this.sb.from('students').update(patch).eq('id', id);
+      if (!error) { ok++; await this.sb.from('promotions').insert({ student_id: id, student_name: (stu && stu.full_name) || '', from_class: from, to_class: to === '__graduated__' ? 'GRADUATED' : to, action: to === '__graduated__' ? 'graduate' : 'promote', status: 'applied', term: curTerm, session: curSession }).then(()=>{},()=>{}); }
+    }
+    if (window.App && App.logActivity) App.logActivity('bulk-promote', 'students', from + '→' + to + ' (' + ok + ')');
+    toast('✅ Promoted ' + ok + ' student(s) to ' + (to === '__graduated__' ? 'Alumni' : to) + '.', 'success', 6000);
+    closeModal(); this.renderList('students'); this.renderList('promotion');
+  },
+
+  ensurePortableButton(moduleId){const existing=document.querySelector('[data-portable-export="'+moduleId+'"]');if(existing)return;const csv=[...document.querySelectorAll('button')].find(b=>String(b.getAttribute('onclick')||'').includes("CRUD.exportCSV('"+moduleId+"')"));if(!csv)return;const btn=document.createElement('button');btn.className='btn btn-outline';btn.dataset.portableExport=moduleId;btn.textContent='♻️ Portable JSON';btn.title='Re-importable archive with UUIDs, arrays, JSON and dates preserved';btn.addEventListener('click',()=>this.exportPortable(moduleId));csv.insertAdjacentElement('afterend',btn);},
+  async exportPortable(moduleId){const d=this.def(moduleId);if(!d||!this.sb)return;if(!window.DataPortability){toast('Portable engine is loading; try again in a moment.','info');return;}DataPortability.init(this.sb);try{let filter=d.generic?{column:'module',value:d.module}:null,n=await DataPortability.exportTable(d.table,filter);toast('✅ '+n+' row(s) exported as re-importable portable JSON.','success',7000);}catch(e){toast(e.message||e,'danger');}},
+  exportCSV(moduleId) {
+    this.ensurePortableButton(moduleId);const d = this.def(moduleId); if (!d || !this.sb) return;
+    let q = this.sb.from(d.table).select('*');
+    if (d.generic) q = q.eq('module', d.module);
+    q.then(({ data }) => {
+      if (!data || !data.length) { toast('Nothing to export.', 'warning'); return; }
+      const keys = Object.keys(data[0]);
+      const csv = [keys.join(',')].concat(data.map(r => keys.map(k => '"' + String(r[k] == null ? '' : (typeof r[k] === 'object' ? JSON.stringify(r[k]) : r[k])).replace(/"/g, '""') + '"').join(','))).join('\n');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = d.table + '.csv'; a.click();
+    });
+  },
+
+  /* Issue 12: Export the visible/queried records as a printable PDF (uses the
+     browser's "Save as PDF" print engine — no paid library, no AI). */
+  /* Issue 5: print a professional payslip for one payroll row. */
+  async printPayslip(id) {
+    if (!this.sb) return;
+    const { data: p } = await this.sb.from('payroll').select('*').eq('id', id).maybeSingle();
+    if (!p) { toast('Payslip not found.', 'warning'); return; }
+    const sc = (window.SCHOOL || {}); const cur = sc.currency || '₦';
+    const n = (x) => Number(p[x]) || 0;
+    const earnings = [['Basic salary', n('basic')], ['Allowances', n('allowances')], ['Bonus / Incentive', n('bonus')], ['Overtime', n('overtime')]].filter(r => r[1]);
+    const deductions = [['Tax (PAYE)', n('tax')], ['Pension', n('pension')], ['Loan repayment', n('loan_deduction')], ['Other deductions', n('other_deductions')]].filter(r => r[1]);
+    const gross = earnings.reduce((a, b) => a + b[1], 0);
+    const totalDed = deductions.reduce((a, b) => a + b[1], 0);
+    /* V8.6 #1: the payslip TRUSTS ARITHMETIC, not a possibly-stale stored value.
+       If the stored net disagrees with gross − deductions (legacy rows saved
+       before the trigger), the recomputed figure prints and the row is
+       silently repaired in the database. */
+    const computedNet = Math.max(0, gross - totalDed);
+    let net = p.net_pay != null ? Number(p.net_pay) : computedNet;
+    if (Math.abs(net - computedNet) > 0.01) {
+      net = computedNet;
+      try { this.sb.from('payroll').update({ net_pay: computedNet }).eq('id', id).then(()=>{}); } catch(_) {}
+    }
+    const fmt = (v) => cur + Number(v).toLocaleString();
+    const rows = (arr) => arr.map(r => '<tr><td style="padding:4px 8px">' + esc(r[0]) + '</td><td style="padding:4px 8px;text-align:right">' + fmt(r[1]) + '</td></tr>').join('');
+    const html = '<div style="width:720px;max-width:96vw;font-family:Arial,sans-serif;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden">' +
+      '<div style="background:' + (sc.primary || '#4f46e5') + ';color:#fff;padding:18px 22px;display:flex;align-items:center;gap:12px">' +
+      '<img src="assets/img/logo.' + (sc.logoExt || 'svg') + '" style="width:48px;height:48px;border-radius:8px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'">' +
+      '<div><h2 style="margin:0">' + esc(sc.name || 'School') + '</h2><div style="font-size:.78rem;opacity:.9">' + esc(sc.address || '') + ' · ' + esc(sc.phone || '') + '</div></div>' +
+      '<div style="margin-left:auto;text-align:right"><strong style="font-size:1.1rem">PAYSLIP</strong><div style="font-size:.8rem">' + esc(p.month || '') + ' ' + esc(p.year || '') + '</div></div></div>' +
+      '<div style="padding:16px 22px"><table style="width:100%;font-size:.9rem;margin-bottom:12px"><tr><td><b>Staff:</b> ' + esc(p.staff_name || '-') + '</td><td style="text-align:right"><b>Status:</b> ' + esc(p.status || 'draft') + '</td></tr><tr><td><b>Method:</b> ' + esc(p.method || '-') + '</td><td style="text-align:right"><b>Slip ref:</b> ' + esc(String(id).slice(0, 8)) + '</td></tr></table>' +
+      '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:240px"><h4 style="margin:6px 0;border-bottom:2px solid #16a34a;color:#16a34a">Earnings</h4><table style="width:100%;font-size:.88rem">' + rows(earnings) + '<tr><td style="padding:6px 8px;font-weight:700;border-top:1px solid #e2e8f0">Gross</td><td style="padding:6px 8px;text-align:right;font-weight:700;border-top:1px solid #e2e8f0">' + fmt(gross) + '</td></tr></table></div>' +
+      '<div style="flex:1;min-width:240px"><h4 style="margin:6px 0;border-bottom:2px solid #dc2626;color:#dc2626">Deductions</h4><table style="width:100%;font-size:.88rem">' + (deductions.length ? rows(deductions) : '<tr><td style="padding:4px 8px;color:#94a3b8">None</td><td></td></tr>') + '<tr><td style="padding:6px 8px;font-weight:700;border-top:1px solid #e2e8f0">Total</td><td style="padding:6px 8px;text-align:right;font-weight:700;border-top:1px solid #e2e8f0">' + fmt(totalDed) + '</td></tr></table></div></div>' +
+      '<div style="margin-top:16px;background:' + (sc.primary || '#4f46e5') + '10;border:1px dashed ' + (sc.primary || '#4f46e5') + ';border-radius:8px;padding:12px;text-align:center"><span style="font-size:.85rem;color:#64748b">NET PAY</span><div style="font-size:1.6rem;font-weight:800;color:' + (sc.primary || '#4f46e5') + '">' + fmt(net) + '</div></div>' +
+      '<div style="display:flex;justify-content:space-between;margin-top:30px;font-size:.8rem"><div>____________________<br>Prepared by (Bursar)</div><div>____________________<br>Authorised (Proprietor)</div></div>' +
+      '<p style="margin-top:18px;font-size:.7rem;color:#94a3b8;text-align:center">This is a computer-generated payslip · ' + esc(sc.name || '') + ' · Powered by HMG Concepts</p></div></div>';
+    const w = window.open('', '_blank');
+    w.document.write('<html><head><title>Payslip</title><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"></head><body style="display:flex;justify-content:center;padding:20px">' + html + '<script>window.onload=function(){setTimeout(function(){window.print()},250)};<\/script></body></html>');
+    w.document.close();
+  },
+
+  exportPDF(moduleId) {
+    const d = this.def(moduleId); if (!d || !this.sb) return;
+    let q = this.sb.from(d.table).select('*');
+    if (d.generic) q = q.eq('module', d.module);
+    q.then(({ data }) => {
+      if (!data || !data.length) { toast('Nothing to export.', 'warning'); return; }
+      const cols = d.listCols || d.cols;
+      const sc = (window.SCHOOL || {});
+      const cellVal = (row, c) => c.key.indexOf('data.') === 0 ? ((row.data || {})[c.key.slice(5)]) : row[c.key];
+      const head = '<tr>' + cols.map(c => '<th>' + esc(c.label) + '</th>').join('') + '</tr>';
+      const rows = data.map(r => '<tr>' + cols.map(c => '<td>' + esc(String(cellVal(r, c) == null ? '' : cellVal(r, c))) + '</td>').join('') + '</tr>').join('');
+      const w = window.open('', '_blank');
+      w.document.write('<html><head><title>' + esc(d.title) + ' export</title><style>body{font-family:Arial,sans-serif;padding:18px;color:#111}h2{margin:0}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:14px;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f1f5f9}</style><base href="'+document.baseURI.replace(/[^/]*$/,'')+'"></head><body><h2>' + esc(sc.name || 'School') + ' — ' + esc(d.title) + ' records</h2><small>Generated ' + (window.fmtDMYT?fmtDMYT(new Date()):new Date().toLocaleString()) + ' · ' + data.length + ' record(s)</small><table>' + head + rows + '</table><script>window.onload=()=>window.print()<\/script></body></html>');
+      w.document.close();
+    });
+  },
+
+  /* Issue 11: Bulk-import students (or any module) from a CSV file. The CSV is
+     parsed in-browser and ONLY the extracted records are stored — the file
+     itself is NEVER uploaded/saved (keeps Supabase storage free). */
+  importCSV(moduleId) {
+    const d = this.def(moduleId); if (!d) { toast('Import not available here.', 'warning'); return; }
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv,text/csv';
+    inp.onchange = () => {
+      const f = inp.files[0]; if (!f) return;
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const rows = CRUD._parseCSV(String(reader.result));
+        if (!rows.length) { toast('CSV is empty or unreadable.', 'warning'); return; }
+        const header = rows[0].map(h => h.trim());
+        const valid = new Set(d.cols.filter(c => c.key.indexOf('data.') !== 0).map(c => c.key));
+        const dataCols = new Set(d.cols.filter(c => c.key.indexOf('data.') === 0).map(c => c.key.slice(5)));
+        const records = rows.slice(1).filter(r => r.some(x => x && x.trim())).map(r => {
+          const rec = {}; const dataObj = {};
+          header.forEach((h, i) => {
+            const v = (r[i] == null ? '' : r[i].trim());
+            if (v === '') return;
+            if (valid.has(h)) rec[h] = v;
+            else if (dataCols.has(h)) dataObj[h] = v;
+          });
+          if (d.generic) { rec.module = d.module; rec.data = dataObj; if (!rec.title && dataObj.title) rec.title = dataObj.title; }
+          return rec;
+        }).filter(r => Object.keys(r).length);
+        if (!records.length) { toast('No valid rows found. Check column headers match field keys.', 'warning', 7000); return; }
+        // chunked insert to stay within free-tier request sizes
+        let ok = 0, fail = 0;
+        for (let i = 0; i < records.length; i += 200) {
+          const { error } = await this.sb.from(d.table).insert(records.slice(i, i + 200));
+          if (error) { fail += Math.min(200, records.length - i); } else { ok += Math.min(200, records.length - i); }
+        }
+        if (window.App && App.logActivity) App.logActivity('import', d.table, ok + ' rows');
+        toast('✅ Imported ' + ok + ' record(s).' + (fail ? ' ' + fail + ' failed.' : '') + ' (CSV file not stored)', fail ? 'warning' : 'success', 6000);
+        this.renderList(moduleId);
+      };
+      reader.readAsText(f);
+    };
+    inp.click();
+  },
+
+  _parseCSV(text) {
+    // RFC-4180-ish CSV parser supporting quoted fields, commas & newlines.
+    const rows = []; let row = [], field = '', inQ = false;
+    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQ) {
+        if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+        else field += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === ',') { row.push(field); field = ''; }
+        else if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+        else field += ch;
+      }
+    }
+    if (field !== '' || row.length) { row.push(field); rows.push(row); }
+    return rows;
+  },
+
+  /* Issue 9: Digital library — when a teacher sets reading questions on a book,
+     the student's auto-marked score can be pushed into the results table so it
+     counts toward the final grade. */
+  async pushReadingScore(studentName, subject, cls, score, label) {
+    if (!this.sb) return;
+    try {
+      await this.sb.from('reading_scores').insert({ student_name: studentName, subject, class: cls, score, source: label || 'digital_library' });
+    } catch (e) {}
+  },
+
+  /* Issue 10: Auto-promotion. Computes promote/repeat/graduate for every active
+     student from their results vs a pass benchmark, then writes draft promotion
+     rows the admin can review & alter before applying. */
+  async autoPromote(opts) {
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    opts = opts || {};
+    const benchmark = Number(opts.benchmark != null ? opts.benchmark : 40);
+    const session = opts.session || '';
+    const term = opts.term || '';
+    const graduatingClass = (opts.graduatingClass || '').trim();
+    const { data: studs } = await this.sb.from('students').select('id,full_name,class,status,department').eq('status', 'active').limit(5000);
+    if (!studs || !studs.length) { toast('No active students found.', 'warning'); return; }
+    let rq = this.sb.from('results').select('student_name,class,subject,ca1,ca2,ca3,exam');
+    if (session) rq = rq.eq('session', session);
+    if (term) rq = rq.eq('term', term);
+    const { data: results } = await rq.limit(50000);
+    const byStudent = {};
+    (results || []).forEach(r => {
+      const t = (Number(r.ca1) || 0) + (Number(r.ca2) || 0) + (Number(r.ca3) || 0) + (Number(r.exam) || 0);
+      (byStudent[r.student_name] = byStudent[r.student_name] || []).push(t);
+    });
+    // class progression map (override via opts.nextClass)
+    /* V7.4: prefer the LIVE class ladder from the registered classes — every
+       school's own structure (Primary → JSS → SS) drives To-class automatically;
+       the static map remains only as the last-resort fallback. */
+    let nextClassMap = opts.nextClass;
+    if (!nextClassMap) {
+      try {
+        const ladder = await this.classLadder();
+        if (ladder.length > 1) { nextClassMap = {}; for (let i = 0; i < ladder.length - 1; i++) nextClassMap[ladder[i]] = ladder[i + 1]; }
+      } catch(_) {}
+      if (!nextClassMap) nextClassMap = CRUD._defaultNextClass();
+    }
+    const drafts = [];
+    studs.forEach(s => {
+      const scores = byStudent[s.full_name] || [];
+      const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+      let action, to_class = '';
+      if (graduatingClass && s.class === graduatingClass) { action = 'graduate'; }
+      else if (avg == null) { action = 'pending'; }
+      else if (avg >= benchmark) { action = 'promote'; to_class = nextClassMap[s.class] || ''; }
+      else { action = 'repeat'; to_class = s.class; }
+      drafts.push({ student_id: s.id || null, student_name: s.full_name, from_class: s.class, to_class, action, department: s.department || '', average: avg == null ? null : Math.round(avg * 10) / 10, session, term, status: 'draft' });
+    });
+    // store as draft promotions (admin can edit before applying)
+    let ok = 0;
+    for (let i = 0; i < drafts.length; i += 200) {
+      let { error } = await this.sb.from('promotions').insert(drafts.slice(i, i + 200).map(d => ({ student_id: d.student_id || null, student_name: d.student_name, from_class: d.from_class, to_class: d.to_class, action: d.action, department: d.department || '', session: d.session, term: d.term, status: d.status, average: d.average })));
+      /* older databases without promotions.department: retry without it */
+      if (error && /department/.test(error.message||'')) ({ error } = await this.sb.from('promotions').insert(drafts.slice(i, i + 200).map(d => ({ student_id: d.student_id || null, student_name: d.student_name, from_class: d.from_class, to_class: d.to_class, action: d.action, session: d.session, term: d.term, status: d.status, average: d.average }))));
+      if (!error) ok += Math.min(200, drafts.length - i);
+    }
+    if (window.App && App.logActivity) App.logActivity('auto-promote', 'promotions', ok + ' drafts @ ' + benchmark + '%');
+    toast('✅ Generated ' + ok + ' promotion draft(s) at ' + benchmark + '% benchmark. Review & edit, then Apply.', 'success', 8000);
+    this.renderList('promotion');
+    return drafts;
+  },
+
+  _defaultNextClass() {
+    // Sensible Nigerian-style progression; admin can override anytime.
+    return {
+      'Nursery 1': 'Nursery 2', 'Nursery 2': 'Primary 1',
+      'Primary 1': 'Primary 2', 'Primary 2': 'Primary 3', 'Primary 3': 'Primary 4',
+      'Primary 4': 'Primary 5', 'Primary 5': 'Primary 6', 'Primary 6': 'JSS1',
+      'JSS1': 'JSS2', 'JSS2': 'JSS3', 'JSS3': 'SSS1',
+      'SSS1': 'SSS2', 'SSS2': 'SSS3'
+    };
+  },
+
+  /* Apply approved/draft promotions: move each student to their to_class. */
+  async applyPromotions() {
+    /* V6.5 #7 — ONE-CLICK session promotion, rebuilt for clarity and safety:
+       • Shows a full PREVIEW (per-action counts + class movements) before anything changes.
+       • Moves students by student_id when available (name matching only as last resort),
+         so two students sharing a name can never be mis-promoted.
+       • Repeat decisions are stamped applied too (student stays in class by design).
+       • Graduates become status='graduated' and later flow to Alumni.
+       • Every applied decision prints on the student's report card automatically
+         (PROMOTED TO…, NOT PROMOTED — REPEAT…, GRADUATED). */
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    const { data: proms, error } = await this.sb.from('promotions').select('*').in('status', ['draft', 'approved']).limit(5000);
+    if (error) { toast(error.message, 'danger'); return; }
+    const actionable = (proms || []).filter(p => ['promote','graduate','repeat'].includes(String(p.action||'').toLowerCase()));
+    if (!actionable.length) { toast('No promotion decisions to apply. Run “⚙ Auto-promote (by exam)” first to draft decisions.', 'warning', 8000); return; }
+    const counts = { promote:0, graduate:0, repeat:0 }; const moves = {};
+    actionable.forEach(p => { const a=String(p.action).toLowerCase(); counts[a]++; if(a==='promote'){ const k=(p.from_class||'?')+' → '+(p.to_class||'?'); moves[k]=(moves[k]||0)+1; } });
+    const moveLines = Object.entries(moves).map(([k,v]) => '   • ' + k + ': ' + v + ' student(s)').join('\n');
+    if (!confirm('ONE-CLICK SESSION PROMOTION — please review:\n\n' +
+      '⬆ Promote: ' + counts.promote + ' student(s)' + (moveLines ? '\n' + moveLines : '') + '\n' +
+      '🎓 Graduate: ' + counts.graduate + ' student(s) (status → graduated)\n' +
+      '🔁 Repeat: ' + counts.repeat + ' student(s) (stay in current class)\n\n' +
+      'What happens on OK:\n' +
+      '1) Promoted students MOVE to their new class automatically — every page (results, attendance, fees, timetable) follows the new class instantly.\n' +
+      '2) Each decision is stamped on the student\'s report card (PROMOTED / REPEAT / GRADUATED).\n' +
+      '3) Decisions become “applied” and will not re-run.\n\nProceed?')) return;
+    /* V7.3: one server-side call finalises everything (moves classes, stamps
+       status='applied' + the CURRENT period so report cards print the decision
+       immediately). Falls back to the legacy loop on un-migrated databases. */
+    try {
+      const rr = await this.sb.rpc('sc_finalise_promotions');
+      if (!rr.error && rr.data && rr.data.ok) {
+        const d = rr.data;
+        if (window.App && App.logActivity) App.logActivity('apply-promotions', 'students', d.promoted + ' promoted, ' + d.graduated + ' graduated, ' + d.repeated + ' repeats' + (d.failed ? ', ' + d.failed + ' failed' : ''));
+        toast('✅ Session promotion finalised: ' + d.promoted + ' moved to their new classes, ' + d.graduated + ' graduated, ' + d.repeated + ' repeat(s) recorded' + (d.failed ? ' — ' + d.failed + ' failed (open the drafts and check the student name/class)' : '') + '. Report cards now print each decision (' + (d.term || 'current term') + ' ' + (d.session || '') + ').', d.failed ? 'warning' : 'success', 11000);
+        this.renderList('promotion'); return;
+      }
+    } catch(_) {}
+    let done = 0, failed = 0;
+    for (const p of actionable) {
+      try {
+        const upd = p.action === 'graduate' ? { status: 'graduated' } : (p.action === 'promote' ? { class: p.to_class } : null);
+        if (upd) {
+          let r;
+          if (p.student_id) r = await this.sb.from('students').update(upd).eq('id', p.student_id).select('id');
+          else r = await this.sb.from('students').update(upd).eq('full_name', p.student_name).select('id');
+          if (r.error || !r.data || !r.data.length) { failed++; continue; }
+        }
+        await this.sb.from('promotions').update({ status: 'applied' }).eq('id', p.id);
+        done++;
+      } catch (_) { failed++; }
+    }
+    if (window.App && App.logActivity) App.logActivity('apply-promotions', 'students', done + ' applied' + (failed ? ', ' + failed + ' failed' : ''));
+    toast('✅ ' + done + ' promotion decision(s) applied' + (failed ? ' — ' + failed + ' failed (student record not found; fix the name/class on the draft and re-apply)' : '') + '. Promoted students are already in their new classes; report cards now show each decision.', failed ? 'warning' : 'success', 10000);
+    this.renderList('promotion');
+  },
+
+  /* Issue 6: Build today's attendance from QR self check-ins so teachers don't
+     hand-enter each student. Anyone scanned = present; the rest of their class
+     are written as absent (admin can edit). */
+  async importAttendanceFromCheckin() {
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: checkins } = await this.sb.from('attendance_checkins').select('student_name,student_id_ref,class,checkin_at').gte('checkin_at', today + 'T00:00:00').limit(5000);
+    if (!checkins || !checkins.length) { toast('No QR check-ins recorded today yet.', 'warning', 6000); return; }
+    const present = {}; checkins.forEach(c => { const n = c.student_name || c.student_id_ref; if (n) present[n] = c.class || ''; });
+    // avoid duplicating existing attendance rows for today
+    const { data: existing } = await this.sb.from('attendance').select('student_name').eq('date', today);
+    const have = new Set((existing || []).map(a => a.student_name));
+    const rows = Object.keys(present).filter(n => !have.has(n)).map(n => ({ student_name: n, class: present[n], date: today, status: 'present', time_in: new Date().toTimeString().slice(0, 5) }));
+    if (!rows.length) { toast('All scanned students are already in today\'s attendance.', 'info'); return; }
+    const { error } = await this.sb.from('attendance').insert(rows);
+    if (error) { toast(error.message, 'danger'); return; }
+    if (window.App && App.logActivity) App.logActivity('attendance-from-checkin', 'attendance', rows.length + ' present');
+    toast('✅ Marked ' + rows.length + ' student(s) PRESENT from QR check-ins.', 'success', 6000);
+    this.renderList('attendance');
+  },
+
+  /* ============================================================
+     ENTERPRISE V10: BULK TRAITS FILL
+     Easy interface to fill Affective/Psychomotor domains for a 
+     whole class at once.
+     ============================================================ */
+  async bulkFillTraits(kind) {
+    if (!this.sb) { toast('Database not configured.', 'warning'); return; }
+    const [{ data: classes }, { data: lookups }] = await Promise.all([this.sb.from('classes').select('name').order('name'), this.sb.from('lookups').select('kind,value').in('kind',['term','session']).order('position')]);
+    const opts = (classes || []).map(c => '<option>' + esc(c.name) + '</option>').join('');
+    const terms = [...new Set((lookups||[]).filter(x=>x.kind==='term').map(x=>x.value).filter(Boolean))];
+    const sessions = [...new Set((lookups||[]).filter(x=>x.kind==='session').map(x=>x.value).filter(Boolean))];
+    const termOpts = (terms.length?terms:['First Term','Second Term','Third Term']).map(v=>'<option>'+esc(v)+'</option>').join('');
+    const sessionOpts = (sessions.length?sessions:['2025/2026','2026/2027']).map(v=>'<option>'+esc(v)+'</option>').join('');
+    const title = kind === 'affective' ? '⭐ Bulk Fill Affective Domain' : '🏃 Bulk Fill Psychomotor Domain';
+    openModal(title,
+      '<div class="grid grid-2"><div class="form-group"><label>Class</label><select id="bf-class" class="form-select" onchange="CRUD._bfLoad(\''+kind+'\')"><option value="">— select —</option>' + opts + '</select></div>' +
+      '<div class="form-group"><label>Term</label><select id="bf-term" class="form-select">'+termOpts+'</select></div><div class="form-group"><label>Session</label><select id="bf-session" class="form-select">'+sessionOpts+'</select></div></div>' +
+      '<div id="bf-list" style="max-height:400px;overflow:auto;margin-top:10px"><p style="color:var(--gray-500)">Pick a class to load students...</p></div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CRUD._bfSave(\''+kind+'\')">Save All</button>');
+  },
+
+  async _bfLoad(kind) {
+    const cls = document.getElementById('bf-class').value;
+    const box = document.getElementById('bf-list');
+    if (!cls) return;
+    const { data: studs } = await this.sb.from('students').select('id,full_name').eq('class', cls).order('full_name');
+    if (!studs || !studs.length) { box.innerHTML = '<p>No students found.</p>'; return; }
+    
+    const traits = kind === 'affective' 
+      ? ['Punctuality','Neatness','Politeness','Honesty','Leadership','Cooperation','Attentiveness']
+      : ['Handwriting','Verbal Fluency','Sports','Crafts','Drawing','Music'];
+
+    let html = '<table class="form-table"><thead><tr><th>Student</th>' + traits.map(t => '<th>'+t+'</th>').join('') + '</tr></thead><tbody>';
+    studs.forEach(s => {
+      html += '<tr data-student-id="'+s.id+'"><td><b>'+esc(s.full_name)+'</b></td>' + traits.map(t => '<td><select class="form-select bf-val" data-trait="'+t+'"><option value="5">5</option><option value="4">4</option><option value="3" selected>3</option><option value="2">2</option><option value="1">1</option></select></td>').join('') + '</tr>';
+    });
+    html += '</tbody></table>';
+    box.innerHTML = html;
+  },
+
+  async _bfSave(kind) {
+    const cls = document.getElementById('bf-class').value;
+    const term = document.getElementById('bf-term').value;
+    const session = (document.getElementById('bf-session')||{}).value || new Date().getFullYear() + '/' + (new Date().getFullYear()+1);
+    const table = kind === 'affective' ? 'affective_traits' : 'psychomotor_traits';
+    const rows = [];
+    document.querySelectorAll('#bf-list tr[data-student-id]').forEach(tr => {
+      const student_id = tr.dataset.studentId;
+      const ratings = {};
+      tr.querySelectorAll('.bf-val').forEach(sel => { ratings[sel.dataset.trait] = sel.value; });
+      rows.push({ student_id, term, session, ratings, teacher_id: window.SC_PROFILE?.id });
+    });
+    const { error } = await this.sb.from(table).upsert(rows, { onConflict: 'student_id,term,session' });
+    if (error) { toast(error.message, 'danger'); return; }
+    toast('✅ Saved traits for ' + rows.length + ' students.', 'success');
+    closeModal();
+  }
+};
+
+/* ---- Auto-promotion modal UI (issue 10) ---- */
+const PromoUI = {
+  async open() {
+    if (!window.CRUD || !CRUD.sb) { toast('Database not configured.', 'warning'); return; }
+    let sessions = [], terms = [];
+    try { const { data } = await CRUD.sb.from('lookups').select('value,kind').in('kind', ['session', 'term']); (data || []).forEach(r => { if (r.kind === 'session') sessions.push(r.value); else terms.push(r.value); }); } catch (e) {}
+    const opt = (arr) => ['<option value="">— any —</option>'].concat(arr.map(v => '<option>' + esc(v) + '</option>')).join('');
+    /* V7.4: pre-select the CURRENT period and suggest the graduating class
+       (top of the class ladder) automatically — the admin usually just clicks
+       Generate drafts. */
+    let curT='', curS='', topClass='';
+    try { const cp = await CRUD.currentPeriod(); curT = cp.term || ''; curS = cp.session || ''; } catch(_){}
+    try { const lad = await CRUD.classLadder(); topClass = lad[lad.length-1] || ''; } catch(_){}
+    openModal('Auto-promote students by exam result',
+      '<div class="form-group"><label>Pass benchmark (% of total)</label><input class="form-input" id="pp-bm" type="number" value="40" min="0" max="100"></div>' +
+      '<div class="form-group"><label>Session</label><select class="form-select" id="pp-sess">' + opt(sessions) + '</select></div>' +
+      '<div class="form-group"><label>Term</label><select class="form-select" id="pp-term">' + opt(terms) + '</select></div>' +
+      '<div class="form-group"><label>Graduating class (students here → graduate)</label><input class="form-input" id="pp-grad" value="' + esc(topClass) + '" placeholder="e.g. SS 3"></div>' +
+      '<p style="color:var(--gray-500);font-size:.85rem">This creates editable DRAFTS only. Review them, then click “Apply promotions”.</p>',
+      '<button class="btn btn-outline" onclick="closeModal()">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="PromoUI.run()">Generate drafts</button>');
+    setTimeout(() => { try {
+      const se=document.getElementById('pp-sess'); if(se&&curS){ if(![...se.options].some(o=>o.value===curS))se.add(new Option(curS,curS)); se.value=curS; }
+      const te=document.getElementById('pp-term'); if(te&&curT){ if(![...te.options].some(o=>o.value===curT))te.add(new Option(curT,curT)); te.value=curT; }
+    } catch(_){} }, 150);
+  },
+  run() {
+    const benchmark = Number(document.getElementById('pp-bm').value || 40);
+    const session = document.getElementById('pp-sess').value;
+    const term = document.getElementById('pp-term').value;
+    const graduatingClass = document.getElementById('pp-grad').value;
+    closeModal();
+    CRUD.autoPromote({ benchmark, session, term, graduatingClass });
+  }
+};
+if (typeof window !== 'undefined') window.PromoUI = PromoUI;
+if (typeof window !== 'undefined') window.CRUD = CRUD;
+if (typeof console !== 'undefined') console.log('%c[School Connect] CRUD engine loaded — real add/edit/delete for every module.', 'color:#0d9488;font-weight:bold');

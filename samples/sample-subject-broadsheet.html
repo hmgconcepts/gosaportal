@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>SAMPLE — Subject Broadsheet (Scoresheet)</title>
+<style>
+@page{size:A4 portrait;margin:10mm}
+body{font-family:Arial,sans-serif;color:#111;background:#f1f5f9;margin:0;padding:16px;display:flex;justify-content:center}
+.sheet{background:#fff;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,.15);width:760px;max-width:100%}
+.wm{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.wm span{font-size:70px;font-weight:900;color:rgba(220,38,38,.07);transform:rotate(-24deg)}
+h1{font-family:Georgia,serif;color:#4f46e5;text-align:center;margin:0;font-size:21px}
+.meta{text-align:center;font-size:11px;margin:6px 0 12px;color:#334155}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #222;padding:4px 6px;font-size:10.5px;text-align:center}
+th{background:#4f46e5;color:#fff}
+tr:nth-child(even){background:#eef2ff}
+.left{text-align:left!important}
+.grade{font-weight:800;color:#16a34a}
+.grade.B{color:#1e40af}.grade.C{color:#d97706}.grade.D,.grade.F{color:#dc2626}
+.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:12px}
+.stat div{border:1px solid #c7d2fe;border-radius:10px;padding:8px;text-align:center;background:#eef2ff}
+.stat b{display:block;font-size:16px;color:#4f46e5}
+.sig{display:flex;justify-content:space-between;margin-top:28px;font-size:11px;text-align:center;align-items:flex-end;gap:20px}
+.sig>div{width:210px}
+.sig-script{font-family:'Segoe Script',cursive;color:#0c4a6e;font-size:1.3rem;height:34px;display:flex;align-items:center;justify-content:center;padding-bottom:4px}
+.sig-line{border-top:1.5px solid #111;padding-top:6px;font-weight:700}
+.stamp-wrap{width:120px;height:120px;display:inline-block;position:relative;margin:0 auto}
+.stamp-wrap svg{width:100%;height:100%;opacity:.92;transform:rotate(-6deg)}
+.stamp-wrap .stamp-text{font-size:8px;font-weight:700;fill:#7f1d1d}
+.grading-scale{margin-top:10px;font-size:9.5px;color:#475569;display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.grading-scale b{color:#4f46e5}
+.note{margin-top:12px;font-size:9.5px;color:#94a3b8;text-align:center}
+@media print{body{background:#fff;padding:0}.sheet{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wm"><span>SAMPLE</span></div>
+<div class="sheet">
+  <h1>HMG ACADEMY — SUBJECT BROADSHEET</h1>
+  <p class="meta">SUBJECT: MATHEMATICS · CLASS: JSS 2A · FIRST TERM, 2026/2027 · Subject Teacher: Mr. A. Samson · 10 of 32 students shown</p>
+  <table>
+    <thead><tr><th>S/N</th><th class="left">FULL NAME</th><th>ADM NO.</th><th>CA1 (10)</th><th>CA2 (10)</th><th>CA3 (10)</th><th>PROJECT (10)</th><th>EXAM (60)</th><th>TOTAL (100)</th><th>GRADE</th><th>POS</th><th>REMARK</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="left">ADEBAYO, Chiamaka</td><td>HMG/2024/0113</td><td>9</td><td>8</td><td>9</td><td>8</td><td>55</td><td><b>89</b></td><td class="grade">A</td><td>1st</td><td>Excellent</td></tr>
+      <tr><td>2</td><td class="left">BELLO, Fatima</td><td>HMG/2024/0107</td><td>8</td><td>9</td><td>9</td><td>8</td><td>53</td><td><b>87</b></td><td class="grade">A</td><td>2nd</td><td>Excellent</td></tr>
+      <tr><td>3</td><td class="left">OKORO, David</td><td>HMG/2024/0101</td><td>9</td><td>8</td><td>8</td><td>9</td><td>50</td><td><b>84</b></td><td class="grade">A</td><td>3rd</td><td>Excellent</td></tr>
+      <tr><td>4</td><td class="left">EZE, Samuel</td><td>HMG/2024/0122</td><td>8</td><td>8</td><td>7</td><td>8</td><td>50</td><td><b>81</b></td><td class="grade">A</td><td>4th</td><td>Excellent</td></tr>
+      <tr><td>5</td><td class="left">OGUNLEYE, Tunde</td><td>HMG/2024/0109</td><td>7</td><td>7</td><td>8</td><td>7</td><td>43</td><td><b>72</b></td><td class="grade">B</td><td>5th</td><td>Very Good</td></tr>
+      <tr><td>6</td><td class="left">MOHAMMED, Aisha</td><td>HMG/2024/0104</td><td>7</td><td>8</td><td>7</td><td>7</td><td>41</td><td><b>70</b></td><td class="grade">B</td><td>6th</td><td>Very Good</td></tr>
+      <tr><td>7</td><td class="left">NWACHUKWU, Peace</td><td>HMG/2024/0118</td><td>7</td><td>6</td><td>7</td><td>7</td><td>41</td><td><b>68</b></td><td class="grade">B</td><td>7th</td><td>Good</td></tr>
+      <tr><td>8</td><td class="left">IBRAHIM, Yusuf</td><td>HMG/2024/0111</td><td>6</td><td>7</td><td>6</td><td>6</td><td>36</td><td><b>61</b></td><td class="grade">B</td><td>8th</td><td>Good</td></tr>
+      <tr><td>9</td><td class="left">CHUKWU, Blessing</td><td>HMG/2024/0125</td><td>6</td><td>6</td><td>6</td><td>5</td><td>35</td><td><b>58</b></td><td>C</td><td>9th</td><td>Credit</td></tr>
+      <tr><td>10</td><td class="left">AKPAN, Mary</td><td>HMG/2024/0120</td><td>5</td><td>6</td><td>5</td><td>6</td><td>30</td><td><b>52</b></td><td>C</td><td>10th</td><td>Credit</td></tr>
+    </tbody>
+  </table>
+  <div class="stat">
+    <div><b>73.2%</b>Subject Average</div>
+    <div><b>89</b>Highest Score</div>
+    <div><b>52</b>Lowest Score</div>
+    <div><b>100%</b>Pass Rate (≥50)</div>
+  </div>
+  <div class="grading-scale"><b>Grading scale:</b> A (80–100) Excellent · B (70–79) Very Good · C (60–69) Good · D (50–59) Credit · E (40–49) Pass · F (0–39) Fail</div>
+  <div class="sig">
+    <div>
+      <div class="sig-script">Adewale S.</div>
+      <div class="sig-line">Subject Teacher's Signature</div>
+    </div>
+    <div>
+      <div class="stamp-wrap">
+        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <path id="sbjTopArc" d="M 16,60 A 44,44 0 0,1 104,60" fill="none"/>
+            <path id="sbjBotArc" d="M 18,62 A 42,42 0 0,0 102,62" fill="none"/>
+          </defs>
+          <circle cx="60" cy="60" r="55" fill="none" stroke="#7f1d1d" stroke-width="3"/>
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#7f1d1d" stroke-width="1.5"/>
+          <text class="stamp-text" font-family="Georgia,serif" font-size="9" letter-spacing="2.2" font-weight="800">
+            <textPath href="#sbjTopArc" startOffset="50%" text-anchor="middle">★ HMG ACADEMY ★</textPath>
+          </text>
+          <text class="stamp-text" font-family="Georgia,serif" font-size="6.5" font-style="italic">
+            <textPath href="#sbjBotArc" startOffset="50%" text-anchor="middle">EXAMINATIONS OFFICE</textPath>
+          </text>
+          <text x="60" y="50" font-family="Georgia,serif" font-size="14" font-weight="900" fill="#7f1d1d" text-anchor="middle">HMG</text>
+          <text x="60" y="63" font-family="Georgia,serif" font-size="5" fill="#7f1d1d" text-anchor="middle">— SEAL —</text>
+          <line x1="35" y1="76" x2="85" y2="76" stroke="#7f1d1d" stroke-width="0.6"/>
+          <text x="60" y="86" font-family="Georgia,serif" font-size="5.5" font-weight="700" fill="#7f1d1d" text-anchor="middle">★ AUTHENTICATED ★</text>
+          <text x="60" y="93" font-family="monospace" font-size="4" fill="#7f1d1d" text-anchor="middle">SC/STMP/2026/0001</text>
+        </svg>
+      </div>
+      <div class="sig-line" style="margin-top:4px">Head of Department's Signature &amp; Stamp</div>
+    </div>
+  </div>
+  <p class="note">SAMPLE of the per-subject scoresheet (Academic Records → Subject Broadsheet → Print). Auto totals, grades, positions and subject statistics. Licensed Platform · HMG Technologies.</p>
+</div>
+</body>
+</html>
