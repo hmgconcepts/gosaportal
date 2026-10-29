@@ -3,7 +3,8 @@
 Back up Supabase and run the entire **`complete-schema.sql`**. It is the only
 production SQL for a fresh project or cumulative upgrade and is safe to re-run.
 It contains every V5.1–V5.8 table, migration, trigger, view, RLS policy, grant and
-RPC. Do not run focused/versioned SQL afterward.
+RPC, including V12.55–V12.57 Midterm purpose/data and secure bulk-push repairs.
+Do not run older focused/versioned SQL afterward.
 
 Wait for: `School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required`.
 
