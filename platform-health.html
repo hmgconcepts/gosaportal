@@ -339,7 +339,9 @@ const PH={
     {file:'v12.52-midterm-roster-complete-and-context-sync.sql', label:'Midterm all roster students + old/new context auto-sync', kind:'rpc', fn:'generate_midterm_reports', args:{p_class:'JSS 1',p_term:'First Term',p_session:'2026/2027'}},
     {file:'v12.55-unify-midterm-assessment-and-report-mapping.sql', label:'Midterm single purpose + legacy CA1/CA2/Test mapping + no-column roster generation', kind:'rpc', fn:'generate_midterm_reports', args:{p_class:'JSS 1',p_term:'First Term',p_session:'2026/2027'}},
     {file:'v12.56-cbt-assessment-check-constraint-safe.sql', label:'Assessment-purpose CHECK compatibility; preserves all existing CBT rows', kind:'col', table:'cbt_exams', col:'assessment_type'},
-    {file:'v12.57-report-details-and-atomic-cbt-bulk-push.sql', label:'Printable Midterm detail + RLS-safe CBT score push', kind:'rpc', fn:'sc_cbt_bulk_push_exam_v2', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}}, 
+    {file:'v12.57-report-details-and-atomic-cbt-bulk-push.sql', label:'Printable Midterm detail + authorized batch CBT score push', kind:'rpc', fn:'sc_cbt_bulk_push_batch_v1', args:{p_exam_ids:['00000000-0000-0000-0000-000000000000']}},
+    {file:'v12.57-report-details-and-atomic-cbt-bulk-push.sql', label:'RLS-safe CBT result-count preview', kind:'rpc', fn:'sc_cbt_bulk_result_counts_v1', args:{p_exam_ids:[]}}, 
+    {file:'v12.58-cbt-bank-alias-repair-and-verified-readback.sql', label:'CBT save/attach aligns csv_data + questions and verifies both aliases', kind:'rpc', fn:'cbt_verify_exam_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}}, 
     {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'}
   ],
 

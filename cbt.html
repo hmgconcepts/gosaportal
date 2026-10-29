@@ -1064,43 +1064,56 @@ window.CBTUI = {
     const patch={teacher_id:e.teacher_id||((window.SC_PROFILE&&SC_PROFILE.id)||null),title,subject,class:className,term,session,assessment_type:v('ed-type'),exam_mode:v('ed-mode'),report_column:v('ed-col'),max_score:Number(v('ed-max'))||0,duration:Number(v('ed-dur'))||45,duration_min:Number(v('ed-dur'))||45,negative_mark:Number(v('ed-neg'))||0,select_count:Number(v('ed-sel'))||0,attempt_limit:Number(v('ed-att'))||0,pass_mark:Number(v('ed-pass'))||0,topic:v('ed-topic'),instructions:v('ed-instr'),start_at:start||null,close_at:close||null,is_open:c('ed-open'),is_archived:c('ed-arch'),randomise:c('ed-rand'),release_results:c('ed-rel'),certificate_enabled:c('ed-cert'),is_entrance:c('ed-ent'),enable_math_keyboard:cMathKb,enable_calculator:cCalc,show_score_on_submit:cShowScore,public_link:e.public_link||'',anti_cheat_config:acPatch,updated_at:new Date().toISOString()};
     const {data,error}=await sb.from('cbt_exams').update(patch).eq('id',id).select().maybeSingle();if(error){toast('Could not save exam: '+error.message,'danger',10000);return;}if(!data){toast('Exam update was not confirmed. Check teacher ownership/RLS.','danger',10000);return;}toast('✅ Full exam settings updated. Candidate and report-card values are uniform.','success',7000);closeModal();CBTUI.refresh();
   },
+  decodeQuestionBank(value){
+    let v=value;
+    for(let i=0;i<3&&typeof v==='string';i++){
+      const t=v.trim();if(!t)return[];
+      try{v=JSON.parse(t);continue;}catch(_){
+        if(/^(question|prompt)\s*,/i.test(t)||t.includes('\n')){try{return CBT.parseCSV(t)||[];}catch(__){return[];}}
+        return[];
+      }
+    }
+    if(Array.isArray(v))return v;
+    if(v&&typeof v==='object'){
+      for(const k of ['questions','csv_data','bank','items'])if(Array.isArray(v[k]))return v[k];
+    }
+    return[];
+  },
+  _isStructuredQuestion(q){return !['mcq','true_false','short_answer','numeric','fill_blank'].includes(String(q&&q.type||'mcq').toLowerCase().replace(/[ -]/g,'_'));},
+  _answerLabel(v){if(v==null||v==='')return'';if(typeof v==='object'){try{return JSON.stringify(v);}catch(_){return'[structured answer]';}}return String(v);},
   async editQuestions(id){
-    if(!sb) return;
-    const {data:e}=await sb.from('cbt_exams').select('*').eq('id',id).maybeSingle();
-    if(!e){ toast('Exam not found','warning'); return; }
-    let qs=(Array.isArray(e.csv_data)&&e.csv_data.length)?e.csv_data:(Array.isArray(e.questions)?e.questions:[]); if(typeof qs==='string'){ try{qs=JSON.parse(qs);}catch(_){qs=[];} }
-    qs=qs.map((q,i)=>CBT.normalizeQuestion(q,i));
-    CBTUI._eq={id, qs, code:e.code, title:e.title};
-    const rows=qs.map((q,i)=>'<tr><td>'+(i+1)+'</td><td style="max-width:340px">'+esc((q.question||'').slice(0,90))+'</td><td>'+esc(q.type||'mcq')+'</td><td>'+(q.answer==null||String(q.answer)===''?'<span style="color:#dc2626;font-weight:800">MISSING</span>':esc(Array.isArray(q.answer)?q.answer.join(', '):q.answer))+'</td>'+
+    if(!sb)return;
+    const {data:e,error}=await sb.from('cbt_exams').select('*').eq('id',id).maybeSingle();
+    if(error||!e){toast('Could not load question bank: '+(error&&error.message||'Exam not found'),'danger',8000);return;}
+    const csvBank=this.decodeQuestionBank(e.csv_data),questionAlias=this.decodeQuestionBank(e.questions);
+    // Candidate getter prefers a non-empty csv_data bank; use the same source
+    // for editing and mark divergent legacy aliases for repair on Save.
+    const qs=(csvBank.length?csvBank:questionAlias).map((q,i)=>CBT.normalizeQuestion(q,i));
+    const aliasesDiverge=csvBank.length&&questionAlias.length&&JSON.stringify(csvBank)!==JSON.stringify(questionAlias);
+    CBTUI._eq={id,qs,code:e.code,title:e.title,bankVersion:Number(e.bank_version||1),aliasesDiverge};
+    const rows=qs.map((q,i)=>'<tr><td>'+(i+1)+'</td><td style="max-width:340px">'+esc((q.question||'').slice(0,90))+'</td><td>'+esc(q.type||'mcq')+'</td><td>'+(q.answer==null||String(q.answer)===''?'<span style="color:#dc2626;font-weight:800">MISSING</span>':esc(CBTUI._answerLabel(q.answer)))+'</td>'+
       '<td style="white-space:nowrap"><button class="btn btn-sm btn-outline" onclick="CBTUI.editQ('+i+')">Edit</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.delQ('+i+')">Delete</button></td></tr>').join('');
+    const aliasNote=aliasesDiverge?'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>Legacy bank mismatch detected.</b> The student-facing bank and alternate bank column differ. Save will atomically synchronize both columns; review this question list before publishing.</div>':'';
     openModal('🛠️ Edit Questions — '+esc(e.title||'')+' ('+qs.length+')',
-      '<div class="table-wrap" style="max-height:380px;overflow:auto"><table><thead><tr><th>#</th><th>Question</th><th>Type</th><th>Answer</th><th></th></tr></thead><tbody>'+ (rows||'<tr><td colspan=5>No questions — use Attach CSV.</td></tr>') +'</tbody></table></div>',
+      aliasNote+'<div class="table-wrap" style="max-height:380px;overflow:auto"><table><thead><tr><th>#</th><th>Question</th><th>Type</th><th>Answer</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="5">No questions — use Attach CSV.</td></tr>')+'</tbody></table></div>',
       '<button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-outline" onclick="CBTUI.appendCSV(\''+id+'\')">＋ Attach another CSV</button><button class="btn btn-primary" onclick="CBTUI.saveQuestions()">Save all changes</button>');
   },
   editQ(i){
-    const q=CBTUI._eq.qs[i]||{};
-    openModal('Edit Question '+(i+1), `
-      <div class="form-group"><label>Question</label><textarea class="form-input" id="eq-q" rows="2">${esc(q.question||q.prompt||'')}</textarea></div>
-      <div class="grid grid-2">
-        <div class="form-group"><label>Type</label><select class="form-select" id="eq-type">${['mcq','true_false','multi_select','fill_blank','short_answer','numeric','essay'].map(t=>'<option '+((q.type||'mcq')===t?'selected':'')+'>'+t+'</option>').join('')}</select></div>
-        <div class="form-group"><label>Mark</label><input class="form-input" type="number" id="eq-mark" value="${q.mark||1}"></div>
-        <div class="form-group"><label>Option A</label><input class="form-input" id="eq-a" value="${esc(q.a||(q.options&&q.options[0])||'')}"></div>
-        <div class="form-group"><label>Option B</label><input class="form-input" id="eq-b" value="${esc(q.b||(q.options&&q.options[1])||'')}"></div>
-        <div class="form-group"><label>Option C</label><input class="form-input" id="eq-c" value="${esc(q.c||(q.options&&q.options[2])||'')}"></div>
-        <div class="form-group"><label>Option D</label><input class="form-input" id="eq-d" value="${esc(q.d||(q.options&&q.options[3])||'')}"></div>
-        <div class="form-group"><label>Correct answer (text or letter)</label><input class="form-input" id="eq-ans" value="${esc(String(q.answer||q.correct||''))}"></div>
-        <div class="form-group"><label>Subject/Section (multi-subject)</label><input class="form-input" id="eq-sec" value="${esc(q.section||q.subject||'')}"></div>
-      </div>
-      <div class="form-group"><label>Explanation (shown after grading)</label><input class="form-input" id="eq-exp" value="${esc(q.explanation||'')}"></div><div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-top:8px;font-size:.82rem">💡 For advanced types (matching, ordering, categorization, matrix, hot_text, dropdown, etc.), editing A-D may not capture all data (pairs/items). For those, use <b>Attach another CSV</b> with full 17-col format to preserve structured data.</div>`,
-      '<button class="btn btn-outline" onclick="CBTUI.editQuestions(\''+CBTUI._eq.id+'\')">← Back</button><button class="btn btn-primary" onclick="CBTUI.saveQ('+i+')">Apply</button>');
+    const q=CBTUI._eq.qs[i]||{},advanced=CBTUI._isStructuredQuestion(q);
+    const common='<div class="form-group"><label>Question / prompt</label><textarea class="form-input" id="eq-q" rows="2">'+esc(q.question||q.prompt||'')+'</textarea></div><div class="grid grid-2"><div class="form-group"><label>Type</label>'+(advanced?'<input class="form-input" id="eq-type" value="'+esc(q.type||'')+'" readonly><small>Type is locked here to preserve the structured answer schema.</small>':'<select class="form-select" id="eq-type">'+['mcq','true_false','multi_select','fill_blank','short_answer','numeric','essay'].map(t=>'<option value="'+t+'" '+((q.type||'mcq')===t?'selected':'')+'>'+t+'</option>').join('')+'</select>')+'</div><div class="form-group"><label>Mark</label><input class="form-input" type="number" id="eq-mark" min="0.01" step="0.25" value="'+esc(q.mark||1)+'"></div><div class="form-group"><label>Subject/Section</label><input class="form-input" id="eq-sec" value="'+esc(q.section||q.subject||'')+'"></div><div class="form-group"><label>Explanation</label><input class="form-input" id="eq-exp" value="'+esc(q.explanation||'')+'"></div></div>';
+    const answer=advanced?'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e">Structured answer data (options, matching pairs, categories, rubric, etc.) is preserved exactly. Use the CSV attachment/import workflow to change those structured fields.<pre style="white-space:pre-wrap;max-height:180px;overflow:auto">'+esc(JSON.stringify({options:q.options,items:q.items,answer:q.answer,correct:q.correct,correct_answer:q.correct_answer},null,2))+'</pre></div>':'<div class="grid grid-2"><div class="form-group"><label>Option A</label><input class="form-input" id="eq-a" value="'+esc(q.a||(q.options&&q.options[0])||'')+'"></div><div class="form-group"><label>Option B</label><input class="form-input" id="eq-b" value="'+esc(q.b||(q.options&&q.options[1])||'')+'"></div><div class="form-group"><label>Option C</label><input class="form-input" id="eq-c" value="'+esc(q.c||(q.options&&q.options[2])||'')+'"></div><div class="form-group"><label>Option D</label><input class="form-input" id="eq-d" value="'+esc(q.d||(q.options&&q.options[3])||'')+'"></div><div class="form-group" style="grid-column:1/-1"><label>Correct answer (text or letter)</label><input class="form-input" id="eq-ans" value="'+esc(CBTUI._answerLabel(q.answer||q.correct||''))+'"></div></div>';
+    openModal('Edit Question '+(i+1),common+answer,'<button class="btn btn-outline" onclick="CBTUI.editQuestions(\''+CBTUI._eq.id+'\')">← Back</button><button class="btn btn-primary" onclick="CBTUI.saveQ('+i+')">Apply</button>');
   },
   saveQ(i){
-    const v=(x)=>document.getElementById(x).value;
-    const q=CBTUI._eq.qs[i]||{};
-    Object.assign(q,{ question:v('eq-q'), type:v('eq-type'), a:v('eq-a'), b:v('eq-b'), c:v('eq-c'), d:v('eq-d'),
-      answer:v('eq-ans'), mark:Number(v('eq-mark'))||1, section:v('eq-sec'), subject:v('eq-sec'), explanation:v('eq-exp') });
-    if(q.options) delete q.options; // rebuild from a-d on normalisation
-    CBTUI._eq.qs[i]=q; toast('Question updated in draft — press “Save all changes”.','info'); CBTUI.editQuestions(CBTUI._eq.id);
+    const v=(x)=>document.getElementById(x)?.value||'';
+    const q=CBTUI._eq.qs[i]||{},advanced=CBTUI._isStructuredQuestion(q);
+    q.question=v('eq-q');q.mark=Number(v('eq-mark'))||1;q.section=v('eq-sec');q.subject=v('eq-sec');q.explanation=v('eq-exp');
+    if(!advanced){
+      const oldOptions=Array.isArray(q.options)?q.options.slice():[];q.type=v('eq-type')||q.type||'mcq';q.a=v('eq-a');q.b=v('eq-b');q.c=v('eq-c');q.d=v('eq-d');q.answer=v('eq-ans');
+      // Edit visible A-D while preserving any additional legacy options beyond D.
+      q.options=[q.a,q.b,q.c,q.d].filter(x=>String(x||'').trim()!=='').concat(oldOptions.slice(4));
+    }
+    CBTUI._eq.qs[i]=q;toast('Question updated in draft — press “Save all changes”.','info');CBTUI.editQuestions(CBTUI._eq.id);
   },
   delQ(i){ if(!confirm('Delete question '+(i+1)+'?'))return; CBTUI._eq.qs.splice(i,1); CBTUI.editQuestions(CBTUI._eq.id); },
   async saveQuestions(){
@@ -1119,9 +1132,12 @@ window.CBTUI = {
       openModal('❌ Cannot save — fix highlighted questions', '<pre style="white-space:pre-wrap;text-align:left;background:#fef2f2;border:1px solid #fca5a5;padding:12px;border-radius:10px;max-height:300px;overflow:auto">'+details+'</pre><p style="font-size:.85rem;color:#64748b">Tip: For categorization, ensure Items has <code>[{"item":"...","category":"..."}]</code> and for matching <code>[{"left":"...","right":"..."}]</code>. Check CSV header is exactly <code>Question,A,B,C,D,CorrectAnswer,Explanation,Type,...</code></p>', '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
       return;
     }
-    // Fetch current version for optimistic lock
-    let curHash=null, curVer=null, curCode=''; try{ const cur=await sb.from('cbt_exams').select('bank_hash,bank_version,code').eq('id',id).maybeSingle(); if(cur.data){curHash=cur.data.bank_hash; curVer=cur.data.bank_version; curCode=cur.data.code;} }catch(_){}
-    // V12.48: Single atomic force v3 locks row and recomputes canonical old hash from DB (ignores stale legacy bank_hash)
+    // Read the exact current version for optimistic concurrency. Never silently
+    // fall back to a NULL version: that would permit a stale editor to overwrite.
+    const current=await sb.from('cbt_exams').select('bank_hash,bank_version,code').eq('id',id).maybeSingle();
+    if(current.error||!current.data){if(btn){btn.textContent=orig;btn.disabled=false;}openModal('❌ Cannot verify current exam version','<p>Could not read the current question-bank version, so no change was published. '+esc(current.error?.message||'Exam row not visible')+'</p><p>Reload after the administrator applies V12.57/V12.58 schema and try again.</p>','<button class="btn btn-outline" onclick="closeModal()">Close</button>');return;}
+    const curVer=Number(current.data.bank_version||1),curCode=current.data.code||CBTUI._eq.code||'';
+    // V12.58: row lock + optimistic version protects concurrent tutors; server repairs both bank aliases.
     let res=null;
     try{ res=await sb.rpc('cbt_force_replace_bank_v3',{p_exam_id:id, p_bank:bank, p_expected_version:curVer}); }catch(e){ res={error:e}; }
     if(res.error || !res.data || res.data.ok===false){
@@ -1145,8 +1161,9 @@ window.CBTUI = {
       if(vr.error) throw new Error('Server verify RPC failed: '+vr.error.message);
       verify=vr.data;
       if(!verify || verify.ok!==true) throw new Error((verify&&verify.error)||'Server verification failed');
-      if(Number(verify.count)!==bank.length) throw new Error('Count mismatch after commit: sent '+bank.length+', database has '+verify.count+'.');
-      if(verify.verified===false) throw new Error('Canonical bank hash does not match published hash; database reports a concurrent trigger/write. DB '+String(verify.actual_hash||'').slice(0,12)+' vs published '+String(res.data.hash||'').slice(0,12));
+      if(Number(verify.count)!==bank.length||Number(verify.questions_count)!==bank.length) throw new Error('Question count mismatch after commit: sent '+bank.length+', csv_data has '+verify.count+', questions alias has '+verify.questions_count+'.');
+      if(verify.aliases_match!==true) throw new Error('The two database question-bank columns disagree after commit. Both aliases must match before success.');
+      if(verify.verified!==true) throw new Error('Canonical stored-bank hash does not match the committed hash. DB '+String(verify.actual_hash||'').slice(0,12)+' vs published '+String(res.data.hash||'').slice(0,12));
     }catch(e){
       if(btn){btn.textContent=orig; btn.disabled=false;}
       // Crucially, do not claim success if server cannot prove commit. Keep draft available.
@@ -1154,7 +1171,7 @@ window.CBTUI = {
       return;
     }
     if(btn){btn.textContent=orig; btn.disabled=false;}
-    toast('✅ Published '+Number(verify.count)+' questions (v'+(verify.bank_version||res.data.version||curVer||1)+') — server verified canonical hash. Students see new version on next load.', 'success', 6000);
+    toast('✅ Published and re-read '+Number(verify.count)+' questions in both database bank columns (v'+(verify.bank_version||res.data.version||curVer||1)+'). Canonical content and aliases match.', 'success', 7000);
     // Robust cache bust + broadcast to student tabs
     try{
       const codeNorm=String(curCode||CBTUI._eq.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -1177,7 +1194,7 @@ window.CBTUI = {
       const res=await sb.rpc('cbt_force_append_bank_v2',{p_exam_id:id,p_new_questions:qs});
       if(res.error||!res.data||res.data.ok!==true)throw new Error((res.data&&res.data.message)||(res.data&&res.data.error)||(res.error&&res.error.message)||'Append RPC did not confirm success');
       const vr=await sb.rpc('cbt_verify_exam_bank',{p_exam_id:id,p_expected_hash:res.data.hash});
-      if(vr.error||!vr.data||vr.data.ok!==true||vr.data.verified!==true||Number(vr.data.count)!==Number(res.data.total))throw new Error((vr.data&&vr.data.error)||(vr.error&&vr.error.message)||'Independent server verification did not match appended question bank');
+      if(vr.error||!vr.data||vr.data.ok!==true||vr.data.verified!==true||vr.data.aliases_match!==true||Number(vr.data.count)!==Number(res.data.total)||Number(vr.data.questions_count)!==Number(res.data.total))throw new Error((vr.data&&vr.data.error)||(vr.error&&vr.error.message)||'Independent server verification did not confirm both appended question-bank aliases');
       if(btn){btn.disabled=false;btn.textContent=original;}
       const codeNorm=String(res.data.code||CBTUI._eq?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
       try{['cbt-exam-cache-'+codeNorm,'cbt-exam-cache-'+codeNorm.toLowerCase()].forEach(k=>localStorage.removeItem(k));localStorage.setItem('cbt-bank-updated-'+codeNorm,Date.now().toString());}catch(_){}
