@@ -184,7 +184,7 @@ begin
   end if;
 
   select count(*) into total_results from public.cbt_results r where r.exam_id=e.id;
-  select count(*) into skipped_manual from public.cbt_results r where r.exam_id=e.id and coalesce(r.grading_status,'graded')<>'graded';
+  select count(*) into skipped_manual from public.cbt_results r join public.cbt_exams ce on ce.id=r.exam_id where r.exam_id=e.id and (coalesce(r.grading_status,'graded')<>'graded' or (upper(coalesce(ce.subject,'')) like 'MULTI-SUBJECT%' and (jsonb_typeof(coalesce(r.subject_scores,'{}'::jsonb))<>'object' or coalesce(r.subject_scores,'{}'::jsonb)='{}'::jsonb)));
   select count(*) into skipped_unverified from public.cbt_results r where r.exam_id=e.id
     and coalesce(r.grading_status,'graded')='graded' and p_verified_only and coalesce(r.engine_version,'') not like 'v5.1%';
   select count(*) into skipped_unidentified from public.cbt_results r left join public.students st on st.id=r.student_id
@@ -240,6 +240,121 @@ exception when others then return jsonb_build_object('ok',false,'error',sqlerrm,
 end$$;
 revoke execute on function public.sc_cbt_bulk_push_exam_v2(uuid,text,boolean,numeric,boolean,text,text,boolean) from public,anon;
 grant execute on function public.sc_cbt_bulk_push_exam_v2(uuid,text,boolean,numeric,boolean,text,text,boolean) to authenticated;
+
+-- Multi-exam transaction. Overlapping exams that target the same class/term/
+-- session/column are merged and deduplicated by student+subject under the chosen
+-- best/latest policy, so the UI need not stop on destination overlap.
+create or replace function public.sc_cbt_bulk_push_batch_v1(
+  p_exam_ids uuid[],p_destination text default null,p_create_missing boolean default true,
+  p_max_mark numeric default 10,p_verified_only boolean default true,
+  p_attempt_policy text default 'best',p_subject_filter text default null,
+  p_require_midterm boolean default false
+) returns jsonb language plpgsql security definer set search_path=public as $$
+declare me uuid:=auth.uid();actor_profile uuid;requested int:=0;found_exams int:=0;bad int:=0;
+        ex public.cbt_exams%rowtype;dest text;col public.assessment_columns%rowtype;
+        created_cols int:=0;saved int:=0;total_results int:=0;skipped_manual int:=0;skipped_unverified int:=0;skipped_unidentified int:=0;
+begin
+  if me is null then return jsonb_build_object('ok',false,'error','Not authenticated');end if;
+  if coalesce(p_attempt_policy,'best') not in('best','latest')then return jsonb_build_object('ok',false,'error','attempt_policy must be best or latest');end if;
+  select count(distinct x) into requested from unnest(coalesce(p_exam_ids,'{}'::uuid[])) x;
+  if requested=0 then return jsonb_build_object('ok',false,'error','Select at least one exam');end if;
+  select count(*) into found_exams from public.cbt_exams e where e.id=any(p_exam_ids);
+  if found_exams<>requested then return jsonb_build_object('ok',false,'error','One or more selected exams no longer exist. Refresh the list.');end if;
+  if not (public.is_admin(me) or public.is_staff(me)) then
+    select count(*) into bad from public.cbt_exams e where e.id=any(p_exam_ids)
+      and not (e.teacher_id=me or public.teacher_can_manage_subject_class(me,e.subject,e.class));
+    if bad>0 then return jsonb_build_object('ok',false,'error','Not authorized to push one or more selected CBTs');end if;
+  end if;
+  if coalesce(p_require_midterm,false) and exists(select 1 from public.cbt_exams e where e.id=any(p_exam_ids) and not public.sc_is_midterm_assessment(e.assessment_type)) then
+    return jsonb_build_object('ok',false,'error','purpose_filter_mismatch','message','Midterm-only push includes a non-midterm CBT. Refresh the preview; no scores were written.');
+  end if;
+  select p.id into actor_profile from public.profiles p where p.id=me;
+
+  -- Nothing gets created for empty, manual-review, unverified (when required),
+  -- or unidentified-only exams. Each destination create is serialized and the
+  -- outer exception block rolls the entire multi-exam transaction back on error.
+  for ex in select * from public.cbt_exams e where e.id=any(p_exam_ids) order by e.class,e.term,e.session,e.id loop
+    if coalesce(trim(ex.class),'')='' or coalesce(trim(ex.term),'')='' or coalesce(trim(ex.session),'')='' then
+      raise exception 'CBT % is missing class, term or session',coalesce(ex.code,ex.id::text);
+    end if;
+    if not exists(select 1 from public.cbt_results r left join public.students st on st.id=r.student_id
+       where r.exam_id=ex.id and coalesce(r.grading_status,'graded')='graded'
+         and (not p_verified_only or coalesce(r.engine_version,'') like 'v5.1%')
+         and (nullif(trim(coalesce(r.student_id_ref,'')),'') is not null or nullif(trim(coalesce(st.admission_no,'')),'') is not null or r.student_id is not null)) then
+      continue;
+    end if;
+    dest:=coalesce(nullif(trim(p_destination),''),nullif(trim(ex.report_column),''),'CBT / Online Exam');
+    perform pg_advisory_xact_lock(hashtext(lower(trim(ex.class))||'|'||lower(trim(ex.term))||'|'||lower(trim(ex.session))||'|'||lower(trim(dest))));
+    select * into col from public.assessment_columns ac where ac.class=ex.class and ac.subject='*'
+      and lower(trim(ac.term))=lower(trim(ex.term)) and lower(trim(ac.session))=lower(trim(ex.session)) and lower(trim(ac.name))=lower(trim(dest))
+      order by ac.created_at asc limit 1;
+    if col.id is null then
+      if not coalesce(p_create_missing,false) then raise exception 'Missing report destination "%" for % · % · %',dest,ex.class,ex.term,ex.session;end if;
+      insert into public.assessment_columns(class,subject,term,session,name,max_mark,weight,position,source,cbt_assessment_type,created_by)
+      values(ex.class,'*',ex.term,ex.session,dest,coalesce(nullif(p_max_mark,0),nullif(ex.max_score,0),10),1,
+        coalesce((select max(position)+1 from public.assessment_columns where class=ex.class and subject='*' and term=ex.term and session=ex.session),0),
+        'cbt',coalesce(ex.assessment_type,'exam'),actor_profile)
+      on conflict(class,subject,term,session,name) do nothing;
+      get diagnostics bad=row_count;if bad=1 then created_cols:=created_cols+1;end if;
+    end if;
+  end loop;
+
+  select count(*) into total_results from public.cbt_results r where r.exam_id=any(p_exam_ids);
+  select count(*) into skipped_manual from public.cbt_results r join public.cbt_exams ce on ce.id=r.exam_id where r.exam_id=any(p_exam_ids) and (coalesce(r.grading_status,'graded')<>'graded' or (upper(coalesce(ce.subject,'')) like 'MULTI-SUBJECT%' and (jsonb_typeof(coalesce(r.subject_scores,'{}'::jsonb))<>'object' or coalesce(r.subject_scores,'{}'::jsonb)='{}'::jsonb)));
+  select count(*) into skipped_unverified from public.cbt_results r where r.exam_id=any(p_exam_ids) and coalesce(r.grading_status,'graded')='graded' and p_verified_only and coalesce(r.engine_version,'') not like 'v5.1%';
+  select count(*) into skipped_unidentified from public.cbt_results r left join public.students st on st.id=r.student_id
+   where r.exam_id=any(p_exam_ids) and coalesce(r.grading_status,'graded')='graded' and (not p_verified_only or coalesce(r.engine_version,'') like 'v5.1%')
+    and nullif(trim(coalesce(r.student_id_ref,'')),'') is null and nullif(trim(coalesce(st.admission_no,'')),'') is null and r.student_id is null;
+
+  with exams as (
+    select e.*,coalesce(nullif(trim(p_destination),''),nullif(trim(e.report_column),''),'CBT / Online Exam') target
+      from public.cbt_exams e where e.id=any(p_exam_ids)
+  ), mapped as (
+    select e.*,c.id column_id,c.max_mark from exams e cross join lateral(
+      select ac.id,ac.max_mark from public.assessment_columns ac where ac.class=e.class and ac.subject='*'
+       and lower(trim(ac.term))=lower(trim(e.term)) and lower(trim(ac.session))=lower(trim(e.session)) and lower(trim(ac.name))=lower(trim(e.target))
+       order by ac.created_at asc limit 1) c
+  ), base as (
+    select r.id result_id,r.student_id,m.column_id,coalesce(nullif(trim(r.student_id_ref),''),nullif(trim(st.admission_no),''),r.student_id::text) student_ref,
+      coalesce(nullif(trim(st.full_name),''),nullif(trim(r.student_name),''),'Student') student_name,
+      coalesce(nullif(trim(m.class),''),nullif(trim(r.student_class),''),nullif(trim(st.class),''),'') class_name,
+      m.term,m.session,m.target,m.max_mark,coalesce(nullif(trim(m.subject),''),'CBT') exam_subject,coalesce(r.subject_scores,'{}'::jsonb) subject_scores,
+      coalesce(r.percent,case when r.total>0 then (r.score/r.total)*100 else 0 end) pct,r.created_at
+    from mapped m join public.cbt_results r on r.exam_id=m.id left join public.students st on st.id=r.student_id
+    where coalesce(r.grading_status,'graded')='graded' and (not p_verified_only or coalesce(r.engine_version,'') like 'v5.1%')
+  ), parts as (
+    select b.result_id,b.student_id,b.column_id,b.student_ref,b.student_name,b.class_name,b.term,b.session,b.target,b.max_mark,trim(k.key) subject,
+      case when jsonb_typeof(k.value)='object' and coalesce(k.value->>'total','') ~ '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$' and (k.value->>'total')::numeric>0
+       then (case when coalesce(k.value->>'score','') ~ '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$' then (k.value->>'score')::numeric else 0 end/(k.value->>'total')::numeric)*100 else b.pct end pct,b.created_at
+    from base b cross join lateral jsonb_each(case when jsonb_typeof(b.subject_scores)='object' then b.subject_scores else '{}'::jsonb end) k where nullif(trim(k.key),'') is not null
+    union all
+    select b.result_id,b.student_id,b.column_id,b.student_ref,b.student_name,b.class_name,b.term,b.session,b.target,b.max_mark,b.exam_subject,b.pct,b.created_at
+    from base b where (jsonb_typeof(b.subject_scores)<>'object' or b.subject_scores='{}'::jsonb) and upper(b.exam_subject) not like 'MULTI-SUBJECT%'
+  ), filtered as (
+    select * from parts where nullif(trim(student_ref),'') is not null and (coalesce(trim(p_subject_filter),'')='' or lower(subject)=lower(trim(p_subject_filter)))
+  ), ranked as (
+    select f.*,row_number() over(partition by f.column_id,f.student_ref,lower(trim(f.subject))
+      order by case when p_attempt_policy='best' then f.pct end desc nulls last,
+               case when p_attempt_policy='latest' then f.created_at end desc nulls last,f.created_at desc,f.result_id desc) rn
+    from filtered f
+  ), chosen as (
+    select r.*,coalesce((select rs.student_name from public.report_scores rs where rs.column_id=r.column_id and rs.student_id_ref=r.student_ref
+       and rs.class=r.class_name and rs.subject=r.subject and rs.term=r.term and rs.session=r.session order by rs.updated_at desc limit 1),r.student_name) display_name
+    from ranked r where rn=1
+  )
+  insert into public.report_scores(column_id,student_id,student_id_ref,student_name,class,subject,term,session,score,source,updated_by,updated_at)
+  select c.column_id,c.student_id,c.student_ref,c.display_name,c.class_name,c.subject,c.term,c.session,round((c.pct/100)*coalesce(c.max_mark,10),2),
+    'cbt:'||c.result_id::text,actor_profile,now() from chosen c
+  on conflict(column_id,student_id_ref,student_name,class,subject,term,session) do update set
+    student_id=coalesce(excluded.student_id,report_scores.student_id),score=excluded.score,source=excluded.source,updated_by=excluded.updated_by,updated_at=now();
+  get diagnostics saved=row_count;
+  return jsonb_build_object('ok',true,'exam_count',found_exams,'total_results',total_results,'saved',saved,'created_columns',created_cols,
+    'skipped_unverified',skipped_unverified,'skipped_manual',skipped_manual,'skipped_unidentified',skipped_unidentified,
+    'attempt_policy',p_attempt_policy,'merge_policy','one row per student and subject per destination; conflicts use selected attempt policy');
+exception when others then return jsonb_build_object('ok',false,'error',sqlerrm,'sqlstate',sqlstate);
+end$$;
+revoke execute on function public.sc_cbt_bulk_push_batch_v1(uuid[],text,boolean,numeric,boolean,text,text,boolean) from public,anon;
+grant execute on function public.sc_cbt_bulk_push_batch_v1(uuid[],text,boolean,numeric,boolean,text,text,boolean) to authenticated;
 
 insert into public.sc_install_state(key,details) values ('v12.57-report-details-and-atomic-cbt-bulk-push.sql',jsonb_build_object('self',true)) on conflict(key) do nothing;
 notify pgrst,'reload schema';select pg_notify('pgrst','reload schema');
