@@ -567,19 +567,22 @@ const ReportEngine = {
   // enter a report until an authorised user explicitly previews and pushes them.
   _bulkCBT:{exams:[],columns:[],counts:{},filtered:[]},
   labelToken(v){return String(v||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');},
+  canonicalCBTPurpose(value){const t=String(value||'').toLowerCase().replace(/[^a-z0-9]/g,'');if(['ca','test','midterm','midtermca','midtermtest','midtermassessment','midtermcolumn'].includes(t))return'midterm';return t||'other';},
+  cbtPurposeLabel(value){const t=this.canonicalCBTPurpose(value);return({midterm:'🔵 Mid-term Assessment',exam:'🔴 Terminal Exam',assignment:'🟢 Assignment',project:'🟣 Project',quiz:'🟡 Quiz',practical:'🟠 Practical'})[t]||'⚪ Other';},
+  examSubjects(exam){const configured=exam&&exam.anti_cheat_config&&exam.anti_cheat_config.subjects;if(Array.isArray(configured)&&configured.length)return configured.map(x=>String(x||'').trim()).filter(Boolean);const s=String(exam&&exam.subject||'');return s.toUpperCase().startsWith('MULTI-SUBJECT:')?s.replace(/^MULTI-SUBJECT:\\s*/i,'').split(',').map(x=>x.trim()).filter(Boolean):(s?[s]:[]);},
   unique(values){return [...new Set((values||[]).map(v=>String(v||'').trim()).filter(Boolean))].sort();},
   selectOptions(values,label){return '<option value="">'+this.esc(label||'All')+'</option>'+this.unique(values).map(v=>'<option value="'+this.esc(v)+'">'+this.esc(v)+'</option>').join('');},
 
   async openBulkCBTExportModal(){
-    const db=this.sb||(typeof sb!=='undefined'?sb:null);if(!db){toast('Database not configured','warning');return;}
+    const db=this.sb||(typeof sb!=='undefined'?sb:null);if(!db){toast('Database not configured','warning');return;}this.sb=db;
     const [er,cr]=await Promise.all([
-      db.from('cbt_exams').select('id,code,title,subject,class,term,session,report_column,max_score,is_open,exam_mode,anti_cheat_config,created_at').order('created_at',{ascending:false}).limit(500),
+      db.from('cbt_exams').select('id,code,title,subject,class,term,session,assessment_type,report_column,max_score,is_open,exam_mode,anti_cheat_config,created_at').order('created_at',{ascending:false}).limit(1000),
       db.from('assessment_columns').select('id,class,subject,term,session,name,max_mark,position,source').order('position').limit(2000)
     ]);
     if(er.error){toast('Could not load CBT exams: '+er.error.message,'danger');return;}
     const exams=er.data||[];if(!exams.length){toast('No CBT exams found.','warning');return;}
-    let counts={};try{const rr=await db.from('cbt_results').select('exam_id').in('exam_id',exams.map(e=>e.id)).limit(20000);(rr.data||[]).forEach(r=>counts[r.exam_id]=(counts[r.exam_id]||0)+1);}catch(_){}
-    this._bulkCBT={exams,columns:cr.data||[],counts,filtered:[]};
+    let counts={},countsUnknown=false;try{const rr=await db.rpc('sc_cbt_bulk_result_counts_v1',{p_exam_ids:exams.map(e=>e.id)});if(rr.error||!rr.data||rr.data.ok!==true)countsUnknown=true;else (rr.data.counts||[]).forEach(x=>counts[x.exam_id]=Number(x.count||0));}catch(_){countsUnknown=true;}
+    this._bulkCBT={exams,columns:cr.data||[],counts,countsUnknown,filtered:[]};
     const columnNames=this.unique((cr.data||[]).filter(c=>c.subject==='*').map(c=>c.name));
     const body=`<div class="notice" style="background:#eff6ff;border-color:#93c5fd;color:#1e3a8a"><b>Bulk workflow — three clear steps</b><ol style="margin:6px 0 0;padding-left:20px"><li>Filter by class, subject, term and session.</li><li>Review the matching exams/results and select what to push.</li><li>Use each exam's destination or override it, then push once.</li></ol><p style="margin:8px 0 0"><b>🎯 Multi-subject CBT exams route automatically:</b> each candidate's per-subject scores are split and written to the matching <b>subject line</b> of their report card (English → English, Mathematics → Mathematics, …) in the destination column — no re-typing, no manual splitting, and re-pushing updates the same rows instead of duplicating.</p></div>
       <div class="grid grid-2">
@@ -587,11 +590,14 @@ const ReportEngine = {
        <div class="form-group"><label>Subject filter</label><select id="be-subject" class="form-select" onchange="ReportEngine.refreshCBTBulkPreview()">${this.selectOptions(exams.flatMap(e=>{const a=e.anti_cheat_config&&e.anti_cheat_config.subjects;return Array.isArray(a)?a:[e.subject]}),'All subjects')}</select></div>
        <div class="form-group"><label>Term filter</label><select id="be-term" class="form-select" onchange="ReportEngine.refreshCBTBulkPreview()">${this.selectOptions(exams.map(e=>e.term),'All terms')}</select></div>
        <div class="form-group"><label>Session filter</label><select id="be-session" class="form-select" onchange="ReportEngine.refreshCBTBulkPreview()">${this.selectOptions(exams.map(e=>e.session),'All sessions')}</select></div>
+       <div class="form-group"><label>Assessment purpose</label><select id="be-purpose" class="form-select" onchange="ReportEngine.refreshCBTBulkPreview()"><option value="all">All purposes</option><option value="midterm">🔵 Mid-term Assessment only</option><option value="exam">🔴 Terminal Exam only</option><option value="assignment">🟢 Assignment only</option><option value="other">Other purposes</option></select><small>Use this to push only Mid-term CBT scores when needed.</small></div>
       </div>
       <div class="card" style="background:#f8fafc;margin:10px 0"><h4 style="margin-top:0">Destination rule</h4>
        <select id="be-destination" class="form-select" onchange="ReportEngine.refreshCBTBulkPreview()"><option value="__exam__">Use each exam's configured Report column (recommended)</option>${columnNames.map(n=>'<option value="'+this.esc(n)+'">Override every selected exam → '+this.esc(n)+'</option>').join('')}</select>
        <div class="grid grid-2" style="margin-top:8px"><label><input type="checkbox" id="be-create" checked onchange="ReportEngine.refreshCBTBulkPreview()"> Create a missing global destination column automatically</label><label>Maximum mark for an auto-created column <input id="be-max" class="form-input" type="number" min="1" step="0.5" value="10" style="max-width:100px;display:inline-block"></label></div>
        <label style="display:block;margin-top:8px"><input type="checkbox" id="be-verified" checked onchange="ReportEngine.refreshCBTBulkPreview()"> Push only V5.1 server-verified/regraded results (recommended)</label>
+       <div class="form-group" style="margin-top:8px"><label>If a student has multiple graded attempts for this CBT</label><select id="be-attempt-policy" class="form-select"><option value="best" selected>Use the highest verified score (recommended)</option><option value="latest">Use the latest graded attempt</option></select></div>
+       <p style="font-size:.82rem;color:#475569">Duplicate attempts are reduced to one score per student + subject + destination before saving; the selected policy is applied consistently.</p>
       </div><div id="be-preview"><span class="pulse">Preparing preview…</span></div>`;
     openModal('🚀 Bulk Push CBT Scores → Official Report Cards',body,'<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="ReportEngine.executeBulkCBTPush()">Push selected exams now</button>');
     await this.refreshCBTBulkPreview();
@@ -599,43 +605,87 @@ const ReportEngine = {
   openCBTExportModal(){return this.openBulkCBTExportModal();},
 
   async refreshCBTBulkPreview(){
-    const host=document.getElementById('be-preview');if(!host)return;const val=id=>(document.getElementById(id)||{}).value||'';
-    const cls=val('be-class'),sub=val('be-subject'),term=val('be-term'),sess=val('be-session'),dest=val('be-destination')||'__exam__';
-    const filtered=(this._bulkCBT.exams||[]).filter(e=>(!cls||e.class===cls)&&(!term||e.term===term)&&(!sess||e.session===sess)&&(!sub||(String(e.subject||'').toLowerCase().includes(sub.toLowerCase())||(Array.isArray(e.anti_cheat_config&&e.anti_cheat_config.subjects)&&(e.anti_cheat_config.subjects||[]).some(x=>String(x).toLowerCase()===sub.toLowerCase())))));
+    const host=document.getElementById('be-preview');if(!host)return;
+    const val=id=>(document.getElementById(id)||{}).value||'';
+    const cls=val('be-class'),sub=val('be-subject'),term=val('be-term'),sess=val('be-session'),dest=val('be-destination')||'__exam__',purpose=val('be-purpose')||'all';
+    const filtered=(this._bulkCBT.exams||[]).filter(e=>{
+      const p=this.canonicalCBTPurpose(e.assessment_type);
+      return (!cls||e.class===cls)&&(!term||e.term===term)&&(!sess||e.session===sess)&&
+        (!sub||this.examSubjects(e).some(x=>x.toLowerCase()===sub.toLowerCase()))&&
+        (purpose==='all'||(purpose==='other'&&!['midterm','exam','assignment'].includes(p))||p===purpose);
+    });
     this._bulkCBT.filtered=filtered;
-    const rows=filtered.map(e=>{const target=dest==='__exam__'?(e.report_column||'CBT / Online Exam'):dest;const col=(this._bulkCBT.columns||[]).find(c=>c.subject==='*'&&c.class===e.class&&c.term===e.term&&c.session===e.session&&this.labelToken(c.name)===this.labelToken(target));const count=this._bulkCBT.counts[e.id]||0;return '<tr><td><input class="be-exam" type="checkbox" value="'+this.esc(e.id)+'" '+(count?'checked':'disabled')+'></td><td><b>'+this.esc(e.code||'')+'</b><br><small>'+this.esc(e.title||'')+'</small></td><td>'+this.esc(e.class||'—')+'</td><td>'+this.esc(e.subject||'—')+'</td><td>'+this.esc(e.term||'—')+'<br>'+this.esc(e.session||'—')+'</td><td><b>'+count+'</b></td><td>'+this.esc(target)+(col?'<br><span style="color:#166534">Ready · max '+Number(col.max_mark||0)+'</span>':'<br><span style="color:#b45309">Missing — '+(document.getElementById('be-create')?.checked?'will be created':'enable auto-create')+'</span>')+'</td></tr>';}).join('');
-    host.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0"><b>'+filtered.length+' exam(s) match · '+filtered.reduce((a,e)=>a+(this._bulkCBT.counts[e.id]||0),0)+' result row(s)</b><label><input type="checkbox" checked onchange="document.querySelectorAll(\'.be-exam:not(:disabled)\').forEach(x=>x.checked=this.checked)"> Select all</label></div><div class="table-wrap"><table><thead><tr><th>Push</th><th>Exam</th><th>Class</th><th>Subject(s)</th><th>Term / Session</th><th>Results</th><th>Destination</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">No exams match these filters.</td></tr>')+'</tbody></table></div><p style="font-size:.8rem;color:#64748b">Scores are scaled from each verified percentage to the destination column maximum. Re-running is safe: the same learner/subject/destination row is updated, not duplicated.</p>';
-  },
-
-  async ensureCBTDestination(exam,name,maxMark,autoCreate){
-    const same=c=>(c.subject==='*'&&c.class===(exam.class||'')&&c.term===(exam.term||'')&&c.session===(exam.session||'')&&this.labelToken(c.name)===this.labelToken(name));let col=(this._bulkCBT.columns||[]).find(same);if(col)return col;
-    if(!autoCreate)throw new Error('Missing report column "'+name+'" for '+(exam.class||'class')+' · '+(exam.term||'term')+' · '+(exam.session||'session'));
-    const peers=(this._bulkCBT.columns||[]).filter(c=>c.class===(exam.class||'')&&c.term===(exam.term||'')&&c.session===(exam.session||''));const payload={class:exam.class||'',subject:'*',term:exam.term||'',session:exam.session||'',name,max_mark:Number(maxMark)||10,weight:1,position:peers.length,source:'cbt',cbt_assessment_type:exam.assessment_type||'exam',created_by:(window.SC_PROFILE&&SC_PROFILE.id)||null};
-    const res=await this.sb.from('assessment_columns').insert(payload).select().maybeSingle();if(res.error){const again=await this.sb.from('assessment_columns').select('*').eq('class',payload.class).eq('subject','*').eq('term',payload.term).eq('session',payload.session);col=(again.data||[]).find(same);if(!col)throw new Error(res.error.message);}else col=res.data;this._bulkCBT.columns.push(col);return col;
+    const rows=filtered.map(e=>{
+      const target=dest==='__exam__'?(e.report_column||'CBT / Online Exam'):dest;
+      const col=(this._bulkCBT.columns||[]).find(c=>c.subject==='*'&&c.class===e.class&&c.term===e.term&&c.session===e.session&&this.labelToken(c.name)===this.labelToken(target));
+      const count=this._bulkCBT.counts[e.id]||0,unknown=!!this._bulkCBT.countsUnknown;
+      return '<tr><td><input class="be-exam" type="checkbox" value="'+this.esc(e.id)+'" '+(unknown?'':' '+(count?'checked':'disabled'))+'></td><td><b>'+this.esc(e.code||'')+'</b><br>'+this.esc(e.title||'')+'<br><small>'+this.esc(this.cbtPurposeLabel(e.assessment_type))+'</small></td><td>'+this.esc(e.class||'—')+'</td><td>'+this.esc(this.examSubjects(e).join(', ')||'—')+'</td><td>'+this.esc(e.term||'—')+'<br>'+this.esc(e.session||'—')+'</td><td><b>'+(unknown?'Server will check':count)+'</b></td><td>'+this.esc(target)+(col?'<br><span style="color:#166534">Ready · max '+Number(col.max_mark||0)+'</span>':'<br><span style="color:#b45309">Missing — '+(document.getElementById('be-create')?.checked?'server will create safely':'enable auto-create')+'</span>')+'</td></tr>';
+    }).join('');
+    host.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0"><b>'+filtered.length+' exam(s) match · '+(this._bulkCBT.countsUnknown?'server will validate result counts':filtered.reduce((a,e)=>a+(this._bulkCBT.counts[e.id]||0),0)+' result row(s)')+'</b><label><input type="checkbox" checked onchange="document.querySelectorAll(\'.be-exam:not(:disabled)\').forEach(x=>x.checked=this.checked)"> Select all</label></div><div class="table-wrap"><table><thead><tr><th>Push</th><th>Exam / purpose</th><th>Class</th><th>Subject(s)</th><th>Term / Session</th><th>Attempts</th><th>Destination</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">No exams match these filters.</td></tr>')+'</tbody></table></div><p style="font-size:.8rem;color:#64748b">One verified score per student + subject + destination is pushed. Multiple attempts use the policy chosen above. The server creates columns and writes scores under an authorized, audited transaction; duplicate rows and browser-side RLS failures are prevented.</p>';
   },
 
   async pushOneCBTExam(exam,targetName,opts){
-    const rr=await this.sb.from('cbt_results').select('*').eq('exam_id',exam.id).limit(10000);if(rr.error)throw new Error(rr.error.message);const verifiedOnly=!!opts.verifiedOnly;let skippedLegacy=0,skippedManual=0;const rows=[];
-    for(const r of (rr.data||[])){
-      if(verifiedOnly&&!String(r.engine_version||'').startsWith('v5.1')){skippedLegacy++;continue;}if(String(r.grading_status||'graded')!=='graded'){skippedManual++;continue;}
-      let parts=[];const breakdown=r.subject_scores&&typeof r.subject_scores==='object'?r.subject_scores:{};const names=Object.keys(breakdown);
-      if(names.length){parts=names.map(subject=>{const x=breakdown[subject]||{},pct=Number(x.total)>0?Number(x.score||0)/Number(x.total)*100:0;return{subject,pct};});}
-      else {if(String(exam.subject||'').toUpperCase().startsWith('MULTI-SUBJECT')){skippedManual++;continue;}const pct=r.percent!=null?Number(r.percent):(Number(r.total)>0?Number(r.score||0)/Number(r.total)*100:0);parts=[{subject:exam.subject||'CBT',pct}];}
-      for(const part of parts){if(opts.subjectFilter&&String(part.subject).toLowerCase()!==String(opts.subjectFilter).toLowerCase())continue;rows.push({column_id:opts.column.id,student_id:r.student_id||null,student_id_ref:r.student_id_ref||'',student_name:r.student_name||'Student',class:exam.class||r.student_class||'',subject:part.subject,term:exam.term||'',session:exam.session||'',score:Math.round((part.pct/100)*Number(opts.column.max_mark||10)*100)/100,source:'cbt:'+r.id,updated_by:(window.SC_PROFILE&&SC_PROFILE.id)||null,updated_at:new Date().toISOString()});}
-    }
-    let saved=0;for(let i=0;i<rows.length;i+=400){const chunk=rows.slice(i,i+400),res=await this.sb.from('report_scores').upsert(chunk,{onConflict:'column_id,student_id_ref,student_name,class,subject,term,session'});if(res.error)throw new Error(res.error.message);saved+=chunk.length;}
-    return{saved,skippedLegacy,skippedManual,totalResults:(rr.data||[]).length};
+    const res=await this.sb.rpc('sc_cbt_bulk_push_exam_v2',{
+      p_exam_id:exam.id,p_destination:targetName,p_create_missing:!!opts.createMissing,
+      p_max_mark:Number(opts.maxMark)||10,p_verified_only:!!opts.verifiedOnly,
+      p_attempt_policy:opts.attemptPolicy||'best',p_subject_filter:opts.subjectFilter||null,
+      p_require_midterm:!!opts.requireMidterm
+    });
+    if(res.error)throw new Error(res.error.message||'Server bulk push failed');
+    if(!res.data||res.data.ok!==true)throw new Error((res.data&&res.data.message)|| (res.data&&res.data.error)||'Server did not confirm the push');
+    return res.data;
   },
 
   async executeBulkCBTPush(){
-    const ids=[...document.querySelectorAll('.be-exam:checked')].map(x=>x.value);if(!ids.length){toast('Select at least one exam that has results.','warning');return;}const dest=(document.getElementById('be-destination')||{}).value||'__exam__',auto=!!document.getElementById('be-create')?.checked,maxMark=Number(document.getElementById('be-max')?.value)||10,verifiedOnly=!!document.getElementById('be-verified')?.checked,subjectFilter=(document.getElementById('be-subject')||{}).value||'';let saved=0,legacy=0,manual=0,failed=[];
-    for(const id of ids){const exam=(this._bulkCBT.exams||[]).find(e=>e.id===id);if(!exam)continue;const target=dest==='__exam__'?(exam.report_column||'CBT / Online Exam'):dest;try{const column=await this.ensureCBTDestination(exam,target,maxMark,auto),out=await this.pushOneCBTExam(exam,target,{column,verifiedOnly,subjectFilter});saved+=out.saved;legacy+=out.skippedLegacy;manual+=out.skippedManual;}catch(e){failed.push((exam.code||exam.title)+': '+(e.message||e));}}
-    if(window.App&&App.logActivity)App.logActivity('bulk-push-cbt','report_scores',saved+' report score rows from '+ids.length+' exams');closeModal();openModal('✅ Bulk CBT push complete','<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+saved+'</div><div class="stat-label">Report score rows saved/updated</div></div><div class="stat-card"><div class="stat-value">'+ids.length+'</div><div class="stat-label">Exams processed</div></div><div class="stat-card"><div class="stat-value">'+legacy+'</div><div class="stat-label">Legacy rows skipped</div></div><div class="stat-card"><div class="stat-value">'+manual+'</div><div class="stat-label">Manual/multi rows skipped</div></div></div>'+(failed.length?'<div class="notice notice-error"><b>Needs attention:</b><br>'+failed.map(this.esc).join('<br>')+'</div>':'<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534">Official `report_scores` is now updated. Open Report Cards and generate the student/class output.</div>'),'<button class="btn btn-primary" onclick="closeModal();location.href=\'report-cards.html\'">Open Report Cards</button>');
+    const ids=[...document.querySelectorAll('.be-exam:checked')].map(x=>x.value);
+    if(!ids.length){toast('Select at least one exam that has results.','warning');return;}
+    const dest=(document.getElementById('be-destination')||{}).value||'__exam__';
+    const auto=!!document.getElementById('be-create')?.checked;
+    const maxMark=Number(document.getElementById('be-max')?.value)||10;
+    const verifiedOnly=!!document.getElementById('be-verified')?.checked;
+    const subjectFilter=(document.getElementById('be-subject')||{}).value||'';
+    const purpose=(document.getElementById('be-purpose')||{}).value||'all';
+    const attemptPolicy=(document.getElementById('be-attempt-policy')||{}).value||'best';
+    const chosen=ids.map(id=>(this._bulkCBT.exams||[]).find(e=>e.id===id)).filter(Boolean);
+    // Prevent a selected batch from silently overwriting the same destination
+    // with a second different CBT for the same subject/student.
+    const claims=new Map(),collisions=[];
+    for(const e of chosen){
+      const target=dest==='__exam__'?(e.report_column||'CBT / Online Exam'):dest;
+      const subjects=this.examSubjects(e);
+      for(const subj of subjects){
+        const k=[e.class,e.term,e.session,this.labelToken(target),subj.toLowerCase().trim()].join('|');
+        if(claims.has(k)&&claims.get(k).id!==e.id)collisions.push({first:claims.get(k),next:e,target,subject:subj});
+        else claims.set(k,e);
+      }
+    }
+    if(collisions.length){
+      const detail=collisions.slice(0,8).map(x=>x.first.code+' + '+x.next.code+' → '+x.target+' / '+x.subject).join('\n');
+      toast('Push stopped: multiple selected CBTs overlap on the same report destination. Choose one CBT per destination/subject, or assign distinct CA1/CA2 columns. No scores were written. '+detail,'warning',12000);
+      return;
+    }
+    let saved=0,legacy=0,manual=0,unidentified=0,created=0,failed=[];
+    for(const exam of chosen){
+      const target=dest==='__exam__'?(exam.report_column||'CBT / Online Exam'):dest;
+      try{
+        const out=await this.pushOneCBTExam(exam,target,{createMissing:auto,maxMark,verifiedOnly,subjectFilter,attemptPolicy,requireMidterm:purpose==='midterm'});
+        saved+=Number(out.saved||0);legacy+=Number(out.skipped_unverified||0);manual+=Number(out.skipped_manual||0);unidentified+=Number(out.skipped_unidentified||0);if(out.created_column)created++;
+      }catch(e){failed.push((exam.code||exam.title)+': '+(e.message||e));}
+    }
+    if(window.App&&App.logActivity)App.logActivity('bulk-push-cbt','report_scores',saved+' report score rows from '+chosen.length+' exams');
+    closeModal();
+    const issues=failed.length?'<div class="notice notice-error"><b>Needs attention (other selected exams may have succeeded):</b><br>'+failed.map(this.esc).join('<br>')+'</div>':'<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534">Server confirmed the score upsert. Repeating the same push is safe and updates the same learner/subject/destination rows.</div>';
+    openModal('✅ Bulk CBT push complete','<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+saved+'</div><div class="stat-label">Report score rows saved/updated</div></div><div class="stat-card"><div class="stat-value">'+chosen.length+'</div><div class="stat-label">Exams processed</div></div><div class="stat-card"><div class="stat-value">'+created+'</div><div class="stat-label">Destination columns safely created</div></div><div class="stat-card"><div class="stat-value">'+legacy+'</div><div class="stat-label">Unverified/legacy skipped</div></div><div class="stat-card"><div class="stat-value">'+manual+'</div><div class="stat-label">Manual-review skipped</div></div><div class="stat-card"><div class="stat-value">'+unidentified+'</div><div class="stat-label">Unidentified attempts skipped</div></div></div>'+issues,'<button class="btn btn-primary" onclick="closeModal();location.href=\'report-cards.html\'">Open Report Cards</button>');
   },
 
   async pushCBTToResults(examId,column,term,session){
-    // Compatibility entry point: one exam now uses the same canonical pipeline.
-    const er=await this.sb.from('cbt_exams').select('*').eq('id',examId).maybeSingle();if(er.error||!er.data){toast('Exam not found','danger');return;}this._bulkCBT.columns=(await this.sb.from('assessment_columns').select('*').limit(2000)).data||[];const exam=Object.assign({},er.data,{term:term||er.data.term,session:session||er.data.session});try{const target=column||exam.report_column||'CBT / Online Exam',col=await this.ensureCBTDestination(exam,target,Number(exam.max_score)||10,true),out=await this.pushOneCBTExam(exam,target,{column:col,verifiedOnly:true,subjectFilter:''});toast('✅ '+out.saved+' CBT score row(s) pushed into official report scores.','success',9000);}catch(e){toast('Push failed: '+e.message,'danger',10000);}
+    // Compatibility entry point delegates to the same server-side safe pipeline.
+    this.sb=this.sb||(window.sb||(typeof sb!=='undefined'?sb:null));if(!this.sb){toast('Database not configured','warning');return;}
+    const er=await this.sb.from('cbt_exams').select('*').eq('id',examId).maybeSingle();
+    if(er.error||!er.data){toast('Exam not found','danger');return;}
+    const exam=Object.assign({},er.data,{term:term||er.data.term,session:session||er.data.session});
+    try{const out=await this.pushOneCBTExam(exam,column||exam.report_column||'CBT / Online Exam',{createMissing:true,maxMark:Number(exam.max_score)||10,verifiedOnly:true,subjectFilter:'',attemptPolicy:'best'});toast('✅ '+out.saved+' CBT score row(s) saved/updated in official report scores.','success',9000);}
+    catch(e){toast('Push failed: '+e.message,'danger',10000);}
   },
   doCBTExport(){return this.executeBulkCBTPush();},
 
