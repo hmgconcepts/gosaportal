@@ -534,7 +534,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div style="background:#fff;border:1px solid #86efac;border-radius:10px;padding:10px;margin:8px 0">
           <b>Clear differentiation (unambiguous) — CBT purposes:</b><br>
           <span style="display:inline-block;margin:2px 6px"><span class="badge" style="background:#dcfce7;color:#166534;border:1px solid #86efac">🟢 CBT Assignment</span> = Homework — multiple per term, cumulative → Assignment column (this page)</span>
-          <span style="display:inline-block;margin:2px 6px"><span class="badge" style="background:#dbeafe;color:#1e40af;border:1px solid #93c5fd">🔵 Mid-term CA</span> = CA1/CA2 — once per term → CA1/CA2 columns (Report Cards → Bulk Push CBT)</span>
+          <span style="display:inline-block;margin:2px 6px"><span class="badge" style="background:#dbeafe;color:#1e40af;border:1px solid #93c5fd">🔵 Mid-term Assessment</span> = choose CA1/CA2/Midterm as the separate destination (Report Cards → Bulk Push CBT)</span>
           <span style="display:inline-block;margin:2px 6px"><span class="badge" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5">🔴 Terminal Exam</span> = Exam — once per term → Exam column (Bulk Push CBT)</span>
           <span style="display:inline-block;margin:2px 6px"><span class="badge" style="background:#f3e8ff;color:#6b21a8;border:1px solid #c4b5fd">🟣 Project</span> / <span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d">🟡 Quiz</span> / 🟠 Practical = other purposes → any report column</span>
         </div>
@@ -772,7 +772,7 @@ const AP={
   },
   async pullCBT(){
     // V12.10: robust pull — uses new bridge RPC sc_assignment_cbt_sync_all, handles multiple CBT assignments per term cumulatively
-    // Clearly differentiated: only 🟢 CBT Assignments (assessment_type=assignment) are pulled, not 🔵 Mid-term CAs or 🔴 Terminal Exams
+    // Clearly differentiated: only 🟢 CBT Assignments (assessment_type=assignment) are pulled, not 🔵 Mid-term Assessments or 🔴 Terminal Exams
     const cls=(document.getElementById('ap-class')||{}).value,sub=(document.getElementById('ap-subject')||{}).value;
     if(!cls||!sub){toast('Pick a class AND subject first.','warning');return;}
     let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
@@ -798,7 +798,7 @@ const AP={
     const er=await eq.limit(200);
     if(er.error){toast(er.error.message,'danger');return;}
     const exams=(er.data||[]).filter(e=>String(e.assessment_type||'').toLowerCase()==='assignment');
-    if(!exams.length){toast('No 🟢 CBT ASSIGNMENTS found for '+cls+' · '+sub+' this term. Differentiation: only assessment_type=Assignment are pulled here (multiple per term, cumulative). Mid-term CAs (🔵) and Terminal Exams (🔴) are pushed via Report Cards → Bulk Push CBT. Create assignment on CBT page → type Assignment.','info',9000);return;}
+    if(!exams.length){toast('No 🟢 CBT ASSIGNMENTS found for '+cls+' · '+sub+' this term. Differentiation: only assessment_type=Assignment are pulled here (multiple per term, cumulative). Mid-term Assessments (🔵) and Terminal Exams (🔴) are pushed via Report Cards → Bulk Push CBT. Create assignment on CBT page → type Assignment.','info',9000);return;}
     const rr=await sb.from('cbt_results').select('*').in('exam_id',exams.map(e=>e.id)).limit(5000);
     if(rr.error){toast(rr.error.message,'danger');return;}
     const studs=(await sb.from('students').select('id,full_name,admission_no').eq('class',cls)).data||[];

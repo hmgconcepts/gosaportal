@@ -151,7 +151,7 @@ This build implements the blueprint you requested for assignments:
 
 **Differentiation (clear, unambiguous):**
 - 🟢 CBT Assignment / Homework = multiple per term, cumulative → Assignment column (Assignments page)
-- 🔵 Mid-term CA/Test = once per term → CA1/CA2 columns (Report Cards → Bulk Push CBT)
+- 🔵 Mid-term Assessment = one purpose; choose CA1/CA2/Midterm as the separate report destination (Report Cards → Bulk Push CBT)
 - 🔴 Terminal Exam = once per term → Exam column
 - Other = Project/Quiz/Practical
 

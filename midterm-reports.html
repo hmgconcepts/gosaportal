@@ -63,8 +63,8 @@
     <div class="app-content">
       <div class="card" style="background:#eff6ff;border-color:#93c5fd">
         <h3 style="margin-top:0">📝 Midterm Test Reports — Once per term</h3>
-        <p style="color:#1e3a8a">Generate <b>midterm sheets</b> that contain <b>only midterm test scores</b> (from CBTs with <code>assessment_type='test'</code> pushed to a <code>Midterm</code> column). These are <b>separate from terminal reports</b> (which contain CA1/CA2/Exam etc.) — both can coexist for same class/term/session, in sync via <code>report_scores</code>, not conflicting.</p>
-        <p style="font-size:.85rem;color:#334155">Tip: Create a Midterm Test CBT (type <code>test</code>), push its scores to a column named <b>Midterm</b> (create it in Report Cards → Columns if not exists), then generate here.</p>
+        <p style="color:#1e3a8a">Generate a <b>Midterm sheet</b> separately from the terminal report. Use the single CBT purpose <b>Mid-term Assessment</b>; its report destination is chosen separately and may be <b>CA1, CA2, Midterm, or a legacy mid-term CA/Test column</b>. The report uses only scores recorded in the matching mid-term columns in <code>report_scores</code>.</p>
+        <p style="font-size:.85rem;color:#334155">Workflow: create a Mid-term Assessment CBT, choose CA1/CA2/Midterm as its report destination, push its verified results from CBT → Bulk Push to Report Cards, then generate here. You do not need a column literally named “Midterm”. Generation still creates a roster sheet if scores have not been pushed; those entries are clearly marked “No score” rather than treated as zero marks.</p>
       </div>
 
       <div class="card" id="mr-staff-tools">
@@ -100,7 +100,8 @@
       <div class="card" style="margin-top:16px;background:#f8fafc">
         <h4>How it stays in sync with terminal reports</h4>
         <ul style="font-size:.88rem;color:#334155;line-height:1.6">
-          <li><b>Same source:</b> Both midterm and terminal read from <code>report_scores</code> → <code>assessment_columns</code>. Midterm filters <code>name ILIKE 'midterm%'</code> or <code>cbt_assessment_type='test'</code>; terminal uses all other columns. So updating a score via CBT push instantly reflects in both reports after re-generating.</li>
+          <li><b>One assessment purpose, flexible destination:</b> Mid-term CA and Mid-term Test are normalized as one Mid-term Assessment purpose. Legacy <code>ca</code>/<code>test</code> exams and columns named Midterm, Mid-term Test/CA, CA1 or CA2 are recognized. The report-card destination is not another assessment type.</li>
+          <li><b>Same source, no hidden magic label:</b> The Midterm sheet reads only matching Midterm/CA1/CA2 score columns from <code>report_scores</code>. A literal column named <code>Midterm</code> is optional. If a score is not pushed, the roster still generates with a clear “No score” state.</li>
           <li><b>No conflict:</b> <code>midterm_report_cards</code> has <code>unique(student_id_ref, class, term, session)</code> separate from <code>report_cards</code> (<code>report_cards</code> is terminal). Same student can have both for same term.</li>
           <li><b>Published flag:</b> Tutors generate (published=false) first to preview, then publish. Students/parents only see published via <code>get_midterm_report</code> + RLS <code>is_parent_of</code>.</li>
         </ul>
@@ -199,7 +200,8 @@ const MR = {
     const status=document.getElementById('mr-status'); status.innerHTML='<span class="pulse">Generating midterm reports…</span>';
     const r=await sb.rpc('generate_midterm_reports',{p_class:c, p_term:t, p_session:s});
     if(r.error || !r.data || r.data.ok===false){ status.innerHTML='<span style="color:#dc2626">'+((r.data&&r.data.error)||r.error?.message||'Generate failed')+'</span>'; return; }
-    status.innerHTML='<span style="color:#16a34a">✅ Generated '+r.data.generated+' midterm reports for '+c+' · '+t+' · '+s+'</span>';
+    const warning=r.data.warning?'<br><span style="color:#a16207">ℹ️ '+MR.esc(r.data.warning)+'</span>':'';
+    status.innerHTML='<span style="color:#16a34a">✅ Generated '+Number(r.data.generated||0)+' student report(s): '+Number(r.data.with_scores||0)+' with scores, '+Number(r.data.without_scores||0)+' awaiting scores for '+MR.esc(c)+' · '+MR.esc(t)+' · '+MR.esc(s)+'.</span>'+warning;
     this.preview();
   },
   async preview(){
