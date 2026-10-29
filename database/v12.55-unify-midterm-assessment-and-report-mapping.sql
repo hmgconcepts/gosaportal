@@ -10,6 +10,12 @@
 -- ============================================================================
 select 'RUNNING: School Connect Midterm assessment unification V12.55' as running_version;
 
+-- Existing customer DBs may have a hand-added enum-like check that rejects the
+-- new canonical value (observed constraint: cbt_exams_assessment_type_check).
+-- Drop only that brittle CHECK constraint; it carries no data. Purposes are
+-- validated in the UI and normalized below. Do NOT rewrite/delete any exam rows.
+alter table public.cbt_exams drop constraint if exists cbt_exams_assessment_type_check;
+
 create or replace function public.sc_is_midterm_assessment(p_type text)
 returns boolean language sql immutable parallel safe set search_path=public as $$
  select regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]','','g') in
