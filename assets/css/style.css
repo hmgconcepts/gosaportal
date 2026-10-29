@@ -777,3 +777,8 @@ html[data-theme="dark"] #notif-page-list .notif-entry .notif-entry-msg,
 body[data-theme="dark"] #notif-page-list .notif-entry .notif-entry-msg{ color:#e0e7ff !important; }
 html[data-theme="dark"] #notif-page-list .notif-entry .notif-entry-time,
 body[data-theme="dark"] #notif-page-list .notif-entry .notif-entry-time{ color:#cbd5e1 !important; }
+
+/* V12.57: toasts are user-critical feedback and must remain above dialogs,
+   drawers, and popups on mobile/tablet as well as desktop. */
+#toast-container,.toast-container{position:fixed!important;top:calc(env(safe-area-inset-top,0px) + 12px)!important;right:12px!important;z-index:2147483647!important;pointer-events:none!important;}
+#toast-container .toast,.toast-container .toast{pointer-events:auto!important;max-width:min(92vw,520px)!important;}

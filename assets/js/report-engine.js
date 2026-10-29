@@ -646,36 +646,26 @@ const ReportEngine = {
     const subjectFilter=(document.getElementById('be-subject')||{}).value||'';
     const purpose=(document.getElementById('be-purpose')||{}).value||'all';
     const attemptPolicy=(document.getElementById('be-attempt-policy')||{}).value||'best';
-    const chosen=ids.map(id=>(this._bulkCBT.exams||[]).find(e=>e.id===id)).filter(Boolean);
-    // Prevent a selected batch from silently overwriting the same destination
-    // with a second different CBT for the same subject/student.
-    const claims=new Map(),collisions=[];
-    for(const e of chosen){
-      const target=dest==='__exam__'?(e.report_column||'CBT / Online Exam'):dest;
-      const subjects=this.examSubjects(e);
-      for(const subj of subjects){
-        const k=[e.class,e.term,e.session,this.labelToken(target),subj.toLowerCase().trim()].join('|');
-        if(claims.has(k)&&claims.get(k).id!==e.id)collisions.push({first:claims.get(k),next:e,target,subject:subj});
-        else claims.set(k,e);
-      }
+    const rpc=this.sb||(window.sb||(typeof sb!=='undefined'?sb:null));if(!rpc){toast('Database not configured','danger');return;}this.sb=rpc;
+    const btn=document.querySelector('#modal-backdrop .btn-primary');if(btn){btn.disabled=true;btn.textContent='⏳ Pushing safely…';}
+    let result;
+    try{
+      result=await rpc.rpc('sc_cbt_bulk_push_batch_v1',{
+        p_exam_ids:ids,p_destination:dest==='__exam__'?null:dest,p_create_missing:auto,p_max_mark:maxMark,
+        p_verified_only:verifiedOnly,p_attempt_policy:attemptPolicy,p_subject_filter:subjectFilter||null,
+        p_require_midterm:purpose==='midterm'
+      });
+      if(result.error)throw new Error(result.error.message||'Server bulk push failed');
+      if(!result.data||result.data.ok!==true)throw new Error((result.data&&result.data.message)||(result.data&&result.data.error)||'Server did not confirm the batch');
+      const out=result.data;
+      if(window.App&&App.logActivity)App.logActivity('bulk-push-cbt','report_scores',Number(out.saved||0)+' rows from '+ids.length+' CBTs');
+      closeModal();
+      openModal('✅ Bulk CBT push complete','<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+Number(out.saved||0)+'</div><div class="stat-label">Score rows saved/updated</div></div><div class="stat-card"><div class="stat-value">'+Number(out.exam_count||ids.length)+'</div><div class="stat-label">Exams processed together</div></div><div class="stat-card"><div class="stat-value">'+Number(out.created_columns||0)+'</div><div class="stat-label">Destination columns safely created</div></div><div class="stat-card"><div class="stat-value">'+Number(out.skipped_unverified||0)+'</div><div class="stat-label">Unverified skipped</div></div><div class="stat-card"><div class="stat-value">'+Number(out.skipped_manual||0)+'</div><div class="stat-label">Manual review skipped</div></div><div class="stat-card"><div class="stat-value">'+Number(out.skipped_unidentified||0)+'</div><div class="stat-label">No safe student identity</div></div></div><div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534"><b>Batch committed.</b> Overlapping CBTs were merged into one deterministic score per student + subject + destination using <b>'+this.esc(attemptPolicy)+'</b> attempt policy. Retrying is idempotent; no duplicate report-score rows were added.</div>','<button class="btn btn-primary" onclick="closeModal();location.href=\'report-cards.html\'">Open Report Cards</button>');
+    }catch(e){
+      if(btn){btn.disabled=false;btn.textContent='Push selected exams now';}
+      // The batch RPC is transaction-scoped: an error means no part of this batch committed.
+      openModal('❌ Bulk push not committed','<div class="notice notice-error"><b>No scores from this batch were committed.</b><br>'+this.esc(e.message||e)+'</div><p>Correct the destination, role or eligible-result issue and retry. Existing CBT attempts and report rows are preserved.</p>','<button class="btn btn-outline" onclick="closeModal()">Close</button>');
     }
-    if(collisions.length){
-      const detail=collisions.slice(0,8).map(x=>x.first.code+' + '+x.next.code+' → '+x.target+' / '+x.subject).join('\n');
-      toast('Push stopped: multiple selected CBTs overlap on the same report destination. Choose one CBT per destination/subject, or assign distinct CA1/CA2 columns. No scores were written. '+detail,'warning',12000);
-      return;
-    }
-    let saved=0,legacy=0,manual=0,unidentified=0,created=0,failed=[];
-    for(const exam of chosen){
-      const target=dest==='__exam__'?(exam.report_column||'CBT / Online Exam'):dest;
-      try{
-        const out=await this.pushOneCBTExam(exam,target,{createMissing:auto,maxMark,verifiedOnly,subjectFilter,attemptPolicy,requireMidterm:purpose==='midterm'});
-        saved+=Number(out.saved||0);legacy+=Number(out.skipped_unverified||0);manual+=Number(out.skipped_manual||0);unidentified+=Number(out.skipped_unidentified||0);if(out.created_column)created++;
-      }catch(e){failed.push((exam.code||exam.title)+': '+(e.message||e));}
-    }
-    if(window.App&&App.logActivity)App.logActivity('bulk-push-cbt','report_scores',saved+' report score rows from '+chosen.length+' exams');
-    closeModal();
-    const issues=failed.length?'<div class="notice notice-error"><b>Needs attention (other selected exams may have succeeded):</b><br>'+failed.map(this.esc).join('<br>')+'</div>':'<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534">Server confirmed the score upsert. Repeating the same push is safe and updates the same learner/subject/destination rows.</div>';
-    openModal('✅ Bulk CBT push complete','<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+saved+'</div><div class="stat-label">Report score rows saved/updated</div></div><div class="stat-card"><div class="stat-value">'+chosen.length+'</div><div class="stat-label">Exams processed</div></div><div class="stat-card"><div class="stat-value">'+created+'</div><div class="stat-label">Destination columns safely created</div></div><div class="stat-card"><div class="stat-value">'+legacy+'</div><div class="stat-label">Unverified/legacy skipped</div></div><div class="stat-card"><div class="stat-value">'+manual+'</div><div class="stat-label">Manual-review skipped</div></div><div class="stat-card"><div class="stat-value">'+unidentified+'</div><div class="stat-label">Unidentified attempts skipped</div></div></div>'+issues,'<button class="btn btn-primary" onclick="closeModal();location.href=\'report-cards.html\'">Open Report Cards</button>');
   },
 
   async pushCBTToResults(examId,column,term,session){
