@@ -63,7 +63,7 @@
     <div class="app-content">
       <div class="card" style="background:#eff6ff;border-color:#93c5fd">
         <h3 style="margin-top:0">📝 Midterm Test Reports — Once per term</h3>
-        <p style="color:#1e3a8a">Generate a <b>Midterm sheet</b> separately from the terminal report. Use the single CBT purpose <b>Mid-term Assessment</b>; its report destination is chosen separately and may be <b>CA1, CA2, Midterm, or a legacy mid-term CA/Test column</b>. The report uses only scores recorded in the matching mid-term columns in <code>report_scores</code>.</p>
+        <p style="color:#1e3a8a">Generate a <b>standalone Midterm report sheet for every student</b>, separately from the terminal report. Use the single CBT purpose <b>Mid-term Assessment</b>; its report destination is chosen separately and may be <b>CA1, CA2, Midterm, or a legacy mid-term CA/Test column</b>. Every generated student row has an individual print-ready sheet, with a class-wide print option.</p>
         <p style="font-size:.85rem;color:#334155">Workflow: create a Mid-term Assessment CBT, choose CA1/CA2/Midterm as its report destination, push its verified results from CBT → Bulk Push to Report Cards, then generate here. You do not need a column literally named “Midterm”. Generation still creates a roster sheet if scores have not been pushed; those entries are clearly marked “No score” rather than treated as zero marks.</p>
       </div>
 
@@ -75,7 +75,8 @@
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           <button class="btn btn-primary" onclick="MR.generate()">📊 Generate Midterm Reports</button>
-          <button class="btn btn-outline" onclick="MR.preview()">👁️ Preview (first 5)</button>
+          <button class="btn btn-outline" onclick="MR.preview()">👁️ Preview generated sheets</button>
+          <button class="btn btn-outline" onclick="MR.printAll()">🖨️ Print all student sheets</button>
           <button class="btn btn-outline" onclick="MR.publish(true)">✅ Publish (student/parent can view)</button>
           <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="MR.publish(false)">🚫 Unpublish</button>
           <button class="btn btn-outline" onclick="MR.exportCSV()">⬇ Export CSV</button>
@@ -170,7 +171,7 @@ const MR = {
             if(ids.length){const r=await sb.from('students').select('id,admission_no,full_name,class').in('id',ids);people=r.data||[];}
           }
         }catch(e){console.warn('Midterm family lookup',e.message);}
-        if(sel) sel.innerHTML=people.length?people.map(x=>'<option value="'+MR.esc(x.admission_no||'')+'" data-class="'+MR.esc(x.class||'')+'">'+MR.esc(x.admission_no||'')+' — '+MR.esc(x.full_name||'')+' ('+MR.esc(x.class||'')+')</option>').join(''):'<option value="">No linked student found</option>';
+        if(sel) sel.innerHTML=people.length?people.map(x=>{const sid=x.admission_no||x.id;return '<option value="'+MR.esc(sid||'')+'" data-class="'+MR.esc(x.class||'')+'">'+MR.esc(x.admission_no||x.id)+' — '+MR.esc(x.full_name||'')+' ('+MR.esc(x.class||'')+')</option>';}).join(''):'<option value="">No linked student found</option>';
         const terms=document.getElementById('mr-family-term'), sessions=document.getElementById('mr-family-session');
         const fill2=(el,rows,key)=>{if(el&&rows&&rows.length)el.innerHTML='<option value="">Select</option>'+rows.map(r=>'<option>'+String(r[key]||'')+'</option>').join('');};
         fill2(terms,(await sb.from('lookups').select('value').eq('kind','term').eq('active',true).order('position')).data,'value');
@@ -191,9 +192,8 @@ const MR = {
     if(host)host.innerHTML='<span class="pulse">Loading published midterm sheet…</span>';
     const r=await sb.rpc('get_midterm_report',{p_student_id_ref:sid,p_class:cls,p_term:term,p_session:session});
     if(r.error||!r.data||!r.data.ok){host.innerHTML='<div class="notice">'+MR.esc((r.data&&r.data.message)|| (r.data&&r.data.error)||r.error?.message||'No report available')+'</div>';return;}
-    const row=r.data.report, scores=row.scores||{};
-    if(row.has_scores===false){host.innerHTML='<div class="notice">No midterm test score has been recorded for this student yet. Please contact the tutor if you believe this is incorrect.</div>';return;}
-    host.innerHTML='<div class="mr-card"><h3>Midterm Report — '+MR.esc(row.student_name)+' · '+MR.esc(row.class)+'</h3><p>'+MR.esc(row.term)+' · '+MR.esc(row.session)+' · Position '+MR.esc(row.position||'—')+'</p><table class="mr-table"><thead><tr><th>Subject</th><th>Midterm score</th></tr></thead><tbody>'+Object.entries(scores).map(([subject,score])=>'<tr><td>'+MR.esc(subject)+'</td><td>'+Number(score||0).toFixed(1)+'</td></tr>').join('')+'</tbody><tfoot><tr><th>Total / Average</th><th>'+Number(row.total||0).toFixed(1)+' / '+Number(row.average||0).toFixed(1)+'%</th></tr></tfoot></table><button class="btn btn-outline no-print" onclick="window.print()">🖨️ Print / Save PDF</button></div>';
+    const row=r.data.report;this._familyRow=row;
+    host.innerHTML=(row.has_scores===false?'<div class="notice">No midterm marks are recorded yet. This is still your student’s standalone report record; contact the tutor if marks should be present.</div>':'')+'<div class="mr-card"><h3>Midterm report sheet — '+MR.esc(row.student_name)+' · '+MR.esc(row.class)+'</h3><p>'+MR.esc(row.term)+' · '+MR.esc(row.session)+' · Position '+MR.esc(row.position||'—')+'</p><button class="btn btn-primary no-print" onclick="MR.printStudent(MR._familyRow)">🖨️ Open standalone sheet / Save PDF</button><div style="margin-top:10px">'+MR.scoreTable(row)+'</div></div>';
   },
   async generate(){
     const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
@@ -204,15 +204,53 @@ const MR = {
     status.innerHTML='<span style="color:#16a34a">✅ Generated '+Number(r.data.generated||0)+' student report(s): '+Number(r.data.with_scores||0)+' with scores, '+Number(r.data.without_scores||0)+' awaiting scores for '+MR.esc(c)+' · '+MR.esc(t)+' · '+MR.esc(s)+'.</span>'+warning;
     this.preview();
   },
-  async preview(){
-    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
-    const box=document.getElementById('mr-list'); box.innerHTML='<span class="pulse">Loading…</span>';
-    const r=await sb.from('midterm_report_cards').select('*').eq('class',c).eq('term',t).eq('session',s).order('average',{ascending:false}).limit(100);
-    if(r.error){ box.innerHTML='<span style="color:#dc2626">'+r.error.message+'</span>'; return; }
-    const rows=r.data||[];
-    if(!rows.length){ box.innerHTML='<p>No midterm reports yet. Generate first.</p>'; return; }
-    box.innerHTML='<div class="table-wrap"><table class="mr-table"><thead><tr><th>#</th><th>Student</th><th>ID</th><th>Total</th><th>Average</th><th>Position</th><th>Score status</th><th>Published</th><th>Subjects</th></tr></thead><tbody>'+rows.map((row,i)=>'<tr><td>'+(i+1)+'</td><td>'+(row.student_name||'')+'</td><td>'+(row.student_id_ref||'')+'</td><td>'+Number(row.total||0).toFixed(1)+'</td><td>'+Number(row.average||0).toFixed(1)+'%</td><td>'+(row.position||'-')+'</td><td>'+(row.has_scores?'Has score':'No score')+'</td><td>'+(row.published?'✅':'—')+'</td><td style="max-width:300px;white-space:normal;font-size:.78rem">'+Object.entries(row.scores||{}).map(([subj,score])=>subj+': '+score).join(', ')+'</td></tr>').join('')+'</tbody></table></div><p style="font-size:.82rem;color:#64748b;margin-top:8px">Showing '+rows.length+' (first 100). Terminal reports are separate — generate them in Report Cards.</p>';
+  async fetchContextRows(c,t,s){
+    const all=[];const pageSize=500;
+    for(let from=0;from<10000;from+=pageSize){
+      const r=await sb.from('midterm_report_cards').select('*').eq('class',c).eq('term',t).eq('session',s).order('average',{ascending:false}).range(from,from+pageSize-1);
+      if(r.error)throw new Error(r.error.message);const part=r.data||[];all.push(...part);if(part.length<pageSize)break;
+    }
+    return all;
   },
+  scoreItems(row){
+    if(Array.isArray(row&&row.score_details)&&row.score_details.length)return row.score_details;
+    return Object.entries((row&&row.scores)||{}).map(([label,score])=>({subject:label,assessment:'Midterm',score,max_mark:null}));
+  },
+  scoreTable(row){
+    const items=this.scoreItems(row);
+    if(!items.length)return '<div class="notice">No Midterm score is recorded for this student yet.</div>';
+    return '<div class="table-wrap"><table class="mr-table"><thead><tr><th>Subject</th><th>Assessment</th><th>Score</th><th>Maximum</th></tr></thead><tbody>'+items.map(x=>'<tr><td>'+this.esc(x.subject||'—')+'</td><td>'+this.esc(x.assessment||'Midterm')+'</td><td>'+Number(x.score||0).toFixed(2)+'</td><td>'+(Number(x.max_mark)>0?Number(x.max_mark).toFixed(2):'—')+'</td></tr>').join('')+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+Number(row.total||0).toFixed(2)+'</th><th>'+Number(row.max_total||0).toFixed(2)+'</th></tr></tfoot></table></div>';
+  },
+  sheetBody(row){
+    const school=window.SCHOOL||{},logoExt=String(school.logoExt||'svg').replace(/[^a-z0-9]/gi,''),logo='assets/img/logo.'+logoExt;
+    const detail=this.scoreItems(row),scoreRows=detail.length?detail.map(x=>'<tr><td>'+this.esc(x.subject||'—')+'</td><td>'+this.esc(x.assessment||'Midterm')+'</td><td>'+Number(x.score||0).toFixed(2)+'</td><td>'+(Number(x.max_mark)>0?Number(x.max_mark).toFixed(2):'—')+'</td></tr>').join(''):'<tr><td colspan="4" class="no-score">No midterm score has been recorded for this student.</td></tr>';
+    return '<section class="report-page"><header class="school-head">'+(school.logoExt?'<img class="school-logo" src="'+this.esc(logo)+'" alt="">':'')+'<div><h1>'+this.esc(school.name||school.shortName||'School')+'</h1><p>'+this.esc(school.motto||'')+'</p></div></header><div class="sheet-title"><div>MIDTERM ASSESSMENT REPORT</div><small>Student report sheet · '+(row.has_scores===false?'No score recorded':'Official scores')+'</small></div><div class="student-meta"><div><b>Student</b><span>'+this.esc(row.student_name||'—')+'</span></div><div><b>Admission / student ID</b><span>'+this.esc(row.student_id_ref||'—')+'</span></div><div><b>Class</b><span>'+this.esc(row.class||'—')+'</span></div><div><b>Term</b><span>'+this.esc(row.term||'—')+'</span></div><div><b>Session</b><span>'+this.esc(row.session||'—')+'</span></div><div><b>Position</b><span>'+(row.has_scores===false?'—':this.esc(row.position||'—'))+'</span></div></div>'+(row.has_scores===false?'<div class="no-score-banner">No midterm marks are recorded for this student for this term. This sheet does not treat missing marks as zero.</div>':'')+'<table class="scores"><thead><tr><th>Subject</th><th>Assessment / report column</th><th>Mark</th><th>Maximum</th></tr></thead><tbody>'+scoreRows+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+Number(row.total||0).toFixed(2)+'</th><th>'+Number(row.max_total||0).toFixed(2)+'</th></tr></tfoot></table><div class="summary"><div><b>Overall percentage</b><span>'+(row.has_scores===false?'—':Number(row.average||0).toFixed(2)+'%')+'</span></div><div><b>Position</b><span>'+(row.has_scores===false?'—':this.esc(row.position||'—'))+'</span></div></div><div class="signatures"><div>Class Teacher</div><div>Head Teacher / Principal</div></div><footer>Generated '+this.esc(new Date().toLocaleDateString())+' · Midterm report is separate from the terminal report card.</footer></section>';
+  },
+  printRows(rows,title,existingWindow){
+    const school=window.SCHOOL||{},candidate=String(school.primary||school.theme?.primary||'#1d4ed8'),primary=/^#[0-9a-f]{3,8}$/i.test(candidate)?candidate:'#1d4ed8';
+    const css='@page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0;color:#0f172a;font-family:Arial,Helvetica,sans-serif}.report-page{min-height:270mm;page-break-after:always;break-after:page;padding:0 2mm 8mm}.report-page:last-child{page-break-after:auto;break-after:auto}.school-head{display:flex;align-items:center;justify-content:center;gap:14px;text-align:center;border-bottom:3px solid '+primary+';padding:8px 0 12px}.school-logo{width:58px;height:58px;object-fit:contain}.school-head h1{font-size:21px;margin:0}.school-head p{font-size:11px;margin:4px 0 0;color:#475569}.sheet-title{text-align:center;margin:18px 0 12px;font-size:18px;font-weight:800;color:'+primary+'}.sheet-title small{display:block;font-size:10px;color:#475569;margin-top:4px}.student-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border:1px solid #cbd5e1;padding:10px;border-radius:6px;margin-bottom:12px}.student-meta div{display:flex;flex-direction:column;gap:3px}.student-meta b{font-size:9px;text-transform:uppercase;color:#475569}.student-meta span{font-size:12px;font-weight:700}.scores{width:100%;border-collapse:collapse;margin-top:12px}.scores th,.scores td{border:1px solid #94a3b8;padding:8px;text-align:left;font-size:11px}.scores th{background:#eff6ff}.scores tfoot th{background:#f1f5f9}.summary{display:flex;gap:12px;margin-top:14px}.summary div{border:1px solid #cbd5e1;border-radius:6px;padding:10px;min-width:130px;display:flex;flex-direction:column;gap:5px}.summary b{font-size:9px;text-transform:uppercase;color:#475569}.summary span{font-size:14px;font-weight:800}.no-score,.no-score-banner{color:#92400e;background:#fffbeb}.no-score-banner{padding:10px;border:1px solid #fcd34d;margin:10px 0;font-size:11px}.signatures{display:flex;justify-content:space-between;gap:40px;margin-top:55px}.signatures div{width:42%;border-top:1px solid #475569;text-align:center;padding-top:6px;font-size:10px}footer{margin-top:18px;border-top:1px solid #cbd5e1;padding-top:6px;color:#64748b;font-size:9px;text-align:center}';
+    const w=existingWindow||window.open('','_blank');if(!w){toast('Allow pop-ups to open printable student reports.','warning',7000);return false;}
+    w.document.open();w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="'+this.esc(location.href.replace(/[^/]*$/,''))+'"><title>'+this.esc(title||'Midterm reports')+'</title><style>'+css+'</style></head><body>'+rows.map(r=>this.sheetBody(r)).join('')+'<script>window.addEventListener("load",function(){var imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=r;i.onerror=r}))).then(()=>setTimeout(()=>window.print(),250))});<\/script></body></html>');w.document.close();return true;
+  },
+  printStudent(row){if(!row){toast('Student report data is not available. Refresh the generated list.','warning');return;}return this.printRows([row],'Midterm report — '+(row.student_name||''));},
+  async printAll(){
+    const {c,t,s}=this.vals();if(!c||!t||!s){toast('Select class, term and session first.','warning');return;}
+    const w=window.open('','_blank');if(!w){toast('Allow pop-ups to open printable student reports.','warning',7000);return;}
+    w.document.write('<!doctype html><title>Preparing reports…</title><p style="font-family:system-ui;padding:24px">Preparing Midterm student report sheets…</p>');
+    try{const rows=await this.fetchContextRows(c,t,s);if(!rows.length){w.close();toast('No generated reports found for this class/term/session.','warning');return;}const html=this.printRows(rows,'Midterm reports — '+c,w);if(!html)w.close();}
+    catch(e){w.close();toast('Could not prepare reports: '+e.message,'danger',9000);}
+  },
+  async preview(){
+    const {c,t,s}=this.vals();if(!c||!t||!s){toast('Pick class, term, session','warning');return;}
+    const box=document.getElementById('mr-list');box.innerHTML='<span class="pulse">Loading all generated reports…</span>';
+    try{
+      const rows=await this.fetchContextRows(c,t,s);this._lastRows=rows;
+      if(!rows.length){box.innerHTML='<p>No midterm reports yet. Generate first.</p>';return;}
+      const body=rows.map((row,i)=>'<tr><td>'+(i+1)+'</td><td>'+this.esc(row.student_name||'')+'</td><td>'+this.esc(row.student_id_ref||'')+'</td><td>'+Number(row.total||0).toFixed(2)+' / '+Number(row.max_total||0).toFixed(2)+'</td><td>'+Number(row.average||0).toFixed(2)+'%</td><td>'+(row.position||'—')+'</td><td>'+(row.has_scores?'Has score':'No score')+'</td><td>'+(row.published?'✅':'—')+'</td><td><button class="btn btn-sm btn-outline" onclick="MR.printStudent(MR._lastRows['+i+'])">View / print sheet</button></td></tr>').join('');
+      box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>'+rows.length+' student sheet(s) generated · '+rows.filter(x=>x.has_scores).length+' scored · '+rows.filter(x=>!x.has_scores).length+' no score</b><button class="btn btn-sm btn-primary" onclick="MR.printAll()">🖨️ Print all '+rows.length+' sheets</button></div><div class="table-wrap"><table class="mr-table"><thead><tr><th>#</th><th>Student</th><th>ID</th><th>Total / Maximum</th><th>Average</th><th>Position</th><th>Status</th><th>Published</th><th>Standalone sheet</th></tr></thead><tbody>'+body+'</tbody></table></div><p style="font-size:.82rem;color:#64748b">Each button opens an independent, print-ready sheet. Use the browser print dialog to print or save as PDF.</p>';
+    }catch(e){box.innerHTML='<div class="notice notice-error">Unable to load generated student reports: '+this.esc(e.message||e)+'</div>';}
+  },
+
   async publish(flag){
     const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
     const r=await sb.rpc('publish_midterm_reports',{p_class:c, p_term:t, p_session:s, p_publish:flag});
@@ -221,11 +259,9 @@ const MR = {
   },
   async exportCSV(){
     const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
-    const r=await sb.from('midterm_report_cards').select('*').eq('class',c).eq('term',t).eq('session',s).order('average',{ascending:false});
-    if(r.error){ toast(r.error.message,'danger'); return; }
-    const rows=r.data||[]; if(!rows.length){ toast('No data','warning'); return; }
-    const header=['Student','ID','Class','Term','Session','Total','Average','Position','Published','Scores_JSON'];
-    const csv=[header.join(',')].concat(rows.map(row=> [row.student_name,row.student_id_ref,row.class,row.term,row.session,row.total,row.average,row.position,row.published, '"'+JSON.stringify(row.scores).replace(/"/g,'""')+'"'].map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(','))).join('\n');
+    let rows;try{rows=await this.fetchContextRows(c,t,s);}catch(e){toast(e.message||'Could not load Midterm rows','danger');return;}if(!rows.length){ toast('No data','warning'); return; }
+    const header=['Student','ID','Class','Term','Session','Total','Maximum','AveragePercent','Position','HasScores','Published','Scores_JSON','Score_Details_JSON'];
+    const csv=[header.join(',')].concat(rows.map(row=> [row.student_name,row.student_id_ref,row.class,row.term,row.session,row.total,row.max_total,row.average,row.position,row.has_scores,row.published,JSON.stringify(row.scores||{}),JSON.stringify(row.score_details||[])].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','))).join('\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='midterm-'+c+'-'+t+'-'+s+'.csv'; a.click();
   }
 };
