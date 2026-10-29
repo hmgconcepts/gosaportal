@@ -17,25 +17,18 @@ const AssignmentCBT = {
   },
   esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;'); },
 
+  isMidTermType(value){return ['ca','test','midterm','midtermtest','midtermca','midtermassessment','midtermcolumn'].includes(String(value||'').toLowerCase().replace(/[^a-z0-9]/g,''));},
+  canonicalPurpose(value){const t=String(value||'').toLowerCase().replace(/[^a-z0-9]/g,'');return this.isMidTermType(t)?'midterm':t;},
   purposeLabel(exam){
-    const t = String((exam && exam.assessment_type) || exam || '').toLowerCase();
-    const map = {
-      'assignment': '🟢 CBT Assignment',
-      'ca': '🔵 Mid-term CA',
-      'test': '🔵 Mid-term Test',
-      'exam': '🔴 Terminal Exam',
-      'project': '🟣 Project',
-      'quiz': '🟡 Quiz',
-      'practical': '🟠 Practical',
-    };
-    return map[t] || '⚪ '+(t||'Other');
+    const raw=String((exam&&exam.assessment_type)||exam||'').toLowerCase(),t=this.canonicalPurpose(raw);
+    const map={'assignment':'🟢 CBT Assignment','midterm':'🔵 Mid-term Assessment','exam':'🔴 Terminal Exam','project':'🟣 Project','quiz':'🟡 Quiz','practical':'🟠 Practical'};
+    return map[t]||'⚪ '+(raw||'Other');
   },
   purposeBadge(exam){
-    const t = String((exam && exam.assessment_type) || exam || '').toLowerCase();
+    const t = this.canonicalPurpose(String((exam && exam.assessment_type) || exam || '').toLowerCase());
     const colors = {
       'assignment': 'background:#dcfce7;color:#166534;border:1px solid #86efac',
-      'ca': 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd',
-      'test': 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd',
+      'midterm': 'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd',
       'exam': 'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5',
       'project': 'background:#f3e8ff;color:#6b21a8;border:1px solid #c4b5fd',
       'quiz': 'background:#fef3c7;color:#92400e;border:1px solid #fcd34d',
@@ -44,7 +37,7 @@ const AssignmentCBT = {
     return `<span class="badge" style="${style}">${this.esc(this.purposeLabel(t))}</span>`;
   },
   isAssignment(exam){ return String(exam.assessment_type||'').toLowerCase() === 'assignment'; },
-  isMidTerm(exam){ const t=String(exam.assessment_type||'').toLowerCase(); return t==='ca' || t==='test' || (exam.report_column && /ca1|ca2/i.test(exam.report_column)); },
+  isMidTerm(exam){ return this.isMidTermType(exam.assessment_type) || (exam.report_column && /ca\s*[-_ ]?\s*[12]|mid\s*[-_ ]?\s*term/i.test(exam.report_column)); },
   isTerminal(exam){ const t=String(exam.assessment_type||'').toLowerCase(); return t==='exam' || (exam.report_column && /exam/i.test(exam.report_column) && !/ca/i.test(exam.report_column)); },
   isMultiSubject(exam){
     if(!exam) return false;
@@ -245,7 +238,7 @@ const AssignmentCBT = {
       const terminals=allForDiff.filter(e=>!this.isAssignment(e) && this.isTerminal(e));
       const others=allForDiff.filter(e=>!this.isAssignment(e) && !this.isMidTerm(e) && !this.isTerminal(e));
       if(!list.length){
-        box.innerHTML=`<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>No CBT Assignments for ${this.esc(klass)} · ${this.esc(subject)} yet.</b><br>Create them on <a href="cbt.html">CBT page</a> → Assessment type = <b>🟢 Assignment / Homework</b>. For multi-subject, use <a href="cbt-multi.html">CBT Multi-Subject Builder</a> → Type = Assignment. They will appear here automatically (single + multi-subject containing ${this.esc(subject)}) and can be scored cumulatively per subject.<br><br><b>Differentiation:</b><br>${midTerms.length? `🔵 Mid-term CAs: ${midTerms.length} — pushed to CA1/CA2 columns<br>` : ''}${terminals.length? `🔴 Terminal Exams: ${terminals.length} — pushed to Exam column<br>` : ''}${others.length? `Other CBT: ${others.length} — project/quiz/practical<br>` : ''}<small>Only 🟢 CBT Assignments are collated here for cumulative assignment scores.</small></div>`;
+        box.innerHTML=`<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>No CBT Assignments for ${this.esc(klass)} · ${this.esc(subject)} yet.</b><br>Create them on <a href="cbt.html">CBT page</a> → Assessment type = <b>🟢 Assignment / Homework</b>. For multi-subject, use <a href="cbt-multi.html">CBT Multi-Subject Builder</a> → Type = Assignment. They will appear here automatically (single + multi-subject containing ${this.esc(subject)}) and can be scored cumulatively per subject.<br><br><b>Differentiation:</b><br>${midTerms.length? `🔵 Mid-term Assessments: ${midTerms.length} — pushed to the configured CA1/CA2/Midterm destination<br>` : ''}${terminals.length? `🔴 Terminal Exams: ${terminals.length} — pushed to Exam column<br>` : ''}${others.length? `Other CBT: ${others.length} — project/quiz/practical<br>` : ''}<small>Only 🟢 CBT Assignments are collated here for cumulative assignment scores.</small></div>`;
         return;
       }
       box.innerHTML=`<div style="margin-bottom:8px"><b>🖥️ ${list.length} CBT Assignment(s) for ${this.esc(klass)} · ${this.esc(subject)}</b> — includes single-subject + multi-subject assignments containing ${this.esc(subject)}. Each given more than once per term, cumulatively collated per subject. Click Score to auto-fill from CBT results (per subject for multi). Students see link to take it.</div>
@@ -258,7 +251,7 @@ const AssignmentCBT = {
         `</tbody></table></div>
         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="AssignmentCBT.uiSyncAll()">🔄 Sync ALL CBT Assignment scores for this class/subject (single + multi)</button><button class="btn btn-outline btn-sm" onclick="AssignmentCBT.renderCBTSection()">↻ Refresh</button></div>
         <div id="ap-cbt-log" style="margin-top:8px;font-size:.85rem;color:#475569"></div>
-        <div class="notice" style="margin-top:10px;background:#eff6ff;border-color:#93c5fd;color:#1e3a8a"><b>Clear differentiation & modus operandi:</b><br>🟢 Assignment = homework (multiple per term, cumulative → Assignment column, per subject for multi) · 🔵 Mid-term CA = CA1/CA2 (once) · 🔴 Terminal Exam = Exam column (once) · Other = project/quiz/practical.<br>For multi-subject CBT assignments, Score class auto-fills per subject (just like exams/mid-term), and push fills each subject Assignment column. Works for pre-existing multi-subject assignments too.</div>`;
+        <div class="notice" style="margin-top:10px;background:#eff6ff;border-color:#93c5fd;color:#1e3a8a"><b>Clear differentiation & modus operandi:</b><br>🟢 Assignment = homework (multiple per term, cumulative → Assignment column, per subject for multi) · 🔵 Mid-term Assessment = choose CA1/CA2/Midterm destination · 🔴 Terminal Exam = Exam column · Other = project/quiz/practical.<br>For multi-subject CBT assignments, Score class auto-fills per subject (just like exams/mid-term), and push fills each subject Assignment column. Works for pre-existing multi-subject assignments too.</div>`;
     }catch(e){ box.innerHTML=`<p style="color:#b91c1c">${this.esc(e.message||e)}</p>`; }
   },
   log(msg, kind){

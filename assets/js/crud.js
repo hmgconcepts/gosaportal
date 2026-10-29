@@ -163,7 +163,7 @@ const CRUD = {
       {key:'subject',label:'Subject',type:'ref',refTable:'subjects',refValue:'name',refStore:'value',required:true},
       {key:'due_date',label:'Due date',type:'date',required:true},
       {key:'drive_link',label:'Drive link / CBT link',type:'text',help:'For physical assignments: paste Google Drive link to resources (optional). For CBT assignments: auto-filled as ./cbt-exam.html?code=CODE — students click to take it. Auto-managed for CBT.'},
-      {key:'is_cbt',label:'CBT Assignment? (auto-managed)',type:'checkbox',adminOnly:true,readonly:true,form:false,list:true,help:'V12.8-12.9: auto-ticked when mirrored from CBT assignment exam. Clearly differentiates 🟢 CBT assignments (multiple per term, cumulative) from 🔵 Mid-term CAs and 🔴 Terminal exams. Do not tick manually — set via CBT page. Hidden from Add new form because CBT assignments auto-fill from CBT page.'},
+      {key:'is_cbt',label:'CBT Assignment? (auto-managed)',type:'checkbox',adminOnly:true,readonly:true,form:false,list:true,help:'V12.8-12.9: auto-ticked when mirrored from CBT assignment exam. Clearly differentiates 🟢 CBT assignments (multiple per term, cumulative) from 🔵 Mid-term Assessments and 🔴 Terminal exams. Do not tick manually — set via CBT page. Hidden from Add new form because CBT assignments auto-fill from CBT page.'},
       {key:'source',label:'Source (auto-managed)',type:'select',options:['manual','cbt_assignment','cbt_mirror'],adminOnly:true,readonly:true,form:false,list:false,help:'V12.9: manual=physical/paper, cbt_assignment=auto-mirrored from CBT. Auto-filled, not for manual editing. Hidden from Add new — not needed, auto-managed.'},
       {key:'cbt_exam_id',label:'Linked CBT Exam ID (auto-managed)',type:'text',adminOnly:true,readonly:true,form:false,list:false,help:'V12.9: auto-filled with cbt_exams.id when is_cbt. Powers auto-fill of scores when Score class clicked. Not redundant — enables multiple CBT assignments per term to accumulate separately. Hidden from Add new form.'}
     ]},
@@ -463,7 +463,7 @@ const CRUD = {
       {key:'class',label:'Class',type:'ref',refTable:'classes',refValue:'name'},
       {key:'term',label:'Term',type:'lookup',lookupKind:'term'},
       {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
-      {key:'assessment_type',label:'Assessment type',type:'select',options:['exam','test','assignment','project','quiz','ca','practical']},
+      {key:'assessment_type',label:'Assessment purpose',type:'select',options:['exam','midterm','assignment','project','quiz','practical']},
       {key:'is_entrance',label:'Entrance / placement assessment',type:'checkbox'},
       {key:'pass_mark',label:'Entrance pass mark (%)',type:'number'},
       {key:'report_column',label:'Report-card column',type:'select',options:['Project','CA1','CA2','CBT Exam','Paper Exam','Exam','Practical']},
@@ -1481,6 +1481,9 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
           (opts.length ? opts.map(o => '<label style="font-weight:500"><input type="checkbox" class="cf-mr" value="' + esc(o.value) + '"' + (cur.includes(String(o.value)) ? ' checked' : '') + '> ' + esc(o.label) + '</label>').join('') : '<span style="color:var(--gray-500);font-size:.85rem">No records in ' + esc(c.refTable) + ' yet.</span>') + '</div>';
       } else if (c.type === 'ref' || c.type === 'lookup' || c.type === 'select') {
         const opts = this.dedupeOptions((c.type === 'select') ? (c.options || []).map(o => ({ value: o, label: o })) : await this.loadOptions(c));
+        // Preserve pre-existing assessment values so legacy CBTs remain editable;
+        // only the canonical Midterm option is offered for new records.
+        if(c.key==='assessment_type' && val && !opts.some(o=>String(o.value)===String(val)) && ['ca','test','midtermca','midtermtest','midtermassessment'].includes(String(val).toLowerCase().replace(/[^a-z0-9]/g,''))) opts.push({value:val,label:String(val)+' (legacy Mid-term Assessment)'});
         const onchg = (c.type === 'ref' && c.autofill) ? ' onchange="CRUD.onRefChange(\'' + moduleId + '\',\'' + c.key + '\',this)"' : '';
         const optHtml = (o) => '<option value="' + esc(o.value) + '"' + (String(val) === String(o.value) ? ' selected' : '') + (o.row ? ' data-row=\'' + esc(JSON.stringify(o.row)) + '\'' : '') + '>' + esc(o.label) + '</option>';
         let inner;
