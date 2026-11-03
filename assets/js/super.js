@@ -593,7 +593,15 @@ const Super = {
   },
 
   idcard: {
-    qrUrl(data, size) { size = size || 120; return 'https://api.qrserver.com/v1/create-qr-code/?size=' + size + 'x' + size + '&data=' + encodeURIComponent(data); },
+    qrUrl(data, size) {
+      // V12.59: render locally when the vendored QR encoder is present. Student
+      // identity data is no longer sent to an external QR-generation service.
+      size=size||120;
+      try{if(typeof window.qrcode==='function'){const qr=window.qrcode(0,'M');qr.addData(String(data==null?'':data));qr.make();const module=qr.getModuleCount(),cell=Math.max(2,Math.floor(size/(module+8)));return qr.createDataURL(cell,4);}}catch(e){console.warn('[ID card] local QR generation failed; falling back to local barcode',e);}
+      // Local Code 39 remains scannable by the native barcode detector; never
+      // fall back to transmitting names/admission numbers to a third party.
+      return this.barcodeSvg(String(data==null?'':data),Math.max(24,Math.round(size/3)));
+    },
     /* ================================================================
        V11.7 (pass 65 #1): REAL Code 39 barcode — generated locally as an
        SVG data URI (no CDN, works offline/printed). Encodes the plain
@@ -966,20 +974,15 @@ const Super = {
         '<div style="display:flex;align-items:stretch">' + this.backHtml(person) + '</div></div>';
     },
     print(person) {
-      // ENTERPRISE V11: robust ID-card printing. Never open an empty page:
-      // validate/fallback the person object, write print CSS, wait briefly for
-      // photos/QR/logo, then print even if a remote image stalls.
-      person = person || {};
-      if (!person.full_name && !person.name) person.full_name = 'Sample Student';
-      if (!person.admission_no && !person.staff_no && !person.id) person.admission_no = 'SAMPLE-ID';
-      // V11.6: physical card = FRONT + BACK, printed together for cutting/duplex.
-      const card = this.pairHtml(person) || this.html(person) || '<div style="padding:30px;border:1px solid #ddd">ID card could not render.</div>';
-      const w = window.open('', '_blank');
-      if (!w) { if (typeof toast === 'function') toast('Popup blocked. Please allow popups to print ID cards.', 'warning'); return; }
-      const base = (typeof document !== 'undefined' && document.baseURI) ? document.baseURI.replace(/[^/]*$/, '') : '';
-      w.document.open();
-      w.document.write('<!DOCTYPE html><html><head><title>ID Card</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{display:flex;justify-content:center;align-items:flex-start;padding:24px;margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.sc-idcard{break-inside:avoid;page-break-inside:avoid}img{max-width:100%}@media print{body{padding:0}}</style></head><body>' + card + '<script>window.onload=function(){var done=false;function go(){if(done)return;done=true;setTimeout(function(){window.focus();window.print()},250)};var imgs=[].slice.call(document.images),left=imgs.length;if(!left)return go();var tick=function(){if(--left<=0)go()};imgs.forEach(function(im){if(im.complete)tick();else{im.onload=tick;im.onerror=tick}});setTimeout(go,2200)};<\/script></body></html>');
-      w.document.close();
+      // Route direct callers through the fixed-mm one-student pipeline whenever
+      // the ID Cards UI exists; retain a standard ID-1 fallback for other pages.
+      person=person||{};if(!person.full_name&&!person.name)person.full_name='Sample Student';if(!person.admission_no&&!person.staff_no&&!person.id)person.admission_no='SAMPLE-ID';
+      if(window.ICUI&&typeof window.ICUI.printCards==='function')return window.ICUI.printCards([person],'ID Card');
+      const front=this.html(person),back=this.backHtml(person),w=window.open('','_blank');
+      if(!w){if(typeof toast==='function')toast('Popup blocked. Allow pop-ups to print ID cards.','warning');return;}
+      const base=document.baseURI?document.baseURI.replace(/[^/]*$/,''):'';const closeScript='</'+'script>';
+      const js='window.addEventListener("load",function(){var imgs=[...document.images],wait=Promise.all(imgs.map(function(i){return i.complete?Promise.resolve():new Promise(function(r){i.onload=r;i.onerror=r})}));wait.then(function(){document.querySelectorAll(".face").forEach(function(f){var c=f.querySelector(".sc-idcard"),b=f.querySelector(".inner");if(!c||!b)return;c.style.maxWidth="none";var r=c.getBoundingClientRect(),scale=Math.min(f.clientWidth/r.width,f.clientHeight/r.height);b.style.width=r.width+"px";b.style.height=r.height+"px";b.style.transform="scale("+scale+")";b.style.left=((f.clientWidth-r.width*scale)/2)+"px";b.style.top=((f.clientHeight-r.height*scale)/2)+"px"});setTimeout(function(){window.print()},300)});setTimeout(function(){window.print()},4500)});';
+      w.document.open();w.document.write('<!doctype html><html><head><title>ID Card</title><base href="'+base+'"><style>@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{margin:0}.sheet{width:190mm;height:277mm;display:flex;align-items:center;justify-content:center;break-after:page}.pair{display:flex;gap:4mm}.face{width:85.6mm;height:53.98mm;position:relative;overflow:hidden;border-radius:3.18mm;background:#fff}.inner{position:absolute;transform-origin:top left}.inner>.sc-idcard{max-width:none!important;margin:0!important;box-shadow:none!important}</style></head><body><section class="sheet"><div class="pair"><div class="face"><div class="inner">'+front+'</div></div><div class="face"><div class="inner">'+back+'</div></div></div></section><script>'+js+closeScript+'</body></html>');w.document.close();
     }
   },
 
