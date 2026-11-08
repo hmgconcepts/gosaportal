@@ -649,6 +649,10 @@ window.CBTUI = {
   canManageExam(e){ const r=String((window.App&&App.currentRole)||(window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase(); const admin=['super_admin','admin','administrator','owner','director','principal','proprietor','head_teacher','bursar']; return admin.includes(r) || (['staff','teacher'].includes(r) && e && (!e.teacher_id || e.teacher_id === (window.SC_PROFILE&&SC_PROFILE.id))); },
   async refresh(){
     const box = document.getElementById('cbt-list');
+    /* V12.60: never assume the container exists — on a role that hides the
+       exam table (or during a script-order race) this threw and aborted the
+       rest of the page bootstrap. */
+    if(!box) return;
     if(!sb){ box.innerHTML = '<div class="card">⚠️ Database not configured. Add your Supabase keys in assets/js/config.js.</div>'; return; }
     const { data, error } = await CBT.listExams();
     if(error){ box.innerHTML = '<div class="card">Could not load exams: '+esc(error.message)+'</div>'; return; }
@@ -1237,6 +1241,86 @@ window.CBTUI = {
     const wa = 'https://wa.me/?text='+encodeURIComponent('Take the exam ('+code+'): '+url+' — no login needed, just enter exam code + student ID. On shared lab computers, after one student finishes, tap \'Next Student — Take Another Exam\' to let the next student enter their code/ID.');
     openModal('Share exam '+code, '<p><strong>Unique public link</strong> (no login, just exam code + student ID):</p><input class="form-input" value="'+esc(url)+'" onclick="this.select()" style="font-weight:700"><p style="margin-top:12px">Access code: <strong style="font-size:1.4rem">'+esc(code)+'</strong></p><div class="notice" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;margin-top:12px"><b>📋 For shared lab computers:</b> Students use the same laptop one after another — no need to log in/out. Student 1 finishes → sees score + <b>🔄 Next Student — Take Another Exam</b> button → clears previous score/timer → Student 2 enters their exam code + student ID on same device. Each gets own score and full timer. Share the link above via WhatsApp.</div>', '<a class="btn btn-outline" target="_blank" href="'+wa+'">Share on WhatsApp</a><button class="btn btn-primary" onclick="navigator.clipboard.writeText(\''+url+'\');toast(\'Link copied — share via WhatsApp\',\'success\')">Copy link</button>');
   },
+  /* =====================================================================
+     V12.60 — FLAGGED-QUESTION REVIEW & RE-SCORE
+     ---------------------------------------------------------------------
+     Candidates flag a question during the exam (🚩 on the runner). Those
+     flags now reach the server, and this is the tutor's queue:
+       • see every flagged question with how many candidates raised it
+       • read the candidate notes and the question text
+       • award the mark to EVERY attempt  (question was wrong / ambiguous)
+       • drop the question from every total (scoring error / off-syllabus)
+       • mark it reviewed with no score change (candidate was mistaken)
+     Awards are idempotent (sc_cbt_resolve_flag revokes the previous one) and
+     every attempt is re-scored server-side, then pushable to report cards.
+     ===================================================================== */
+  async flagReview(examId, code){
+    if(!sb) return;
+    let sum=null;
+    try{
+      const {data,error}=await sb.rpc('sc_cbt_flagged_summary',{p_exam_id:examId});
+      if(error) throw error;
+      sum=data;
+    }catch(e){
+      openModal('Flagged questions', '<div class="notice notice-error"><b>Flag review is not installed in this database yet.</b><p>Run <code>database/v12.60-expert-fix-pack.sql</code> in the Supabase SQL editor, then reload.</p><small>'+esc(e.message||e)+'</small></div>','<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+      return;
+    }
+    if(!sum||sum.ok===false){ openModal('Flagged questions','<div class="notice notice-error">'+esc((sum&&sum.error)||'Could not load flags.')+'</div>','<button class="btn btn-outline" onclick="closeModal()">Close</button>'); return; }
+    const qs=sum.questions||[];
+    const card=(q,i)=>{
+      const res=q.resolution;
+      const students=(q.students||[]).map(x=>'<li><b>'+esc(x.student||x.ref||'candidate')+'</b> <small style="color:#64748b">'+(x.ref?esc(x.ref)+' · ':'')+(x.score!=null?esc(x.score)+'/'+esc(x.total):'')+'</small></li>').join('');
+      return '<div class="card" style="margin-bottom:12px;border-left:5px solid '+(res?'#16a34a':'#f59e0b')+'">'+
+        '<div style="display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">'+
+          '<div style="flex:1;min-width:240px"><b>Question '+(q.index+1)+'</b> '+
+          '<span class="badge" style="background:'+(res?'#dcfce7':'#fef3c7')+';color:'+(res?'#166534':'#92400e')+'">'+
+          (res?'✅ resolved · '+esc(res.action):'🚩 '+q.flagged_by+' flag'+(q.flagged_by===1?'':'s'))+'</span>'+
+          '<div style="margin-top:6px;font-size:.9rem;color:#334155">'+esc(q.question||'(question text unavailable)')+'</div>'+
+          (students?'<ul style="margin:8px 0 0 18px;font-size:.85rem;line-height:1.6">'+students+'</ul>':'')+
+          (res?'<div style="margin-top:8px;font-size:.8rem;color:#166534">Resolved by '+esc(res.resolved_by_name||'staff')+
+              (res.note?' — “'+esc(res.note)+'”':'')+' · '+res.affected_results+' attempt(s) adjusted</div>':'')+
+          '</div>'+
+          '<div style="display:flex;flex-direction:column;gap:6px;min-width:190px">'+
+            '<button class="btn btn-sm btn-primary" onclick="CBTUI.flagResolve(\''+examId+'\','+q.index+',\'award_all\',\''+esc(code||'')+'\')">✅ Award the mark to everyone</button>'+
+            '<button class="btn btn-sm btn-outline" onclick="CBTUI.flagResolve(\''+examId+'\','+q.index+',\'drop\',\''+esc(code||'')+'\')">➖ Drop the question</button>'+
+            '<button class="btn btn-sm btn-outline" onclick="CBTUI.flagResolve(\''+examId+'\','+q.index+',\'none\',\''+esc(code||'')+'\')">👁 Reviewed, no change</button>'+
+            (res?'<button class="btn btn-sm btn-outline" style="color:#b91c1c;border-color:#fca5a5" onclick="CBTUI.flagRevoke(\''+examId+'\','+q.index+',\''+esc(code||'')+'\')">↩️ Undo resolution</button>':'')+
+          '</div>'+
+        '</div></div>';
+    };
+    const body = '<div class="notice" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;margin-bottom:12px">'+
+      '<b>How this works:</b> a candidate taps 🚩 on a question during the exam and can add a reason. Nothing is changed automatically — you decide once, and <b>every attempt of this exam</b> is re-scored consistently. Then use <b>Push to report cards</b> so the official marks follow.'+
+      '</div>'+
+      (qs.length? qs.map(card).join('') :
+        '<div class="card" style="text-align:center;padding:28px"><div style="font-size:2rem">🎉</div><p><b>No flagged questions.</b></p><p style="color:#64748b">Candidates have not raised any question for this exam.</p></div>');
+    openModal('🚩 Flagged questions — '+esc(code||''), body,
+      '<a class="btn btn-outline" href="#" onclick="closeModal();CBTUI.results(\''+examId+'\',\''+esc(code||'')+'\');return false;">← Back to results</a>'+
+      (qs.length?' <button class="btn btn-primary" onclick="closeModal();CBTUI.pushMySubject(\''+examId+'\')">🚀 Push updated scores to report cards</button>':''));
+  },
+  async flagResolve(examId, index, action, code){
+    const labels={award_all:'award the mark to EVERY attempt',drop:'remove this question from EVERY attempt\'s total',none:'mark it reviewed with no score change'};
+    if(!confirm('Confirm: '+labels[action]+' for question '+(Number(index)+1)+'?\n\nThis re-scores all attempts of this exam. You can undo afterwards.')) return;
+    let note='';
+    try{ note=(window.prompt('Optional note for the audit trail (shown on the result):','')||'').trim(); }catch(_){ }
+    try{
+      toast('Re-scoring every attempt…','info',3000);
+      const {data,error}=await sb.rpc('sc_cbt_resolve_flag',{p_exam_id:examId,p_question_index:Number(index),p_action:action,p_note:note});
+      if(error) throw error;
+      if(data&&data.ok===false) throw new Error(data.error||'Could not resolve');
+      toast('✅ '+(data.message||'Done.')+' ('+(data.affected_results||0)+' attempt(s) updated)','success',9000);
+      try{ if(window.CBTUI&&_removeCacheForExam){} }catch(_){}
+      this.flagReview(examId, code);
+    }catch(e){ toast('Flag resolution failed: '+(e.message||e),'danger',9000); }
+  },
+  async flagRevoke(examId, index, code){
+    if(!confirm('Undo the resolution for question '+(Number(index)+1)+'?\n\nScores already adjusted will NOT be reverted automatically — run Regrade afterwards to rebuild them from the stored answers.')) return;
+    try{
+      const {data,error}=await sb.rpc('sc_cbt_resolve_flag',{p_exam_id:examId,p_question_index:Number(index),p_action:'none',p_revoke:true});
+      if(error) throw error;
+      toast('Resolution revoked. Run Regrade to rebuild the original scores.','info',8000);
+      this.flagReview(examId, code);
+    }catch(e){ toast('Could not revoke: '+(e.message||e),'danger',8000); }
+  },
   async results(id,code){
     if(!sb)return;
     const { data } = await sb.from('cbt_results').select('*').eq('exam_id',id).order('score',{ascending:false});
@@ -1244,9 +1328,11 @@ window.CBTUI = {
     const pending=(data||[]).filter(r=>Number(r.ungraded_count||0)>0||String(r.grading_status||'')==='manual_review').length;
     const rows=(data||[]).map((r,i)=>{
       const needs=Number(r.ungraded_count||0)>0||String(r.grading_status||'')==='manual_review';
-      return '<tr><td>'+(i+1)+'</td><td>'+esc(r.student_name)+'</td><td>'+esc(r.student_id_ref||'-')+'</td><td><b>'+r.score+'/'+r.total+'</b></td><td>'+(r.percent||0)+'%</td><td>'+Number(r.correct_count||0)+' / '+Number(r.wrong_count||0)+' / '+Number(r.skipped_count||0)+'</td><td><span class="badge" style="background:'+(String(r.engine_version||'').startsWith('v5.1')?'#dcfce7':'#fee2e2')+'">'+esc(r.engine_version||'legacy')+'</span><br><small>'+(needs?'<span style="color:#b45309;font-weight:800">✍️ awaiting review'+(Number(r.ungraded_count||0)?' ('+r.ungraded_count+' Q)':'')+'</span>':esc(r.grading_status||'unknown'))+(r.reviewed_at?'<br>reviewed':'')+'</small></td><td>'+esc(r.cert_code||'-')+'</td><td>'+(needs?'<button class="btn btn-sm btn-primary" onclick="CBTUI.reviewResult(\''+r.id+'\')">✍️ Review</button>':(r.manual_awards&&Object.keys(r.manual_awards||{}).length?'<button class="btn btn-sm btn-outline" onclick="CBTUI.reviewResult(\''+r.id+'\')">✏️ Re-review</button>':''))+' <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fca5a5;margin-top:4px" onclick="CBTUI.allowRetake(\''+id+'\',\''+esc(r.student_id_ref||'')+'\',\''+esc(r.student_name||'')+'\')" title="Allow this ONE student to rewrite — deletes previous attempt, keeps others. For system malfunction, power loss, network failure, auto-submit, etc.">↩️ Allow retake</button></td></tr>';
+      const flagN=(Array.isArray(r.flagged_questions)?r.flagged_questions.length:0);
+      const flagCell=flagN?'<br><button class="btn btn-sm" style="margin-top:4px;background:#fef3c7;border:1px solid #f59e0b;color:#92400e;font-weight:800" onclick="CBTUI.flagReview(\''+id+'\',\''+esc(code||'')+'\')" title="This candidate flagged '+flagN+' question(s) — open the review queue">🚩 '+flagN+' flagged</button>':'';
+      return '<tr><td>'+(i+1)+'</td><td>'+esc(r.student_name)+'</td><td>'+esc(r.student_id_ref||'-')+'</td><td><b>'+r.score+'/'+r.total+'</b></td><td>'+(r.percent||0)+'%</td><td>'+Number(r.correct_count||0)+' / '+Number(r.wrong_count||0)+' / '+Number(r.skipped_count||0)+'</td><td><span class="badge" style="background:'+(String(r.engine_version||'').startsWith('v5.1')?'#dcfce7':'#fee2e2')+'">'+esc(r.engine_version||'legacy')+'</span><br><small>'+(needs?'<span style="color:#b45309;font-weight:800">✍️ awaiting review'+(Number(r.ungraded_count||0)?' ('+r.ungraded_count+' Q)':'')+'</span>':esc(r.grading_status||'unknown'))+(r.reviewed_at?'<br>reviewed':'')+flagCell+'</small></td><td>'+esc(r.cert_code||'-')+'</td><td>'+(needs?'<button class="btn btn-sm btn-primary" onclick="CBTUI.reviewResult(\''+r.id+'\')">✍️ Review</button>':(r.manual_awards&&Object.keys(r.manual_awards||{}).length?'<button class="btn btn-sm btn-outline" onclick="CBTUI.reviewResult(\''+r.id+'\')">✏️ Re-review</button>':''))+' <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#fca5a5;margin-top:4px" onclick="CBTUI.allowRetake(\''+id+'\',\''+esc(r.student_id_ref||'')+'\',\''+esc(r.student_name||'')+'\')" title="Allow this ONE student to rewrite — deletes previous attempt, keeps others. For system malfunction, power loss, network failure, auto-submit, etc.">↩️ Allow retake</button></td></tr>';
     }).join('');
-    openModal('Results — '+code, '<div style="margin-bottom:10px">'+(pending?'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-bottom:8px"><b>✍️ '+pending+' result(s) contain teacher-marked questions (essay / code / oral) awaiting your review.</b> Their percentages exclude those marks until you award them — click Review on each row.</div>':'')+'<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534;margin-bottom:8px">🔄 <b>Retake for malfunction?</b> If a registered student\'s device switched off, network failed, or system auto-submitted incomplete, click <b>↩️ Allow retake</b> for that student — it deletes ONLY that student\'s previous attempt for this exam (others kept). Student can then rewrite immediately. Also handles: power loss, browser crash, violation false positive, time expiry, roster not found, duplicate submit. See Guide below.</div>'+'<button class="btn btn-sm btn-outline" onclick="CBTUI.exportCSV(\''+id+'\')">⬇ Export CSV</button> <button class="btn btn-sm btn-primary" onclick="closeModal();CBTUI.regradeResults(\''+id+'\')">Regrade Saved Results with V5.1</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="closeModal();CBTUI.clearResults(\''+id+'\',\''+esc(code)+'\')">Export then clear results (ALL)</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.manageRetakes(\''+id+'\')">📋 View retake allowances</button> <button class="btn btn-sm btn-outline" style="background:#fff7ed;border-color:#fed7aa" onclick="CBTUI.recoverMissing(\''+id+'\',\''+esc(code)+'\')">🔍 Recover Missing</button><br><div style="margin-top:10px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px"><b>📤 Push to Report Card — Individual Teacher</b><p style="font-size:.82rem;color:#1e40af;margin:4px 0 6px">Push <b>only your subject\'s</b> scores to the official report card (uses your current subject filter). Works per-subject even inside multi-subject exams.</p><button class="btn btn-sm btn-primary" onclick="CBTUI.pushMySubject(\''+id+'\')">🚀 Push My Subject\'s Scores</button> <button class="btn btn-sm btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">📊 Bulk Push (All Subjects)</button> <span style="font-size:.78rem;color:#475569">Teacher can push his/her subject even inside bulk — subject teacher RLS enforced.</span></div></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>%</th><th>Correct/Wrong/Skipped</th><th>Engine / Status</th><th>Cert</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan=9>No submissions yet.</td></tr>')+'</tbody></table></div><div style="margin-top:12px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.85rem;color:#1e40af"><b>💡 10 scenarios where student needs retake (expert):</b><ol style="margin:6px 0 0 16px;line-height:1.6"><li><b>Power/system off</b> during exam, could not submit — allow retake deletes old, student rewrites</li><li><b>Auto-submitted incomplete</b> due to malfunction — same</li><li><b>Network loss</b> during submit — payload in pending queue with jittered retries, flushes on next online; if failed, allow retake</li><li><b>Browser crash</b> — draft auto-saved in localStorage cbt-draft-CODE, resume on return, or retake if lost</li><li><b>Violation auto-submit false positive</b> (tab switch) — teacher reviews violation_log, allows retake</li><li><b>Time expiry</b> with unfinished — teacher gives extra time via accommodations or retake</li><li><b>Not on roster</b> — teacher adds to cbt_roster or uses offline_override</li><li><b>Duplicate client_ref</b> — idempotency via unique index, teacher clears duplicate via retake</li><li><b>Attempt limit reached</b> but needs practice retake — same</li><li><b>Exam closed/archived mid-exam</b> — teacher reopens (is_open, is_archived) and allows retake</li></ol><p style="margin:6px 0 0">All handled robustly, self-contained, seamless — offline draft + pending queue + localStorage recovery + server idempotency + teacher-controlled retake.</p></div>');
+    openModal('Results — '+code, '<div style="margin-bottom:10px">'+(pending?'<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;margin-bottom:8px"><b>✍️ '+pending+' result(s) contain teacher-marked questions (essay / code / oral) awaiting your review.</b> Their percentages exclude those marks until you award them — click Review on each row.</div>':'')+'<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534;margin-bottom:8px">🔄 <b>Retake for malfunction?</b> If a registered student\'s device switched off, network failed, or system auto-submitted incomplete, click <b>↩️ Allow retake</b> for that student — it deletes ONLY that student\'s previous attempt for this exam (others kept). Student can then rewrite immediately. Also handles: power loss, browser crash, violation false positive, time expiry, roster not found, duplicate submit. See Guide below.</div>'+'<button class="btn btn-sm btn-outline" onclick="CBTUI.exportCSV(\''+id+'\')">⬇ Export CSV</button> <button class="btn btn-sm btn-primary" onclick="closeModal();CBTUI.regradeResults(\''+id+'\')">Regrade Saved Results with V5.1</button> <button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="closeModal();CBTUI.clearResults(\''+id+'\',\''+esc(code)+'\')">Export then clear results (ALL)</button> <button class="btn btn-sm btn-outline" onclick="CBTUI.manageRetakes(\''+id+'\')">📋 View retake allowances</button> <button class="btn btn-sm btn-outline" style="background:#fff7ed;border-color:#fed7aa" onclick="CBTUI.recoverMissing(\''+id+'\',\''+esc(code)+'\')">🔍 Recover Missing</button> <button class="btn btn-sm btn-primary" style="background:#b45309;border-color:#92400e" onclick="CBTUI.flagReview(\''+id+'\',\''+esc(code)+'\')">🚩 Flagged Questions (review &amp; re-score)</button><br><div style="margin-top:10px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px"><b>📤 Push to Report Card — Individual Teacher</b><p style="font-size:.82rem;color:#1e40af;margin:4px 0 6px">Push <b>only your subject\'s</b> scores to the official report card (uses your current subject filter). Works per-subject even inside multi-subject exams.</p><button class="btn btn-sm btn-primary" onclick="CBTUI.pushMySubject(\''+id+'\')">🚀 Push My Subject\'s Scores</button> <button class="btn btn-sm btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">📊 Bulk Push (All Subjects)</button> <span style="font-size:.78rem;color:#475569">Teacher can push his/her subject even inside bulk — subject teacher RLS enforced.</span></div></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>ID</th><th>Score</th><th>%</th><th>Correct/Wrong/Skipped</th><th>Engine / Status</th><th>Cert</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan=9>No submissions yet.</td></tr>')+'</tbody></table></div><div style="margin-top:12px;padding:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:.85rem;color:#1e40af"><b>💡 10 scenarios where student needs retake (expert):</b><ol style="margin:6px 0 0 16px;line-height:1.6"><li><b>Power/system off</b> during exam, could not submit — allow retake deletes old, student rewrites</li><li><b>Auto-submitted incomplete</b> due to malfunction — same</li><li><b>Network loss</b> during submit — payload in pending queue with jittered retries, flushes on next online; if failed, allow retake</li><li><b>Browser crash</b> — draft auto-saved in localStorage cbt-draft-CODE, resume on return, or retake if lost</li><li><b>Violation auto-submit false positive</b> (tab switch) — teacher reviews violation_log, allows retake</li><li><b>Time expiry</b> with unfinished — teacher gives extra time via accommodations or retake</li><li><b>Not on roster</b> — teacher adds to cbt_roster or uses offline_override</li><li><b>Duplicate client_ref</b> — idempotency via unique index, teacher clears duplicate via retake</li><li><b>Attempt limit reached</b> but needs practice retake — same</li><li><b>Exam closed/archived mid-exam</b> — teacher reopens (is_open, is_archived) and allows retake</li></ol><p style="margin:6px 0 0">All handled robustly, self-contained, seamless — offline draft + pending queue + localStorage recovery + server idempotency + teacher-controlled retake.</p></div>');
   },
   async allowRetake(examId, studentRef, studentName){
     if(!sb) return;

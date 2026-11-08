@@ -527,6 +527,30 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         
         <p style="margin:10px 0 0;font-size:.85rem;color:var(--gray-500)">Tip: click the <strong>ℹ️ Help</strong> button in the top bar, or the 💬 assistant, for the full explanation of any page.</p>
       </div></div>
+      <div class="card" style="margin-bottom:16px;border:2px solid #a7f3d0" data-admin-only id="fee-segment-card">
+        <h2 style="margin-top:0">🎯 Paid vs Debtors — one-click segmentation</h2>
+        <p style="color:var(--gray-600);font-size:.9rem;margin-top:0">Every figure below comes from the same engine as the dashboard's <b>💰 School Fees — Current Term</b> widget (<code>sc_student_fee_state</code>), so the two pages can never disagree. Pick a class and filter; then lock portal access for the debtors in one click.</p>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+          <div class="form-group" style="margin:0"><label>Class</label><select class="form-input" id="seg-class"><option value="">— whole school —</option></select></div>
+          <div class="form-group" style="margin:0"><label>Show</label><select class="form-input" id="seg-filter">
+            <option value="all">Everyone</option>
+            <option value="paid">✅ Fully paid only</option>
+            <option value="debtor">🔴 Debtors only (anything owing)</option>
+            <option value="partial">🟠 Part-paid only</option>
+            <option value="unbilled">⚪ No fee structure</option>
+          </select></div>
+          <button class="btn btn-primary" onclick="FeeSegment.load()">Load</button>
+          <button class="btn btn-outline" onclick="FeeSegment.exportCSV()">⬇ CSV</button>
+        </div>
+        <div id="seg-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
+        <div id="seg-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;display:none">
+          <button class="btn btn-sm btn-outline" style="border-color:#fca5a5;color:#b91c1c" onclick="FeeSegment.lock('portal',true)">🔒 Lock portal — debtors in view</button>
+          <button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534" onclick="FeeSegment.lock('portal',false)">🔓 Unlock portal — everyone in view</button>
+          <button class="btn btn-sm btn-outline" style="border-color:#fca5a5;color:#b91c1c" onclick="FeeSegment.lock('report',true)">🔒 Lock report cards — debtors in view</button>
+          <button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534" onclick="FeeSegment.lock('report',false)">🔓 Unlock report cards — everyone in view</button>
+        </div>
+        <div id="seg-out"><span class="pulse">Loading fee segmentation…</span></div>
+      </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary" onclick="CRUD.openForm('fees')" data-admin-only>+ Add new (admin/bursar)</button> <a class="btn btn-outline" href="payment-history.html" data-admin-only>🧾 Payment History & Bulk Receipts</a>
         <button class="btn btn-outline" onclick="CRUD.renderList('fees')">↻ Refresh</button>
@@ -681,6 +705,109 @@ document.addEventListener('DOMContentLoaded',()=>FM.init());FM.init();
 <script>
 /* V10.9 (#1): FEE LEDGER DOCTOR UI — renders the sc_fee_ledger_doctor scan,
    grouped by error kind, with per-row shortcuts into the fees table. */
+/* =====================================================================
+   V12.60 — PAID vs DEBTORS SEGMENTATION (fees.html)
+   ---------------------------------------------------------------------
+   Reads sc_fee_overview / sc_fee_roster (server-side truth, same engine as
+   the dashboard widget) and lets the bursar act on the filtered set with
+   ONE call to sc_set_student_locks_by_filter — no row-by-row clicking.
+   ===================================================================== */
+const FeeSegment={
+  rows:[], sum:null,
+  flag(v){ return Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); },
+  badge(s){
+    const map={paid:['#dcfce7','#166534','✅ Fully paid'],debtor:['#fee2e2','#991b1b','🔴 Debtor'],
+               partial:['#fef3c7','#92400e','🟠 Part-paid'],'no-bill':['#f1f5f9','#475569','⚪ No fee structure']};
+    const m=map[s]||map['no-bill'];
+    return '<span class="badge" style="background:'+m[0]+';color:'+m[1]+';font-weight:800">'+m[2]+'</span>';
+  },
+  async init(){
+    const sel=document.getElementById('seg-class'); if(!sel) return;
+    try{
+      const {data}=await sb.from('students').select('class').limit(5000);
+      const classes=[...new Set((data||[]).map(x=>String(x.class||'').trim()).filter(Boolean))].sort();
+      sel.innerHTML='<option value="">— whole school —</option>'+classes.map(c=>'<option value="'+this.esc(c)+'">'+this.esc(c)+'</option>').join('');
+    }catch(_){ }
+    this.load();
+  },
+  esc(s){ return (window.esc?esc(s):String(s==null?'':s)).toString().replace(/</g,'&lt;'); },
+  async load(){
+    const box=document.getElementById('seg-out'); if(!box) return;
+    const cls=(document.getElementById('seg-class')||{}).value||'';
+    const filter=(document.getElementById('seg-filter')||{}).value||'all';
+    box.innerHTML='<span class="pulse">Loading…</span>';
+    try{
+      const r=await sb.rpc('sc_fee_roster',{p_class:cls||null,p_term:null,p_session:null,p_filter:filter});
+      if(r.error) throw r.error;
+      const d=r.data||{};
+      if(d.ok===false) throw new Error(d.error||'Could not load');
+      this.rows=d.rows||[]; this.sum=d;
+      const money=(n)=>'₦'+this.flag(n);
+      document.getElementById('seg-summary').innerHTML=
+        '<span class="badge" style="background:#eff6ff;color:#1e40af;padding:8px 12px">Term: '+this.esc(d.term||'')+' · '+this.esc(d.session||'')+'</span>'+
+        '<span class="badge" style="background:#f1f5f9;color:#0f172a;padding:8px 12px">Students: <b>'+Number(d.students||0)+'</b></span>'+
+        '<span class="badge" style="background:#dcfce7;color:#166534;padding:8px 12px">Fully paid: <b>'+Number(d.fully_paid||0)+'</b></span>'+
+        '<span class="badge" style="background:#fee2e2;color:#991b1b;padding:8px 12px">Debtors: <b>'+Number(d.debtors||0)+'</b></span>'+
+        '<span class="badge" style="background:#fef3c7;color:#92400e;padding:8px 12px">Part-paid: <b>'+Number(d.partial||0)+'</b></span>'+
+        '<span class="badge" style="background:#f1f5f9;color:#0f172a;padding:8px 12px">Billed: <b>'+money(d.billed)+'</b></span>'+
+        '<span class="badge" style="background:#dcfce7;color:#166534;padding:8px 12px">Collected: <b>'+money(d.collected)+'</b></span>'+
+        '<span class="badge" style="background:#fee2e2;color:#991b1b;padding:8px 12px">Outstanding: <b>'+money(d.outstanding)+'</b></span>'+
+        '<span class="badge" style="background:#eef2ff;color:#3730a3;padding:8px 12px">Collection rate: <b>'+Number(d.collection_rate||0)+'%</b></span>';
+      const act=document.getElementById('seg-actions'); if(act) act.style.display='flex';
+      if(!this.rows.length){
+        box.innerHTML='<div class="notice">No students match this filter'+(filter!=='all'?' — try “Everyone”.':'')+'.</div>'; return;
+      }
+      box.innerHTML='<div class="table-wrap"><table><thead><tr><th>#</th><th>Student</th><th>Class</th><th>Bill</th><th>Paid</th><th>Balance</th><th>Arrears</th><th>TOTAL due</th><th>Status</th><th>Portal</th></tr></thead><tbody>'+
+        this.rows.map((x,i)=>'<tr>'+
+          '<td>'+(i+1)+'</td>'+
+          '<td><b>'+this.esc(x.student)+'</b><br><small style="color:#64748b">'+this.esc(x.admission_no||'')+'</small></td>'+
+          '<td>'+this.esc(x.class||'')+'</td>'+
+          '<td>'+money(x.bill)+'</td>'+
+          '<td style="color:#166534;font-weight:700">'+money(x.paid)+'</td>'+
+          '<td>'+money(x.balance)+'</td>'+
+          '<td style="color:'+(Number(x.arrears)>0?'#b91c1c':'#475569')+'">'+money(x.arrears)+'</td>'+
+          '<td><b style="color:'+(Number(x.total_due)>0?'#b91c1c':'#166534')+'">'+money(x.total_due)+'</b></td>'+
+          '<td>'+this.badge(x.status)+'</td>'+
+          '<td>'+(x.portal_locked?'<span style="color:#b91c1c;font-weight:800">🔒 locked</span>':'<span style="color:#166534">open</span>')+'</td>'+
+        '</tr>').join('')+'</tbody></table></div>'+
+        '<p style="font-size:.82rem;color:#64748b">Balance is this term&rsquo; bill minus payments; TOTAL due adds any previous-term arrears still owing. These are the exact numbers the dashboard widget shows.</p>';
+    }catch(e){
+      const msg=String(e.message||e);
+      box.innerHTML='<div class="notice notice-error">'+(/could not find the function|does not exist|schema cache/i.test(msg)
+        ? 'Run <code>database/v12.60-expert-fix-pack.sql</code> in Supabase to enable fee segmentation.'
+        : this.esc(msg))+'</div>';
+    }
+  },
+  lock(kind,locked){
+    const debtors=this.rows.filter(x=>Number(x.total_due)>0).map(x=>x.student_id).filter(Boolean);
+    const ids=locked?debtors:this.rows.map(x=>x.student_id).filter(Boolean);
+    if(!ids.length){ toast('Nothing to '+(locked?'lock':'unlock')+' in the current view.','warning',6000); return; }
+    const extra = locked ? ' Only students who still owe will be locked.' : '';
+    if(!confirm((locked?'LOCK':'UNLOCK')+' '+(kind==='report'?'report cards':'portal access')+' for '+ids.length+' student(s) in the current view?'+extra)) return;
+    if(!confirm((locked?'LOCK':'UNLOCK')+' '+(kind==='report'?'report cards':'portal access')+' for '+ids.length+' student(s) in the current view?'+extra)) return;
+
+    let msg='';
+    if(locked){ try{ msg=(window.prompt('Message these students/parents will see:','Portal access is paused until outstanding school fees are cleared. Please contact the bursary.')||'').trim(); }catch(_){ } }
+    toast('Updating '+ids.length+' student(s)…','info',3000);
+    sb.rpc('sc_set_student_locks_by_filter',{p_kind:kind,p_locked:!!locked,p_message:msg||null,p_class:null,p_only_debtors:!!locked,p_student_ids:ids,p_term:null,p_session:null})
+      .then(r=>{
+        if(r.error) throw r.error;
+        const d=r.data||{};
+        if(d.ok===false) throw new Error(d.error||'Failed');
+        toast((locked?'🔒 Locked':'🔓 Unlocked')+' '+Number(d.updated||ids.length)+' student(s).','success',7000);
+        this.load();
+      })
+      .catch(e=>toast('Could not update access: '+(e.message||e),'danger',9000));
+  },
+  exportCSV(){
+    if(!this.rows.length){ toast('Load the list first.','warning'); return; }
+    const head=['Student','Admission no','Class','Bill','Paid','Balance','Arrears','Total due','Status','Portal locked'];
+    const csv=[head.join(',')].concat(this.rows.map(x=>[x.student,x.admission_no,x.class,x.bill,x.paid,x.balance,x.arrears,x.total_due,x.status,x.portal_locked].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','))).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+    a.download='fee-segmentation-'+(this.sum&&this.sum.term||'term')+'.csv'; a.click();
+  }
+};
+document.addEventListener('DOMContentLoaded',function(){ try{ FeeSegment.init(); }catch(_){ } });
 const FeeDoctor={
   esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
   async run(heal){

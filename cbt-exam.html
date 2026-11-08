@@ -207,6 +207,25 @@ textarea.form-input{min-height:80px;resize:vertical}
     _done: false,
   };
 
+  /* V12.60 — a flag can carry a one-line reason. It is optional; a plain
+     tap still records the flag so the tutor sees the question in the
+     review queue. */
+  Exam.toggleFlag = function(i){
+    i = Number(i);
+    this.flags = this.flags || {}; this.flagNotes = this.flagNotes || {};
+    const next = !this.flags[i];
+    this.flags[i] = next;
+    if (!next) { delete this.flagNotes[i]; this.render(); return; }
+    const q = this.qs()[i] || {};
+    const label = 'Q' + (i + 1) + (q.subject || q.section ? ' · ' + (q.subject || q.section) : '');
+    let note = '';
+    try {
+      note = window.prompt(label + ' — why are you flagging this question?\n(e.g. "two correct options", "image did not load", "typo", "not in the syllabus")\n\nLeave blank to flag without a note.', '') || '';
+    } catch (_) { note = ''; }
+    if (note.trim()) this.flagNotes[i] = note.trim().slice(0, 240);
+    this.render();
+    if (window.toast) toast('🚩 Flagged for your tutor' + (note.trim() ? ' — "' + note.trim().slice(0,60) + '"' : '') + '. Keep answering; flagged questions are reviewed after marking.', 'success', 5000);
+  };
   Exam.qs = function(){ return (this.data && (this.data._questions || this.data.questions || this.data.csv_data)) || []; };
   Exam.param = function(){
     const u = new URLSearchParams(location.search);
@@ -469,7 +488,7 @@ textarea.form-input{min-height:80px;resize:vertical}
           const a = btn.dataset.act;
           if (a === 'prev-in') this.prevInSubject();
           else if (a === 'next-in') this.nextInSubject();
-          else if (a === 'flag') { this.flags[this.idx] = !this.flags[this.idx]; this.render(); }
+          else if (a === 'flag') { this.toggleFlag(this.idx); }
           else if (a === 'legend') this.showLegend();
           else if (a === 'submit') this.confirmSubmit();
         });
@@ -501,7 +520,7 @@ textarea.form-input{min-height:80px;resize:vertical}
             const btn=this.root().querySelector('[data-act="prev-in"]');
             if(btn && !btn.disabled){ this.prevInSubject(); e.preventDefault(); }
           }else if(key==='R'){
-            this.flags[this.idx]=!this.flags[this.idx];
+            this.toggleFlag(this.idx);
             this.render();
             e.preventDefault();
           }else if(key==='S'){
@@ -579,7 +598,24 @@ textarea.form-input{min-height:80px;resize:vertical}
       this.root().innerHTML = '<div class="card"><div class="notice notice-error">⚠ Database not configured. Open <code>assets/js/config.js</code> and add your Supabase URL and anon key.</div></div>';
       return;
     }
-    const code = (($('e-code')||{}).value||this._pendingCode||'').toUpperCase().trim(),canonicalCode=code.replace(/[^A-Z0-9]/g,''),admission=(($('e-admission')||{}).value||'').trim();
+    let code = (($('e-code')||{}).value||this._pendingCode||'').toUpperCase().trim();
+    /* V12.60 — LEGACY-LINK SELF-HEAL.
+       Old Take-Assignment links, WhatsApp forwards and printed QR codes carry
+       the exam UUID instead of the 6-character code. Resolve it to the real
+       code here so the candidate never sees "exam_not_found". */
+    if (/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/.test(code) || /^[0-9A-F]{32}$/.test(code)) {
+      try {
+        const r = await window.sb.rpc('sc_cbt_resolve_code', { p_ref: code });
+        const resolved = String((r && r.data) || '').trim();
+        if (resolved) {
+          code = resolved.toUpperCase();
+          const fld = $('e-code'); if (fld) fld.value = code;
+          try { history.replaceState(null, '', '?code=' + encodeURIComponent(code)); } catch (_) {}
+          toast('Recovered exam code ' + code + ' from an old link.', 'success', 5000);
+        }
+      } catch (_) { /* fall through — the server-side v7 getter also resolves ids */ }
+    }
+    const canonicalCode=code.replace(/[^A-Z0-9]/g,''),admission=(($('e-admission')||{}).value||'').trim();
     let nm=(($('e-open-name')||{}).value||'').trim();if(anon&&!nm)nm='Anonymous-'+Math.random().toString(36).slice(2,7).toUpperCase();
     this.student={name:nm,id_ref:admission,class:(($('e-open-class')||{}).value||'').trim(),anonymous:!!anon};
     if(!code){toast('Enter the exam code.','warning');return;}
@@ -596,8 +632,13 @@ textarea.form-input{min-height:80px;resize:vertical}
 
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const r = await window.sb.rpc('cbt_get_public_exam_v6', { p_code: canonicalCode, p_admission_no: admission });
+        const r = await window.sb.rpc('cbt_get_public_exam_v7', { p_code: canonicalCode, p_admission_no: admission });
         data = r.data; error = r.error;
+        /* v7 is an optional wrapper — older installs simply do not have it. */
+        if (error && /could not find the function|does not exist|schema cache/i.test(String(error.message || error))) {
+          const r6 = await window.sb.rpc('cbt_get_public_exam_v6', { p_code: canonicalCode, p_admission_no: admission });
+          data = r6.data; error = r6.error;
+        }
       } catch (e) { error = e; }
       if (data && !error) break; // includes explicit not-open/not-found diagnostics
       if(error && /cbt_get_public_exam_v6|schema cache|function/i.test(String(error.message||error))) break;
@@ -650,6 +691,7 @@ textarea.form-input{min-height:80px;resize:vertical}
     }
     this.answers = new Array(this.qs().length).fill(null);
     this.flags = {};
+    this.flagNotes = {};
     this._done = false;
     this.clientRef = (window.crypto && typeof window.crypto.randomUUID === 'function') ? window.crypto.randomUUID() : ('cbt-'+Date.now()+'-'+Math.random().toString(36).slice(2,10));
     // Restore a recent draft by ORIGINAL question index, so randomisation and
@@ -828,7 +870,16 @@ textarea.form-input{min-height:80px;resize:vertical}
         index: (q._orig_index != null ? q._orig_index : i),
         subject: (q.section || q.subject || 'General'),
         answer: this.answers[i]
-      }))
+      })),
+      /* V12.60: question flags travel WITH the submission. Previously they
+         lived only in memory, so a tutor could never see which question a
+         candidate had trouble with. `flagged_questions` is the ORIGINAL
+         question index list; `flag_notes` carries the candidate's reason. */
+      flagged_questions: Object.keys(this.flags || {})
+        .filter(k => this.flags[k])
+        .map(k => { const q = this.qs()[Number(k)]; return (q && q._orig_index != null) ? q._orig_index : Number(k); })
+        .filter(n => Number.isFinite(n)),
+      flag_notes: (this.flagNotes || {})
     };
     let resp = null;
     for (let attempt = 0; attempt < 6; attempt++) {
@@ -841,6 +892,18 @@ textarea.form-input{min-height:80px;resize:vertical}
       await new Promise(r => setTimeout(r, wait));
     }
     const confirmed=!!(resp&&!resp.error&&resp.data&&resp.data.saved&&String(resp.data.engine_version||'').startsWith('v5.1'));
+    /* V12.60: push the candidate's question flags to the server as soon as the
+       attempt is confirmed, so tutors see them in the review queue. */
+    if (confirmed && Object.keys(this.flags||{}).some(k=>this.flags[k])) {
+      try {
+        await window.sb.rpc('sc_cbt_save_flags', {
+          p_exam_id: this.data.id, p_client_ref: this.clientRef,
+          p_flagged: payload.flagged_questions || [],
+          p_notes: payload.flag_notes || {},
+          p_admission_no: payload.student_id_ref || ''
+        });
+      } catch (e) { console.warn('Flag sync queued locally:', e && e.message || e); }
+    }
     const terminalError=resp&&resp.data&&['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty','wrong_class','not_on_roster','invalid_admission','admission_required'].includes(resp.data.error);
     if (!confirmed && !terminalError) {
       try { const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]'); q.push(payload); localStorage.setItem('cbt-pending-queue', JSON.stringify(q.slice(-10))); } catch (_) {}

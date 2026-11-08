@@ -10,11 +10,13 @@
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Digital ID Cards • God of Seed Academy">
-<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:description" content="God of Seed Academy — Comprehensive school management platform">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -59,11 +61,22 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 @media(max-width:900px){.app-sidebar,.app-layout.floating .app-sidebar{position:fixed!important;left:0;top:0;bottom:0;width:min(86vw,310px)!important;height:100vh!important;margin:0!important;border-radius:0!important;transform:translateX(-100%);transition:transform .25s ease;box-shadow:0 20px 40px rgba(0,0,0,.22);z-index:100}.app-sidebar.open{transform:translateX(0)}.app-layout.topnav .app-sidebar,.app-layout.cardhub .app-sidebar,.app-layout.mega-menu .app-sidebar,.app-layout.tabbed .app-sidebar,.app-layout.dashboard-pro .app-sidebar{flex-direction:column;align-items:stretch}.app-layout.topnav .app-brand,.app-layout.cardhub .app-brand,.app-layout.mega-menu .app-brand,.app-layout.tabbed .app-brand,.app-layout.dashboard-pro .app-brand{width:auto;min-width:0;border-right:none;border-bottom:1px solid #e2e8f0}.app-layout.topnav .app-nav,.app-layout.cardhub .app-nav,.app-layout.mega-menu .app-nav,.app-layout.tabbed .app-nav,.app-layout.dashboard-pro .app-nav{display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden}.app-layout.topnav .app-nav a,.app-layout.cardhub .app-nav a,.app-layout.mega-menu .app-nav a,.app-layout.tabbed .app-nav a,.app-layout.dashboard-pro .app-nav a{display:grid;grid-template-columns:32px minmax(0,1fr);justify-items:stretch;text-align:left;min-height:42px;font-size:.875rem}.app-content{padding:16px}.app-topbar{padding:12px 14px;gap:10px}.app-topbar .mobile-toggle{display:inline-flex;align-items:center;justify-content:center;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:10px;width:40px;height:40px;font-size:1.2rem;cursor:pointer}.user-chip{max-width:150px;overflow:hidden}.user-chip strong{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 @media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
 </style>
-    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+
+    <meta name="description" content="God of Seed Academy — Digital ID Cards. Comprehensive school management platform.">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
+    <meta name="robots" content="index, follow">
     <link rel="canonical" href="./idcards.html">
+    <meta property="og:title" content="Digital ID Cards • God of Seed Academy">
+    <meta property="og:description" content="God of Seed Academy — Digital ID Cards. Comprehensive school management platform.">
     <meta property="og:url" content="./idcards.html">
-</head>
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Digital ID Cards • God of Seed Academy">
+    <meta name="twitter:description" content="God of Seed Academy — Digital ID Cards. Comprehensive school management platform.">
+    <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
+  </head>
 <body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
 
 <div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
@@ -498,8 +511,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         </div>
         <div class="grid grid-2">
           <div class="form-group"><label>Pick a <span id="ic-pick-label">student</span></label><select class="form-select" id="ic-student" onchange="ICUI.pick(this.value)"><option value="">— choose —</option></select></div>
+          <div class="form-group"><label>Search name / admission no <small style="color:var(--gray-500)">(scopes the PDF)</small></label><input class="form-input" id="ic-search" placeholder="e.g. Ada or GoSA/2024/001" oninput="ICUI.updatePdfLabel()"></div>
           <div class="form-group"><label>…or enter manually</label><input class="form-input" id="ic-name" placeholder="Full name" oninput="ICUI.render()"></div>
-          <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><select class="form-select" id="ic-class" onchange="ICUI.render()"><option value="">— All classes — whole school —</option></select><small style="color:var(--gray-500)">Select a class to filter bulk print — NOT printed on card (lifetime card). Choose "All classes" for whole school.</small></div>
+          <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><select class="form-select" id="ic-class" onchange="ICUI.render();ICUI.updatePdfLabel()"><option value="">— All classes — whole school —</option></select><small style="color:var(--gray-500)">Select a class to filter bulk print — NOT printed on card (lifetime card). Choose "All classes" for whole school.</small></div>
           <div class="form-group"><label>ID / Admission / Staff no</label><input class="form-input" id="ic-id" placeholder="(auto)" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Gender</label><input class="form-input" id="ic-gender" placeholder="male/female" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Phone</label><input class="form-input" id="ic-phone" placeholder="0803..." oninput="ICUI.render()"></div>
@@ -510,24 +524,27 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         <div class="card" style="background:#f8fafc;border:1px solid #cbd5e1;margin:12px 0">
           <h3 style="margin:0 0 10px">📐 Finished card size & print layout</h3>
           <div class="grid grid-3">
-            <div class="form-group"><label>Standard card size</label><select class="form-select" id="ic-size-preset" onchange="ICUI.applyCardSize()"><option value="id1">ISO/IEC 7810 ID-1 — 85.60 × 53.98 mm (plastic card)</option><option value="id2">ISO ID-2 — 105 × 74 mm</option><option value="id3">ISO ID-3 — 125 × 88 mm</option><option value="custom">Custom size (mm)</option></select></div>
+            <div class="form-group"><label>Standard finished size</label><select class="form-select" id="ic-size-preset" onchange="ICUI.applyCardSize()"><option value="id1">ISO/IEC 7810 ID-1 — 85.60 × 53.98 mm (plastic card)</option><option value="id2">ISO ID-2 — 105 × 74 mm</option><option value="id3">ISO ID-3 — 125 × 88 mm</option><option value="custom">Custom size (mm)</option></select></div>
             <div class="form-group"><label>Card orientation</label><select class="form-select" id="ic-card-orientation" onchange="ICUI.applyCardSize()"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
             <div class="form-group"><label>Paper size</label><select class="form-select" id="ic-paper-size" onchange="ICUI.applyCardSize()"><option value="A4">A4</option><option value="Letter">US Letter</option><option value="custom">Custom sheet size</option></select></div>
             <div class="form-group"><label>Paper orientation</label><select class="form-select" id="ic-paper-orientation"><option value="portrait">Portrait sheet</option><option value="landscape">Landscape sheet</option></select></div>
-            <div class="form-group"><label>Front/back output</label><select class="form-select" id="ic-print-mode"><option value="paired">One student per page — front + back together</option><option value="duplex">Duplex plastic — consecutive front/back pages per student</option></select></div>
+            <div class="form-group"><label>Front/back output</label><select class="form-select" id="ic-print-mode"><option value="paired">One student per page — front + back together</option><option value="duplex">Plastic duplex — consecutive front/back pages per student</option></select></div>
             <div class="form-group"><label>Pair placement</label><select class="form-select" id="ic-pair-layout"><option value="auto">Auto-fit on sheet</option><option value="side">Side-by-side</option><option value="stack">Stacked</option></select></div>
-            <div class="form-group" id="ic-custom-size-wrap" style="display:none"><label>Custom width (mm)</label><input class="form-input" id="ic-card-width-mm" type="number" min="30" max="250" step="0.1" value="85.6"></div>
-            <div class="form-group" id="ic-custom-height-wrap" style="display:none"><label>Custom height (mm)</label><input class="form-input" id="ic-card-height-mm" type="number" min="30" max="250" step="0.1" value="53.98" oninput="ICUI.updateCardSizeLabel()"></div>
+            <div class="form-group" id="ic-custom-size-wrap" style="display:none"><label>Card width (mm)</label><input class="form-input" id="ic-card-width-mm" type="number" min="30" max="250" step="0.1" value="85.6" oninput="ICUI.updateCardSizeLabel()"></div>
+            <div class="form-group" id="ic-custom-height-wrap" style="display:none"><label>Card height (mm)</label><input class="form-input" id="ic-card-height-mm" type="number" min="30" max="250" step="0.1" value="53.98" oninput="ICUI.updateCardSizeLabel()"></div>
             <div class="form-group" id="ic-custom-paper-width-wrap" style="display:none"><label>Custom sheet width (mm)</label><input class="form-input" id="ic-paper-width-mm" type="number" min="100" max="500" step="1" value="210"></div>
             <div class="form-group" id="ic-custom-paper-height-wrap" style="display:none"><label>Custom sheet height (mm)</label><input class="form-input" id="ic-paper-height-mm" type="number" min="100" max="500" step="1" value="297"></div>
             <label style="display:flex;align-items:center;gap:8px;margin:8px 0"><input type="checkbox" id="ic-trim-guides" checked> Show cut/trim guides</label>
           </div>
-          <div class="notice" style="margin:8px 0 0;font-size:.82rem">Finished card dimensions are physical millimetres; Landscape/Portrait rotates the same size. ISO ID-1 is the common plastic-card size (85.60 × 53.98 mm); nominal thickness is defined by the card stock, not this printer page. Use paired sheets for paper/cutting, or consecutive front/back pages for a duplex card printer. For portrait cards choose the Vertical design template; the card's physical orientation remains independently controlled. Test printer flip-edge/alignment on scrap stock first.</div>
+          <div id="ic-size-summary" class="notice" style="margin:8px 0 0;font-size:.82rem">Finished card: ISO ID-1 · 85.60 × 53.98 mm. Landscape/Portrait rotates the same physical standard.</div>
+          <p style="font-size:.8rem;color:#475569;margin:8px 0 0">The output uses fixed physical millimetres and one student per print unit, so pages cannot flow into the next student. ISO/IEC 7810 ID-1 is the common plastic-card format. Card stock thickness/material is a printer/media choice; nominal ID-1 plastic stock is about 0.76 mm. Use paired-sheet mode for paper/cutting, or duplex mode for a two-sided card printer. Print a test on scrap first and confirm the printer's flip edge.</p>
         </div>
-        <div class="notice" style="margin-bottom:10px;font-size:.82rem">🪪 <b>Lifetime card:</b> student cards omit class and expiry (one physical card serves the student's studentship); staff cards omit expiry. Each printed student has an isolated page layout, with both sides kept together or as an explicit duplex page pair—never flowed into another student's card.</div>
+        <div class="notice" style="margin-bottom:10px;font-size:.82rem">🪪 <b>Lifetime card:</b> student cards omit class and expiry; staff cards omit expiry. Front and back stay together in the selected paired or duplex output, and every student starts on a fresh sheet.</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
+          <button class="btn btn-primary" onclick="ICUI.pdfAll()" title="Vector PDF at exact millimetres — opens in CorelDRAW, Illustrator, InDesign and Word with editable text">⬇ Download PDF <span id="ic-pdf-label">(all)</span></button>
+          <button class="btn btn-outline" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
           <button class="btn btn-outline" onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
+          <button class="btn btn-outline" onclick="ICUI.downloadHtml()" title="HTML proof sheet — for archiving or emailing, never for print production">⬇ HTML proof</button>
         </div>
       </div>
       <div id="ic-preview" style="display:flex;justify-content:center"></div>
@@ -548,11 +565,16 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 <script src="assets/js/site-help.js"></script>
 <script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/qrcode-generator.js"></script>
+<script src="assets/js/sc-pdf-fonts.js"></script>
+<script src="assets/js/idcard-pdf.js"></script>
+<script src="assets/js/idcard-pdf.selftest.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/theme-manager.js"></script>
 <script src="assets/js/legibility.js"></script>
 <script src="assets/js/crud.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script src="assets/js/analytics.js"></script>
 <script src="assets/js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(reg => { Notifications.init(sb, reg); Voting.init(sb); });
@@ -594,8 +616,6 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         ICUI.all=data||[]; ICUI.loadClasses(); const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
         if(!adminTier&&ICUI.all.length){ setTimeout(()=>{ sel.value=JSON.stringify(ICUI.all[0]); ICUI.pick(sel.value); },100); }
       } else {
-        /* V11.6: role-scoped like the field-proven template — parents see only
-           linked children, students only themselves; staff/admin see all. */
         const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.SCHOOL_USER && SCHOOL_USER.role) || '';
         const userId = (window.SC_PROFILE && SC_PROFILE.id) || (window.SCHOOL_USER && SCHOOL_USER.id) || null;
         let query = sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').order('full_name').limit(5000);
@@ -611,7 +631,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         }
         await ICUI.fillPhotos(data||[]);
         ICUI.all=data||[]; ICUI.loadClasses(); const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
-        // Auto-select first student/child for parents or students (role declared above)
+        // Auto-select an actual linked child/self, never a sample object.
         if (ICUI.all.length > 0 && (role === 'parent' || role === 'student')) {
           setTimeout(() => {
             sel.value = JSON.stringify(ICUI.all[0]);
@@ -620,7 +640,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         }
       }
     }catch(e){ console.warn('ID-card list load failed:', e); if(typeof toast==='function')toast('Could not load list. You can still type details manually and print.', 'warning', 7000); }
-    this.loaded=true; this.render();
+    this.loaded=true; this.render(); try{this.updatePdfLabel();}catch(_){}
   },
   /* V11.7 (#3): AUTO PHOTO — people set their photo on My Profile
      (profiles.photo_url). Any student/staff row without its own photo_url
@@ -709,6 +729,195 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   updateCardSizeLabel(){
     const preset=document.getElementById('ic-size-preset'),w=Number(document.getElementById('ic-card-width-mm')?.value),h=Number(document.getElementById('ic-card-height-mm')?.value),out=document.getElementById('ic-size-summary');
     if(out)out.textContent='Finished card: '+(preset&&preset.value==='custom'?'Custom':'ISO '+String(preset&&preset.value||'ID-1').toUpperCase())+' · '+(Number.isFinite(w)?w.toFixed(2):'—')+' × '+(Number.isFinite(h)?h.toFixed(2):'—')+' mm. Card size is held in physical millimetres; printer scaling must be set to 100%.';
+  },
+  /* =======================================================================
+     V12.60 — CORELDRAW-SAFE PDF EXPORT
+     -----------------------------------------------------------------------
+     Why this replaced print-to-PDF: the browser's own PDF writer emits
+     transparency groups, soft masks, patterns, shadings and ICC colours.
+     CorelDRAW's importer hangs or force-closes on a multi-page bulk ID-card
+     file made that way — the "PDF crashes CorelDRAW" report.
+     IDCardPDF (assets/js/idcard-pdf.js) writes a plain PDF 1.3 file with an
+     embedded TrueType font, DeviceRGB fills, no transparency and no ICC
+     profiles, so it opens in CorelDRAW, Illustrator, InDesign, Word, Acrobat
+     and every browser, with text still editable.
+     ======================================================================= */
+  brand(){
+    /* Mirror exactly what the on-screen card uses (Super.idcard reads
+       window.SCHOOL.primary / .accent / .shortName), so the PDF is visually
+       identical to the preview the admin has just approved. */
+    const S=window.SCHOOL||{};
+    const pick=(v,f)=>String(v||'').trim()||f;
+    const pcEl=document.getElementById('ic-pc'), acEl=document.getElementById('ic-ac');
+    /* Fallback chain for the school name: config → <title> suffix → brand text.
+       A generated site always has SCHOOL.name; this only matters when the page
+       is opened standalone (proofing, a broken config, an offline cache). */
+    const titleSchool = (() => {
+      const t = String(document.title || '');
+      const parts = t.split(/[•|]/).map(x => x.trim()).filter(Boolean);
+      return parts.length > 1 ? parts[parts.length - 1] : '';
+    })();
+    const brandSchool = (() => {
+      const el = document.querySelector('.app-brand strong, .app-brand h1, .brand-name');
+      return el ? String(el.textContent || '').trim() : '';
+    })();
+    const schoolName = pick(S.name, titleSchool || brandSchool || 'School');
+    const initials = schoolName.split(/\s+/).filter(w=>/[A-Za-z]/.test(w)).map(w=>w[0]).join('').slice(0,5).toUpperCase();
+    return {
+      name: schoolName,
+      shortName: pick(S.shortName||S.short_name||S.acronym, initials),
+      motto: pick(S.motto, ''),
+      address: pick(S.address, ''),
+      phone: pick(S.phone, ''),
+      email: pick(S.email, ''),
+      primary: pick((pcEl&&pcEl.value)||S.primary, '#1e3a8a'),
+      accent: pick((acEl&&acEl.value)||S.accent, '#0ea5e9')
+    };
+  },
+  /* photo_url -> Image element (crossOrigin safe, resolved before layout) */
+  async loadPhoto(url){
+    if(!url) return null;
+    try{
+      const img=new Image(); img.crossOrigin='anonymous'; img.decoding='sync';
+      await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src=url; });
+      return img;
+    }catch(e){ console.warn('ID-card photo skipped:', url, e&&e.message); return null; }
+  },
+  /* QR for the verification line — uses the bundled qrcode-generator */
+  makeQr(text){
+    try{
+      if(!text||!window.qrcode) return null;
+      const qr=qrcode(0,'M'); qr.addData(String(text)); qr.make();
+      const n=qr.getModuleCount(), quiet=4, size=(n+quiet*2)*4;
+      const c=document.createElement('canvas'); c.width=c.height=size;
+      const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,size,size); ctx.fillStyle='#000';
+      for(let r=0;r<n;r++)for(let col=0;col<n;col++) if(qr.isDark(r,col)) ctx.fillRect((col+quiet)*4,(r+quiet)*4,4,4);
+      return c;
+    }catch(e){ console.warn('QR skipped:', e&&e.message); return null; }
+  },
+  /* Build the exact job list the PDF engine needs. */
+  async pdfCards(people,opts){
+    opts=opts||{};
+    const S=window.SCHOOL||{}, self=location.origin+location.pathname;
+    const out=[];
+    for(const person of (people||[])){
+      const photo=await this.loadPhoto(person.photo_url);
+      const verify=S.slug? (location.origin+'/verify.html?id='+encodeURIComponent(person.admission_no||person.staff_no||'')) : self;
+      const qr=this.makeQr(verify);
+      out.push({
+        front:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
+                class:person.class, arm:person.arm, date_of_birth:person.date_of_birth,
+                blood_group:person.blood_group, type:person.type||this.kind, role:person.role,
+                department:person.department, phone:person.phone, photo:photo, qr:qr },
+        back:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
+               type:person.type||this.kind }
+      });
+    }
+    return out;
+  },
+  pdfLayout(cfg){
+    if(cfg.mode==='duplex') return 'single';
+    return cfg.layout==='stack' ? 'stack' : (cfg.layout==='side' ? 'side' : 'single');
+  },
+  async pdfAll(){
+    let cfg; try{ cfg=this.printConfig(); }catch(e){ toast(e.message||e,'warning',8000); return false; }
+    if(!window.IDCardPDF || !IDCardPDF.available()){
+      toast('The PDF engine did not load. Reload the page, or use Print as a fallback.','warning',8000);
+      return false;
+    }
+    const to=this.tplOpts();
+    const filter=this.currentFilter();
+    let source=(this.all&&this.all.length)?this.all:(this.cur&&this.cur.id?[this.cur]:[this.person()]);
+    source=this.applyFilter(source,filter,true);
+    if(!source.length) return false;
+    const label=this.filterLabel(filter);
+    const btn=document.querySelector('[onclick="ICUI.pdfAll()"]');
+    const restore=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Building PDF…'; }
+    try{
+      const people=source.map(x=>this.recordPerson(x,to));
+      const cards=await this.pdfCards(people);
+      const bytes=IDCardPDF.build(cards,{
+        widthMm:cfg.width, heightMm:cfg.height,
+        pageWidthMm:(cfg.paperOrientation==='landscape'?this.paperDims(cfg.paper)[1]:this.paperDims(cfg.paper)[0]),
+        pageHeightMm:(cfg.paperOrientation==='landscape'?this.paperDims(cfg.paper)[0]:this.paperDims(cfg.paper)[1]),
+        marginMm:cfg.margin, gapMm:cfg.gap, layout:this.pdfLayout(cfg), trim:cfg.trim,
+        brand:this.brand(), title:'ID Cards — '+label,
+        creator:(window.SCHOOL&&SCHOOL.name)||'School Connect'
+      });
+      const name=(this.kind==='staff'?'staff':'student')+'-id-cards-'+
+                 String(label).replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()+'-'+
+                 new Date().toISOString().slice(0,10)+'.pdf';
+      const blob=new Blob([bytes],{type:'application/pdf'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url; a.download=name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),10000);
+      toast('PDF ready — '+cards.length+' card'+(cards.length===1?'':'s')+', '+(bytes.length/1024).toFixed(0)+
+            ' KB. Text is editable and every card is at exact size.','success',8000);
+      if(window.CRUD&&CRUD.audit) try{ CRUD.audit('idcards','download-pdf',label,'',{count:cards.length}); }catch(_){}
+      return true;
+    }catch(e){
+      console.error('ID-card PDF build failed',e);
+      toast('PDF build failed: '+(e.message||e)+' — the Print button still works.','error',10000);
+      return false;
+    }finally{ if(btn){ btn.disabled=false; btn.innerHTML=restore; } }
+  },
+  updatePdfLabel(){
+    const el=document.getElementById('ic-pdf-label'); if(!el) return;
+    const f=this.currentFilter();
+    let n=null;
+    try{ n=this.applyFilter((this.all&&this.all.length)?this.all:[],f,false).length || null; }catch(_){}
+    el.textContent='('+(n!=null?n+' · ':'')+this.filterLabel(f)+')';
+  },
+  paperDims(paper){
+    if(paper==='Letter') return [215.9,279.4];
+    if(paper==='custom'){ const n=id=>Number(document.getElementById(id)?.value)||210; return [n('ic-paper-width-mm'),n('ic-paper-height-mm')]; }
+    return [210,297];
+  },
+  /* one place that decides WHICH people a print/PDF run covers */
+  currentFilter(){
+    const el=document.getElementById('ic-class');
+    const cls=String((el&&el.value)||'').trim();
+    const q=String((document.getElementById('ic-search')&&document.getElementById('ic-search').value)||'').trim().toLowerCase();
+    return { class:cls, q:q };
+  },
+  filterLabel(f){
+    if(f&&f.q) return 'search “'+f.q+'”';
+    if(f&&f.class) return f.class;
+    return this.kind==='staff'?'all staff':'whole school';
+  },
+  applyFilter(source,f,warn){
+    let list=source||[];
+    if(f&&f.class){
+      const cls=f.class.toLowerCase();
+      const hit=list.filter(x=>this.kind==='staff'
+        ? [x.department,x.staff_type,x.role].some(v=>String(v||'').toLowerCase()===cls||String(v||'').toLowerCase().includes(cls))
+        : String(x.class||'').toLowerCase()===cls||String(x.class||'').toLowerCase().startsWith(cls));
+      if(hit.length) list=hit;
+      else if(warn){ toast('No '+(this.kind==='staff'?'staff':'students')+' found for “'+f.class+'”. Pick another filter.','warning',7000); return []; }
+    }
+    if(f&&f.q){
+      const q=f.q;
+      const hit=list.filter(x=>[x.full_name,x.admission_no,x.staff_no,x.class,x.role,x.department]
+        .some(v=>String(v||'').toLowerCase().includes(q)));
+      if(hit.length) list=hit;
+      else if(warn){ toast('Nothing matched “'+f.q+'”.','warning',6000); return []; }
+    }
+    return list;
+  },
+  /* keep the old HTML proof sheet, but make its purpose unmistakable */
+  downloadHtml(){
+    const to=this.tplOpts();
+    let source=(this.all&&this.all.length)?this.all:(this.cur&&this.cur.id?[this.cur]:[this.person()]);
+    source=this.applyFilter(source,this.currentFilter(),true);
+    if(!source.length) return false;
+    const people=source.map(x=>this.recordPerson(x,to));
+    const html=people.map(p=>'<div style="page-break-inside:avoid;margin:0 0 8mm">'+
+      this.cardHtml(p)+this.fallbackBackHtml(p)+'</div>').join('');
+    this.printHtml('<h1 style="font-family:system-ui;font-size:12pt">ID cards — proof sheet</h1>'+
+      '<p style="font-family:system-ui;font-size:9pt;color:#475569">Visual proof only. Use “Download PDF” for print production.</p>'+html,
+      'ID Cards — proof sheet');
+    return true;
   },
   printConfig(){
     const n=id=>Number(document.getElementById(id)?.value),settings={width:n('ic-card-width-mm'),height:n('ic-card-height-mm'),paper:document.getElementById('ic-paper-size')?.value||'A4',paperOrientation:document.getElementById('ic-paper-orientation')?.value||'portrait',mode:document.getElementById('ic-print-mode')?.value||'paired',layout:document.getElementById('ic-pair-layout')?.value||'auto',trim:!!document.getElementById('ic-trim-guides')?.checked,margin:10,gap:4};

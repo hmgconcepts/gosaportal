@@ -79,6 +79,8 @@
           <button class="btn btn-outline" onclick="MR.printAll()">🖨️ Print all student sheets</button>
           <button class="btn btn-outline" onclick="MR.publish(true)">✅ Publish (student/parent can view)</button>
           <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="MR.publish(false)">🚫 Unpublish</button>
+          <button class="btn btn-primary" style="background:#059669;border-color:#047857" onclick="MR.publishAllClasses(true)" title="Generate AND publish midterm reports for every class in one click — no class-by-class repetition">✅ Publish ALL classes (one click)</button>
+          <button class="btn btn-outline" onclick="MR.publishAllClasses(false)" title="Unpublish midterm reports for every class at once">🚫 Unpublish all classes</button>
           <button class="btn btn-outline" onclick="MR.exportCSV()">⬇ Export CSV</button>
         </div>
         <div id="mr-status" style="margin-top:12px;font-size:.9rem;color:#475569"></div>
@@ -256,6 +258,45 @@ const MR = {
     const r=await sb.rpc('publish_midterm_reports',{p_class:c, p_term:t, p_session:s, p_publish:flag});
     if(r.error || !r.data || r.data.ok===false){ toast((r.data&&r.data.error)||r.error?.message||'Publish failed','danger'); return; }
     toast((flag?'✅ Published':'🚫 Unpublished')+' midterm reports','success'); this.preview();
+  },
+  /* =====================================================================
+     V12.60 — ONE-CLICK PUBLISH FOR EVERY CLASS
+     ---------------------------------------------------------------------
+     Publishing used to be class-scoped: an admin had to re-select each class
+     and press Publish again (and Generate before it). This runs the whole
+     school in one call and reports exactly what happened per class.
+     ===================================================================== */
+  async publishAllClasses(flag){
+    const {t,s}=this.vals();
+    if(!t||!s){ toast('Pick a term and session first — the class filter is ignored here.','warning',8000); return; }
+    const verb=flag?'publish':'unpublish';
+    const detail = flag
+      ? 'Students and parents will see their midterm sheets immediately. Generate runs first so no class is skipped.'
+      : 'Students and parents will lose access until you publish again.';
+    if(!confirm('This will '+(flag?'GENERATE and PUBLISH':'UNPUBLISH')+' midterm reports for EVERY class · '+t+' · '+s+'.\n\n'+detail+'\n\nContinue?')) return;
+
+    const btn=event&&event.target?event.target.closest('button'):null;
+    const restore=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Working…'; }
+    try{
+      const r=await sb.rpc('sc_publish_all_midterm_reports',{p_term:t,p_session:s,p_publish:!!flag,p_generate:!!flag});
+      if(r.error) throw r.error;
+      const d=r.data||{};
+      if(d.ok===false) throw new Error(d.error||('Could not '+verb));
+      const details=(d.details||[]);
+      const rows=details.map(x=>'<tr><td><b>'+this.esc(x.class)+'</b></td><td>'+Number(x.with_scores||0)+'</td><td>'+Number(x.without_scores||0)+'</td><td>'+(flag?'✅ published':'🚫 unpublished')+'</td></tr>').join('');
+      openModal((flag?'✅ Published':'🚫 Unpublished')+' — all classes',
+        '<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534"><b>'+Number(d.classes||details.length)+' class(es) processed</b> · '+Number(d.generated||0)+' sheet(s) generated for '+this.esc(t)+' · '+this.esc(s)+'</div>'+
+        '<div class="table-wrap"><table class="mr-table"><thead><tr><th>Class</th><th>With scores</th><th>No scores</th><th>Status</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No classes found.</td></tr>')+'</tbody></table></div>'+
+        '<p style="font-size:.82rem;color:#64748b">Classes listed with 0 / 0 have no students or no scores yet — they are published anyway so late entries appear automatically.</p>',
+        '<button class="btn btn-outline" onclick="closeModal()">Close</button> <button class="btn btn-primary" onclick="closeModal();MR.preview()">👁️ Preview this class</button>');
+      toast('✅ '+verb+' complete for '+Number(d.classes||details.length)+' class(es).','success',8000);
+      try{ this.preview(); }catch(_){}
+    }catch(e){
+      const msg=String(e.message||e);
+      if(/could not find the function|does not exist|schema cache/i.test(msg)){
+        toast('Run database/v12.60-expert-fix-pack.sql in Supabase to enable one-click publish.','danger',12000);
+      } else { toast('Bulk '+verb+' failed: '+msg,'danger',10000); }
+    }finally{ if(btn){ btn.disabled=false; btn.innerHTML=restore; } }
   },
   async exportCSV(){
     const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Guide • School Connect</title>
+<meta name="description" content="Step-by-step guide to building, deploying and running your free school management platform with School Connect.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="canonical" href="https://schoolconnectportal.vercel.app/guide.html">
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  body { background: var(--gray-100); }
+  .doc-shell { max-width: 900px; margin: 0 auto; padding: 100px 24px 60px; }
+  .doc-title { font-size: 2.5rem; font-weight: 900; color: var(--dark); margin-bottom: 8px; }
+  .doc-subtitle { font-size: 1.1rem; color: var(--gray-600); margin-bottom: 40px; }
+  .toc { background: white; border-radius: 16px; padding: 24px; margin-bottom: 32px; box-shadow: var(--shadow); }
+  .toc h2 { font-size: 1.2rem; font-weight: 800; margin-bottom: 16px; color: var(--dark); }
+  .toc ol { padding-left: 24px; line-height: 2; }
+  .toc a { color: var(--primary); text-decoration: none; font-weight: 500; }
+  .toc a:hover { text-decoration: underline; }
+  .section { background: white; border-radius: 16px; padding: 32px; margin-bottom: 24px; box-shadow: var(--shadow); }
+  .section h2 { font-size: 1.6rem; font-weight: 800; color: var(--dark); margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .section h3 { font-size: 1.15rem; font-weight: 700; color: var(--gray-800); margin: 24px 0 12px; }
+  .section p { color: var(--gray-700); margin-bottom: 16px; font-size: 0.95rem; line-height: 1.7; }
+  .section ol, .section ul { margin-left: 24px; line-height: 1.9; color: var(--gray-700); }
+  .step-list { counter-reset: step; list-style: none; padding: 0; }
+  .step-list li { display: flex; gap: 16px; margin-bottom: 20px; padding: 16px; background: var(--gray-100); border-radius: 12px; }
+  .step-list li::before { counter-increment: step; content: counter(step); width: 36px; height: 36px; min-width: 36px; border-radius: 50%; background: var(--gradient); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; }
+  .step-content { flex: 1; }
+  code { background: var(--gray-100); padding: 2px 8px; border-radius: 6px; font-size: 0.88rem; color: var(--primary); font-family: 'Courier New', monospace; }
+  pre { background: var(--dark); color: #e2e8f0; padding: 20px; border-radius: 12px; overflow-x: auto; font-size: 0.85rem; font-family: 'Courier New', monospace; margin: 16px 0; line-height: 1.6; }
+  pre code { background: none; color: inherit; padding: 0; }
+  .info-box { background: rgba(79,70,229,0.06); border: 1px solid rgba(79,70,229,0.15); border-radius: 12px; padding: 16px 20px; margin: 16px 0; }
+  .info-box strong { color: var(--primary); }
+  .warning-box { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; padding: 16px 20px; margin: 16px 0; }
+  .warning-box strong { color: var(--warning); }
+  .success-box { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); border-radius: 12px; padding: 16px 20px; margin: 16px 0; }
+  .success-box strong { color: var(--success); }
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .feature-item { background: var(--gray-100); padding: 14px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+</style>
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <meta property="og:url" content="./guide.html">
+    <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <img src="assets/img/logo.png" alt="">
+      <span>School Connect</span>
+    </a>
+    <button class="mobile-toggle" onclick="document.querySelector('.nav-links').classList.toggle('show')" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="builder.html">Builder</a></li>
+      <li><a href="voting.html">Voting</a></li>
+      <li><a href="notifications.html">Notifications</a></li>
+      <li><a href="ecosystem.html">Ecosystem</a></li>
+      <li><a href="guide.html" class="active">Guide</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Read this guide offline.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<main class="doc-shell">
+  <h1 class="doc-title">📖 User Guide</h1>
+  <p class="doc-subtitle">From form to live platform in 4 steps. Plus every feature explained.</p>
+
+  <div class="toc">
+    <h2>📑 Table of Contents</h2>
+    <ol>
+      <li><a href="#quick">Quick Start (4 steps)</a></li>
+      <li><a href="#voting">Voting & Polls</a></li>
+      <li><a href="#notifications">Multi-Channel Notifications</a></li>
+      <li><a href="#install">PWA Install Enforcement</a></li>
+      <li><a href="#seo">SEO & Lead Generation</a></li>
+      <li><a href="#free">Why everything is free</a></li>
+      <li><a href="#security">Security & RLS</a></li>
+      <li><a href="#trouble">Troubleshooting</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ol>
+  </div>
+
+  <section id="quick" class="section">
+    <h2>1️⃣ Quick Start — 4 Steps</h2>
+
+    <h3>Step 1 · Fill the Wizard</h3>
+    <ol class="step-list">
+      <li><span class="step-content"><strong>Open the builder</strong> — go to <a href="builder.html">builder.html</a> or click "Start Building" on the home page.</span></li>
+      <li><span class="step-content"><strong>Pick a preset</strong> or fill the form manually. A preset pre-fills every module you need.</span></li>
+      <li><span class="step-content"><strong>Step 2</strong>: choose a theme (14) and font (8).</span></li>
+      <li><span class="step-content"><strong>Step 3</strong>: pick a layout — Sidebar, Top Nav or Card Hub.</span></li>
+      <li><span class="step-content"><strong>Step 4</strong>: list your classes/levels (comma-separated).</span></li>
+      <li><span class="step-content"><strong>Step 5</strong>: tick the modules you want (44 available).</span></li>
+      <li><span class="step-content"><strong>Step 6</strong>: optional — paste Supabase keys, then click <strong>Generate &amp; Download ZIP</strong>.</span></li>
+    </ol>
+
+    <h3>Step 2 · Create the Free Database (Supabase)</h3>
+    <ol>
+      <li>Go to <strong>supabase.com</strong> → start a new project (free).</li>
+      <li>Wait ~2 minutes for provisioning.</li>
+      <li>Open <strong>SQL Editor → New query</strong>.</li>
+      <li>Open the unzipped <code>database/schema.sql</code> file, copy it, paste, and click <strong>Run</strong>.</li>
+    </ol>
+    <div class="success-box"><strong>✓ Done?</strong> You should see "Success. No rows returned." The schema is idempotent — safe to re-run.</div>
+
+    <h3>Step 3 · Connect the App</h3>
+    <p>In Supabase, go to <strong>Project Settings → API</strong> and copy your URL + anon public key. Open the unzipped <code>assets/js/config.js</code> and replace the placeholders:</p>
+    <pre><code>window.SUPABASE_URL = 'https://abc.supabase.co';
+window.SUPABASE_KEY = 'eyJ...your-anon-key...';</code></pre>
+
+    <h3>Step 4 · Publish (Free)</h3>
+    <p>Upload the unzipped folder to <strong>GitHub Pages</strong>, <strong>Cloudflare Pages</strong>, <strong>Netlify</strong> or <strong>Vercel</strong>. All are free.</p>
+  </section>
+
+  <section id="voting" class="section">
+    <h2>2️⃣ Voting & Polls</h2>
+    <p>Students vote for prefects, head boy/girl, staff polls. Live results, anonymous ballots, multi-channel notifications.</p>
+
+    <h3>How to create a poll</h3>
+    <ol>
+      <li>Sign in as admin / principal / head teacher.</li>
+      <li>Click <strong>Voting &amp; Polls</strong> in the sidebar.</li>
+      <li>Click <strong>+ New Poll</strong>. Fill the form:
+        <ul>
+          <li><strong>Title</strong> — e.g. "Head Boy Election 2026".</li>
+          <li><strong>Type</strong> — single choice, multi choice, yes/no or ranked.</li>
+          <li><strong>Candidates</strong> — one per line: <code>Name | Class/Arm | Photo URL</code>.</li>
+          <li><strong>Audience</strong> — students, staff, parents or everyone.</li>
+          <li><strong>Anonymous</strong> — checked if you want anonymous ballots.</li>
+          <li><strong>Closes at</strong> — optional deadline.</li>
+        </ul>
+      </li>
+      <li>Click <strong>Create</strong>. <span class="badge badge-success">✓</span> All eligible users get a notification instantly.</li>
+    </ol>
+
+    <h3>How voting works</h3>
+    <ul>
+      <li>Voters see live results — bars update as people vote.</li>
+      <li>One vote per user per poll (DB-enforced). They can change their vote.</li>
+      <li>Anonymous mode: votes are stored but <code>voter_id</code> is hidden in the UI.</li>
+      <li>Closing a poll triggers another notification with the final results link.</li>
+    </ul>
+
+    <div class="info-box"><strong>Try it:</strong> visit <a href="voting.html">voting.html</a> for a live demo.</div>
+  </section>
+
+  <section id="notifications" class="section">
+    <h2>3️⃣ Multi-Channel Notifications</h2>
+    <p>Every announcement, broadcast, message, poll and result triggers all enabled channels automatically.</p>
+
+    <div class="feature-grid">
+      <div class="feature-item">📨 In-app bell</div>
+      <div class="feature-item">🔔 Browser push</div>
+      <div class="feature-item">📧 Email (free)</div>
+      <div class="feature-item">💬 WhatsApp (free)</div>
+      <div class="feature-item">📱 SMS (free)</div>
+      <div class="feature-item">🌍 Multi-language</div>
+    </div>
+
+    <h3>How to enable push</h3>
+    <ol>
+      <li>Open the school site in Chrome / Edge / Firefox.</li>
+      <li>Click the install banner at the bottom of any page (or use <a href="install.html">install.html</a> for help).</li>
+      <li>After install, click the bell icon — grant notification permission.</li>
+    </ol>
+    <div class="info-box"><strong>💡 Tip:</strong> Browser push only works after PWA install. Email, WhatsApp and SMS work everywhere.</div>
+
+    <h3>How to send a broadcast</h3>
+    <ol>
+      <li>Open <strong>Messaging</strong> in the sidebar.</li>
+      <li>Pick the audience (class, role, or all).</li>
+      <li>Compose the message. Pick channels.</li>
+      <li>Click <strong>Send</strong>. WhatsApp opens <code>wa.me</code>, email opens <code>mailto:</code>, SMS opens <code>sms:</code>.</li>
+    </ol>
+  </section>
+
+  <section id="install" class="section">
+    <h2>4️⃣ PWA Install Enforcement</h2>
+    <p>Every page on the platform shows an install banner until users install the app. This guarantees parents and teachers actually install it (so they receive push notifications).</p>
+
+    <h3>Detection</h3>
+    <ul>
+      <li>Chrome / Edge on desktop: native install prompt appears.</li>
+      <li>Android: "Install app" menu option.</li>
+      <li>iOS Safari: step-by-step helper appears automatically.</li>
+    </ul>
+
+    <h3>For admins</h3>
+    <p>You can disable the banner or change its frequency by editing the PWA-install banner block in any generated page.</p>
+  </section>
+
+  <section id="seo" class="section">
+    <h2>5️⃣ SEO & Lead Generation</h2>
+    <p>Every generated platform is SEO-optimized to drive traffic back to <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a>.</p>
+
+    <h3>What we include automatically</h3>
+    <ul>
+      <li><code>robots.txt</code> + <code>sitemap.xml</code></li>
+      <li>JSON-LD structured data (Organization, Software, FAQ, Breadcrumb)</li>
+      <li>Open Graph + Twitter Card tags for rich social previews</li>
+      <li>Canonical URLs</li>
+      <li>An auto-generated <code>about.html</code> for admissions</li>
+      <li>Footer attribution to HMG Concepts on every page</li>
+    </ul>
+    <div class="info-box"><strong>💡 Lead generation:</strong> the footer of every generated school site links back to <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">hmgconcepts.pages.dev</a>. Schools that love the software share it with other schools — the cycle continues.</div>
+  </section>
+
+  <section id="free" class="section">
+    <h2>6️⃣ Why everything is free</h2>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0">
+      <tr style="background:var(--gray-100)"><th style="text-align:left;padding:12px 16px;font-size:0.85rem;text-transform:uppercase;color:var(--gray-600)">Need</th><th style="text-align:left;padding:12px 16px;font-size:0.85rem;text-transform:uppercase;color:var(--gray-600)">Free tool used</th></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Hosting</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">GitHub Pages · Cloudflare Pages · Netlify · Vercel (free tiers)</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Database + Auth</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Supabase free tier (50k rows/mo)</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Media storage</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Google Drive share-links (unlimited, free)</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Charts</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Chart.js via CDN</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Messaging</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">WhatsApp (wa.me) + Email (mailto) + SMS (sms:)</td></tr>
+      <tr><td style="padding:12px 16px">ZIP creation</td><td style="padding:12px 16px">JSZip (client-side, MIT)</td></tr>
+    </table>
+    <div class="warning-box"><strong>⚠️ No AI APIs are used.</strong> AI APIs are not cost-effective. All logic is deterministic and runs in the browser.</div>
+  </section>
+
+  <section id="security" class="section">
+    <h2>7️⃣ Security & RLS</h2>
+    <ul>
+      <li>User-chosen passwords via Supabase Auth (bcrypt-hashed server-side).</li>
+      <li>Row-Level Security on <strong>every</strong> table (95+ least-privilege policies).</li>
+      <li>Only the <strong>anon public</strong> key reaches the browser. Never the service-role key.</li>
+      <li>All data rendered into the DOM is HTML-escaped (defence-in-depth).</li>
+      <li>Suspended / pending accounts are blocked at login.</li>
+    </ul>
+  </section>
+
+  <section id="trouble" class="section">
+    <h2>8️⃣ Troubleshooting</h2>
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="background:var(--gray-100)"><th style="text-align:left;padding:12px 16px">Symptom</th><th style="text-align:left;padding:12px 16px">Fix</th></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">"Demo Mode" banner appears</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)"><code>assets/js/config.js</code> keys are missing/wrong, or you opened via <code>file://</code> (use a hosted URL).</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Lists show "Error loading"</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Re-run <code>schema.sql</code>; confirm anon key is correct.</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">"Email not confirmed"</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Confirm the email, or disable "Confirm email" in Supabase Auth.</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Assets 404 on GitHub Pages</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Ensure <code>.nojekyll</code> is in the repo root.</td></tr>
+      <tr><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">New user can't see data</td><td style="padding:12px 16px;border-bottom:1px solid var(--gray-200)">Run the <code>UPDATE profiles SET status='approved' …</code> SQL.</td></tr>
+      <tr><td style="padding:12px 16px">Push not arriving</td><td style="padding:12px 16px">Install the app first; grant notification permission; check OS settings.</td></tr>
+    </table>
+  </section>
+
+  <section id="contact" class="section">
+    <h2>9️⃣ Contact & Support</h2>
+    <p>Questions? We're here to help.</p>
+    <ul>
+      <li><strong>WhatsApp:</strong> <a href="https://wa.me/2348100866322" target="_blank" rel="noopener">+234 810 086 6322</a></li>
+      <li><strong>HMG Concepts:</strong> <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">hmgconcepts.pages.dev</a></li>
+    </ul>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="footer-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div>
+      <h5>🎓 School Connect</h5>
+      <p style="color:var(--gray-400);font-size:0.9rem">An HMG Ecosystem generator that builds complete school management platforms. HMG Ecosystem Licensed.</p>
+    </div>
+    <div>
+      <h5>Product</h5>
+      <a href="builder.html">Builder</a>
+      <a href="voting.html">Voting Demo</a>
+      <a href="notifications.html">Notifications</a>
+      <a href="install.html">PWA Install</a>
+    </div>
+    <div>
+      <h5>Ecosystem</h5>
+      <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a>
+      <a href="ecosystem.html">Explore</a>
+    </div>
+  </div>
+  <div class="footer-bottom">© 2026 HMG Concepts · <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" style="color:var(--gray-400)">hmgconcepts.pages.dev</a></div>
+</footer>
+
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script>
+  if (typeof PWAInstall !== 'undefined') PWAInstall.init();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  function toast(msg, type='info', ms=3500) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.innerHTML = '<div class="toast-msg">' + msg + '</div>';
+    c.appendChild(t);
+    setTimeout(() => { t.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, ms);
+  }
+</script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+</body>
+</html>
