@@ -1516,7 +1516,40 @@ const App = {
         const l = await sb.from('parent_child').select('student_id').eq('parent_id', SC_PROFILE.id);
         const ids = (l.data || []).map(x => x.student_id);
         if (ids.length) { const st = await sb.from('students').select('id,full_name').in('id', ids); studs = st.data || []; }
-      } else return;
+      } else {
+        /* V12.60 — the school-wide view for admins was missing entirely: the
+           loader returned early for every staff role, so bursars saw nothing
+           here while the Fees page showed real numbers. The widget now shows
+           the SAME engine's aggregates (sc_fee_overview) so both pages agree. */
+        const ovr = await sb.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
+        if (ovr.error || !ovr.data) {
+          paint('<p style="color:var(--gray-500);font-size:.85rem">School-wide fee summary needs the V12.60 database pack (database/v12.60-expert-fix-pack.sql).</p>');
+          return;
+        }
+        const o = ovr.data || {};
+        if (o.ok === false) { paint('<p style="color:var(--gray-500);font-size:.85rem">' + esc(o.error || 'Fee summary unavailable.') + '</p>'); return; }
+        const cur = '₦';
+        const paidPct = Number(o.collection_rate || 0);
+        paint('<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">' +
+          '<div><div style="font-size:1.6rem;font-weight:900;color:#0f172a">' + cur + Number(o.billed || 0).toLocaleString() + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Billed · ' + esc(o.term || '') + ' ' + esc(o.session || '') + '</div></div>' +
+          '<div><div style="font-size:1.6rem;font-weight:900;color:#15803d">' + cur + Number(o.collected || 0).toLocaleString() + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Collected</div></div>' +
+          '<div><div style="font-size:1.6rem;font-weight:900;color:' + (Number(o.outstanding || 0) > 0 ? '#b91c1c' : '#15803d') + '">' + cur + Number(o.outstanding || 0).toLocaleString() + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Outstanding</div></div>' +
+          '<div><div style="font-size:1.6rem;font-weight:900;color:#1e40af">' + paidPct + '%</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Collection rate</div></div>' +
+          '</div>' +
+          '<div style="height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:10px"><div style="height:100%;width:' + Math.max(0, Math.min(100, paidPct)) + '%;background:#16a34a"></div></div>' +
+          '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.85rem">' +
+          '<span class="badge" style="background:#dcfce7;color:#166534;padding:6px 10px">✅ Fully paid: <b>' + Number(o.fully_paid || 0) + '</b></span>' +
+          '<span class="badge" style="background:#fee2e2;color:#991b1b;padding:6px 10px">🔴 Debtors: <b>' + Number(o.debtors || 0) + '</b></span>' +
+          '<span class="badge" style="background:#fef3c7;color:#92400e;padding:6px 10px">🟠 Part-paid: <b>' + Number(o.partial || 0) + '</b></span>' +
+          '<span class="badge" style="background:#f1f5f9;color:#475569;padding:6px 10px">Students: <b>' + Number(o.students || 0) + '</b></span>' +
+          '</div>' +
+          '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
+          '<a class="btn btn-sm btn-primary" href="fees.html">Open fees · paid vs debtors</a>' +
+          '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button>' +
+          '</div>' +
+          '<p style="font-size:.76rem;color:var(--gray-500);margin:8px 0 0">Identical figures to the Fees page — both read the same server-side engine.</p>');
+        return;
+      }
       if (!studs.length) { paint('<p style="color:var(--gray-500);font-size:.85rem">No linked student record yet — fees appear here once the admin links the account.</p>'); return; }
       const money = (cur, n) => cur + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
       let h = '';
@@ -1709,9 +1742,35 @@ const App = {
       /* V7.8: the Notices tile showed the length of a 5-row PREVIEW list (max
          "5" forever). Real total count now. */
       set('stat-announcements', announcementCount);
-      /* V7.8 educator ask: money OWED at a glance, not just money received.
-         Sum of stored/derived balances across fee payments (current data). */
-      const feesOwed = (feeRows || []).reduce((a, b) => a + (b.balance != null ? (Number(b.balance) || 0) : Math.max(0, (Number(b.fee_total) || 0) - (Number(b.amount_paid) || 0))), 0);
+      /* V12.60 — OUTSTANDING IS A STUDENT-LEVEL NUMBER, NOT A SUM OF SNAPSHOTS.
+         fee_payments.balance is "what was left after THAT row" (a running
+         snapshot). Adding the snapshots together makes money owed grow every
+         time a payment is recorded — the exact "paying fees increases
+         outstanding" bug. The authoritative figure is the school-wide bill
+         minus collections, computed server-side. */
+      let feesOwed = null;
+      try {
+        const ovr = await supabase.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
+        if (!ovr.error && ovr.data && ovr.data.ok !== false) feesOwed = Number(ovr.data.outstanding || 0);
+      } catch (_) { /* fall through to the conservative estimate */ }
+      if (feesOwed == null) {
+        /* Fallback: one balance per STUDENT — the LAST snapshot of each
+           student's ledger, never the sum of every snapshot. */
+        const perStudent = new Map();
+        (feeRows || []).forEach(r => {
+          if (!r || !r.student_id) return;
+          const t = Date.parse(r.created_at || '') || 0;
+          const prev = perStudent.get(r.student_id);
+          if (!prev || t >= prev.t) {
+            perStudent.set(r.student_id, {
+              t: t,
+              bal: r.balance != null ? (Number(r.balance) || 0)
+                                     : Math.max(0, (Number(r.fee_total) || 0) - (Number(r.amount_paid) || 0))
+            });
+          }
+        });
+        feesOwed = [...perStudent.values()].reduce((a, x) => a + x.bal, 0);
+      }
       set('stat-outstanding', feesOwed.toLocaleString());
       set('ov-staff-count', staffCount);
       set('ov-attendance', attendanceCount);
@@ -2040,15 +2099,42 @@ function handleSignUp(e){ return App.handleSignUp(e); }
 
 // Load the portable archive engine on every operational page so any CSV/data
 // export has a single re-import path without uploading source files to Supabase.
-(function(){if(window.DataPortability)return;const s=document.createElement('script');s.src='assets/js/data-portability.js';s.defer=true;document.head.appendChild(s);})();
+/* V12.60 — DUPLICATE-LOAD GUARD FIX.
+   These engines are declared with top-level `const`, which does NOT create a
+   window property, so `if (window.X) return` never fired and any page that
+   also had <script src="assets/js/data-portability.js"> loaded the file TWICE.
+   The second evaluation throws "Identifier 'X' has already been declared"
+   and, on pages that do not wrap in try/catch, that aborted the rest of the
+   inline bootstrap (which is why some pages rendered nothing). The guard now
+   checks the lexical global first and tags the DOM as a backstop. */
+/* V12.60 — single-load helper for the background engines.
+   The old one-shot `if (window.X) return` guard could not see a top-level
+   `const X` (const does not create a window property), and it also ran while
+   the parser had NOT yet reached the page's own <script src="…"> tag, so the
+   file got injected AND parsed → "Identifier 'X' has already been declared".
+   The decision is now taken after parsing, when the document is complete. */
+function scLoadOnce(globalName, src){
+  function decide(){
+    try { if (window[globalName]) return; } catch (_) {}
+    try { if (typeof eval(globalName) !== 'undefined') return; } catch (_) {}   /* const/let global */
+    if (document.querySelector('script[data-sc-once="' + src + '"]')) return;
+    if (document.querySelector('script[src$="' + src + '"]')) return;           /* page owns it */
+    const s = document.createElement('script'); s.src = src; s.defer = true;
+    s.setAttribute('data-sc-once', src);
+    document.head.appendChild(s);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', decide, { once: true });
+  else setTimeout(decide, 0);
+}
+scLoadOnce('DataPortability', 'assets/js/data-portability.js');
 // V5.9: Google Drive auto-sync engine — loaded everywhere so a due scheduled backup
 // can run in the background no matter which page an admin opens.
-(function(){if(window.DriveSync)return;const s=document.createElement('script');s.src='assets/js/drive-sync.js';s.defer=true;document.head.appendChild(s);})();
+scLoadOnce('DriveSync', 'assets/js/drive-sync.js');
 // V6.0: runtime security layer (idle auto-lock, login audit, emergency lockdown, password meter).
-(function(){if(window.SecurityGuard)return;const s=document.createElement('script');s.src='assets/js/security-guard.js';s.defer=true;document.head.appendChild(s);})();
+scLoadOnce('SecurityGuard', 'assets/js/security-guard.js');
 // V6.8: demo sample-data engine (auto-fills showcase pages on demo deployments).
-(function(){if(window.DemoSampleData)return;const s=document.createElement('script');s.src='assets/js/demo-sample-data.js';s.defer=true;document.head.appendChild(s);})();
-(function(){if(window.ReportCommentBands)return;const s=document.createElement('script');s.src='assets/js/v57-enhancements.js';s.defer=true;document.head.appendChild(s);})();
+scLoadOnce('DemoSampleData', 'assets/js/demo-sample-data.js');
+scLoadOnce('ReportCommentBands', 'assets/js/v57-enhancements.js');
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', App.init);
 else App.init();
 

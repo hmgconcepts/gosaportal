@@ -695,6 +695,68 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     affective_traits:'teacher_id', psychomotor_traits:'teacher_id', report_comments:'teacher_id',
     digital_library:'teacher_id', eresources:'uploaded_by', conduct:'recorded_by_id',
     behaviour:'awarded_by', behaviour_points:'awarded_by', support_plans:'created_by', diary:'created_by', student_diary:'created_by' },
+  /* =====================================================================
+     V12.60 — CBT TAKE-LINK BRIDGE (bug: students saw a UUID, exam not found)
+     ---------------------------------------------------------------------
+     cbt_exams.code is the only identifier cbt_get_public_exam_v6() accepts.
+     Three different places used to build student links:
+       • the DB mirror trigger (assignments.drive_link)   — never set the code
+       • this table action cell                           — fell back to the id
+       • assignment-cbt.js                                — correct
+     cbtTakeHref() makes the JS side deterministic for all of them, and
+     CBT.resolveCode() repairs anything that still only has a UUID.
+     ===================================================================== */
+  cbtTakeHref(row){
+    row = row || {};
+    const codeLike = (v)=>{
+      const t = String(v||'').trim(); if(!t) return '';
+      if(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)) return ''; /* uuid */
+      if(/^https?:\/\//i.test(t)) return '';                                                    /* full url */
+      if(t.length > 24) return '';
+      return t.toUpperCase().replace(/[^A-Z0-9]/g,'');
+    };
+    const fromLink = (v)=>{
+      const t = String(v||'');
+      const m = t.match(/[?&](?:code|exam|c)=([^&#]+)/i);
+      return m ? decodeURIComponent(m[1]) : '';
+    };
+    const code =
+      codeLike(row.cbt_code) ||
+      codeLike(row.exam_code) ||
+      codeLike(row.code) ||
+      codeLike(fromLink(row.drive_link)) ||
+      codeLike(CRUD._cbtCodeCache && CRUD._cbtCodeCache[row.cbt_exam_id]);
+    if(code) return './cbt-exam.html?code=' + encodeURIComponent(code);
+    /* Nothing usable on the row: keep any real external link, otherwise ask
+       the DB for the code once the table is on screen. */
+    if(row.drive_link && !/cbt-exam\.html/i.test(row.drive_link)) return row.drive_link;
+    if(row.cbt_exam_id){ CRUD.queueCbtCodeLookup(row.cbt_exam_id); }
+    return row.cbt_exam_id ? './cbt-exam.html?code=' + encodeURIComponent(row.cbt_exam_id) : '#';
+  },
+  /* Batch-resolve codes for id-only rows and patch the anchors in place, so a
+     table rendered from a stale mirror row self-heals without a reload. */
+  queueCbtCodeLookup(examId){
+    if(!examId || !window.sb) return;
+    CRUD._cbtCodeCache = CRUD._cbtCodeCache || {};
+    CRUD._cbtPending = CRUD._cbtPending || {};
+    if(CRUD._cbtPending[examId]) return;
+    CRUD._cbtPending[examId] = true;
+    clearTimeout(CRUD._cbtFlush);
+    CRUD._cbtFlush = setTimeout(async ()=>{
+      const ids = Object.keys(CRUD._cbtPending).filter(id=>!CRUD._cbtCodeCache[id]);
+      CRUD._cbtPending = {};
+      if(!ids.length) return;
+      try{
+        const { data, error } = await sb.from('cbt_exams').select('id,code').in('id', ids);
+        if(error) throw error;
+        (data||[]).forEach(e=>{ if(e.code) CRUD._cbtCodeCache[e.id] = e.code; });
+        document.querySelectorAll('a.ap-take-cbt[data-cbt-exam]').forEach(a=>{
+          const code = CRUD._cbtCodeCache[a.getAttribute('data-cbt-exam')];
+          if(code) a.setAttribute('href','./cbt-exam.html?code='+encodeURIComponent(code));
+        });
+      }catch(e){ console.warn('CBT code lookup failed:', e.message||e); }
+    }, 120);
+  },
   rowLockedForMe(moduleId, row, role, uid) {
     try {
       const r = String(role||'').toLowerCase();
@@ -825,6 +887,20 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         ? this.sb.from(listTable).select('*').eq('module', d.module).limit(500)
         : this.sb.from(listTable).select('*').limit(500);
       ({ data, error } = await rq);
+    }
+    /* V12.60: enrich CBT assignment rows with their real exam CODE in one
+       query, so every Take link is built from the code (never the UUID). */
+    if (moduleId === 'assignments' && Array.isArray(data) && data.length) {
+      const needCodes = data.filter(r => (r.is_cbt || r.cbt_exam_id)).map(r => r.cbt_exam_id).filter(Boolean);
+      if (needCodes.length) {
+        try {
+          const uniq = [...new Set(needCodes)];
+          const { data: exams } = await this.sb.from('cbt_exams').select('id,code').in('id', uniq);
+          const map = {}; (exams || []).forEach(e => { if (e && e.id) map[e.id] = e.code || ''; });
+          this._cbtCodeCache = Object.assign(this._cbtCodeCache || {}, map);
+          data.forEach(r => { if (r.cbt_exam_id && map[r.cbt_exam_id]) r.cbt_code = map[r.cbt_exam_id]; });
+        } catch (e) { console.warn('CBT code enrichment skipped:', e.message || e); }
+      }
     }
     const cols = d.listCols || d.cols;
     const writable = this.canWrite(moduleId) && (!d.readOnly || (window.App && App.isAdminRole && App.isAdminRole(currentRole)));
@@ -1033,8 +1109,15 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       if(moduleId === 'assignments'){
         if(isStudent || isParent){
           // Student/parent portal: Take Assignment button for every CBT assignment in table (robust, all-inclusive, self-contained, seamless)
+          /* V12.60 CBT-CODE BRIDGE: the take link must ALWAYS carry the human
+             exam code, never the UUID. Historic mirror rows were written with
+             drive_link = ./cbt-exam.html?code=<uuid> (or with drive_link NULL),
+             which is exactly the "student sees a UUID / exam_not_found" bug.
+             We normalise every candidate here and let CBT.resolveCode() finish
+             the job asynchronously when only an id is available. */
+          const takeHref = CRUD.cbtTakeHref(row);
           const takeBtn = (row.is_cbt || row.cbt_exam_id) ?
-            '<a class="btn btn-sm btn-primary ap-take-cbt" href="'+esc(row.drive_link||'./cbt-exam.html?code='+(row.cbt_exam_id||''))+'" target="_blank" title="Take this CBT assignment — auto-marked, multiple per term cumulative per subject">🖥️ Take Assignment</a> ' :
+            '<a class="btn btn-sm btn-primary ap-take-cbt" data-cbt-exam="'+esc(row.cbt_exam_id||'')+'" href="'+esc(takeHref)+'" target="_blank" title="Take this CBT assignment — auto-marked, multiple per term cumulative per subject">🖥️ Take Assignment</a> ' :
             (row.drive_link ? '<a class="btn btn-sm btn-outline" href="'+esc(row.drive_link)+'" target="_blank" title="View assignment resources">🔗 View Assignment</a> ' : '<span class="badge" style="background:#f1f5f9;color:#475569">📄 Physical — no link</span> ');
           actionCell = '<td style="white-space:nowrap">'+takeBtn+'</td>';
         }else if(writable){
@@ -1329,7 +1412,9 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
           ? '<button class="btn btn-sm btn-outline" style="border-color:#dc2626;color:#b91c1c" onclick="CRUD.bulkStudentLock(\'portal\',true)">🔒 Lock portal</button>' +
             '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'portal\',false)">🔓 Restore portal</button>' +
             '<button class="btn btn-sm btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="CRUD.bulkStudentLock(\'report\',true)">🧾 Hide report cards</button>' +
-            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'report\',false)">🧾 Restore report cards</button>'
+            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'report\',false)">🧾 Restore report cards</button>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#dc2626;color:#b91c1c;font-weight:700" onclick="CRUD.lockAllDebtors(\'portal\',true)" title="One click: lock EVERY student who still owes fees this term — no ticking required">🔒 Lock ALL debtors</button>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534;font-weight:700" onclick="CRUD.lockAllDebtors(\'portal\',false)" title="One click: unlock EVERY student who has now cleared their fees">🔓 Unlock ALL cleared</button>'
           : '') +
         '<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#b91c1c" onclick="CRUD.bulkDelete(\'' + moduleId + '\')">🗑 Delete selected</button>' +
         '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',false)">Clear selection</button>';
@@ -1894,9 +1979,41 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     if(d.table==='lesson_plans'&&window.SC_PROFILE&&window.App&&App.isAdminRole&&App.isAdminRole(App.currentRole)){
       if(payload.review_feedback||['approved','needs-changes'].includes(String(payload.status||''))){payload.reviewed_by=SC_PROFILE.full_name||SC_PROFILE.email||'';payload.reviewed_at=new Date().toISOString();}}
     if(d.table==='fee_payments'&&window.SC_PROFILE){if(!id&&!payload.received_by)payload.received_by=SC_PROFILE.id||null;if(!payload.received_by_name)payload.received_by_name=SC_PROFILE.full_name||SC_PROFILE.email||'';if(!payload.payment_date)payload.payment_date=new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});}
-    // ENTERPRISE V11 (issue 13): auto-compute fee balance when blank
-    if (d.table === 'fee_payments' && payload.balance == null && payload.fee_total != null) {
-      payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
+    /* =================================================================
+       V12.60 — FEE SNAPSHOT DISCIPLINE (fixes "paying raises outstanding")
+       -----------------------------------------------------------------
+       fee_payments.fee_total / .balance are SNAPSHOTS of the student's
+       position at the moment the row was written — not independent bills.
+       The old code copied the form's "total due" (which already had the
+       previous payments subtracted) into fee_total, and the healing trigger
+       then reconstructed it as bill+paid, which is how "fees paid" and
+       "outstanding" both climbed with every new receipt.
+       Now every new receipt is normalised against the authoritative bill and
+       the whole ledger is re-derived afterwards by sc_fee_sync_snapshots().
+       ================================================================= */
+    if (d.table === 'fee_payments') {
+      try {
+        const isOverride = payload.total_overridden === true;
+        if (payload.student_id) {
+          const acct = await this.sb.rpc('sc_fee_account', { p_student: payload.student_id, p_term: payload.term || null, p_session: payload.session || null });
+          const a = (acct && acct.data) || {};
+          if (!acct.error && a.ok !== false && Number(a.bill || 0) > 0 && !isOverride) {
+            /* fee_total on the row = the BILL at the time of this receipt. */
+            payload.fee_total = Number(a.bill);
+            if (payload.balance == null) {
+              payload.balance = Math.max(0, Number(a.bill) - (Number(a.paid || 0) + (Number(payload.amount_paid) || 0)));
+            }
+          } else if (payload.balance == null && payload.fee_total != null) {
+            payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
+          }
+        } else if (payload.balance == null && payload.fee_total != null) {
+          payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
+        }
+      } catch (e) {
+        if (payload.balance == null && payload.fee_total != null) {
+          payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
+        }
+      }
     }
     /* V10.3 (#4): persist the DELIBERATE total-due override flag. Only set
        when the admin double-click-unlocked the field AND changed the value —
@@ -2074,6 +2191,20 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       }
     } catch(e) { console.warn('Notification hook skipped:', e.message || e); }
     this.invalidateTableCaches(moduleId);
+    /* V12.60: after any fee write, re-derive the WHOLE ledger for that
+       student+term from the authoritative bill so every stored snapshot
+       (old and new) agrees with the dashboard. */
+    if (d.table === 'fee_payments' && payload.student_id) {
+      try {
+        const rr = await this.sb.rpc('sc_fee_sync_snapshots', {
+          p_student: payload.student_id, p_term: payload.term || null, p_session: payload.session || null
+        });
+        if (!rr.error && rr.data && rr.data.ok) {
+          const out = Number(rr.data.outstanding || 0);
+          if (out > 0) toast('🧾 Ledger reconciled — outstanding is now ' + out.toLocaleString() + '.', 'info', 6000);
+        }
+      } catch (_) {}
+    }
     closeModal();
     if (!id && (moduleId === 'students' || moduleId === 'staff')) {
       const email = moduleId === 'students' ? payload.guardian_email : payload.email;
@@ -2248,6 +2379,54 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     this.renderList('students');
   },
   /* Bulk: lock/unlock every currently-selected row on the Students table. */
+  /* =====================================================================
+     V12.60 — ONE-CLICK SCHOOL-WIDE PORTAL LOCKING BY FEE STATUS
+     ---------------------------------------------------------------------
+     The old flow needed a checkbox on every student. This asks the server to
+     select the set (every debtor, or every cleared student) and applies the
+     lock in a single RPC — with a preview of who will be affected.
+     ===================================================================== */
+  async lockAllDebtors(kind, lock){
+    const label = kind === 'portal' ? 'PORTAL ACCESS' : 'REPORT CARDS';
+    const verb = lock ? 'LOCK' : 'RESTORE';
+    let preview = null;
+    try {
+      const r = await this.sb.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
+      if (!r.error && r.data && r.data.ok !== false) preview = r.data;
+    } catch (_) {}
+    const willLock = preview ? Number(preview.debtors || 0) + Number(preview.partial || 0) : null;
+    const willUnlock = preview ? Number(preview.fully_paid || 0) : null;
+    const n = lock ? willLock : willUnlock;
+    const target = lock ? 'students who still owe fees' : 'students who have fully paid';
+    let message = '';
+    if (lock) {
+      const def = kind === 'portal'
+        ? 'Access to the school portal has been suspended because of outstanding school fees. Please contact the school bursary to resolve this.'
+        : 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.';
+      message = prompt(verb + ' ' + label + ' for every ' + target + (n != null ? ' (' + n + ')' : '') + '?\n\nThis message will be shown to each of them (edit if needed):', def);
+      if (message == null) return;
+    } else if (!confirm(verb + ' ' + label + ' for every ' + target + (n != null ? ' (' + n + ')' : '') + '?')) return;
+    toast('Working through the school…', 'info', 3000);
+    try {
+      const r = await this.sb.rpc('sc_set_student_locks_by_filter', {
+        p_kind: kind, p_locked: !!lock, p_message: message || null,
+        p_class: null, p_only_debtors: !!lock, p_student_ids: null, p_term: null, p_session: null
+      });
+      if (r.error) throw r.error;
+      const d = r.data || {};
+      if (d.ok === false) throw new Error(d.error || 'Bulk lock failed');
+      toast((lock ? '🔒 Locked ' : '🔓 Restored ') + Number(d.updated || 0) + ' student(s) — ' + label + '.', lock ? 'warning' : 'success', 9000);
+      if (window.App && App.logActivity) App.logActivity(lock ? 'bulk-lock-all' : 'bulk-unlock-all', 'students', kind + ':' + d.updated);
+      this.invalidateTableCaches('students');
+      this.renderList('students');
+    } catch (e) {
+      const msg = String(e.message || e);
+      if (/sc_set_student_locks_by_filter|could not find the function|does not exist|schema cache/i.test(msg)) {
+        toast('One-click locking needs the V12.60 pack — run database/v12.60-expert-fix-pack.sql in Supabase.', 'warning', 12000);
+      } else toast('Bulk lock failed: ' + msg, 'danger', 9000);
+    }
+  },
+
   async bulkStudentLock(kind, lock) {
     const ids = this.bulkSelected('students');
     if (!ids.length) { toast('Tick at least one student first (use the checkboxes).', 'warning', 6000); return; }
