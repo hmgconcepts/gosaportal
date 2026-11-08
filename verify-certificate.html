@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Verify Certificate • God of Seed Academy</title>
@@ -15,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
 <meta property="og:title" content="Verify Certificate • God of Seed Academy">
-<meta property="og:description" content="God of Seed Academy — Comprehensive school management platform">
+<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -136,4 +137,6 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script>
 const VC={ async check(){ const code=document.getElementById('vc-code').value.trim(); const box=document.getElementById('vc-result'); if(!code){box.innerHTML='<p style="color:#dc2626">Enter a code.</p>';return;} if(!sb){box.innerHTML='<p style="color:#dc2626">Database not configured.</p>';return;} box.innerHTML='<p class="pulse">Checking…</p>'; try{ const {data,error}=await sb.rpc('verify_certificate',{p_code:code}); if(error){box.innerHTML='<p style="color:#dc2626">'+error.message+'</p>';return;} const r=(data||[])[0]; if(!r){box.innerHTML='<div class="card" style="border-color:#fecaca;background:#fff7f7"><h3>❌ Not verified</h3><p>No valid certificate was found for this code.</p></div>';return;} box.innerHTML='<div class="card" style="border-color:#bbf7d0;background:#f0fdf4"><h2>✅ Authentic Certificate</h2><p><strong>Recipient:</strong> '+esc(r.student_name||'')+'</p><p><strong>Type:</strong> '+esc(r.certificate_type||'')+'</p><p><strong>Issued:</strong> '+esc(r.issued_on||'')+'</p><p><strong>Score:</strong> '+esc(r.score||'')+'</p><p><strong>Code:</strong> '+esc(r.serial_no||code)+'</p></div>'; }catch(e){box.innerHTML='<p style="color:#dc2626">Verification failed: '+esc(e.message||e)+'</p>';} }};
 function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
-</script></body></html>
+</script><script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+</body></html>

@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Students &amp; Profiles • God of Seed Academy</title>
 <meta name="description" content="God of Seed Academy — Students &amp; Profiles. Comprehensive school management platform.">
-<meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo.png">
 <link rel="manifest" href="manifest.json">
@@ -62,7 +63,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </style>
 
     <meta name="description" content="God of Seed Academy — Students &amp; Profiles. Comprehensive school management platform.">
-    <meta name="keywords" content="God of Seed Academy, school management, GOSA, HMG Concepts">
+    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./students.html">
@@ -119,10 +120,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.svg'">
+        <img src="assets/img/logo.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
           <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GOSA</div>
+          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -479,18 +480,18 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         
         <button class="btn btn-sm btn-outline" onclick="if(window.Super)Super.chatbot.explainPage()" title="About this page">ℹ️ Help</button>
         <div class="user-chip" style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:999px;background:var(--white)"><span>👤</span><span><strong id="user-display-name">Connecting…</strong><small id="user-display-role" style="display:block;color:var(--gray-500);line-height:1">restoring session</small></span></div>
-        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle theme">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()" title="Toggle dark/light — robust like Fleet Console">🌙</button>
+        <button class="btn btn-sm btn-outline" onclick="if(window.ThemeManager)ThemeManager.openPalette()" title="Theme palette — colour themes + dark/light + reset (Ctrl+K)">🎨</button>
         <button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout >Sign out</button>
       </div>
     </header>
     <div class="app-content">
-<div id="bulk-actions-toolbar" style="display:none;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:white;padding:12px 20px;border-radius:8px;margin-bottom:16px;align-items:center;gap:12px">
-          <span id="bulk-count">0 students selected</span>
-          <button class="btn btn-sm" style="background:white;color:#3b82f6" onclick="CRUD.bulkAction('export')">📥 Export Selected</button>
-          <button class="btn btn-sm" style="background:white;color:#3b82f6" onclick="CRUD.bulkAction('message')">💬 Message Selected</button>
-          <button class="btn btn-sm" style="background:white;color:#ef4444" onclick="CRUD.bulkAction('delete')">🗑️ Delete Selected</button>
-          <button class="btn btn-sm" style="background:rgba(255,255,255,0.2);color:white" onclick="CRUD.clearSelection()">✕ Clear</button>
-        </div>
+<!-- V12.60: the legacy #bulk-actions-toolbar called CRUD.bulkAction() and
+     CRUD.clearSelection(), neither of which exists — every button threw. The
+     working bulk bar is injected by CRUD.renderBulkBar() after the table
+     renders (select rows with the checkboxes) and now also carries the
+     one-click "Lock ALL debtors / Unlock ALL cleared" actions. -->
+
 
       
       <div class="card" style="margin-bottom:16px;background:#eef2ff;border-color:#c7d2fe">
@@ -508,6 +509,17 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary" onclick="CRUD.openForm('students')" data-staff-only>+ Add new</button>
+      <div class="card" style="margin-bottom:16px;border:2px solid #fecaca" data-admin-only>
+        <h2 style="margin-top:0">🔐 Portal access control — one click</h2>
+        <p style="color:var(--gray-600);font-size:.9rem;margin-top:0">Instead of opening each student record, act on a whole group at once. Locking blocks the student <b>and</b> their linked parents from the portal; hiding report cards keeps the rest of the portal open. Both are reversible in the same one click.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-sm btn-primary" style="background:#b91c1c;border-color:#991b1b" onclick="CRUD.lockAllDebtors('portal',true)">🔒 Lock portal — ALL debtors</button>
+          <button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534" onclick="CRUD.lockAllDebtors('portal',false)">🔓 Unlock portal — ALL cleared</button>
+          <button class="btn btn-sm btn-outline" style="border-color:#b45309;color:#92400e" onclick="CRUD.lockAllDebtors('report',true)">🧾 Hide report cards — ALL debtors</button>
+          <button class="btn btn-sm btn-outline" onclick="CRUD.lockAllDebtors('report',false)">🧾 Restore report cards — ALL cleared</button>
+          <span style="font-size:.8rem;color:var(--gray-500)">Tick rows below for a hand-picked selection instead — the bulk bar appears above the table.</span>
+        </div>
+      </div>
         <button class="btn btn-outline" onclick="CRUD.renderList('students')">↻ Refresh</button>
         <button class="btn btn-outline" onclick="CRUD.exportCSV('students')" data-staff-only>⬇ Export CSV</button>
         <button class="btn btn-outline" onclick="CRUD.exportPDF('students')" data-staff-only>📄 Export PDF</button>
@@ -539,6 +551,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script src="assets/js/ai-assistant.js"></script>
 <script src="assets/js/super.js"></script>
 <script src="assets/js/enterprise.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
 <script src="assets/js/crud.js"></script>
 <script src="assets/js/report-engine.js"></script>
 <script src="assets/js/analytics.js"></script>

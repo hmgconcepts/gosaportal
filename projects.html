@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Projects • School Connect — HMG Concepts</title>
+<meta name="description" content="Manage your saved school platform projects. Save, load and share configurations.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="canonical" href="https://schoolconnectportal.vercel.app/projects.html">
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  body { background: var(--gray-100); }
+  .projects-shell { max-width: 1200px; margin: 0 auto; padding: 100px 24px 60px; }
+  .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; margin-top: 24px; }
+  .project-card { background: white; border-radius: 16px; padding: 28px; box-shadow: var(--shadow); border: 1px solid var(--gray-200); transition: var(--transition); }
+  .project-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+  .project-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+  .project-avatar { width: 48px; height: 48px; border-radius: 12px; background: var(--gradient); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: white; font-weight: 800; }
+  .project-info h3 { font-size: 1.05rem; font-weight: 800; color: var(--dark); }
+  .project-info span { font-size: 0.8rem; color: var(--gray-500); }
+  .project-stats { display: flex; gap: 24px; margin-bottom: 16px; padding: 16px 0; border-top: 1px solid var(--gray-100); border-bottom: 1px solid var(--gray-100); }
+  .project-stat { text-align: center; }
+  .project-stat .value { font-size: 1.2rem; font-weight: 800; color: var(--primary); }
+  .project-stat .label { font-size: 0.72rem; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+  .empty-state { text-align: center; padding: 60px 24px; background: white; border-radius: 16px; box-shadow: var(--shadow); }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.5; }
+  .empty-state h3 { font-size: 1.2rem; font-weight: 800; color: var(--dark); margin-bottom: 8px; }
+  .empty-state p { color: var(--gray-600); margin-bottom: 20px; }
+</style>
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <meta property="og:url" content="./projects.html">
+    <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <img src="assets/img/logo.png" alt="">
+      <span>School Connect</span>
+    </a>
+    <button class="mobile-toggle" onclick="document.querySelector('.nav-links').classList.toggle('show')" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="builder.html">Builder</a></li>
+      <li><a href="voting.html">Voting</a></li>
+      <li><a href="notifications.html">Notifications</a></li>
+      <li><a href="ecosystem.html">Ecosystem</a></li>
+      <li><a href="projects.html" class="active">My Projects</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Save your projects offline. Get updates.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<main class="projects-shell">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+    <div>
+      <h1 style="font-size:2rem;font-weight:900;color:var(--dark);margin-bottom:4px">📁 My Projects</h1>
+      <p style="color:var(--gray-600)">Saved school platform configurations from your local browser.</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="builder.html" class="btn btn-primary">+ New Project</a>
+      <button class="btn btn-outline" onclick="clearAll()">🗑️ Clear all</button>
+    </div>
+  </div>
+
+  <div id="projects-list"></div>
+</main>
+
+<footer class="footer">
+  <div class="footer-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div>
+      <h5>🎓 School Connect</h5>
+      <p style="color:var(--gray-400);font-size:0.9rem">An HMG Ecosystem generator that builds complete school management platforms. HMG Ecosystem Licensed.</p>
+    </div>
+    <div>
+      <h5>Product</h5>
+      <a href="builder.html">Builder</a>
+      <a href="voting.html">Voting Demo</a>
+      <a href="notifications.html">Notifications</a>
+      <a href="install.html">PWA Install</a>
+    </div>
+    <div>
+      <h5>Ecosystem</h5>
+      <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">HMG Concepts</a>
+      <a href="ecosystem.html">Explore</a>
+    </div>
+  </div>
+  <div class="footer-bottom">© 2026 HMG Concepts · <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" style="color:var(--gray-400)">hmgconcepts.pages.dev</a></div>
+</footer>
+
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script>
+  function loadProjects() {
+    try {
+      const saved = localStorage.getItem('sc-wizard-config');
+      const list = document.getElementById('projects-list');
+      if (!saved) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">📂</div>
+            <h3>No projects yet</h3>
+            <p>Your current builder draft will appear here. Open the <a href="builder.html">builder</a> to start.</p>
+            <a href="builder.html" class="btn btn-primary">🚀 Open Builder</a>
+          </div>`;
+        return;
+      }
+      const cfg = JSON.parse(saved);
+      const initial = (cfg.schoolName || 'S').trim()[0].toUpperCase() || 'S';
+      const moduleCount = (cfg.modules || []).length;
+      const presetName = cfg.presetId ? cfg.presetId.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()) : 'Custom';
+      const themeName = cfg.themeId || 'indigo';
+      const lastEdit = new Date().toLocaleString();
+      list.innerHTML = `
+        <div class="projects-grid">
+          <div class="project-card">
+            <div class="project-header">
+              <div class="project-avatar">${initial}</div>
+              <div class="project-info">
+                <h3>${cfg.schoolName || 'Untitled school'}</h3>
+                <span>Last edit: ${lastEdit}</span>
+              </div>
+            </div>
+            <div class="project-stats">
+              <div class="project-stat"><div class="value">${moduleCount}</div><div class="label">Modules</div></div>
+              <div class="project-stat"><div class="value">${themeName}</div><div class="label">Theme</div></div>
+              <div class="project-stat"><div class="value">${cfg.layout || 'sidebar'}</div><div class="label">Layout</div></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a href="builder.html" class="btn btn-primary btn-sm">✏️ Edit</a>
+              <a href="voting.html" class="btn btn-outline btn-sm">👁️ Preview</a>
+              <button class="btn btn-outline btn-sm" onclick="exportProject()">📤 Export</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteProject()">🗑️ Delete</button>
+            </div>
+          </div>
+        </div>`;
+    } catch (e) {
+      document.getElementById('projects-list').innerHTML = '<p style="color:var(--danger)">Failed to load projects.</p>';
+    }
+  }
+
+  function exportProject() {
+    const cfg = JSON.parse(localStorage.getItem('sc-wizard-config') || '{}');
+    const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (cfg.schoolName || 'project') + '-config.json';
+    a.click();
+    toast('✅ Project exported.', 'success');
+  }
+
+  function deleteProject() {
+    if (!confirm('Delete this project? This cannot be undone.')) return;
+    localStorage.removeItem('sc-wizard-config');
+    toast('Project deleted.', 'info');
+    loadProjects();
+  }
+
+  function clearAll() {
+    if (!confirm('Clear ALL local data? This cannot be undone.')) return;
+    localStorage.clear();
+    toast('All local data cleared.', 'info');
+    loadProjects();
+  }
+
+  function toast(msg, type='info', ms=3500) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.innerHTML = '<div class="toast-msg">' + msg + '</div>';
+    c.appendChild(t);
+    setTimeout(() => { t.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, ms);
+  }
+
+  loadProjects();
+  if (typeof PWAInstall !== 'undefined') PWAInstall.init();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+</body>
+</html>

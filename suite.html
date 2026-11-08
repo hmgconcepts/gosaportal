@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HMG Connect Suite — Free Generators by HMG Concepts</title>
+<meta name="description" content="Three enterprise tools by HMG Concepts (His Marvellous Grace). School Connect, Church Connect, Business Connect. 100% free forever.">
+<meta name="theme-color" content="#7c3aed">
+<link rel="canonical" href="https://schoolconnectportal.vercel.app/suite.html">
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.png">
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  body { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); color: white; min-height: 100vh; }
+  body .nav { background: rgba(15,23,42,0.85); border-bottom-color: rgba(255,255,255,0.1); }
+  body .nav-links a { color: rgba(255,255,255,0.85); }
+  body .nav-links a:hover { background: rgba(255,255,255,0.08); color: white; }
+  body .nav-logo { color: white; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 60px 24px; }
+  .suite-header { text-align: center; margin-bottom: 60px; padding-top: 60px; }
+  .suite-header h1 { font-size: clamp(2.5rem,5vw,3.5rem); font-weight: 900; margin-bottom: 16px; background: linear-gradient(135deg, #818cf8 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.1; }
+  .suite-header p { font-size: 1.15rem; opacity: 0.8; max-width: 640px; margin: 0 auto 32px; line-height: 1.7; }
+  .hmg-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.1); padding: 8px 20px; border-radius: 50px; font-size: 0.85rem; margin-bottom: 24px; border: 1px solid rgba(255,255,255,0.2); }
+  .suite-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 60px; }
+  .suite-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 36px; text-align: center; transition: var(--transition); }
+  .suite-card:hover { transform: translateY(-6px); border-color: rgba(129,140,248,0.5); background: rgba(255,255,255,0.08); }
+  .suite-card.live { border-color: rgba(16,185,129,0.5); }
+  .suite-icon { font-size: 3.5rem; margin-bottom: 20px; }
+  .suite-card h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 12px; color: white; }
+  .suite-card p { font-size: 0.92rem; opacity: 0.75; line-height: 1.6; margin-bottom: 20px; }
+  .suite-features { font-size: 0.8rem; opacity: 0.6; line-height: 1.7; margin-bottom: 24px; text-align: left; }
+  .suite-status { display: inline-block; padding: 4px 12px; border-radius: 50px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .status-live { background: rgba(16,185,129,0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+  .status-soon { background: rgba(245,158,11,0.15); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
+  .suite-btn { display: inline-block; padding: 12px 28px; background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%); color: white; border-radius: 12px; font-weight: 700; text-decoration: none; transition: var(--transition); }
+  .suite-btn:hover { transform: scale(1.05); color: white; }
+  .suite-btn.disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.5); cursor: not-allowed; }
+  .suite-footer { text-align: center; padding: 40px 24px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 60px; }
+  .suite-footer p { opacity: 0.5; font-size: 0.9rem; }
+  .suite-footer a { color: #818cf8; text-decoration: none; }
+</style>
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+    <meta name="author" content="HMG Concepts">
+    <meta property="og:url" content="./suite.html">
+    <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">
+      <img src="assets/img/logo.png" alt="">
+      <span style="color:white">School Connect</span>
+    </a>
+    <button class="mobile-toggle" onclick="document.querySelector('.nav-links').classList.toggle('show')" aria-label="Menu" style="color:white">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="builder.html">Builder</a></li>
+      <li><a href="voting.html">Voting</a></li>
+      <li><a href="notifications.html">Notifications</a></li>
+      <li><a href="ecosystem.html">Ecosystem</a></li>
+      <li><a href="guide.html">Guide</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div id="pwa-install-banner" class="pwa-install">
+  <div class="pwa-install-header">
+    <img src="assets/img/logo.png" alt="" class="pwa-install-icon">
+    <div style="flex:1">
+      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-msg">Get push notifications, offline access.</div>
+    </div>
+    <button class="modal-close" data-pwa-action="dismiss">×</button>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="btn btn-outline btn-sm" data-pwa-action="never">Not now</button>
+    <button class="btn btn-primary btn-sm" data-pwa-action="install">Install App</button>
+  </div>
+</div>
+
+<div id="toast-container" class="toast-container"></div>
+
+<main class="container">
+  <div class="suite-header">
+    <div class="hmg-badge">🌟 Part of the HMG Concepts Ecosystem</div>
+    <h1>The HMG Connect Suite</h1>
+    <p>Three enterprise tools that solve real problems. Each platform runs on free tools, requires zero monthly fees, and stays in your ownership forever.</p>
+    <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" class="suite-btn">🌐 hmgconcepts.pages.dev</a>
+  </div>
+
+  <div class="suite-grid">
+    <div class="suite-card live">
+      <div class="suite-status status-live">● Live now</div>
+      <div class="suite-icon">🎓</div>
+      <h2>School Connect</h2>
+      <p>A complete school management platform. 88 modules covering every school operation. HMG Ecosystem Licensed.</p>
+      <div class="suite-features">
+        ✓ Students · Staff · Classes · Attendance<br>
+        ✓ Results · Fees · Timetable · CBT<br>
+        ✓ Voting &amp; Polls · Push Notifications<br>
+        ✓ PWA Install · SEO Lead-Gen
+      </div>
+      <a href="builder.html" class="suite-btn">Build a school →</a>
+    </div>
+
+    <div class="suite-card">
+      <div class="suite-status status-soon">Coming soon</div>
+      <div class="suite-icon">⛪</div>
+      <h2>Church Connect</h2>
+      <p>For churches of every size. Members, giving, events, sermons, small groups and pastoral care.</p>
+      <div class="suite-features">
+        ✓ Members &amp; families<br>
+        ✓ Giving &amp; tithes<br>
+        ✓ Sermons &amp; media<br>
+        ✓ Pastoral care · Event RSVPs
+      </div>
+      <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" class="suite-btn disabled">Join waitlist →</a>
+    </div>
+
+    <div class="suite-card">
+      <div class="suite-status status-soon">Coming soon</div>
+      <div class="suite-icon">💼</div>
+      <h2>Business Connect</h2>
+      <p>For SMEs. Inventory, sales, customers, expenses and invoicing. Same free philosophy.</p>
+      <div class="suite-features">
+        ✓ Inventory &amp; POS<br>
+        ✓ Customers &amp; sales<br>
+        ✓ Invoicing &amp; expenses<br>
+        ✓ Reports &amp; analytics
+      </div>
+      <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener" class="suite-btn disabled">Join waitlist →</a>
+    </div>
+  </div>
+
+  <div style="text-align:center;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:48px 24px;margin-top:40px">
+    <h2 style="font-size:2rem;font-weight:900;margin-bottom:12px">One Philosophy. Three Generators.</h2>
+    <p style="opacity:0.85;max-width:600px;margin:0 auto 24px;font-size:1.05rem;line-height:1.7">HMG Ecosystem Licensed. No AI APIs. No subscriptions. No lock-in. Just tools that work — owned by you, hosted on free infrastructure, secure by design.</p>
+    <a href="ecosystem.html" class="suite-btn">Explore the ecosystem →</a>
+  </div>
+
+  <div class="suite-footer">
+    <p>© 2026 HMG Concepts (His Marvellous Grace) · <a href="https://hmgconcepts.pages.dev/" target="_blank" rel="noopener">hmgconcepts.pages.dev</a> · EdTech · DataTech · FaithTech</p>
+  </div>
+</main>
+
+<script src="assets/js/notifications.js"></script>
+<script src="assets/js/pwa-install.js"></script>
+<script>
+  if (typeof PWAInstall !== 'undefined') PWAInstall.init();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+  function toast(msg, type='info', ms=3500) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = 'toast toast-' + type;
+    t.innerHTML = '<div class="toast-msg">' + msg + '</div>';
+    c.appendChild(t);
+    setTimeout(() => { t.style.animation = 'slideOut 0.3s ease forwards'; setTimeout(() => t.remove(), 300); }, ms);
+  }
+</script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+</body>
+</html>

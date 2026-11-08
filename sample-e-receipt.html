@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>SAMPLE — Fee E-Receipt & Payslip</title>
 <style>
@@ -55,5 +56,7 @@ h2{margin:0;font-size:1.15rem}.sub{margin:2px 0 0;font-size:.72rem;color:#334155
   <div class="sig"><span class="script">A. Samson</span><div style="border-top:1px solid #111;width:180px;margin:2px auto 0;padding-top:2px"><b>Mrs. A. Samson</b> — Bursar / Principal</div></div>
   <p class="note">SAMPLE e-receipt (Fees → row → Print E-Receipt). Real receipts carry your school logo, the authorised signature saved in Settings (background auto-removed), amounts in your currency and dd/mm/yyyy dates. Licensed Platform · HMG Technologies.</p>
 </div>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
 </body>
 </html>
