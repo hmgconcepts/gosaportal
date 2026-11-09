@@ -75,6 +75,7 @@
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
           <button class="btn btn-primary" onclick="MR.generate()">📊 Generate Midterm Reports</button>
+          <button class="btn btn-outline" style="border-color:#b45309;color:#b45309" onclick="MR.repairRanking()" title="Re-measure every card against the class's full expected subject load and re-rank the class fairly. Use this on any class generated before V12.64, where a student who sat fewer subjects could take 1st place.">🔧 Repair percentages &amp; positions</button>
           <button class="btn btn-outline" onclick="MR.preview()">👁️ Preview generated sheets</button>
           <button class="btn btn-outline" onclick="MR.printAll()">🖨️ Print all student sheets</button>
           <button class="btn btn-outline" onclick="MR.publish(true)">✅ Publish (student/parent can view)</button>
@@ -206,6 +207,45 @@ const MR = {
     status.innerHTML='<span style="color:#16a34a">✅ Generated '+Number(r.data.generated||0)+' student report(s): '+Number(r.data.with_scores||0)+' with scores, '+Number(r.data.without_scores||0)+' awaiting scores for '+MR.esc(c)+' · '+MR.esc(t)+' · '+MR.esc(s)+'.</span>'+warning;
     this.preview();
   },
+  /* V12.64 — ONE-CLICK REPAIR.
+     Any midterm or terminal card generated before V12.64 carries a percentage
+     that was averaged over the marks the learner happened to submit, and a
+     position that a one-subject learner could top. This re-measures every card
+     in the class against the full expected load and re-ranks it. Dry-run first
+     so the damage is shown before anything is written. */
+  async repairRanking(){
+    const c=(document.getElementById('mr-class')||{}).value||'', t=(document.getElementById('mr-term')||{}).value||'', s=(document.getElementById('mr-session')||{}).value||'';
+    if(!c||!t||!s){ toast('Choose class, term and session first.','warning',6000); return false; }
+    const status=document.getElementById('mr-status');
+    try{
+      if(status) status.innerHTML='<span style="color:#0369a1">Checking '+this.esc(c)+' …</span>';
+      const dry=await sb.rpc('sc_reports_recompute',{p_class:c,p_term:t,p_session:s,p_dry_run:true});
+      if(dry.error) throw new Error(dry.error.message);
+      const n=Number((dry.data&&dry.data.finding_count)||0);
+      let proceed=true;
+      if(n>0){
+        const kinds={};
+        (dry.data.findings||[]).forEach(f=>{kinds[f.kind]=(kinds[f.kind]||0)+1;});
+        const detail=Object.entries(kinds).map(([k,v])=>v+' × '+(k==='percentage_not_of_expected_load'?'percentage not measured against the full subject load':'partial sitting ranked above a complete one')).join('; ');
+        proceed=confirm('Found '+n+' card(s) that do not meet the reporting standard:\n\n'+detail+'\n\nRe-measure and re-rank '+c+' now?');
+      } else {
+        proceed=confirm('No defects found in '+c+' — all cards already meet the standard.\n\nRe-measure and re-rank anyway? (safe, idempotent)');
+      }
+      if(!proceed){ if(status) status.innerHTML='<span style="color:#64748b">Cancelled — nothing was written.</span>'; return false; }
+      const fix=await sb.rpc('sc_reports_recompute',{p_class:c,p_term:t,p_session:s,p_dry_run:false});
+      if(fix.error || !fix.data || fix.data.ok===false) throw new Error((fix.data&&fix.data.error)||fix.error?.message||'Repair failed');
+      const d=fix.data;
+      if(status) status.innerHTML='<span style="color:#16a34a">✅ Re-measured and re-ranked '+this.esc(c)+'. '+
+        'Defects found before: '+n+'. Midterm cards repaired: '+Number(d.midterm_groups_repaired||0)+
+        ', terminal cards repaired: '+Number(d.terminal_groups_repaired||0)+
+        '. Ranking now: '+this.esc(JSON.stringify(d.midterm_ranking||{}))+'</span>';
+      this.preview();
+      return true;
+    }catch(e){
+      if(status) status.innerHTML='<span style="color:#dc2626">'+this.esc(e.message||e)+'</span>';
+      return false;
+    }
+  },
   async fetchContextRows(c,t,s){
     const all=[];const pageSize=500;
     for(let from=0;from<10000;from+=pageSize){
@@ -226,7 +266,16 @@ const MR = {
   sheetBody(row){
     const school=window.SCHOOL||{},logoExt=String(school.logoExt||'svg').replace(/[^a-z0-9]/gi,''),logo='assets/img/logo.'+logoExt;
     const detail=this.scoreItems(row),scoreRows=detail.length?detail.map(x=>'<tr><td>'+this.esc(x.subject||'—')+'</td><td>'+this.esc(x.assessment||'Midterm')+'</td><td>'+Number(x.score||0).toFixed(2)+'</td><td>'+(Number(x.max_mark)>0?Number(x.max_mark).toFixed(2):'—')+'</td></tr>').join(''):'<tr><td colspan="4" class="no-score">No midterm score has been recorded for this student.</td></tr>';
-    return '<section class="report-page"><header class="school-head">'+(school.logoExt?'<img class="school-logo" src="'+this.esc(logo)+'" alt="">':'')+'<div><h1>'+this.esc(school.name||school.shortName||'School')+'</h1><p>'+this.esc(school.motto||'')+'</p></div></header><div class="sheet-title"><div>MIDTERM ASSESSMENT REPORT</div><small>Student report sheet · '+(row.has_scores===false?'No score recorded':'Official scores')+'</small></div><div class="student-meta"><div><b>Student</b><span>'+this.esc(row.student_name||'—')+'</span></div><div><b>Admission / student ID</b><span>'+this.esc(row.student_id_ref||'—')+'</span></div><div><b>Class</b><span>'+this.esc(row.class||'—')+'</span></div><div><b>Term</b><span>'+this.esc(row.term||'—')+'</span></div><div><b>Session</b><span>'+this.esc(row.session||'—')+'</span></div><div><b>Position</b><span>'+(row.has_scores===false?'—':this.esc(row.position||'—'))+'</span></div></div>'+(row.has_scores===false?'<div class="no-score-banner">No midterm marks are recorded for this student for this term. This sheet does not treat missing marks as zero.</div>':'')+'<table class="scores"><thead><tr><th>Subject</th><th>Assessment / report column</th><th>Mark</th><th>Maximum</th></tr></thead><tbody>'+scoreRows+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+Number(row.total||0).toFixed(2)+'</th><th>'+Number(row.max_total||0).toFixed(2)+'</th></tr></tfoot></table><div class="summary"><div><b>Overall percentage</b><span>'+(row.has_scores===false?'—':Number(row.average||0).toFixed(2)+'%')+'</span></div><div><b>Position</b><span>'+(row.has_scores===false?'—':this.esc(row.position||'—'))+'</span></div></div><div class="signatures"><div>Class Teacher</div><div>Head Teacher / Principal</div></div><footer>Generated '+this.esc(new Date().toLocaleDateString())+' · Midterm report is separate from the terminal report card.</footer></section>';
+    return '<section class="report-page"><header class="school-head">'+(school.logoExt?'<img class="school-logo" src="'+this.esc(logo)+'" alt="">':'')+'<div><h1>'+this.esc(school.name||school.shortName||'School')+'</h1><p>'+this.esc(school.motto||'')+'</p></div></header><div class="sheet-title"><div>MIDTERM ASSESSMENT REPORT</div><small>Student report sheet · '+(row.has_scores===false?'No score recorded':'Official scores')+'</small></div><div class="student-meta"><div><b>Student</b><span>'+this.esc(row.student_name||'—')+'</span></div><div><b>Admission / student ID</b><span>'+this.esc(row.student_id_ref||'—')+'</span></div><div><b>Class</b><span>'+this.esc(row.class||'—')+'</span></div><div><b>Term</b><span>'+this.esc(row.term||'—')+'</span></div><div><b>Session</b><span>'+this.esc(row.session||'—')+'</span></div><div><b>Position</b><span>'+(row.has_scores===false?'—':this.esc(row.position||'—'))+'</span></div></div>'+(row.has_scores===false?'<div class="no-score-banner">No midterm marks are recorded for this student for this term. This sheet does not treat missing marks as zero.</div>':'')+'<table class="scores"><thead><tr><th>Subject</th><th>Assessment / report column</th><th>Mark</th><th>Maximum</th></tr></thead><tbody>'+scoreRows+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+Number(row.total||0).toFixed(2)+'</th><th>'+Number(row.max_total||0).toFixed(2)+'</th></tr></tfoot></table><div class="summary">'+
+      '<div><b>Overall percentage</b><span>'+(row.has_scores===false?'—':Number(row.percentage!=null?row.percentage:row.average||0).toFixed(2)+'%')+'</span>'+
+        '<small style="display:block;font-size:9px;color:#64748b">of the full expected load'+(Number(row.expected_total)>0?' ('+Number(row.total||0).toFixed(2)+' of '+Number(row.expected_total).toFixed(2)+')':'')+'</small></div>'+
+      '<div><b>Position</b><span>'+(row.has_scores===false||row.position==null?'—':this.esc(row.position))+'</span>'+
+        (Number(row.rank_cohort_size)>0?'<small style="display:block;font-size:9px;color:#64748b">of '+Number(row.rank_cohort_size)+' ranked</small>':'')+'</div>'+
+      '<div><b>Subjects sat</b><span>'+Number(row.subjects_sat||0)+' / '+Number(row.subjects_expected||0)+'</span></div>'+
+      '<div><b>Grade</b><span>'+(this.esc(row.grade||'')||'—')+'</span></div>'+
+      '</div>'+
+      ((row.rank_basis)?'<div class="notice" style="text-align:center">'+this.esc(row.rank_basis)+'</div>':'')+
+      '<div class="signatures"><div>Class Teacher</div><div>Head Teacher / Principal</div></div><footer>Generated '+this.esc(new Date().toLocaleDateString())+' · Midterm report is separate from the terminal report card.</footer></section>';
   },
   printRows(rows,title,existingWindow){
     const school=window.SCHOOL||{},candidate=String(school.primary||school.theme?.primary||'#1d4ed8'),primary=/^#[0-9a-f]{3,8}$/i.test(candidate)?candidate:'#1d4ed8';

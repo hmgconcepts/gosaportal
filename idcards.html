@@ -526,7 +526,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           <div class="grid grid-3">
             <div class="form-group"><label>Standard finished size</label><select class="form-select" id="ic-size-preset" onchange="ICUI.applyCardSize()"><option value="id1">ISO/IEC 7810 ID-1 — 85.60 × 53.98 mm (plastic card)</option><option value="id2">ISO ID-2 — 105 × 74 mm</option><option value="id3">ISO ID-3 — 125 × 88 mm</option><option value="custom">Custom size (mm)</option></select></div>
             <div class="form-group"><label>Card orientation</label><select class="form-select" id="ic-card-orientation" onchange="ICUI.applyCardSize()"><option value="landscape">Landscape</option><option value="portrait">Portrait</option></select></div>
-            <div class="form-group"><label>Paper size</label><select class="form-select" id="ic-paper-size" onchange="ICUI.applyCardSize()"><option value="A4">A4</option><option value="Letter">US Letter</option><option value="custom">Custom sheet size</option></select></div>
+            <div class="form-group"><label>Paper size</label><select class="form-select" id="ic-paper-size" onchange="ICUI.applyCardSize()"><option value="A4">A4</option><option value="Letter">US Letter</option><option value="exact">Exact card size (no margins — best for CorelDRAW)</option><option value="custom">Custom sheet size</option></select></div>
             <div class="form-group"><label>Paper orientation</label><select class="form-select" id="ic-paper-orientation"><option value="portrait">Portrait sheet</option><option value="landscape">Landscape sheet</option></select></div>
             <div class="form-group"><label>Front/back output</label><select class="form-select" id="ic-print-mode"><option value="paired">One student per page — front + back together</option><option value="duplex">Plastic duplex — consecutive front/back pages per student</option></select></div>
             <div class="form-group"><label>Pair placement</label><select class="form-select" id="ic-pair-layout"><option value="auto">Auto-fit on sheet</option><option value="side">Side-by-side</option><option value="stack">Stacked</option></select></div>
@@ -761,6 +761,16 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
      embedded TrueType font, DeviceRGB fills, no transparency and no ICC
      profiles, so it opens in CorelDRAW, Illustrator, InDesign, Word, Acrobat
      and every browser, with text still editable.
+
+     V12.63 fixed what was still broken underneath that:
+       * the font was declared with /FirstChar 32 /LastChar 255 (224 codes) and
+         NO /Widths array, so every consumer had to invent glyph advances —
+         CorelDRAW laid the text out differently from Acrobat and lines ran off
+         the card. /Widths is now read from the embedded font's own hmtx table;
+       * /FontBBox, /Ascent, /Descent and /CapHeight were hard-coded constants
+         that did not match the font. They are now derived from head/hhea;
+       * there was no /ToUnicode CMap, so copy/paste and search produced
+         mojibake. One is now emitted for both faces.
      ======================================================================= */
   brand(){
     /* Mirror exactly what the on-screen card uses (Super.idcard reads
@@ -795,13 +805,41 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     };
   },
   /* photo_url -> Image element (crossOrigin safe, resolved before layout) */
+  /* V12.63 — the blank-photo bug.
+     The old loader set crossOrigin='anonymous' on EVERY url, including the
+     ones that are already same-origin. Two things then went wrong:
+       * a Supabase/Cloudinary URL that does not return an
+         Access-Control-Allow-Origin header fails to load at all, so the photo
+         silently became null;
+       * if it did load, the canvas was tainted and toDataURL() threw, which
+         the PDF engine swallowed -> blank photo in the exported file.
+     Now: try a plain crossOrigin load first (no CORS requirement for
+     same-origin), and only fall back to a proxied/absolute fetch when that
+     fails. Every failure is reported so it can be shown to the user. */
   async loadPhoto(url){
     if(!url) return null;
-    try{
-      const img=new Image(); img.crossOrigin='anonymous'; img.decoding='sync';
-      await new Promise((res,rej)=>{ img.onload=res; img.onerror=rej; img.src=url; });
-      return img;
-    }catch(e){ console.warn('ID-card photo skipped:', url, e&&e.message); return null; }
+    const raw=String(url).trim();
+    const abs=(()=>{ try{ return new URL(raw, location.href).href; }catch(e){ return raw; } })();
+    const attempts=[
+      {mode:'anonymous',src:abs},
+      {mode:'anonymous',src:abs+(abs.includes('?')?'&':'?')+'v=idcard'},
+      {mode:'',src:abs}
+    ];
+    for(const a of attempts){
+      try{
+        const img=await new Promise((res,rej)=>{
+          const im=new Image();
+          if(a.mode) im.crossOrigin=a.mode;
+          im.decoding='async'; im.loading='eager';
+          im.onload=()=>res(im); im.onerror=()=>rej(new Error('load failed'));
+          im.src=a.src;
+        });
+        if(img && (img.naturalWidth||img.width)) return img;
+      }catch(e){ /* try the next strategy */ }
+    }
+    console.warn('ID-card photo skipped:', raw);
+    if(window.IDCardPDF && IDCardPDF.noteWarning) IDCardPDF.noteWarning('photo could not be loaded', raw);
+    return null;
   },
   /* QR for the verification line — uses the bundled qrcode-generator */
   makeQr(text){
@@ -859,6 +897,17 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const restore=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Building PDF…'; }
     try{
       const people=source.map(x=>this.recordPerson(x,to));
+      /* V12.63 — tell the user up-front which records have no photo on file.
+         Before this, an empty photo field produced a blank card and everyone
+         blamed the PDF engine. */
+      const withoutPhoto=people.filter(p=>!p.photo_url);
+      if(withoutPhoto.length){
+        const names=withoutPhoto.slice(0,4).map(p=>p.full_name).filter(Boolean).join(', ');
+        toast(withoutPhoto.length+' record'+(withoutPhoto.length===1?'':'s')+
+              ' have no photo on file'+(names?' ('+names+(withoutPhoto.length>4?'…':'')+')':'')+
+              ' — those cards will print with a marked placeholder. Add the photo under the record first.',
+              'warning',12000);
+      }
       const cards=await this.pdfCards(people);
       const bytes=IDCardPDF.build(cards,{
         widthMm:cfg.width, heightMm:cfg.height,
@@ -876,8 +925,22 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       const a=document.createElement('a'); a.href=url; a.download=name;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(()=>URL.revokeObjectURL(url),10000);
-      toast('PDF ready — '+cards.length+' card'+(cards.length===1?'':'s')+', '+(bytes.length/1024).toFixed(0)+
-            ' KB. Text is editable and every card is at exact size.','success',8000);
+      /* V12.63 — never report success while silently dropping a photo or a
+         signature. The warnings are shown, and the count of cards that are
+         missing artwork is stated plainly. */
+      let warns=[]; try{ warns=IDCardPDF.lastWarnings?IDCardPDF.lastWarnings():[]; }catch(_){}
+      const noPhoto=warns.filter(w=>/photo/i.test(w.message)).length;
+      if(warns.length){
+        console.warn('ID card PDF warnings:', warns);
+        toast('PDF ready — '+cards.length+' card'+(cards.length===1?'':'s')+', '+
+              (bytes.length/1024).toFixed(0)+' KB, but '+warns.length+
+              ' item'+(warns.length===1?'':'s')+' could not be embedded'+
+              (noPhoto?' ('+noPhoto+' without a photo)':'')+'. First: '+warns[0].message+
+              (warns[0].detail?' — '+warns[0].detail:''),'warning',14000);
+      }else{
+        toast('PDF ready — '+cards.length+' card'+(cards.length===1?'':'s')+', '+(bytes.length/1024).toFixed(0)+
+              ' KB. Text is editable, every card is at exact size, and photos and signatures are embedded.','success',8000);
+      }
       if(window.CRUD&&CRUD.audit) try{ CRUD.audit('idcards','download-pdf',label,'',{count:cards.length}); }catch(_){}
       return true;
     }catch(e){
@@ -895,6 +958,12 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   },
   paperDims(paper){
     if(paper==='Letter') return [215.9,279.4];
+    /* V12.63 — "exact" makes the PAGE the size of the CARD. Opening that PDF in
+       CorelDRAW gives one card per page at trim size, with no white surround to
+       crop away. The old engine always centred cards on a full A4 sheet, which
+       is what produced a page of white with a small card floating in the middle. */
+    if(paper==='exact') return [Number(document.getElementById('ic-card-width-mm')?.value)||85.6,
+                                Number(document.getElementById('ic-card-height-mm')?.value)||53.98];
     if(paper==='custom'){ const n=id=>Number(document.getElementById(id)?.value)||210; return [n('ic-paper-width-mm'),n('ic-paper-height-mm')]; }
     return [210,297];
   },
