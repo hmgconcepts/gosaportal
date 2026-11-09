@@ -1557,6 +1557,7 @@ const App = {
             '</table>' : '') +
           '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
             '<a class="btn btn-sm btn-primary" href="fees.html">Open Fees &amp; Payments</a>' +
+            '<a class="btn btn-sm btn-outline" href="fees.html#fee-statement">🖨️ Paid vs outstanding statement</a>' +
             '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button>' +
           '</div>' +
           '<p style="font-size:.74rem;color:var(--gray-500);margin:8px 0 0">Identical figures to the Fees page — both read the same server-side fee engine.</p>');
@@ -1584,11 +1585,81 @@ const App = {
           (arrears > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, arrears) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Previous terms owing</div></div>' : '') +
           (totalDue > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, totalDue) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#b91c1c">TOTAL OUTSTANDING</div></div>' : '<div style="align-self:center;font-weight:800;color:#15803d">✅ Fully paid</div>') +
           '</div>';
+        /* ============================================================
+           V12.62 (item 1) — the card must be COMPLETE and must reconcile
+           line by line with the Fees page, without the family having to
+           navigate anywhere. Same engine (sc_student_fee_state →
+           sc_fee_ledger_for), same figures, four labelled lines that add
+           up, plus the actual receipts underneath.
+           ============================================================ */
         const br = f.breakdown || [];
-        if (br.length) h += '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">📋 Fee breakdown</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + br.map(b => '<tr><td style="padding:2px 6px">' + esc(b.item) + '</td><td style="padding:2px 6px;text-align:right"><b>' + money(cur, b.amount) + '</b></td></tr>').join('') + '<tr><td style="padding:4px 6px;border-top:1px solid var(--gray-300)"><b>Total</b></td><td style="padding:4px 6px;text-align:right;border-top:1px solid var(--gray-300)"><b>' + money(cur, f.bill) + '</b></td></tr></table></details>';
         const ar = f.arrears_rows || [];
-        if (ar.length) h += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:#b91c1c">🧮 Previous terms owing — breakdown</summary><table style="width:100%;font-size:.82rem;margin-top:6px">' + ar.map(a => '<tr><td style="padding:2px 6px">' + esc(a.term) + ' ' + esc(a.session) + '</td><td style="padding:2px 6px;text-align:right">billed <b>' + money(cur, a.bill) + '</b> · paid ' + money(cur, a.paid) + ' · owing <b style="color:#b91c1c">' + money(cur, a.owing) + '</b></td></tr>').join('') + '</table></details>';
-        h += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm btn-outline" href="fees.html">🧾 Payment history & e-receipts</a>' + (role === 'parent' ? '<a class="btn btn-sm btn-outline" href="payments_online.html">💳 Pay online</a>' : '') + '</div></div>';
+        const paidPct = Number(f.paid_percent || 0);
+
+        h += '<div style="margin-top:10px;border:1px solid var(--gray-300);border-radius:10px;overflow:hidden">' +
+             '<div style="background:var(--gray-100);padding:6px 10px;font-size:.8rem;font-weight:800;color:var(--gray-700)">How this balance is calculated</div>' +
+             '<table style="width:100%;font-size:.84rem;border-collapse:collapse">' +
+               '<tr><td style="padding:4px 10px">Total fees this term</td>' +
+                   '<td style="padding:4px 10px;text-align:right;font-weight:700">' + money(cur, f.bill) + '</td></tr>' +
+               (Number(f.aid || 0) > 0
+                 ? '<tr><td style="padding:4px 10px;color:#7c3aed">Less scholarship / aid</td><td style="padding:4px 10px;text-align:right;color:#7c3aed;font-weight:700">−' + money(cur, f.aid) + '</td></tr>' : '') +
+               (arrears > 0
+                 ? '<tr><td style="padding:4px 10px;color:#b91c1c">Add arrears from earlier terms</td><td style="padding:4px 10px;text-align:right;color:#b91c1c;font-weight:700">+' + money(cur, arrears) + '</td></tr>' : '') +
+               '<tr><td style="padding:4px 10px;color:#15803d">Less total paid so far</td>' +
+                   '<td style="padding:4px 10px;text-align:right;color:#15803d;font-weight:700">−' + money(cur, f.paid) + '</td></tr>' +
+               '<tr style="border-top:2px solid var(--gray-300)"><td style="padding:6px 10px"><b>' +
+                   (totalDue > 0 ? 'BALANCE STILL OWED' : 'FULLY SETTLED') + '</b></td>' +
+                   '<td style="padding:6px 10px;text-align:right"><b style="font-size:1.05rem;color:' + (totalDue > 0 ? '#b91c1c' : '#15803d') + '">' +
+                   money(cur, totalDue) + '</b></td></tr>' +
+             '</table>' +
+             /* progress bar: how much of the whole obligation is settled */
+             '<div style="padding:8px 10px;border-top:1px solid var(--gray-200)">' +
+               '<div style="height:8px;border-radius:999px;background:#e2e8f0;overflow:hidden">' +
+                 '<div style="height:100%;width:' + Math.max(0, Math.min(100, paidPct)) + '%;background:' + (totalDue > 0 ? '#f59e0b' : '#16a34a') + '"></div></div>' +
+               '<div style="font-size:.74rem;color:var(--gray-500);margin-top:4px">' + paidPct + '% settled · ' +
+                 Number(f.receipts || 0) + ' receipt(s)' + (f.last_payment ? ' · last payment ' + esc(String(f.last_payment).slice(0, 10)) : '') + '</div>' +
+             '</div>' +
+           '</div>';
+
+        /* this term's bill, itemised */
+        if (br.length) h += '<details style="margin-top:8px"' + (br.length > 4 ? '' : ' open') + '>' +
+          '<summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">📋 What the ' + money(cur, f.bill) + ' is made of</summary>' +
+          '<table style="width:100%;font-size:.82rem;margin-top:6px">' +
+          br.map(b => '<tr><td style="padding:2px 6px">' + esc(b.item) + '</td><td style="padding:2px 6px;text-align:right"><b>' + money(cur, b.amount) + '</b></td></tr>').join('') +
+          '<tr><td style="padding:4px 6px;border-top:1px solid var(--gray-300)"><b>Total</b></td><td style="padding:4px 6px;text-align:right;border-top:1px solid var(--gray-300)"><b>' + money(cur, f.bill) + '</b></td></tr>' +
+          '</table></details>';
+
+        /* which earlier terms are still owing */
+        if (ar.length) h += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:#b91c1c">🧮 Which earlier terms are still owing</summary>' +
+          '<table style="width:100%;font-size:.82rem;margin-top:6px"><thead><tr><th style="text-align:left;padding:2px 6px">Term</th><th style="padding:2px 6px">Billed</th><th style="padding:2px 6px">Paid</th><th style="padding:2px 6px">Owing</th></tr></thead><tbody>' +
+          ar.map(a => '<tr><td style="padding:2px 6px">' + esc(a.term || '—') + ' ' + esc(a.session || '') +
+            (a.opening ? ' <span style="font-size:.7rem;color:#7c3aed">(before School Connect)</span>' : '') + '</td>' +
+            '<td style="padding:2px 6px;text-align:right">' + money(cur, a.bill) + '</td>' +
+            '<td style="padding:2px 6px;text-align:right">' + money(cur, a.paid) + '</td>' +
+            '<td style="padding:2px 6px;text-align:right"><b style="color:#b91c1c">' + money(cur, a.owing) + '</b></td></tr>').join('') +
+          '</tbody></table></details>';
+
+        /* the actual receipts — the family can see the history right here */
+        try {
+          const pr = await sb.from('fee_payments')
+            .select('amount_paid,method,reference,term,session,payment_date,created_at')
+            .eq('student_id', s.id).order('created_at', { ascending: false }).limit(50);
+          const pays = pr.data || [];
+          if (pays.length) {
+            h += '<details style="margin-top:6px"><summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--gray-600)">🧾 Payment history — ' + pays.length + ' receipt(s)</summary>' +
+              '<div class="table-wrap" style="margin-top:6px"><table style="font-size:.8rem"><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Term</th><th>Reference</th></tr></thead><tbody>' +
+              pays.map(p => '<tr><td>' + esc(String(p.payment_date || p.created_at || '').slice(0, 10)) + '</td>' +
+                '<td style="text-align:right"><b style="color:#15803d">' + money(cur, p.amount_paid) + '</b></td>' +
+                '<td>' + esc(p.method || '—') + '</td>' +
+                '<td>' + esc((p.term || '') + (p.session ? ' · ' + p.session : '')) + '</td>' +
+                '<td>' + esc(p.reference || '—') + '</td></tr>').join('') +
+              '</tbody></table></div></details>';
+          } else {
+            h += '<p style="font-size:.8rem;color:var(--gray-500);margin:8px 0 0">No payment has been recorded yet.</p>';
+          }
+        } catch (_) { /* the totals above are authoritative even if history fails */ }
+
+        h += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm btn-outline" href="fees.html">🧾 Receipts &amp; e-receipts</a>' + (role === 'parent' ? '<a class="btn btn-sm btn-outline" href="payments_online.html">💳 Pay online</a>' : '') + '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div></div>';
       }
       paint(h || '<div style="color:var(--gray-500);font-size:.85rem"><p>💤 No fee structure has been published for the class yet.</p><p>Once the school saves the Class Fee Structure (admin: 💰 School Fee Structure page) and runs the v9.4 database update, the full bill, payments and balance appear here automatically.</p><button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div>');
     } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Fee summary could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Retry</button></p>'); }
@@ -1753,23 +1824,50 @@ const App = {
          tiles now read the SAME server-side aggregate (sc_fee_overview):
          collected → Fees Paid, outstanding → Fees Outstanding. The row-sum is
          only a last-resort fallback when the RPC is not installed. */
-      let feesPaid = null, feesPaidFromEngine = false;
+      /* V12.62 (item 2) — ONE call, ONE aggregate object. These two tiles used
+         to make two independent rpc() round-trips; if the second failed or the
+         data moved in between, "paid" and "outstanding" could disagree, and a
+         bursar reading both tiles sees exactly the "both went up" symptom.
+         Now a single snapshot feeds both, so they are arithmetically linked:
+             outstanding = net_bill + arrears − collected
+         and both come from the same engine as the Fees page. */
+      let feesPaid = null, feesOwed = null, feeSrc = null, ovSnap = null;
       try {
-        const ovPaid = await supabase.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
-        if (!ovPaid.error && ovPaid.data && ovPaid.data.ok !== false) {
-          feesPaid = Number(ovPaid.data.collected || 0);
-          feesPaidFromEngine = true;
-        }
+        const ov = await supabase.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
+        if (!ov.error && ov.data && ov.data.ok !== false) { ovSnap = ov.data; feeSrc = 'engine'; }
       } catch (_) {}
-      if (feesPaid == null) feesPaid = (feeRows || []).reduce((a,b) => a + (Number(b.amount_paid) || 0), 0);
+      if (ovSnap) {
+        feesPaid = Number(ovSnap.collected || 0);
+        feesOwed = Number(ovSnap.outstanding || 0);
+      } else {
+        /* Consistent fallback — BOTH figures from the same per-student pass, so
+           they can never contradict each other even without the engine. */
+        const per = new Map();
+        (feeRows || []).forEach(r => {
+          if (!r || !r.student_id) return;
+          const t = Date.parse(r.created_at || '') || 0;
+          const prev = per.get(r.student_id) || { t: -1, paid: 0, bal: 0 };
+          per.set(r.student_id, {
+            t: Math.max(prev.t, t),
+            paid: prev.paid + (Number(r.amount_paid) || 0),
+            bal: t >= prev.t
+              ? (r.balance != null ? (Number(r.balance) || 0)
+                                   : Math.max(0, (Number(r.fee_total) || 0) - (Number(r.amount_paid) || 0)))
+              : prev.bal
+          });
+        });
+        feesPaid = 0; feesOwed = 0;
+        per.forEach(v => { feesPaid += v.paid; feesOwed += v.bal; });
+        feeSrc = 'rows';
+      }
       set('stat-students', studentCount);
       set('stat-staff', staffCount);
       set('stat-fees', feesPaid.toLocaleString());
       try {
         const tile = document.getElementById('stat-fees');
-        if (tile) tile.title = feesPaidFromEngine
-          ? 'Total collected this term, from the same fee engine as the Fees page.'
-          : 'Sum of the most recent 500 receipts (fee engine not installed).';
+        if (tile) tile.title = feeSrc === 'engine'
+          ? 'Total collected this term, from the same fee engine as the Fees page. Rises as money comes in.'
+          : 'Sum of recent receipts (fee engine not installed).';
       } catch (_) {}
       /* V7.8: the Notices tile showed the length of a 5-row PREVIEW list (max
          "5" forever). Real total count now. */
@@ -1780,30 +1878,26 @@ const App = {
          time a payment is recorded — the exact "paying fees increases
          outstanding" bug. The authoritative figure is the school-wide bill
          minus collections, computed server-side. */
-      let feesOwed = null;
-      try {
-        const ovr = await supabase.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
-        if (!ovr.error && ovr.data && ovr.data.ok !== false) feesOwed = Number(ovr.data.outstanding || 0);
-      } catch (_) { /* fall through to the conservative estimate */ }
-      if (feesOwed == null) {
-        /* Fallback: one balance per STUDENT — the LAST snapshot of each
-           student's ledger, never the sum of every snapshot. */
-        const perStudent = new Map();
-        (feeRows || []).forEach(r => {
-          if (!r || !r.student_id) return;
-          const t = Date.parse(r.created_at || '') || 0;
-          const prev = perStudent.get(r.student_id);
-          if (!prev || t >= prev.t) {
-            perStudent.set(r.student_id, {
-              t: t,
-              bal: r.balance != null ? (Number(r.balance) || 0)
-                                     : Math.max(0, (Number(r.fee_total) || 0) - (Number(r.amount_paid) || 0))
-            });
-          }
-        });
-        feesOwed = [...perStudent.values()].reduce((a, x) => a + x.bal, 0);
-      }
       set('stat-outstanding', feesOwed.toLocaleString());
+      /* make it visible WHY these two numbers move in opposite directions */
+      try {
+        const t2 = document.getElementById('stat-outstanding');
+        if (t2) t2.title = feeSrc === 'engine'
+          ? 'Net bill + arrears − collected, from the same fee engine as the Fees page. Every payment lowers this.'
+          : 'Estimated from recent receipts (fee engine not installed).';
+        if (ovSnap) {
+          const note = document.getElementById('fee-reconcile-note');
+          if (note) {
+            const cur = ovSnap.currency || '₦';
+            const m = n => cur + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+            note.innerHTML = 'Bill ' + m(ovSnap.net_bill) + ' + arrears ' + m(ovSnap.arrears) +
+              ' − collected ' + m(ovSnap.collected) + ' = <b>outstanding ' + m(ovSnap.outstanding) + '</b>' +
+              ' · ' + Number(ovSnap.collection_rate || 0) + '% collected · ' +
+              Number(ovSnap.fully_paid || 0) + ' fully paid, ' + Number(ovSnap.debtors || 0) + ' owing of ' + Number(ovSnap.students || 0);
+            note.style.display = '';
+          }
+        }
+      } catch (_) {}
       set('ov-staff-count', staffCount);
       set('ov-attendance', attendanceCount);
       set('ov-cbt-open', cbtCount);
