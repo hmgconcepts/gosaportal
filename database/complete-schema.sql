@@ -14443,7 +14443,7 @@ grant execute on function public.sc_fee_bill_for(uuid,text,text) to authenticate
 create or replace function public.sc_fee_account(p_student uuid, p_term text default null, p_session text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare st record; cur record; b jsonb; bill numeric := 0; paid numeric := 0; arrears numeric := 0;
-        arr_rows jsonb := '[]'::jsonb; t record; tbill numeric; tpaid numeric; opening numeric := 0;
+        arr_rows jsonb := '[]'::jsonb; t record; tbill numeric; tbill_row jsonb; tpaid numeric; opening numeric := 0;
         t_term text; t_session text; owing numeric; total_due numeric; status_txt text;
 begin
   select * into st from public.students where id = p_student;
@@ -14468,8 +14468,15 @@ begin
      group by 1,2
   loop
     tpaid := coalesce(t.tp,0);
-    tbill := public.sc_fee_bill_for(p_student, t.term, t.session);
-    tbill := coalesce((tbill->>'bill')::numeric, coalesce(t.tb,0));
+    /* The resolver returns jsonb; assigning it straight to a numeric variable
+       made PostgreSQL attempt a jsonb->numeric cast and abort the whole call
+       with `invalid input syntax for type numeric: {"ok": true, ...}`.
+       Assign to a jsonb holder, then extract the scalar. */
+    tbill_row := public.sc_fee_bill_for(p_student, t.term, t.session);
+    tbill := coalesce(
+               case when jsonb_typeof(tbill_row) = 'object'
+                    then nullif(tbill_row->>'bill','')::numeric end,
+               coalesce(t.tb,0));
     if tbill > tpaid then
       arrears := arrears + (tbill - tpaid);
       arr_rows := arr_rows || jsonb_build_array(jsonb_build_object('term',t.term,'session',t.session,'bill',tbill,'paid',tpaid,'owing',tbill-tpaid));
@@ -14512,6 +14519,7 @@ returns jsonb language plpgsql stable security definer set search_path=public as
 declare me uuid := auth.uid(); cur record; rows jsonb := '[]'::jsonb; r record; acct jsonb;
         n int := 0; paid_n int := 0; debtor_n int := 0; partial_n int := 0; nobill_n int := 0;
         billed numeric := 0; collected numeric := 0; outstanding numeric := 0; arrears_total numeric := 0;
+        aid_total numeric := 0; opening_total numeric := 0;
         t_term text; t_session text;
 begin
   if me is null or not (public.is_staff(me) or public.is_admin(me)) then
@@ -14531,6 +14539,8 @@ begin
       collected := collected + coalesce((acct->>'paid')::numeric,0);
       outstanding := outstanding + coalesce((acct->>'total_due')::numeric,0);
       arrears_total := arrears_total + coalesce((acct->>'arrears')::numeric,0);
+      aid_total := aid_total + coalesce((acct->>'aid')::numeric,0);
+      opening_total := opening_total + coalesce((acct->>'opening_arrears')::numeric,0);
       if (acct->>'status') = 'paid' then paid_n := paid_n + 1;
       elsif (acct->>'status') = 'debtor' then debtor_n := debtor_n + 1;
       elsif (acct->>'status') = 'partial' then partial_n := partial_n + 1;
@@ -14544,10 +14554,26 @@ begin
         'portal_locked',acct->'portal_locked','report_locked',acct->'report_locked'));
     end if;
   end loop;
+  /* V12.61 — a CONCISE, EXACT breakdown so the dashboard widget is complete
+     and its figures can be reconciled line by line with the Fees page:
+        billed        = this term's class-structure bills (before aid)
+        aid           = scholarships / bursaries applied to this term
+        net_bill      = billed - aid  (what the school actually expects)
+        collected     = money received against THIS term
+        outstanding   = net_bill + arrears - collected   (never negative)
+        arrears       = unpaid balances carried in from earlier terms
+        opening       = pre-School-Connect balances still owed
+        rate          = collected / net_bill  */
   return jsonb_build_object('ok',true,'term',t_term,'session',t_session,'class',coalesce(p_class,''),
     'students',n,'fully_paid',paid_n,'debtors',debtor_n,'partial',partial_n,'no_bill',nobill_n,
-    'billed',billed,'collected',collected,'outstanding',outstanding,'arrears',arrears_total,
-    'collection_rate', case when billed > 0 then round(collected / billed * 100, 1) else 0 end,
+    'billed',billed,'aid',aid_total,'net_bill',greatest(billed-aid_total,0),
+    'collected',collected,'outstanding',outstanding,'arrears',arrears_total,'opening_arrears',opening_total,
+    'collection_rate', case when (billed-aid_total) > 0 then round(collected / (billed-aid_total) * 100, 1) else 0 end,
+    'breakdown', jsonb_build_array(
+       jsonb_build_object('item','This term bill (class structure)','amount',billed),
+       jsonb_build_object('item','Scholarship / aid applied','amount',-aid_total),
+       jsonb_build_object('item','Arrears from earlier terms','amount',arrears_total),
+       jsonb_build_object('item','Paid so far this term','amount',-collected)),
     'rows',rows);
 end $$;
 revoke all on function public.sc_fee_overview(text,text,text) from public, anon;
