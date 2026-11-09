@@ -609,23 +609,24 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         const sRole=((window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
         const sUid=(window.SC_PROFILE&&SC_PROFILE.id)||null;
         const adminTier=['super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(sRole);
-        let sq=sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url,user_id').order('full_name').limit(3000);
-        if(!adminTier&&sUid) sq=sq.eq('user_id',sUid);
-        const {data,error}=await sq; if(error)throw error;
+        const mkStaff=()=>{ let sq=sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url,user_id').order('full_name');
+          if(!adminTier&&sUid) sq=sq.eq('user_id',sUid); return sq; };
+        const data=await this.pageAll(mkStaff);
         await ICUI.fillPhotos(data||[]);
         ICUI.all=data||[]; ICUI.loadClasses(); const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
         if(!adminTier&&ICUI.all.length){ setTimeout(()=>{ sel.value=JSON.stringify(ICUI.all[0]); ICUI.pick(sel.value); },100); }
       } else {
         const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.SCHOOL_USER && SCHOOL_USER.role) || '';
         const userId = (window.SC_PROFILE && SC_PROFILE.id) || (window.SCHOOL_USER && SCHOOL_USER.id) || null;
-        let query = sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').order('full_name').limit(5000);
-        if (role === 'student' && userId) query=query.eq('user_id',userId);
+        const mkStu=()=>{ let query = sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').order('full_name');
+          if (role === 'student' && userId) query=query.eq('user_id',userId); return query; };
         /* V12.2: if the student record was never LINKED (user_id null — common
            on onboarded schools), the eq() above returns nothing and the page
            fell back to a sample card with no photo. Name-match fallback keeps
            the real record (and its staff-entered photo) on screen. */
-        if (role === 'parent' && userId) { const linked=await sb.from('parent_child').select('student_id').eq('parent_id',userId); const ids=(linked.data||[]).map(x=>x.student_id).filter(Boolean); if(!ids.length){ICUI.all=[];this.loaded=true;this.render();return;} query=query.in('id',ids); }
-        let {data,error}=await query; if(error)throw error;
+        let parentIds=null;
+        if (role === 'parent' && userId) { const linked=await sb.from('parent_child').select('student_id').eq('parent_id',userId); parentIds=(linked.data||[]).map(x=>x.student_id).filter(Boolean); if(!parentIds.length){ICUI.all=[];this.loaded=true;this.render();return;} }
+        let data = await this.pageAll(()=>{ const q=mkStu(); return parentIds?q.in('id',parentIds):q; });
         if(role==='student'&&userId&&!(data||[]).length&&window.SC_PROFILE&&SC_PROFILE.full_name){
           try{ const nm=await sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').ilike('full_name',SC_PROFILE.full_name).limit(1); if((nm.data||[]).length) data=nm.data; }catch(_){ }
         }
@@ -646,13 +647,32 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
      (profiles.photo_url). Any student/staff row without its own photo_url
      inherits the linked profile's photo in ONE batched query, so single AND
      bulk printing show every photo with no re-entering of Drive links. */
+  /* V12.61 — PostgREST caps a single response at max_rows (1000 by default),
+     so .limit(5000) still returned 1000: a 1,500-student school silently got
+     1,000 cards and no warning. Page through the whole table instead. */
+  async pageAll(make, pageSize){
+    const PS=pageSize||1000, out=[]; let from=0, guard=0;
+    for(;;){
+      const {data,error}=await make().range(from, from+PS-1);
+      if(error) throw error;
+      const rows=data||[];
+      for(const r of rows) out.push(r);
+      if(rows.length<PS) break;
+      from+=PS;
+      if(++guard>60) break;                 /* hard stop at 60k rows */
+    }
+    return out;
+  },
   async fillPhotos(rows){
     try{
       const need=(rows||[]).filter(r=>!r.photo_url&&r.user_id);
       if(!need.length) return;
       const ids=[...new Set(need.map(r=>r.user_id))];
-      const r=await sb.from('profiles').select('id,photo_url').in('id',ids);
-      const map={}; (r.data||[]).forEach(p=>{ if(p.photo_url) map[p.id]=p.photo_url; });
+      const map={};
+      for(let i=0;i<ids.length;i+=200){       /* 200 ids per request keeps the URL legal */
+        const r=await sb.from('profiles').select('id,photo_url').in('id',ids.slice(i,i+200));
+        (r.data||[]).forEach(p=>{ if(p.photo_url) map[p.id]=p.photo_url; });
+      }
       need.forEach(row=>{ if(map[row.user_id]) row.photo_url=map[row.user_id]; });
     }catch(e){ console.warn('profile photo enrichment skipped:', e.message||e); }
   },
@@ -827,7 +847,11 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     }
     const to=this.tplOpts();
     const filter=this.currentFilter();
-    let source=(this.all&&this.all.length)?this.all:(this.cur&&this.cur.id?[this.cur]:[this.person()]);
+    let source=this.exportSource();
+    if(!source.length){
+      toast('Nothing selected. Pick a '+(this.kind==='staff'?'staff member':'student')+' from the list, or type a name to print a single card. The on-screen sample is never exported.','warning',8000);
+      return false;
+    }
     source=this.applyFilter(source,filter,true);
     if(!source.length) return false;
     const label=this.filterLabel(filter);
@@ -886,29 +910,45 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     if(f&&f.class) return f.class;
     return this.kind==='staff'?'all staff':'whole school';
   },
+  /* V12.61 — a filter narrows, it never widens.
+     Before this fix an unmatched class (or search) silently fell back to the
+     FULL list, so "print JSS 3" happily produced all 800 cards. Now an empty
+     match is an empty result, and the caller says so. Whitespace, casing and
+     "JSS1"/"JSS 1" spelling are all normalised. */
+  normCls(v){ return String(v||'').toUpperCase().replace(/[\s\-_]+/g,''); },
   applyFilter(source,f,warn){
-    let list=source||[];
-    if(f&&f.class){
-      const cls=f.class.toLowerCase();
-      const hit=list.filter(x=>this.kind==='staff'
-        ? [x.department,x.staff_type,x.role].some(v=>String(v||'').toLowerCase()===cls||String(v||'').toLowerCase().includes(cls))
-        : String(x.class||'').toLowerCase()===cls||String(x.class||'').toLowerCase().startsWith(cls));
-      if(hit.length) list=hit;
-      else if(warn){ toast('No '+(this.kind==='staff'?'staff':'students')+' found for “'+f.class+'”. Pick another filter.','warning',7000); return []; }
+    let list=(source||[]).slice();
+    const cls=this.normCls(f&&f.class);
+    if(cls){
+      list=list.filter(x=>{
+        if(this.kind==='staff'){
+          return [x.department,x.staff_type,x.role,x.designation]
+            .some(v=>{ const n=this.normCls(v); return n && (n===cls||n.indexOf(cls)===0 || cls.indexOf(n)===0); });
+        }
+        const c=this.normCls(x.class), a=this.normCls(x.arm);
+        return c===cls || (c && c.indexOf(cls)===0) || (c+'-'+a)===cls;
+      });
+      if(!list.length){
+        if(warn) toast('No '+(this.kind==='staff'?'staff':'students')+' found for “'+String(f.class)+'”. Nothing will be printed — pick another filter.','warning',7000);
+        return [];
+      }
     }
-    if(f&&f.q){
-      const q=f.q;
-      const hit=list.filter(x=>[x.full_name,x.admission_no,x.staff_no,x.class,x.role,x.department]
+    const q=String((f&&f.q)||'').trim().toLowerCase();
+    if(q){
+      list=list.filter(x=>[x.full_name,x.name,x.admission_no,x.staff_no,x.class,x.arm,x.role,x.department]
         .some(v=>String(v||'').toLowerCase().includes(q)));
-      if(hit.length) list=hit;
-      else if(warn){ toast('Nothing matched “'+f.q+'”.','warning',6000); return []; }
+      if(!list.length){
+        if(warn) toast('Nothing matched “'+q+'”. Nothing will be printed.','warning',6000);
+        return [];
+      }
     }
     return list;
   },
   /* keep the old HTML proof sheet, but make its purpose unmistakable */
   downloadHtml(){
     const to=this.tplOpts();
-    let source=(this.all&&this.all.length)?this.all:(this.cur&&this.cur.id?[this.cur]:[this.person()]);
+    let source=this.exportSource();
+    if(!source.length){ toast('Nothing selected — pick a record or type a name first.','warning',6000); return false; }
     source=this.applyFilter(source,this.currentFilter(),true);
     if(!source.length) return false;
     const people=source.map(x=>this.recordPerson(x,to));
@@ -935,10 +975,35 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     if(settings.mode==='paired'&&settings.layout==='stack'&&settings.height*2+settings.gap>settings.contentHeight)throw new Error('Stacked faces do not fit this paper. Choose Auto-fit or Side-by-side.');
     return settings;
   },
+  /* a raw database UUID is never a printable ID number */
+  looksUuid(v){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v||'').trim()); },
+  idNumber(row,field){
+    const direct=String(row[field]||'').trim();
+    if(direct) return direct;
+    const fallback=String(row.id||'').trim();
+    return this.looksUuid(fallback)?'':fallback;
+  },
+  /* V12.61 — the ONE place that decides what a print/PDF run covers.
+     It must never emit the on-screen demo record: "Sample Student / STD-001"
+     used to be printable as a real card when nothing was selected. */
+  exportSource(){
+    if(this.all&&this.all.length) return this.all;
+    if(this.cur&&(this.cur.full_name||this.cur.id)) return [this.cur];
+    const typed=String((document.getElementById('ic-name')||{}).value||'').trim();
+    if(typed) return [this.manualRecord()];
+    return [];
+  },
+  manualRecord(){
+    const v=id=>String((document.getElementById(id)||{}).value||'').trim();
+    const r={full_name:v('ic-name'),admission_no:v('ic-id'),staff_no:v('ic-id'),photo_url:v('ic-photo'),
+             gender:v('ic-gender'),phone:v('ic-phone'),blood_group:v('ic-blood'),class:v('ic-class')};
+    if(this.kind==='staff'){ r.role=v('ic-dept'); r.department=v('ic-dept'); }
+    return r;
+  },
   recordPerson(row,to){
     const p={full_name:row.full_name||'',photo_url:row.photo_url||'',gender:row.gender||'',phone:row.phone||row.guardian_phone||'',blood_group:row.blood_group||'',type:this.kind,template:to.template,pc:to.pc,ac:to.ac};
-    if(this.kind==='staff'){p.staff_no=row.staff_no||row.id||'';p.role=row.role||'';p.department=row.department||'';p.staff_type=row.staff_type||'';}
-    else{p.admission_no=row.admission_no||row.id||'';p.admission_year=row.admission_year||'';p.date_of_birth=row.date_of_birth||row.dob||'';p.class=row.class||'';p.arm=row.arm||'';}
+    if(this.kind==='staff'){p.staff_no=this.idNumber(row,'staff_no');p.role=row.role||'';p.department=row.department||'';p.staff_type=row.staff_type||'';}
+    else{p.admission_no=this.idNumber(row,'admission_no');p.admission_year=row.admission_year||'';p.date_of_birth=row.date_of_birth||row.dob||'';p.class=row.class||'';p.arm=row.arm||'';}
     return p;
   },
   printCards(people,title){
@@ -960,15 +1025,26 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const closeScript='</'+'script>';w.document.open();w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="'+esc(base)+'"><title>'+esc(title||'Student ID Cards')+'</title><style>'+css+'</style></head><body>'+sheets+'<script>'+js+closeScript+'</body></html>');w.document.close();return true;
   },
   fallbackBackHtml(p){const s=window.SCHOOL||{};return '<div class="sc-idcard" style="width:340px;height:220px;border:1px solid #cbd5e1;border-radius:16px;padding:18px;background:#fff;font-family:system-ui"><h3 style="margin:0 0 8px">If found, return to '+esc(s.name||'the school')+'</h3><p>'+esc(s.address||'')+'</p><p>'+esc(s.phone||'')+' · '+esc(s.email||'')+'</p><b>'+esc(p.admission_no||p.staff_no||'')+'</b><p>Powered by HMG Concepts</p></div>';},
-  print(){return this.printCards([this.person()],'ID Card');},
+  print(){
+    const src=this.exportSource();
+    if(!src.length){ toast('Nothing selected — pick a record or type a name first. The sample preview is never printed.','warning',7000); return false; }
+    return this.printCards(src.slice(0,1).map(x=>this.recordPerson(x,this.tplOpts())),'ID Card');
+  },
   printHtml(cards,title){const w=window.open('','_blank');if(!w){toast('Popup blocked. Please allow popups.','warning');return;}const base=document.baseURI.replace(/[^/]*$/,'');w.document.open();w.document.write('<!doctype html><html><head><title>'+esc(title||'ID Cards')+'</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}body{margin:0}</style></head><body>'+cards+'</body></html>');w.document.close();},
+  /* Bulk print — same single source of truth as the PDF (exportSource +
+     applyFilter), so class filters, searches and the preview can never disagree,
+     and an empty match prints nothing instead of the whole school. */
   printAll(){
-    const to=this.tplOpts(),clsRaw=(document.getElementById('ic-class')?document.getElementById('ic-class').value:'').trim(),cls=clsRaw.toLowerCase();
-    let source=(this.all&&this.all.length)?this.all:[this.person()];
-    if(cls){if(this.kind!=='staff'){const a=source.filter(x=>String(x.class||'').trim().toLowerCase()===cls||String(x.class||'').trim().toLowerCase().startsWith(cls)||String(x.class||'').trim().toLowerCase().includes(cls));if(a.length)source=a;else{toast('No students found for class "'+clsRaw+'"; no cards were printed.','warning',7000);return;}}
-      else{const a=source.filter(x=>String(x.department||'').trim().toLowerCase()===cls||String(x.staff_type||'').trim().toLowerCase()===cls||String(x.role||'').trim().toLowerCase()===cls||String(x.department||'').toLowerCase().includes(cls));if(a.length)source=a;else{toast('No staff found for filter "'+clsRaw+'"; no cards were printed.','warning',7000);return;}}}
-    const people=source.map(x=>this.recordPerson(x,to));return this.printCards(people,'ID Cards — '+(clsRaw||'whole school'));
+    const to=this.tplOpts();
+    let source=this.exportSource();
+    if(!source.length){ toast('Nothing selected — pick a record or type a name first. The sample preview is never printed.','warning',7000); return false; }
+    const f=this.currentFilter();
+    source=this.applyFilter(source,f,true);
+    if(!source.length) return false;
+    const people=source.map(x=>this.recordPerson(x,to));
+    return this.printCards(people,'ID Cards — '+this.filterLabel(f));
   }
+
 };
 window.ICUI=ICUI;
 document.addEventListener('DOMContentLoaded',()=>{ try{ICUI.applyCardSize();}catch(_){} if(window.Super)Super.init(window.sb||null,window.SCHOOL); 

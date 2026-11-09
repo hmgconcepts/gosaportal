@@ -116,10 +116,18 @@
 
   /* ---------- images ------------------------------------------------------- */
   var measureCanvas = document.createElement('canvas');
+  /* Headless / locked-down browsers can return a null 2D context. Fall back to a
+     proportional estimate (0.52 em average for Roboto) instead of throwing. */
   function measureMm(text, sizeMm, bold) {
-    var ctx = measureCanvas.getContext('2d');
-    ctx.font = (bold ? '700 ' : '400 ') + (sizeMm * 10) + 'px "Roboto", Arial, sans-serif';
-    return ctx.measureText(sanitize(text)).width / 10;
+    var t = sanitize(text);
+    try {
+      var ctx = measureCanvas.getContext('2d');
+      if (!ctx) throw new Error('no-2d-context');
+      ctx.font = (bold ? '700 ' : '400 ') + (sizeMm * 10) + 'px "Roboto", Arial, sans-serif';
+      return ctx.measureText(t).width / 10;
+    } catch (e) {
+      return t.length * sizeMm * (bold ? 0.56 : 0.52);
+    }
   }
   /* Flatten ANY drawable to opaque JPEG bytes (no alpha ⇒ no /SMask). */
   function toJpeg(src) {
@@ -169,13 +177,34 @@
     var ctx = this.ctx;
     ctx.font = (bold ? '700 ' : '400 ') + (size * this.unit) + 'px "Roboto", Arial, sans-serif';
     ctx.textAlign = 'left';
+    /* V12.61 — fit-to-box that NEVER overflows and NEVER prints illegible 1.7 mm
+       text. Order of attack: (1) shrink to a readable floor of 65 % of the design
+       size; (2) if it still does not fit, ellipsise; (3) if even one character
+       will not fit, clip it. Before this fix a 60-character name bottomed out at
+       1.7 mm and spilled past the card edge into the QR / next card. */
     if (o.maxMm) {
-      while (size > 1.7 && ctx.measureText(clean).width > o.maxMm * this.unit) {
-        size -= 0.1;
+      var maxW = o.maxMm * this.unit;
+      var floor = Math.min(size, Math.max(1.9, size * 0.65));
+      while (size > floor && ctx.measureText(clean).width > maxW) {
+        size = Math.max(floor, +(size - 0.1).toFixed(2));
+        ctx.font = (bold ? '700 ' : '400 ') + (size * this.unit) + 'px "Roboto", Arial, sans-serif';
+        if (size <= floor) break;
+      }
+      if (ctx.measureText(clean).width > maxW) {
+        var ell = '\u2026';
+        if (ctx.measureText(ell).width > maxW) {
+          clean = '';                       /* nothing legible fits — draw nothing */
+        } else {
+          var cut = clean;
+          while (cut.length > 1 && ctx.measureText(cut + ell).width > maxW) cut = cut.slice(0, -1);
+          clean = (cut.replace(/[\s.,;:\-\/]+$/, '') || clean.charAt(0)) + ell;
+        }
+        if (!clean) return this;
+        /* re-measure so the recorded width is the PRINTED width */
         ctx.font = (bold ? '700 ' : '400 ') + (size * this.unit) + 'px "Roboto", Arial, sans-serif';
       }
     }
-    var wMm = ctx.measureText(clean).width / this.unit;
+    var wMm = Math.min(ctx.measureText(clean).width / this.unit, o.maxMm ? o.maxMm : Infinity);
     ctx.fillStyle = o.colour || '#0f172a';
     ctx.textBaseline = 'top';
     ctx.fillText(clean, xMm * this.unit, yMm * this.unit);

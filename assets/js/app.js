@@ -1528,26 +1528,38 @@ const App = {
         }
         const o = ovr.data || {};
         if (o.ok === false) { paint('<p style="color:var(--gray-500);font-size:.85rem">' + esc(o.error || 'Fee summary unavailable.') + '</p>'); return; }
-        const cur = '₦';
-        const paidPct = Number(o.collection_rate || 0);
-        paint('<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">' +
-          '<div><div style="font-size:1.6rem;font-weight:900;color:#0f172a">' + cur + Number(o.billed || 0).toLocaleString() + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Billed · ' + esc(o.term || '') + ' ' + esc(o.session || '') + '</div></div>' +
-          '<div><div style="font-size:1.6rem;font-weight:900;color:#15803d">' + cur + Number(o.collected || 0).toLocaleString() + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Collected</div></div>' +
-          '<div><div style="font-size:1.6rem;font-weight:900;color:' + (Number(o.outstanding || 0) > 0 ? '#b91c1c' : '#15803d') + '">' + cur + Number(o.outstanding || 0).toLocaleString() + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Outstanding</div></div>' +
-          '<div><div style="font-size:1.6rem;font-weight:900;color:#1e40af">' + paidPct + '%</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Collection rate</div></div>' +
+        const cur = o.currency || '₦';
+        const money = (n) => cur + Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
+        const rate = Number(o.collection_rate || 0);
+        const bd = Array.isArray(o.breakdown) ? o.breakdown : [];
+        const zero = Number(o.students || 0) === 0;
+        paint(
+          (zero ? '<p style="color:var(--gray-500);font-size:.85rem">No active students yet — the school-wide figures appear here as soon as students are enrolled.</p>' : '') +
+          '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">' +
+            '<div><div style="font-size:1.5rem;font-weight:900;color:#0f172a">' + money(o.net_bill) + '</div>' +
+              '<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Net bill · ' + esc(o.term || '') + ' ' + esc(o.session || '') + '</div></div>' +
+            '<div><div style="font-size:1.5rem;font-weight:900;color:#15803d">' + money(o.collected) + '</div>' +
+              '<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Paid</div></div>' +
+            '<div><div style="font-size:1.5rem;font-weight:900;color:' + (Number(o.outstanding || 0) > 0 ? '#b91c1c' : '#15803d') + '">' + money(o.outstanding) + '</div>' +
+              '<div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Outstanding (incl. arrears)</div></div>' +
           '</div>' +
-          '<div style="height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:10px"><div style="height:100%;width:' + Math.max(0, Math.min(100, paidPct)) + '%;background:#16a34a"></div></div>' +
-          '<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:.85rem">' +
-          '<span class="badge" style="background:#dcfce7;color:#166534;padding:6px 10px">✅ Fully paid: <b>' + Number(o.fully_paid || 0) + '</b></span>' +
-          '<span class="badge" style="background:#fee2e2;color:#991b1b;padding:6px 10px">🔴 Debtors: <b>' + Number(o.debtors || 0) + '</b></span>' +
-          '<span class="badge" style="background:#fef3c7;color:#92400e;padding:6px 10px">🟠 Part-paid: <b>' + Number(o.partial || 0) + '</b></span>' +
-          '<span class="badge" style="background:#f1f5f9;color:#475569;padding:6px 10px">Students: <b>' + Number(o.students || 0) + '</b></span>' +
+          '<div style="height:10px;border-radius:999px;background:#e2e8f0;overflow:hidden;margin-bottom:6px" title="' + rate + '% of the net bill collected">' +
+            '<div style="height:100%;width:' + Math.max(0, Math.min(100, rate)) + '%;background:' + (rate >= 100 ? '#15803d' : '#16a34a') + '"></div></div>' +
+          '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:10px">' + rate + '% collected · ' +
+            Number(o.fully_paid || 0) + ' fully paid · ' + Number(o.debtors || 0) + ' owing · ' + Number(o.partial || 0) + ' part-paid of ' + Number(o.students || 0) + ' students</div>' +
+          /* concise, exact breakdown — every row reconciles with the Fees page */
+          (bd.length ? '<table style="width:100%;font-size:.82rem;border-collapse:collapse;margin-bottom:8px">' +
+            bd.map(x => '<tr><td style="padding:2px 4px;color:#334155">' + esc(x.item) + '</td>' +
+              '<td style="padding:2px 4px;text-align:right;font-weight:700;color:' + (Number(x.amount) < 0 ? '#15803d' : '#0f172a') + '">' +
+              (Number(x.amount) < 0 ? '−' : '') + money(Math.abs(Number(x.amount) || 0)) + '</td></tr>').join('') +
+            '<tr><td style="padding:4px;border-top:1px solid #cbd5e1"><b>Outstanding</b></td>' +
+            '<td style="padding:4px;border-top:1px solid #cbd5e1;text-align:right"><b style="color:#b91c1c">' + money(o.outstanding) + '</b></td></tr>' +
+            '</table>' : '') +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            '<a class="btn btn-sm btn-primary" href="fees.html">Open Fees &amp; Payments</a>' +
+            '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button>' +
           '</div>' +
-          '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
-          '<a class="btn btn-sm btn-primary" href="fees.html">Open fees · paid vs debtors</a>' +
-          '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button>' +
-          '</div>' +
-          '<p style="font-size:.76rem;color:var(--gray-500);margin:8px 0 0">Identical figures to the Fees page — both read the same server-side engine.</p>');
+          '<p style="font-size:.74rem;color:var(--gray-500);margin:8px 0 0">Identical figures to the Fees page — both read the same server-side fee engine.</p>');
         return;
       }
       if (!studs.length) { paint('<p style="color:var(--gray-500);font-size:.85rem">No linked student record yet — fees appear here once the admin links the account.</p>'); return; }
@@ -1715,7 +1727,7 @@ const App = {
     try {
       const [studentCount, staffCount, feeRows, announcements, openPolls, events, broadcasts, surveys, lostFound, ptaMeetings, meals, attendanceCount, cbtCount, resultCount, parentCount, complaintCount, hostelRows, announcementCount] = await Promise.all([
         safeCount('students'), safeCount('staff'),
-        safeRows('fee_payments', 'amount_paid,balance,fee_total', 500),
+        safeRows('fee_payments', 'student_id,amount_paid,balance,fee_total,term,session,created_at', 500),
         safeRows('announcements', '*', 5),
         safeRows('polls', '*', 5).then(x=>(x||[]).filter(p=>String(p.status||'open')==='open')),
         safeRows('events', '*', 5),
@@ -1735,10 +1747,30 @@ const App = {
         safeRows('hostel_allocations', '*', 4),
         safeCount('announcements')
       ]);
-      const feesPaid = (feeRows || []).reduce((a,b) => a + (Number(b.amount_paid) || 0), 0);
+      /* V12.61 — "FEES PAID" MUST MATCH "FEES OUTSTANDING".
+         The old tile summed the first 500 fee_payments rows, so on a busy
+         school it silently saturated and disagreed with the fee engine. Both
+         tiles now read the SAME server-side aggregate (sc_fee_overview):
+         collected → Fees Paid, outstanding → Fees Outstanding. The row-sum is
+         only a last-resort fallback when the RPC is not installed. */
+      let feesPaid = null, feesPaidFromEngine = false;
+      try {
+        const ovPaid = await supabase.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
+        if (!ovPaid.error && ovPaid.data && ovPaid.data.ok !== false) {
+          feesPaid = Number(ovPaid.data.collected || 0);
+          feesPaidFromEngine = true;
+        }
+      } catch (_) {}
+      if (feesPaid == null) feesPaid = (feeRows || []).reduce((a,b) => a + (Number(b.amount_paid) || 0), 0);
       set('stat-students', studentCount);
       set('stat-staff', staffCount);
       set('stat-fees', feesPaid.toLocaleString());
+      try {
+        const tile = document.getElementById('stat-fees');
+        if (tile) tile.title = feesPaidFromEngine
+          ? 'Total collected this term, from the same fee engine as the Fees page.'
+          : 'Sum of the most recent 500 receipts (fee engine not installed).';
+      } catch (_) {}
       /* V7.8: the Notices tile showed the length of a 5-row PREVIEW list (max
          "5" forever). Real total count now. */
       set('stat-announcements', announcementCount);

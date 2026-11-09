@@ -871,9 +871,16 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const listTable = d.listTable || d.table;
     const listCols = d.listCols || d.cols;
     const orderCol = d.listOrder || (d.listTable ? 'id' : 'created_at');
+    /* V12.61 (#3): 500 rows was the real ceiling on "select them all" — a
+       1,200-student school could never be acted on in one pass. Students and
+       other high-volume admin tables are now paged to 20,000 rows; small
+       modules keep the cheap single request. */
+    const PAGED = ['students','results','attendance','promotion','admissions','alumni','inventory','library','exam_registrations'];
+    const wantsAll = PAGED.indexOf(this.canonicalId(moduleId)) >= 0;
+    const LIST_CAP = wantsAll ? 20000 : 500;
     let query = d.generic
-      ? this.sb.from(listTable).select('*').eq('module', d.module).order(orderCol, { ascending: false }).limit(500)
-      : this.sb.from(listTable).select('*').order(orderCol, { ascending: false }).limit(500);
+      ? this.sb.from(listTable).select('*').eq('module', d.module).order(orderCol, { ascending: false }).limit(LIST_CAP)
+      : this.sb.from(listTable).select('*').order(orderCol, { ascending: false }).limit(LIST_CAP);
 
     // Role-based filtering is applied after fetching because different tables use
     // either student_id, student_name or class-level fields. Supabase RLS remains the
@@ -884,8 +891,8 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     // schemas) lack the order column — retry unordered instead of erroring.
     if (error && /column .* does not exist/i.test(error.message || '')) {
       const rq = d.generic
-        ? this.sb.from(listTable).select('*').eq('module', d.module).limit(500)
-        : this.sb.from(listTable).select('*').limit(500);
+        ? this.sb.from(listTable).select('*').eq('module', d.module).limit(LIST_CAP)
+        : this.sb.from(listTable).select('*').limit(LIST_CAP);
       ({ data, error } = await rq);
     }
     /* V12.60: enrich CBT assignment rows with their real exam CODE in one
@@ -911,7 +918,9 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const cellVal = (row, c) => c.key.indexOf('data.') === 0 ? ((row.data || {})[c.key.slice(5)]) : row[c.key];
     // V12.13: assignments — student Take button needs Actions column even when not writable (student portal) — fixes Take not showing beside every CBT assignment
     const needsActions = writable || (moduleId === 'assignments');
-    const head = '<tr>' + (bulkable ? '<th style="width:34px"><input type="checkbox" title="Select all visible" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',this.checked)"></th>' : '') + cols.map(c => '<th>' + esc(c.label) + '</th>').join('') + (needsActions ? '<th>Actions</th>' : '') + '</tr>';
+    const head = '<tr>' + (bulkable ? '<th style="width:34px"><input type="checkbox" title="Select all visible rows" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',this.checked)">' +
+      (this.canonicalId(moduleId) === 'students' ? '<div style="margin-top:4px"><button class="btn btn-sm" style="font-size:.62rem;padding:1px 4px;white-space:nowrap" title="Select EVERY student this filter matches — not just the rows on this screen" onclick="CRUD.bulkSelectAllMatching(\'' + moduleId + '\')">⇕ all</button></div>' : '') +
+      '</th>' : '') + cols.map(c => '<th>' + esc(c.label) + '</th>').join('') + (needsActions ? '<th>Actions</th>' : '') + '</tr>';
     tableEl.querySelector('thead').innerHTML = head;
     const tb = tableEl.querySelector('tbody');
     if (error) {
@@ -1084,7 +1093,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     
     const isLinkCol = (key) => /(_link|link|media_url|photo_url|video|image|thumbnail|read_link|drive)$/i.test(key) || /^(media_url|read_link|drive_link|photo_url)$/i.test(key);
     const renderedRows = filteredData.map(row => {
-      const bulkCb = bulkable ? '<td>' + (row._ghost ? '' : '<input type="checkbox" class="sc-bulk-cb" value="' + esc(String(row.id)) + '" onclick="CRUD.bulkBarRefresh(\'' + moduleId + '\')">') + '</td>' : '';
+      const bulkCb = bulkable ? '<td>' + (row._ghost ? '' : '<input type="checkbox" class="sc-bulk-cb" value="' + esc(String(row.id)) + '" onclick="CRUD._bulkShift=!!event.shiftKey;CRUD.bulkRowClick(\'' + moduleId + '\',this)">') + '</td>' : '';
       const dataCells = cols.map(c => {
         let v = cellVal(row, c);
         if (c.key === 'is_cbt'){
@@ -1384,10 +1393,102 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
      Promotion drafts especially: an auto-promote run creates one row per
      student, so clearing a bad run row-by-row was unusable. */
   BULK_MODULES: ['students','promotion','results','attendance','activity_log','admissions','alumni','behaviour','inventory','library','announcements','events','birthdays','visitors','exam_registrations','helpdesk','complaints'],
+  /* ==========================================================================
+     V12.61 (#3) — SELECT-AS-MANY-AS-YOU-LIKE, THEN ACT IN ONE CLICK
+     Before this, bulk actions only ever saw the rows rendered on screen, and
+     the list query itself stopped at 500 rows, so a 1,200-student school
+     could not be blocked in one pass. Three additions fix that:
+       1. the list is paged, so the whole roll is really in the DOM;
+       2. "Select all N in this school/class" works SERVER-SIDE — the ids are
+          streamed from the database, not from what happens to be rendered;
+       3. shift-click selects a range, like a spreadsheet.
+     ========================================================================== */
+  bulkScope: {},                       /* moduleId -> {kind, cls, n, ids} */
+  bulkIds(moduleId) {
+    const sc = this.bulkScope[this.canonicalId(moduleId)];
+    if (sc && sc.on && Array.isArray(sc.ids)) return sc.ids.slice();
+    return this.bulkSelected(moduleId);
+  },
+  bulkCount(moduleId) {
+    const sc = this.bulkScope[this.canonicalId(moduleId)];
+    if (sc && sc.on) return Number(sc.n || (sc.ids || []).length);
+    return this.bulkSelected(moduleId).length;
+  },
+  /* every id the CURRENT filter matches, straight from the database */
+  async bulkFetchAllIds(moduleId) {
+    const key = this.canonicalId(moduleId);
+    const table = key + '-table';
+    const el = document.getElementById(table);
+    const cls = this.bulkCurrentClass();
+    const ids = [];
+    try {
+      const page = 1000;
+      for (let from = 0; from < 200000; from += page) {
+        let q = this.sb.from('students').select('id').order('id').range(from, from + page - 1);
+        if (cls) q = q.eq('class', cls);
+        const { data, error } = await q;
+        if (error) throw error;
+        const rows = data || [];
+        rows.forEach(r => { if (r && r.id) ids.push(String(r.id)); });
+        if (rows.length < page) break;
+      }
+    } catch (e) {
+      toast('Could not read the full student list: ' + (e.message || e) + ' — select rows individually instead.', 'warning', 9000);
+      return [];
+    }
+    this.bulkScope[key] = { on: true, ids: ids, n: ids.length, cls: cls || '' };
+    if (el) {
+      /* switch the row checkboxes to the selected state (no re-render needed) */
+      el.querySelectorAll('tbody .sc-bulk-cb').forEach(cb => { cb.checked = true; });
+      const head = el.querySelector('thead input[type="checkbox"]');
+      if (head) head.checked = true;
+    }
+    this.bulkBarRefresh(moduleId);
+    toast('Selected all ' + ids.length + ' student' + (ids.length === 1 ? '' : 's') + (cls ? ' in ' + cls : ' in the school') + '.', 'success', 6000);
+    return ids;
+  },
+  bulkSelectAllMatching(moduleId) { return this.bulkFetchAllIds(moduleId); },
+  bulkClearScope(moduleId) {
+    const key = this.canonicalId(moduleId);
+    delete this.bulkScope[key];
+    const el = document.getElementById(key + '-table');
+    if (el) {
+      el.querySelectorAll('tbody .sc-bulk-cb').forEach(cb => { cb.checked = false; });
+      const head = el.querySelector('thead input[type="checkbox"]');
+      if (head) head.checked = false;
+    }
+    this.bulkBarRefresh(moduleId);
+  },
+  /* class currently picked in the students page toolbar (if any) */
+  bulkCurrentClass() {
+    const sel = document.getElementById('students-class-filter') || document.getElementById('class-filter');
+    return sel && sel.value ? String(sel.value).trim() : '';
+  },
   bulkToggleAll(moduleId, checked) {
-    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    /* ticking the header box means "every row you can see"; the explicit
+       "select all N" button is the one that reaches the whole school. */
+    const key = this.canonicalId(moduleId);
+    if (!checked && this.bulkScope[key]) delete this.bulkScope[key];
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(key + '-table');
     if (!tableEl) return;
     tableEl.querySelectorAll('tbody .sc-bulk-cb').forEach(cb => { const tr = cb.closest('tr'); if (!tr || tr.style.display !== 'none') cb.checked = checked; });
+    this.bulkBarRefresh(moduleId);
+  },
+  /* shift-click a range of rows */
+  bulkRowClick(moduleId, cb) {
+    const key = this.canonicalId(moduleId);
+    if (this.bulkScope[key]) delete this.bulkScope[key];
+    const tableEl = document.getElementById(key + '-table');
+    if (tableEl && cb && cb.shiftKey === undefined) { /* noop */ }
+    const boxes = tableEl ? [...tableEl.querySelectorAll('tbody .sc-bulk-cb')] : [];
+    const idx = boxes.indexOf(cb);
+    if (idx < 0) { this.bulkBarRefresh(moduleId); return; }
+    if (this._bulkAnchor === undefined || this._bulkAnchor === null || this._bulkAnchorModule !== key) this._bulkAnchor = idx;
+    if (this._bulkShift && this._bulkAnchorModule === key) {
+      const a = Math.min(this._bulkAnchor, idx), b = Math.max(this._bulkAnchor, idx);
+      for (let i = a; i <= b; i++) boxes[i].checked = true;
+    }
+    this._bulkAnchor = idx; this._bulkAnchorModule = key; this._bulkShift = false;
     this.bulkBarRefresh(moduleId);
   },
   bulkSelected(moduleId) {
@@ -1396,10 +1497,16 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     return [...tableEl.querySelectorAll('tbody .sc-bulk-cb:checked')].map(cb => cb.value).filter(Boolean);
   },
   bulkBarRefresh(moduleId) {
-    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(this.canonicalId(moduleId) + '-table');
+    const key = this.canonicalId(moduleId);
+    const tableEl = document.getElementById(moduleId + '-table') || document.getElementById(key + '-table');
     if (!tableEl) return;
     const wrap = tableEl.closest('.table-wrap') || tableEl.parentNode;
-    const n = this.bulkSelected(moduleId).length;
+    if (this.bulkScope[key] && this.bulkScope[key].on) {
+      const live = this.bulkSelected(moduleId).length;
+      if (!live) delete this.bulkScope[key];          /* every tick was undone */
+    }
+    const sc = this.bulkScope[key];
+    const n = (sc && sc.on) ? Number(sc.n || 0) : this.bulkSelected(moduleId).length;
     let bar = wrap.querySelector('.sc-bulk-bar');
     if (!n) { if (bar) bar.remove(); return; }
     if (!bar) {
@@ -1407,20 +1514,25 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       bar.className = 'sc-bulk-bar';
       bar.style.cssText = 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;margin-bottom:12px';
       bar.innerHTML = '<b class="sc-bulk-count" style="color:#b91c1c"></b>' +
-        /* V10.7 (#6): fee-discipline bulk actions on the Students table. */
-        (this.canonicalId(moduleId) === 'students'
-          ? '<button class="btn btn-sm btn-outline" style="border-color:#dc2626;color:#b91c1c" onclick="CRUD.bulkStudentLock(\'portal\',true)">🔒 Lock portal</button>' +
-            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'portal\',false)">🔓 Restore portal</button>' +
-            '<button class="btn btn-sm btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="CRUD.bulkStudentLock(\'report\',true)">🧾 Hide report cards</button>' +
-            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'report\',false)">🧾 Restore report cards</button>' +
-            '<button class="btn btn-sm btn-outline" style="border-color:#dc2626;color:#b91c1c;font-weight:700" onclick="CRUD.lockAllDebtors(\'portal\',true)" title="One click: lock EVERY student who still owes fees this term — no ticking required">🔒 Lock ALL debtors</button>' +
-            '<button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534;font-weight:700" onclick="CRUD.lockAllDebtors(\'portal\',false)" title="One click: unlock EVERY student who has now cleared their fees">🔓 Unlock ALL cleared</button>'
+        (key === 'students'
+          ? '<span style="width:1px;height:22px;background:#fecaca"></span>' +
+            '<button class="btn btn-sm btn-primary" style="background:#b91c1c;border-color:#991b1b" onclick="CRUD.bulkStudentLock(\'portal\',true)" title="Block the portal for every selected student — one click">🔒 Block portal — selected</button>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534" onclick="CRUD.bulkStudentLock(\'portal\',false)">🔓 Unblock portal — selected</button>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#f59e0b;color:#b45309" onclick="CRUD.bulkStudentLock(\'report\',true)">🧾 Hide report cards — selected</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkStudentLock(\'report\',false)">🧾 Restore report cards — selected</button>' +
+            '<span style="width:1px;height:22px;background:#fecaca"></span>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#dc2626;color:#b91c1c;font-weight:700" onclick="CRUD.lockAllDebtors(\'portal\',true)" title="One click: every student who still owes fees this term — no ticking at all">🔒 Lock ALL debtors</button>' +
+            '<button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534;font-weight:700" onclick="CRUD.lockAllDebtors(\'portal\',false)" title="One click: every student who has cleared their fees">🔓 Unlock ALL cleared</button>'
           : '') +
+        '<span style="width:1px;height:22px;background:#fecaca"></span>' +
         '<button class="btn btn-sm btn-outline" style="border-color:#ef4444;color:#b91c1c" onclick="CRUD.bulkDelete(\'' + moduleId + '\')">🗑 Delete selected</button>' +
-        '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkToggleAll(\'' + moduleId + '\',false)">Clear selection</button>';
+        '<button class="btn btn-sm btn-outline" onclick="CRUD.bulkClearScope(\'' + moduleId + '\')">Clear selection</button>';
       wrap.insertBefore(bar, wrap.firstChild);
     }
-    bar.querySelector('.sc-bulk-count').textContent = n + ' selected';
+    const cnt = bar.querySelector('.sc-bulk-count');
+    if (cnt) cnt.textContent = (sc && sc.on)
+      ? n + ' selected — the WHOLE ' + (sc.cls || 'school') + ' (beyond this screen)'
+      : n + ' selected';
   },
   async bulkDelete(moduleId) {
     const d = this.def(moduleId); if (!d || !this.sb) return;
@@ -2356,12 +2468,13 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
   async toggleStudentLock(studentId, kind, lock, name) {
     if (!this.sb) return;
     const label = kind === 'portal' ? 'PORTAL ACCESS' : 'REPORT CARD';
+    const verbWord = () => lock ? 'Block' : 'Restore';
     let message = '';
     if (lock) {
       const def = kind === 'portal'
         ? 'Access to the school portal has been suspended because of outstanding school fees. Please contact the school bursary to resolve this.'
         : 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.';
-      message = prompt('Lock ' + label + ' for ' + (name || 'this student') + '?\n\nThis BOLD message will be shown to the student/parents (edit it if needed):', def);
+      message = prompt(verbWord() + ' ' + label + ' for ' + (name || 'this student') + '?\n\nThis BOLD message will be shown to the student/parents (edit it if needed):', def);
       if (message == null) return;   // cancelled
     } else if (!confirm('Restore ' + label + ' for ' + (name || 'this student') + '?')) return;
     const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: [studentId], p_kind: kind, p_locked: lock, p_message: message || '' });
@@ -2428,26 +2541,40 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
   },
 
   async bulkStudentLock(kind, lock) {
-    const ids = this.bulkSelected('students');
-    if (!ids.length) { toast('Tick at least one student first (use the checkboxes).', 'warning', 6000); return; }
+    /* V12.61 (#3): honours the server-side "select all N" scope, so one click
+       can act on 1,500 students, not just the 500 that used to be rendered. */
+    const ids = this.bulkIds('students');
+    if (!ids.length) { toast('Tick at least one student first — or use “⇕ all” to select the whole roll.', 'warning', 6000); return; }
     const label = kind === 'portal' ? 'PORTAL ACCESS' : 'REPORT CARD';
+    const verbWord = () => lock ? 'Block' : 'Restore';
     let message = '';
     if (lock) {
       const def = kind === 'portal'
         ? 'Access to the school portal has been suspended because of outstanding school fees. Please contact the school bursary to resolve this.'
         : 'Your report card is temporarily unavailable because of outstanding school fees. Please contact the school bursary to resolve this.';
-      message = prompt('Lock ' + label + ' for ' + ids.length + ' selected student(s)?\n\nThis BOLD message will be shown to each of them (edit it if needed):', def);
+      message = prompt(verbWord() + ' ' + label + ' for ' + ids.length + ' selected student(s)?\n\nThis BOLD message will be shown to each of them (edit it if needed):', def);
       if (message == null) return;
     } else if (!confirm('Restore ' + label + ' for ' + ids.length + ' selected student(s)?')) return;
-    const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: ids, p_kind: kind, p_locked: lock, p_message: message || '' });
-    if (r.error || !r.data || r.data.ok === false) {
-      const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Bulk lock failed';
-      if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v10.7-fee-locks-arrears.sql once in Supabase.', 'warning', 12000);
-      else toast(msg, 'danger', 9000);
-      return;
+    /* Send the array in batches so a whole-school selection cannot exceed the
+       request limit; the RPC accepts uuid[] and is idempotent. */
+    let updated = 0;
+    const BATCH = 500;
+    toast('Applying to ' + ids.length + ' student(s)…', 'info', 3000);
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const chunk = ids.slice(i, i + BATCH);
+      const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: chunk, p_kind: kind, p_locked: lock, p_message: message || '' });
+      if (r.error || !r.data || r.data.ok === false) {
+        const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Bulk lock failed';
+        if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v12.60-expert-fix-pack.sql once in Supabase.', 'warning', 12000);
+        else toast(msg, 'danger', 9000);
+        if (updated) { this.invalidateTableCaches('students'); this.renderList('students'); }
+        return;
+      }
+      updated += Number(r.data.updated || 0);
     }
-    if (window.App && App.logActivity) App.logActivity(lock ? 'bulk-lock' : 'bulk-unlock', 'students', kind + ':' + r.data.updated);
-    toast((lock ? '🔒 Locked ' : '🔓 Restored ') + r.data.updated + ' student(s) — ' + label + '.', lock ? 'warning' : 'success', 9000);
+    if (window.App && App.logActivity) App.logActivity(lock ? 'bulk-lock' : 'bulk-unlock', 'students', kind + ':' + updated);
+    toast((lock ? '🔒 Blocked ' : '🔓 Restored ') + updated + ' student(s) — ' + label + '.', lock ? 'warning' : 'success', 9000);
+    this.bulkClearScope('students');
     this.invalidateTableCaches('students');
     this.renderList('students');
   },
