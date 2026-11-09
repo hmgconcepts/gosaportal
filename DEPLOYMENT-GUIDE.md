@@ -7,6 +7,13 @@ This guide has **two parts**:
 
 Everything uses **free tools only**. No credit card, no monthly fees, no AI APIs.
 
+> **V12.65 SIZE NOTE:** the complete schema is deliberately kept under 1 MB so the
+> Supabase SQL Editor accepts it ("Query is too large to be run via the SQL Editor"
+> appears above 1 MB). It is built by `tools/build-complete-schema.py`, never edited
+> by hand, and `tools/verify-complete-schema.mjs` proves it produces exactly the same
+> 127 tables / 1,541 columns / 195 functions / 292 policies as the raw cumulative
+> file. If a future edit pushes it over the limit, re-run the builder.
+>
 > **V5.6.1 ONE-SQL RULE:** back up Supabase and run the entire
 > `database/complete-schema.sql` for a fresh install or any upgrade. It includes
 > every earlier focused pack and is safe to re-run. Do not run versioned/focused
@@ -63,11 +70,13 @@ live data on the builder site itself:
 ## B2. Install the tables (run ONE SQL file)
 1. Supabase → **SQL Editor → + New query**.
 2. Open **`database/complete-schema.sql`** from the ZIP, copy **all** of it, paste, **Run**.
-3. Confirm the final success message: **`School Connect CBT V5.1 definitive grading engine installed — use RPC cbt_submit_v5 ✅`**.
-   - ✅ This one file installs everything (all tables, RLS, triggers, views, and
-     **every RPC the app calls** — all 16 — plus the CBT scale pack and the
-     Punctuality Points engine).
-   - ✅ It is **idempotent** — safe to run again.
+3. Confirm the final success row: **`V12.65 applied: public.diary + diary_ack, sc_diary_ack, sc_diary_acks, sc_diary_feed`**.
+   - ✅ This one file installs everything: **127 tables, 1,541 columns, 195 functions,
+     4 views, 292 RLS policies, 242 indexes, 354 constraints**, every trigger, grant
+     and seed row, plus every RPC the app calls.
+   - ✅ It is **idempotent** — safe to run again, and safe on an existing project.
+   - ✅ It is **782 KB**, comfortably inside Supabase's 1 MB SQL Editor limit, so it
+     pastes and runs from the dashboard in one go.
    - ✅ Apart from the optional demo packs (`demo-users.sql`, `demo-seed.sql`),
      this is the **only** SQL your deployment ever needs.
    - ❌ You do **not** need to run any smaller feature SQL separately (each of those

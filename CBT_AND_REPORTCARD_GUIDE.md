@@ -170,6 +170,34 @@ the browser and a card generated in the database always agree. The regression
 suite asserts this: `tools/verification/tmp-rank.mjs` (Postgres),
 `tmp-rank-edge.mjs` (ties, no-shows, partials) and `work/rank-check.js` (browser).
 
+## Class diary (V12.65)
+
+The Class Diary (`diary.html`) records classwork, homework, behaviour notes and
+remarks per class / subject / period, and lets a parent or student acknowledge
+that they have seen an entry.
+
+It was shipped from V5 with **no table behind it** — every read, insert and
+acknowledge failed with `42P01 relation public.diary does not exist`, so the page
+could never show or save an entry. V12.65 installs the missing schema:
+
+| Object | Purpose |
+|---|---|
+| `public.diary` | one row per entry — date, class, subject, period, classwork, homework, behaviour, note, author |
+| `public.diary_ack` | one row per reader acknowledgement (unique per entry + user) |
+| `sc_diary_feed(class, limit)` | role-scoped read: admins and staff see all, families see their children's classes |
+| `sc_diary_ack(diary_id, note)` | acknowledge — idempotent; keeps `diary.acks` and `diary_ack` in step |
+| `sc_diary_acks(diary_id)` | read the acknowledgements back |
+
+**Access rules.** Staff may post and edit their own entries; admins may edit or
+delete any; a parent or student may read only entries for a class one of their
+children is in; nobody else sees anything. RLS is enabled on both tables —
+the diary is personal data about children, not a public noticeboard.
+
+**Acknowledging.** The page calls `sc_diary_ack`, not a direct row update, so the
+legacy `acks` JSON array on the diary row and the `diary_ack` table are written
+in one statement and cannot drift apart. Acknowledging twice updates the first
+acknowledgement rather than creating a second.
+
 ## Existing CBT edit and Attach CSV integrity (V12.58+)
 
 Question edits and CSV append run through row-locked server RPCs. Existing legacy JSON/TEXT banks are normalized; the currently served bank is read using the same precedence as the student getter. Save now requires an optimistic version match and independent verification that `csv_data` and `questions` contain the same canonical bank/hash. Append falls back to a non-empty legacy `questions` bank when `csv_data` is empty, then writes both aliases. Advanced structured question data is preserved by the single-question editor; use the full CSV/structured editor to modify pairs, categories, matrices or rubrics. On a mismatch or failed readback, the page does not claim success; refresh and compare before retrying.
