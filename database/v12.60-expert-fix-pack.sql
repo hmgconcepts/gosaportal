@@ -331,6 +331,8 @@ begin
         'bill',acct->'bill','aid',acct->'aid','paid',acct->'paid','balance',acct->'balance',
         'arrears',acct->'arrears','total_due',acct->'total_due','status',acct->>'status',
         'fully_paid',acct->'fully_paid','debtor',acct->'debtor',
+        'paid_percent',acct->'paid_percent','receipts',acct->'receipts','last_payment',acct->'last_payment',
+        'opening_arrears',acct->'opening_arrears',
         'portal_locked',acct->'portal_locked','report_locked',acct->'report_locked'));
     end if;
   end loop;
@@ -757,3 +759,351 @@ grant execute on function public.sc_fee_roster(text,text,text,text) to authentic
 
 notify pgrst,'reload schema'; select pg_notify('pgrst','reload schema');
 select 'School Connect V12.60 installed — CBT code bridge, fee truth engine, bulk locks, all-class midterm publish, CBT flag resolution, fee roster ✅' as status;
+
+-- ============================================================================
+-- V12.62 — ONE FEE ENGINE (items 1, 2, 4, 5)
+-- ----------------------------------------------------------------------------
+-- WHY THIS EXISTS
+--   The dashboard card read sc_student_fee_state; the Fees page and every
+--   school-wide total read sc_fee_account. The two functions each decided
+--   *which fee structure applies* and *what the arrears are* in their own way:
+--     • sc_student_fee_state used max(fee_total) of the student's own receipts
+--       as the previous-term bill;
+--     • sc_fee_account used sc_fee_bill_for() — the class structure — and fell
+--       back to max(fee_total) only when no structure existed.
+--   So for any school whose class fees were changed after payments were taken,
+--   the same student showed two different balances on two different pages.
+--   The fallback ALSO multiplied arrears by the number of receipts whenever a
+--   previous-term receipt carried fee_total=0.
+--
+--   From here on there is exactly ONE implementation of the per-student
+--   account. Everything else — family view, class roster, the whole-school
+--   overview, the master financial sheet — is a view over it.
+-- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- 1) sc_fee_ledger_for — the single source of per-student financial truth.
+-- ---------------------------------------------------------------------------
+create or replace function public.sc_fee_ledger_for(p_student uuid,
+                                                    p_term text default null,
+                                                    p_session text default null)
+returns jsonb language plpgsql stable security definer set search_path=public as $$
+declare
+  st record; cur record; b jsonb;
+  t_term text; t_session text;
+  bill numeric := 0; aid numeric := 0; paid numeric := 0;
+  arrears numeric := 0; arr_rows jsonb := '[]'::jsonb;
+  opening numeric := 0; t record; tbill numeric; tpaid numeric; tbill_row jsonb;
+  owing numeric; total_due numeric; status_txt text; grand numeric;
+  n_receipts int := 0; last_pay date; paid_pct numeric;
+begin
+  select * into st from public.students where id = p_student;
+  if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
+  select term, session into cur from public.academic_periods where is_current = true limit 1;
+  t_term    := coalesce(nullif(btrim(p_term),''),    cur.term);
+  t_session := coalesce(nullif(btrim(p_session),''), cur.session);
+
+  /* ---- the bill for THIS term (structure + aid + bursar override) ---- */
+  b := public.sc_fee_bill_for(p_student, t_term, t_session);
+  bill := coalesce(nullif(b->>'bill','')::numeric, 0);
+  aid  := coalesce(nullif(b->>'aid','')::numeric, 0);
+
+  /* ---- money received against THIS term ---- */
+  select coalesce(sum(amount_paid),0), count(*), max(coalesce(payment_date, created_at::date))
+    into paid, n_receipts, last_pay
+    from public.fee_payments
+   where student_id = p_student
+     and (coalesce(t_term,'')    = '' or coalesce(term,'')    = t_term)
+     and (coalesce(t_session,'') = '' or coalesce(session,'') = t_session);
+
+  /* ---- arrears: previous terms, using the SAME bill resolver ---- */
+  for t in
+    select coalesce(term,'') as term, coalesce(session,'') as session
+      from public.fee_payments
+     where student_id = p_student
+       and not (coalesce(term,'') = coalesce(t_term,'') and coalesce(session,'') = coalesce(t_session,''))
+     group by 1,2
+  loop
+    select coalesce(sum(amount_paid),0) into tpaid from public.fee_payments
+     where student_id = p_student
+       and coalesce(term,'') = t.term and coalesce(session,'') = t.session;
+    /* Same resolver as this term — a changed class fee now applies to the
+       arrears too, instead of becoming "whatever the last receipt said". */
+    tbill_row := public.sc_fee_bill_for(p_student, t.term, t.session);
+    tbill := coalesce(nullif(tbill_row->>'bill','')::numeric, 0);
+    /* Only if no structure exists for that term may the student's own receipt
+       snapshot stand in — and never once per receipt (the old multiplication). */
+    if tbill <= 0 then
+      select coalesce(max(nullif(fee_total,0)),0) into tbill from public.fee_payments
+       where student_id = p_student
+         and coalesce(term,'') = t.term and coalesce(session,'') = t.session;
+    end if;
+    if tbill > tpaid then
+      arrears := arrears + (tbill - tpaid);
+      arr_rows := arr_rows || jsonb_build_array(jsonb_build_object(
+        'term',t.term,'session',t.session,'bill',tbill,'paid',tpaid,'owing',tbill - tpaid));
+    end if;
+  end loop;
+
+  /* ---- debts from before the school adopted School Connect ---- */
+  begin
+    opening := coalesce(st.opening_arrears,0);
+    if opening > 0 then
+      arrears := arrears + opening;
+      arr_rows := arr_rows || jsonb_build_array(jsonb_build_object(
+        'term','Before School Connect',
+        'session',coalesce(nullif(st.opening_arrears_note,''),'Opening balance'),
+        'bill',opening,'paid',0,'owing',opening,'opening',true));
+    end if;
+  exception when undefined_column then opening := 0;
+  end;
+
+  owing     := greatest(bill - paid, 0);
+  total_due := owing + arrears;
+  grand     := greatest(bill,0) + arrears;
+  paid_pct  := case when grand > 0 then round((grand - total_due) / grand * 100, 1) else 100 end;
+  status_txt := case
+                  when total_due <= 0.005 then 'paid'
+                  when paid <= 0.005      then 'debtor'
+                  else 'partial'
+                end;
+  if bill <= 0 and paid <= 0 and arrears <= 0 then status_txt := 'no-bill'; end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'student_id', st.id, 'student_name', st.full_name, 'admission_no', st.admission_no,
+    'class', st.class, 'arm', st.arm, 'department', st.department,
+    'term', coalesce(t_term,''), 'session', coalesce(t_session,''),
+    'bill', bill, 'aid', aid, 'paid', paid,
+    'balance', owing, 'arrears', arrears, 'arrears_rows', arr_rows,
+    'opening_arrears', opening,
+    'total_due', total_due, 'grand_total', grand, 'paid_percent', paid_pct,
+    'status', status_txt,
+    'fully_paid', total_due <= 0.005, 'debtor', total_due > 0.005,
+    'breakdown', coalesce(b->'breakdown','[]'::jsonb),
+    'aid_rows', coalesce(b->'aid_rows','[]'::jsonb),
+    'currency', coalesce(b->>'currency','₦'),
+    'due_date', b->>'due_date',
+    'override', coalesce((b->>'override')::boolean,false),
+    'matched', coalesce((b->>'matched')::boolean,false),
+    'receipts', n_receipts, 'last_payment', last_pay,
+    /* Who may see this: the bursar needs the lock flags, a parent does not. */
+    'portal_locked', coalesce(st.portal_locked,false),
+    'report_locked', coalesce(st.report_locked,false),
+    /* V12.61 compatibility aliases — old callers keep working unchanged. */
+    'payments', n_receipts
+  );
+end $$;
+revoke all on function public.sc_fee_ledger_for(uuid,text,text) from public, anon;
+grant execute on function public.sc_fee_ledger_for(uuid,text,text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 2) sc_fee_account → now a thin wrapper (identical numbers by construction).
+--    V12.61 also ADDED the authorisation check this function never had: any
+--    signed-in user could read any student's fees by guessing/knowing a UUID.
+-- ---------------------------------------------------------------------------
+create or replace function public.sc_fee_account(p_student uuid, p_term text default null, p_session text default null)
+returns jsonb language plpgsql stable security definer set search_path=public as $$
+declare st record; allowed boolean; led jsonb;
+begin
+  select * into st from public.students where id = p_student;
+  if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
+  allowed := coalesce(public.is_staff(auth.uid()),false)
+          or coalesce(st.user_id = auth.uid(),false)
+          or coalesce(public.is_parent_of(auth.uid(), st.id),false)
+          or coalesce(st.guardian_email = auth.jwt()->>'email',false);
+  if not allowed then return jsonb_build_object('ok',false,'error','Not authorised for this student.'); end if;
+  led := public.sc_fee_ledger_for(p_student, p_term, p_session);
+  return led;
+end $$;
+revoke all on function public.sc_fee_account(uuid,text,text) from public, anon;
+grant execute on function public.sc_fee_account(uuid,text,text) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- 3) sc_student_fee_state → same engine, same authorisation, plus the extra
+--    fields the family panel has always displayed (note, matched_arm …).
+-- ---------------------------------------------------------------------------
+create or replace function public.sc_student_fee_state(p_student uuid)
+returns jsonb language plpgsql stable security definer set search_path=public as $$
+declare st record; allowed boolean; led jsonb; b jsonb;
+begin
+  select * into st from public.students where id = p_student;
+  if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
+  allowed := coalesce(public.is_staff(auth.uid()),false)
+          or coalesce(st.user_id = auth.uid(),false)
+          or coalesce(public.is_parent_of(auth.uid(), st.id),false)
+          or coalesce(st.guardian_email = auth.jwt()->>'email',false);
+  if not allowed then return jsonb_build_object('ok',false,'error','Not authorised for this student.'); end if;
+  led := public.sc_fee_ledger_for(p_student, null, null);
+  b   := public.sc_fee_bill_for(p_student, led->>'term', led->>'session');
+  return led || jsonb_build_object(
+    'note',   coalesce(b->>'note',''),
+    'due_date', b->>'due_date',
+    'matched_arm', coalesce(b->>'matched_arm',''),
+    'matched_department', coalesce(b->>'matched_department',''));
+end $$;
+revoke all on function public.sc_student_fee_state(uuid) from public, anon;
+grant execute on function public.sc_student_fee_state(uuid) to authenticated;
+
+-- ============================================================================
+-- V12.62 (item 4) — ONE-CLICK FEE REPAIR
+-- ----------------------------------------------------------------------------
+-- The bursar's problem, stated exactly:
+--   "a student owes 30,500; he paid 10,000 + 5,000 + 5,000 = 20,000, balance
+--    10,500. Later we remember an older debt and add it to his FIRST payment —
+--    every other record must then update."
+--
+-- When a back-dated receipt is inserted or an amount/term/date is corrected,
+-- everything derived from those rows drifts:
+--   • fee_total / balance snapshots on EVERY later receipt of that term,
+--   • each student's arrears, total_due and portal-lock state,
+--   • the dashboard, the roster, the master sheet and the printed receipts.
+--
+-- This function repairs all of it in one transaction and returns a full report.
+-- It is idempotent: running it twice changes nothing the second time.
+-- ----------------------------------------------------------------------------
+create or replace function public.sc_fee_repair_all(p_dry_run boolean default false,
+                                                    p_class text default null,
+                                                    p_student uuid default null)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare
+  me uuid := auth.uid();
+  cur record; r record; led jsonb;
+  n_scanned int := 0; n_rebuilt int := 0; n_moved int := 0; n_period int := 0;
+  n_unlinked int := 0; n_zero int := 0; n_overpaid int := 0; n_nobill int := 0;
+  n_opening int := 0; n_snapshot int := 0; n_dup int := 0; n_with_opening int := 0;
+  retotal numeric := 0; recount int := 0;
+  findings jsonb := '[]'::jsonb;
+  acting text := case when coalesce(p_dry_run,false) then 'report' else 'repaired' end;
+  t_term text; t_session text;
+begin
+  if me is null or not (coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)) then
+    return jsonb_build_object('ok',false,'error','Only staff can repair the fee ledger.');
+  end if;
+  if p_dry_run is null then p_dry_run := false; end if;
+  select term, session into cur from public.academic_periods where is_current = true limit 1;
+  t_term := cur.term; t_session := cur.session;
+
+  /* ---------- 1. receipts that belong to NO period ---------- */
+  for r in select id, coalesce(student_name,'') nm, coalesce(amount_paid,0) amt,
+                  coalesce(term,'') term, coalesce(session,'') session
+             from public.fee_payments
+            where student_id is not null
+              and (coalesce(term,'') = '' or coalesce(session,'') = '')
+              and (p_student is null or student_id = p_student)
+            limit 500
+  loop
+    n_period := n_period + 1;
+    findings := findings || jsonb_build_array(jsonb_build_object(
+      'kind','missing_period','student',r.nm,'amount',r.amt,
+      'issue','Receipt has no term/session — it is invisible to every term filter and to the arrears calculation.',
+      'fix','Assigned to the current term '||coalesce(t_term,'?')||' '||coalesce(t_session,'')));
+    if not p_dry_run then
+      update public.fee_payments set term = coalesce(t_term,''), session = coalesce(t_session,'')
+       where id = r.id;
+    end if;
+  end loop;
+
+  /* ---------- 2. receipts linked to NO student ---------- */
+  select count(*) into n_unlinked from public.fee_payments where student_id is null;
+  if n_unlinked > 0 then
+    findings := findings || jsonb_build_array(jsonb_build_object(
+      'kind','unlinked','count',n_unlinked,
+      'issue',n_unlinked||' receipt(s) have no student — the money reaches no balance, no receipt and no report.',
+      'fix','Cannot be guessed safely. Open Admin Data → fee_payments and pick the student on each row.'));
+  end if;
+
+  /* ---------- 3. zero / negative amounts ---------- */
+  select count(*) into n_zero from public.fee_payments where coalesce(amount_paid,0) <= 0;
+  if n_zero > 0 then
+    findings := findings || jsonb_build_array(jsonb_build_object(
+      'kind','non_positive','count',n_zero,
+      'issue',n_zero||' receipt(s) record zero or a negative amount — they distort the running balance.',
+      'fix','Left untouched (deleting money records is the bursar''s decision). Listed for review.'));
+  end if;
+
+  /* ---------- 4. duplicate receipts (same student + amount + day) ---------- */
+  for r in
+    select student_id, coalesce(student_name,'') nm, coalesce(amount_paid,0) amt,
+           date(coalesce(created_at, now()))::text as paid_on, count(*) n
+      from public.fee_payments
+     where student_id is not null and coalesce(amount_paid,0) > 0
+     group by student_id, coalesce(student_name,''), coalesce(amount_paid,0), date(coalesce(created_at, now()))
+    having count(*) > 1
+  loop
+    n_dup := n_dup + 1;
+    findings := findings || jsonb_build_array(jsonb_build_object(
+      'kind','duplicate','student',r.nm,'amount',r.amt,'day',r.paid_on,'count',r.n,
+      'issue','Same student, same amount, same day, recorded '||r.n||' times — likely a double entry.',
+      'fix','Flagged only. Confirm with the cash book, then delete the extra row in Admin Data.'));
+  end loop;
+
+  /* ---------- 5. rebuild every affected student ---------- */
+  for r in select st.id, st.full_name, st.class
+             from public.students st
+            where coalesce(st.status,'active') in ('active','approved')
+              and (p_student is null or st.id = p_student)
+              and (coalesce(btrim(p_class),'') = '' or lower(btrim(st.class)) = lower(btrim(p_class)))
+            order by st.class, st.full_name
+  loop
+    n_scanned := n_scanned + 1;
+    led := public.sc_fee_ledger_for(r.id, t_term, t_session);
+    /* a bill of zero while money has been received means NO fee structure matched */
+    if coalesce((led->>'bill')::numeric,0) <= 0 and coalesce((led->>'paid')::numeric,0) > 0 then
+      n_nobill := n_nobill + 1;
+      findings := findings || jsonb_build_array(jsonb_build_object(
+        'kind','no_fee_structure','student',r.full_name,'class',r.class,
+        'paid',(led->>'paid')::numeric,
+        'issue','Money was received but no class fee structure matches this student, so the bill is ₦0 and the balance cannot be right.',
+        'fix','Set the Class Fee Structure for '||coalesce(r.class,'this class')||' (or give the student a personal total) then run the repair again.'));
+    end if;
+    /* arrears carried from before the school adopted School Connect */
+    if coalesce((led->>'opening_arrears')::numeric,0) > 0 then
+      n_opening := n_opening + 1;
+    end if;
+    /* overpayment */
+    if coalesce((led->>'paid')::numeric,0) > coalesce((led->>'grand_total')::numeric,0) + 0.005 then
+      n_overpaid := n_overpaid + 1;
+      findings := findings || jsonb_build_array(jsonb_build_object(
+        'kind','overpayment','student',r.full_name,
+        'paid',(led->>'paid')::numeric,'grand_total',(led->>'grand_total')::numeric,
+        'excess',round(((led->>'paid')::numeric - (led->>'grand_total')::numeric)::numeric, 2),
+        'issue','More has been recorded as paid than the student was ever billed — a credit is due or an amount was mistyped.',
+        'fix','Shown as a credit in the ledger. Verify the receipt amounts.'));
+    end if;
+    if not p_dry_run then
+      /* rewrite every fee_total / balance snapshot for this student so the
+         printed receipts and any legacy screen agree with the engine */
+      led := public.sc_fee_sync_snapshots(r.id, t_term, t_session);
+      n_rebuilt := n_rebuilt + 1;
+      retotal := retotal + coalesce((led->>'outstanding')::numeric,0);
+    end if;
+  end loop;
+
+  /* ---------- 6. one-time backfill: opening balances ---------- */
+  begin
+    select count(*) into n_with_opening from public.students where coalesce(opening_arrears,0) > 0;
+  exception when undefined_column then n_with_opening := 0;
+  end;
+
+  return jsonb_build_object(
+    'ok', true, 'mode', acting,
+    'term', coalesce(t_term,''), 'session', coalesce(t_session,''),
+    'students_scanned', n_scanned,
+    'students_rebuilt', n_rebuilt,
+    'outstanding_after', retotal,
+    'counts', jsonb_build_object(
+      'missing_period', n_period,
+      'unlinked_receipts', n_unlinked,
+      'non_positive', n_zero,
+      'duplicate_groups', n_dup,
+      'no_fee_structure', n_nobill,
+      'overpaid', n_overpaid,
+      'with_opening_arrears', n_with_opening),
+    'findings', findings,
+    'note', case when p_dry_run
+                 then 'Read-only check — nothing was changed. Press Repair to apply.'
+                 else 'Ledger rebuilt. Every receipt snapshot, arrears figure, portal lock and dashboard total now come from the same engine.' end);
+end $$;
+revoke all on function public.sc_fee_repair_all(boolean,text,uuid) from public, anon;
+grant execute on function public.sc_fee_repair_all(boolean,text,uuid) to authenticated;
