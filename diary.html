@@ -692,4 +692,7 @@ const DRY={
   }
 };
 document.addEventListener('DOMContentLoaded',()=>DRY.refresh()); DRY.refresh();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.DRY = DRY;
 </script></body></html>

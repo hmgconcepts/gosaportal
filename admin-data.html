@@ -691,6 +691,9 @@ const DataTools = {
   }
 };
 document.addEventListener('DOMContentLoaded',()=>DataTools.init());if(document.readyState!=='loading')DataTools.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.DataTools = DataTools;
 </script><script src="assets/js/drive-sync.js"></script>
 <script src="assets/js/recovery.js"></script>
 <script>
@@ -730,6 +733,9 @@ const GD={
   async del(id,name){if(!confirm('Delete the Drive backup “'+name+'” permanently?'))return;try{await DriveSync.deleteBackup(id);toast('Drive backup deleted.','info');this.list();}catch(e){toast(e.message||e,'danger');}}
 };
 document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>GD.refreshStatus(),800);});
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.GD = GD;
 </script>
 <script src="assets/js/demo-sample-data.js"></script>
 <script>
@@ -804,5 +810,11 @@ const DS={
     }catch(e){box.textContent='';toast(e.message||e,'danger',9000);}
   }
 };
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.DS = DS;
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.RL = RL;
 </script>
 </body></html>

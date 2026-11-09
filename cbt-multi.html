@@ -521,6 +521,9 @@ const MM = {
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 MM.addSubject('English Language'); MM.addSubject('Mathematics');
 MM.lookups();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.MM = MM;
 </script>
 <script>
 /* Role guard for non-shell pages */

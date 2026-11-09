@@ -761,6 +761,9 @@ const CK = {
 
 window.addEventListener('beforeunload', () => CK.stopCam());
 document.addEventListener('DOMContentLoaded', () => CK.init());
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.CK = CK;
 </script>
 </body>
 </html>

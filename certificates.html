@@ -625,4 +625,7 @@ const CTUI={ code:'', sig:'',
   }
 };
 document.addEventListener('DOMContentLoaded',()=>{ CTUI.loadStudents(); CTUI.render(); }); CTUI.render();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.CTUI = CTUI;
 </script></body></html>

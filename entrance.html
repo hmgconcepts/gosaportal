@@ -643,4 +643,7 @@ const EN={ rows:[], exam:null,
   exportCSV(){ if(!this.rows.length){toast('No results','warning');return;} var keys=['student_name','student_class','score','total','percent','correct_count','wrong_count']; var csv=[keys.join(',')].concat(this.rows.map(r=>keys.map(k=>'"'+String(r[k]==null?'':r[k]).replace(/"/g,'""')+'"').join(','))).join('\n'); var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='assessment-results.csv';a.click(); }
 };
 document.addEventListener('DOMContentLoaded',()=>EN.init()); EN.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.EN = EN;
 </script></body></html>

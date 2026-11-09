@@ -562,4 +562,7 @@ const ADM={
   async set(id,s){ await sb.from('admissions').update({status:s}).eq('id',id); ADM.load(); }
 };
 document.addEventListener('DOMContentLoaded',()=>{ ADM.links(); ADM.load(); }); ADM.links(); ADM.load();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.ADM = ADM;
 </script></body></html>

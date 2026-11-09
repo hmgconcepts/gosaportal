@@ -540,4 +540,7 @@ const MN={
   async view(w){ const {data}=await Enterprise.menu.week(w);
     document.getElementById('mn-week-view').innerHTML='<div class="card"><h3>Menu — week of '+esc(w)+'</h3><div class="table-wrap"><table><thead><tr><th>Day</th><th>Meal</th><th>Description</th><th>Allergens</th></tr></thead><tbody>'+(data||[]).map(m=>'<tr><td>'+esc(m.day)+'</td><td>'+esc(m.meal)+'</td><td>'+esc(m.description||'')+'</td><td>'+esc(m.allergens||'')+'</td></tr>').join('')+'</tbody></table></div></div>'; }
 };
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.MN = MN;
 </script></body></html>

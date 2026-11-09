@@ -503,6 +503,56 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div id="fee-doctor-out" style="margin-top:12px"></div>
       </div>
 
+      <!-- ===================================================================
+           V12.62 (item 5) — FEE COLLECTION STATEMENT (print / PDF)
+           One printable document showing, for the whole school or one class:
+             A. every student who has FULLY paid,
+             B. every student who has NOT (part-paid and untouched),
+           and for each one, exactly how they paid — the dated instalments.
+           =================================================================== -->
+      <div class="card" id="fee-statement" style="margin-bottom:16px;border:2px solid #0ea5e9;scroll-margin-top:20px" data-admin-only>
+        <h2 style="margin-top:0">🖨️ Fee collection statement — fully paid vs outstanding (PDF)</h2>
+        <p style="color:var(--gray-700);font-size:.9rem;margin-top:0">
+          A printable statement for management, the PTA or an audit. It lists <b>every student who has paid in full</b>
+          and <b>every student who has not</b>, and shows the individual instalments that make up each student's payments.
+          Opens the browser's print dialog — choose <b>Save as PDF</b> to keep a copy.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="form-select" id="fs-class" style="max-width:220px"><option value="">ALL classes</option></select>
+          <select class="form-select" id="fs-scope" style="max-width:250px">
+            <option value="both">Both groups (fully paid + outstanding)</option>
+            <option value="paid">Fully paid only</option>
+            <option value="debtors">Outstanding only</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.86rem"><input type="checkbox" id="fs-schedule" checked> Show each student's payment schedule</label>
+          <button class="btn btn-primary" onclick="FeeStatement.print()">🖨️ Print / Save as PDF</button>
+          <button class="btn btn-outline" onclick="FeeStatement.exportCSV()">⬇ CSV</button>
+        </div>
+        <div id="fs-out" style="margin-top:12px"></div>
+      </div>
+
+      <!-- ===================================================================
+           V12.62 (item 4) — ONE-CLICK FEE REPAIR
+           After a back-dated receipt is added, an amount corrected, or an old
+           debt folded into an earlier payment, every derived record can drift.
+           This button finds and fixes all of it in one transaction.
+           =================================================================== -->
+      <div class="card" style="margin-bottom:16px;border:2px solid #f59e0b;background:#fffbeb" data-admin-only>
+        <h2 style="margin-top:0">🛠️ One-click fee repair</h2>
+        <p style="color:var(--gray-700);font-size:.9rem;margin-top:0">
+          Use this after you <b>change an old receipt</b> (add a forgotten debt, correct an amount, fix a wrong term/date),
+          or whenever a balance looks wrong. It rebuilds every receipt snapshot, recomputes arrears and outstanding for
+          every student, re-syncs the portal-lock state, and reports anything it cannot fix safely — duplicates,
+          unlinked receipts, overpayments and missing fee structures.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="form-select" id="rep-class" style="max-width:220px"><option value="">ALL classes</option></select>
+          <button class="btn btn-outline" onclick="FeeRepair.run(true)">🔍 Check only (changes nothing)</button>
+          <button class="btn btn-primary" style="background:#b45309;border-color:#92400e" onclick="FeeRepair.run(false)">✅ Repair everything now</button>
+        </div>
+        <div id="rep-out" style="margin-top:12px"></div>
+      </div>
+
       <div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe" data-admin-only><h2 style="margin-top:0">📑 Master Financial Records — export by class (V10.1)</h2>
         <p style="color:var(--gray-600);font-size:.9rem">One row per student: current-term bill, scholarship/aid, paid so far, balance, previous-term arrears and TOTAL outstanding — computed live by the same engine that powers the dashboards. Print/save as PDF or download CSV. Needs <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>
         <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
@@ -601,6 +651,9 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <script>
 const FeeDaily={rows:[],esc:s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;'),today(){return new Date().toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'});},money(n){return((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},async fetchDate(date){const all=[];for(let from=0;;from+=1000){const r=await sb.from('fee_payments').select('*').eq('payment_date',date).order('created_at',{ascending:false}).range(from,from+999);if(r.error)throw r.error;all.push(...(r.data||[]));if(!r.data||r.data.length<1000)break;}return all;},async sumRange(from,to){let total=0,count=0;for(let start=0;;start+=1000){const r=await sb.from('fee_payments').select('amount_paid').gte('payment_date',from).lte('payment_date',to).range(start,start+999);if(r.error)throw r.error;(r.data||[]).forEach(x=>{total+=Number(x.amount_paid||0);count++;});if(!r.data||r.data.length<1000)break;}return{total,count};},async load(){if(!window.sb)return;const input=document.getElementById('fd-date'),date=input.value||this.today();input.value=date;try{const rows=await this.fetchDate(date);this.rows=rows;const ids=[...new Set(rows.map(x=>x.student_id).filter(Boolean))],students={};if(ids.length){const r=await sb.from('students').select('id,full_name,admission_no,class').in('id',ids);(r.data||[]).forEach(x=>students[x.id]=x);}const d=new Date(date+'T12:00:00'),yd=new Date(d);yd.setDate(d.getDate()-1);const yesterday=yd.toLocaleDateString('en-CA',{timeZone:'Africa/Lagos'}),monthStart=date.slice(0,7)+'-01',[prev,month]=await Promise.all([this.sumRange(yesterday,yesterday),this.sumRange(monthStart,date)]),total=rows.reduce((a,x)=>a+Number(x.amount_paid||0),0),methods={},classes={},collectors={};rows.forEach(x=>{methods[x.method||'unspecified']=(methods[x.method||'unspecified']||0)+Number(x.amount_paid||0);const st=students[x.student_id]||{},cl=st.class||'Unassigned';classes[cl]=(classes[cl]||0)+Number(x.amount_paid||0);const by=x.received_by_name||'Not recorded';collectors[by]=(collectors[by]||0)+Number(x.amount_paid||0);});const breakdown=(title,obj)=>'<div><h4>'+title+'</h4><div class="table-wrap"><table><tbody>'+Object.entries(obj).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<tr><td>'+this.esc(k)+'</td><td><b>'+this.money(v)+'</b></td></tr>').join('')+'</tbody></table></div></div>';document.getElementById('fd-out').innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+this.money(total)+'</div><div class="stat-label">Selected day total</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Transactions</div></div><div class="stat-card"><div class="stat-value">'+this.money(rows.length?total/rows.length:0)+'</div><div class="stat-label">Average receipt</div></div><div class="stat-card"><div class="stat-value">'+this.money(prev.total)+'</div><div class="stat-label">Previous day</div></div><div class="stat-card"><div class="stat-value">'+this.money(month.total)+'</div><div class="stat-label">Month-to-date</div></div></div><div class="grid grid-3">'+breakdown('By payment method',methods)+breakdown('By class',classes)+breakdown('By collector',collectors)+'</div><h4>Transactions for '+this.esc(date)+'</h4><div class="table-wrap"><table><thead><tr><th>Time</th><th>Student</th><th>Class</th><th>Amount</th><th>Method</th><th>Reference</th><th>Collector</th></tr></thead><tbody>'+(rows.length?rows.map(x=>{const st=students[x.student_id]||{};return'<tr><td>'+this.esc(String(x.created_at||'').slice(11,16))+'</td><td>'+this.esc(st.full_name||x.student_name||'')+'<br><small>'+this.esc(st.admission_no||'')+'</small></td><td>'+this.esc(st.class||'')+'</td><td><b>'+this.money(x.amount_paid)+'</b></td><td>'+this.esc(x.method||'')+'</td><td>'+this.esc(x.reference||'')+'</td><td>'+this.esc(x.received_by_name||'')+'</td></tr>';}).join(''):'<tr><td colspan="7">No fees recorded on this date.</td></tr>')+'</tbody></table></div>';}catch(e){document.getElementById('fd-out').innerHTML='<div class="notice notice-error">'+this.esc(e.message||e)+'. Run the latest complete-schema.sql if payment_date is missing.</div>'; }},exportDay(){if(!this.rows.length){toast('No daily rows to export.','warning');return;}const keys=['payment_date','created_at','student_id','student_name','amount_paid','method','reference','term','session','received_by_name'],csv=[keys.join(',')].concat(this.rows.map(r=>keys.map(k=>'"'+String(r[k]??'').replace(/"/g,'""')+'"').join(','))).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='daily-fees-'+document.getElementById('fd-date').value+'.csv';a.click();}};
 document.addEventListener('DOMContentLoaded',()=>FeeDaily.load());
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FeeDaily = FeeDaily;
 </script>
 <script>
 /* ===== FAM — V9.4 (#1): Family fee panel for parents & students =====
@@ -685,6 +738,242 @@ const FAM={
   }
 };
 document.addEventListener('DOMContentLoaded',()=>FAM.init());FAM.init();
+/* =====================================================================
+   V12.62 (item 5) — FeeStatement: printable fully-paid vs outstanding report.
+   Data comes from sc_fee_roster (the same engine as every other screen) plus
+   the individual receipts, so the statement can never disagree with the pages.
+   ===================================================================== */
+const FeeStatement={
+  rows:[], pays:{}, ctx:{},
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  money(n){return((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});},
+  async init(){
+    try{
+      const {data}=await sb.from('students').select('class').limit(20000);
+      const cls=[...new Set((data||[]).map(x=>String(x.class||'').trim()).filter(Boolean))].sort();
+      const el=document.getElementById('fs-class');
+      if(el)cls.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o);});
+    }catch(_){}
+  },
+  async load(){
+    const cls=(document.getElementById('fs-class')||{}).value||'';
+    const r=await sb.rpc('sc_fee_roster',{p_class:cls||null,p_term:null,p_session:null,p_filter:'all'});
+    if(r.error) throw r.error;
+    const d=r.data||{};
+    if(d.ok===false) throw new Error(d.error||'Could not load the fee roster');
+    this.rows=d.rows||[]; this.ctx={cls:cls,term:d.term,session:d.session,summary:d};
+    /* every receipt, so each student's schedule can be printed */
+    const ids=this.rows.map(x=>x.student_id).filter(Boolean);
+    this.pays={};
+    for(let i=0;i<ids.length;i+=200){
+      const pr=await sb.from('fee_payments')
+        .select('student_id,amount_paid,method,reference,term,session,payment_date,created_at')
+        .in('student_id',ids.slice(i,i+200)).order('payment_date',{ascending:true});
+      (pr.data||[]).forEach(p=>{ (this.pays[p.student_id]=this.pays[p.student_id]||[]).push(p); });
+    }
+    return this.ctx;
+  },
+  grouped(){
+    const paid=this.rows.filter(x=>Number(x.total_due)<=0.005);
+    const owing=this.rows.filter(x=>Number(x.total_due)>0.005);
+    const untouched=owing.filter(x=>Number(x.paid)<=0.005);
+    const partial=owing.filter(x=>Number(x.paid)>0.005);
+    return {paid, owing, untouched, partial};
+  },
+  async preview(){
+    const box=document.getElementById('fs-out'); if(!box) return;
+    box.innerHTML='<span class="pulse">Building the statement…</span>';
+    try{
+      await this.load();
+      const g=this.grouped(), d=this.ctx.summary||{};
+      const sch=!!(document.getElementById('fs-schedule')||{}).checked;
+      box.innerHTML='<div class="notice notice-success">✅ Statement ready — <b>'+g.paid.length+'</b> fully paid · <b>'+
+        g.partial.length+'</b> part-paid · <b>'+g.untouched.length+'</b> not yet paid · collected <b>'+this.money(d.collected)+
+        '</b> of <b>'+this.money(d.net_bill)+'</b> ('+Number(d.collection_rate||0)+'%). Press <b>Print / Save as PDF</b>.'+
+        (sch?' Payment schedules included.':'')+'</div>';
+    }catch(e){
+      box.innerHTML='<div class="notice notice-error">'+this.esc(e.message||e)+'</div>';
+    }
+  },
+  async print(){
+    const btn=null;
+    try{ await this.load(); }catch(e){ toast('Statement failed: '+(e.message||e),'danger',8000); return; }
+    const g=this.grouped(), d=this.ctx.summary||{};
+    const scope=(document.getElementById('fs-scope')||{}).value||'both';
+    const sch=!!(document.getElementById('fs-schedule')||{}).checked;
+    const sc=window.SCHOOL||{}, cur=sc.currency||'₦';
+    const now=new Date();
+    const fdate=v=>{ if(!v)return '—'; const x=new Date(String(v).length===10?String(v)+'T00:00:00':v); return isNaN(x)?String(v):x.toLocaleDateString('en-GB'); };
+
+    const head='<h1 style="margin:0;font-size:17pt">'+this.esc(sc.name||'School')+'</h1>'+
+      '<p style="margin:2px 0;font-size:8.5pt;color:#475569">'+this.esc(sc.address||'')+
+      (sc.phone?' · '+this.esc(sc.phone):'')+(sc.email?' · '+this.esc(sc.email):'')+'</p>'+
+      '<h2 style="margin:12px 0 2px;font-size:13pt;letter-spacing:.04em">FEE COLLECTION STATEMENT</h2>'+
+      '<p style="margin:0;font-size:9pt;color:#334155">'+this.esc(this.ctx.term||'')+' '+this.esc(this.ctx.session||'')+
+      ' · '+(this.ctx.cls?this.esc(this.ctx.cls):'Whole school')+' · generated '+now.toLocaleString()+'</p>';
+
+    /* summary block — the same reconciliation as every screen */
+    const sum='<table style="width:100%;border-collapse:collapse;margin:10px 0 14px;font-size:9.5pt">'+
+      '<tr>'+
+      this.cell('Students',Number(d.students||0))+
+      this.cell('Fully paid',g.paid.length)+
+      this.cell('Part-paid',g.partial.length)+
+      this.cell('Not paid',g.untouched.length)+
+      '</tr><tr>'+
+      this.cell('Net bill',this.money(d.net_bill))+
+      this.cell('Collected',this.money(d.collected))+
+      this.cell('Arrears',this.money(d.arrears))+
+      this.cell('Outstanding',this.money(d.outstanding))+
+      '</tr></table>';
+
+    const sched=(x)=>{
+      if(!sch) return '';
+      const ps=this.pays[x.student_id]||[];
+      if(!ps.length) return '';
+      return '<div style="font-size:7.6pt;color:#475569;padding:1px 0 4px 14px">Payments: '+
+        ps.map(p=>fdate(p.payment_date||p.created_at)+' '+this.money(p.amount_paid)+(p.method?' ('+this.esc(p.method)+')':'')).join(' &nbsp;·&nbsp; ')+'</div>';
+    };
+    const table=(list,title,cols,rowFn)=> list.length?(
+      '<h3 style="margin:14px 0 4px;font-size:10.5pt;border-bottom:2px solid #0f172a;padding-bottom:2px">'+title+' ('+list.length+')</h3>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:8.6pt">'+
+      '<thead><tr>'+cols.map(c=>'<th style="border:1px solid #94a3b8;background:#e2e8f0;padding:3px 5px;text-align:left">'+c+'</th>').join('')+'</tr></thead><tbody>'+
+      list.map((x,i)=>'<tr style="'+(i%2?'background:#f8fafc':'')+'">'+rowFn(x,i)+'</tr>'+sched(x)).join('')+
+      '</tbody></table>') : '<p style="font-size:9pt;color:#166534">None.</p>';
+
+    const td=(v,al)=>'<td style="border:1px solid #cbd5e1;padding:2px 5px;'+(al?'text-align:'+al:'')+'">'+v+'</td>';
+    const paidTbl=table(g.paid,'A. FULLY PAID',
+      ['#','Student','Adm. No','Class','Bill','Paid','Instalments','Cleared on'],
+      (x,i)=>td(i+1)+td('<b>'+this.esc(x.student)+'</b>')+td(this.esc(x.admission_no||''))+td(this.esc(x.class||''))+
+        td(this.money(x.bill),'right')+td('<b>'+this.money(x.paid)+'</b>','right')+
+        td(Number(x.receipts||0),'center')+td(fdate(x.last_payment),'right'));
+
+    const owingTbl=table(g.owing,'B. NOT COMPLETED',
+      ['#','Student','Adm. No','Class','Bill','Paid','This-term balance','Arrears','TOTAL due'],
+      (x,i)=>td(i+1)+td('<b>'+this.esc(x.student)+'</b>')+td(this.esc(x.admission_no||''))+td(this.esc(x.class||''))+
+        td(this.money(x.bill),'right')+td(this.money(x.paid),'right')+
+        td(this.money(x.balance),'right')+td(this.money(x.arrears),'right')+
+        td('<b>'+this.money(x.total_due)+'</b>','right'));
+
+    const foot='<p style="margin-top:16px;font-size:8pt;color:#475569;border-top:1px solid #cbd5e1;padding-top:6px">'+
+      'Prepared by the Bursary · '+this.esc(sc.name||'')+' · All figures computed by the School Connect fee engine ('+this.esc(this.ctx.term||'')+' '+this.esc(this.ctx.session||'')+'). '+
+      'Signed: ______________________ &nbsp;&nbsp; Date: '+now.toLocaleDateString('en-GB')+'</p>';
+
+    const body='<!doctype html><html><head><meta charset="utf-8"><title>Fee Collection Statement — '+this.esc(this.ctx.term||'')+'</title>'+
+      '<style>@page{size:A4 portrait;margin:12mm}'+
+      'body{font-family:"Segoe UI",system-ui,Arial,sans-serif;color:#0f172a;margin:0}'+
+      'table{page-break-inside:auto}tr{page-break-inside:avoid;page-break-after:auto}'+
+      'thead{display:table-header-group}h3{page-break-after:avoid}'+
+      '@media print{.no-print{display:none}}</style></head><body>'+
+      head+sum+
+      ((scope==='both'||scope==='paid') ? paidTbl : '')+
+      ((scope==='both'||scope==='debtors') ? owingTbl : '')+
+      foot+'</body></html>';
+
+    const w=window.open('','_blank');
+    if(!w){ toast('Allow pop-ups to print the statement.','warning',7000); return; }
+    w.document.open(); w.document.write(body); w.document.close();
+    setTimeout(()=>{ try{ w.focus(); w.print(); }catch(_){} }, 600);
+    try{ if(window.App&&App.logActivity) App.logActivity('fee-statement','fees',(this.ctx.cls||'all')+':'+g.paid.length+'/'+g.owing.length); }catch(_){}
+  },
+  cell(label,value){
+    return '<td style="border:1px solid #94a3b8;padding:4px 7px"><div style="font-size:7.5pt;text-transform:uppercase;letter-spacing:.05em;color:#64748b">'+label+
+      '</div><div style="font-size:11pt;font-weight:800">'+value+'</div></td>';
+  },
+  async exportCSV(){
+    try{ await this.load(); }catch(e){ toast('CSV failed: '+(e.message||e),'danger',7000); return; }
+    const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+    const lines=[['Group','Student','Admission No','Class','Bill','Paid','Balance','Arrears','Total Due','Status','Receipts','Last Payment','Payment Schedule']];
+    const g=this.grouped();
+    const add=(grp,list)=>list.forEach(x=>{
+      const ps=(this.pays[x.student_id]||[]).map(p=>(p.payment_date||p.created_at||'')+' '+p.amount_paid).join(' | ');
+      lines.push([grp,x.student,x.admission_no,x.class,x.bill,x.paid,x.balance,x.arrears,x.total_due,x.status,x.receipts,x.last_payment,ps]);
+    });
+    add('FULLY PAID',g.paid); add('PART-PAID',g.partial); add('NOT PAID',g.untouched);
+    const csv=lines.map(r=>r.map(q).join(',')).join('\n');
+    const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='fee-collection-statement-'+(this.ctx.cls||'whole-school').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),8000);
+    toast('CSV exported — '+this.rows.length+' students.','success',6000);
+  }
+};
+if(document.getElementById('fs-class')) document.addEventListener('DOMContentLoaded',()=>FeeStatement.init());
+document.addEventListener('DOMContentLoaded',()=>{ if(document.getElementById('fs-out')) setTimeout(()=>FeeStatement.preview(),900); });
+['fs-class','fs-scope','fs-schedule'].forEach(id=>document.addEventListener('DOMContentLoaded',()=>{
+  const e=document.getElementById(id); if(e) e.addEventListener('change',()=>FeeStatement.preview());
+}));
+
+/* =====================================================================
+   V12.62 (item 4) — FeeRepair: the one-click fix for every derived record.
+   ===================================================================== */
+const FeeRepair={
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  money(n){return((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},
+  async init(){
+    try{
+      const {data}=await sb.from('students').select('class').limit(20000);
+      const cls=[...new Set((data||[]).map(x=>String(x.class||'').trim()).filter(Boolean))].sort();
+      const el=document.getElementById('rep-class');
+      if(el)(data||[]).length&&cls.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o);});
+    }catch(_){}
+  },
+  async run(dry){
+    const box=document.getElementById('rep-out'); if(!box) return;
+    const cls=(document.getElementById('rep-class')||{}).value||'';
+    if(!dry && !confirm('Rebuild the fee ledger for '+(cls||'the whole school')+'?\n\nEvery receipt snapshot, arrears figure and lock state will be recomputed from the fee engine. Nothing is deleted. This is safe to run more than once.')) return;
+    box.innerHTML='<span class="pulse">'+(dry?'Checking':'Repairing')+' every student…</span>';
+    try{
+      const r=await sb.rpc('sc_fee_repair_all',{p_dry_run:!!dry,p_class:cls||null,p_student:null});
+      if(r.error) throw r.error;
+      const d=r.data||{};
+      if(d.ok===false) throw new Error(d.error||'Repair failed');
+      const c=d.counts||{};
+      const items=[
+        ['Receipts with no term/session',c.missing_period,'repaired automatically — they were invisible to every total'],
+        ['Unlinked receipts (no student)',c.unlinked_receipts,'needs you: pick the student on that row'],
+        ['Zero / negative amounts',c.non_positive,'needs you: verify in the cash book'],
+        ['Duplicate receipt groups',c.duplicate_groups,'needs you: delete the double entry'],
+        ['Students billed ₦0 but paying',c.no_fee_structure,'needs you: set the class fee structure'],
+        ['Students who overpaid',c.overpaid,'a credit is due — verify the amounts'],
+        ['Students with an opening balance',c.with_opening_arrears,'carried over from the paper ledger']
+      ];
+      let h='<div class="notice '+(dry?'':'notice-success')+'" style="margin-bottom:10px">'+
+        (dry?'Read-only check complete — nothing has been changed.':(this.esc(d.note||'Ledger rebuilt.')))+
+        '<br><b>'+Number(d.students_scanned||0)+'</b> student(s) checked'+
+        (dry?'':' · <b>'+Number(d.students_rebuilt||0)+'</b> rebuilt · total outstanding now <b>'+this.money(d.outstanding_after)+'</b>')+
+        '</div>';
+      h+='<div class="table-wrap"><table><thead><tr><th>What was checked</th><th>Found</th><th>What it means</th></tr></thead><tbody>';
+      items.forEach(([label,n,note])=>{
+        const bad=Number(n||0)>0;
+        h+='<tr><td>'+label+'</td><td><b style="color:'+(bad?'#b45309':'#166534')+'">'+Number(n||0)+'</b></td><td style="font-size:.84rem;color:var(--gray-600)">'+note+'</td></tr>';
+      });
+      h+='</tbody></table></div>';
+      const f=d.findings||[];
+      if(f.length){
+        h+='<details style="margin-top:10px"'+(f.length<6?' open':'')+'><summary style="cursor:pointer;font-weight:700;font-size:.88rem">📋 Every finding ('+f.length+')</summary>'+
+           '<div class="table-wrap" style="margin-top:8px"><table><thead><tr><th>Student</th><th>Kind</th><th>What we found</th><th>What to do</th></tr></thead><tbody>'+
+           f.slice(0,200).map(x=>'<tr><td><b>'+this.esc(x.student||('×'+x.count))+'</b></td><td><span class="badge">'+this.esc(x.kind)+'</span></td><td style="font-size:.82rem">'+this.esc(x.issue||'')+'</td><td style="font-size:.82rem;color:var(--gray-600)">'+this.esc(x.fix||'')+'</td></tr>').join('')+
+           '</tbody></table></div></details>';
+      } else {
+        h+='<p style="color:#166534;font-weight:700;margin-top:10px">✅ No problems found — every receipt, snapshot and balance is consistent.</p>';
+      }
+      box.innerHTML=h;
+      if(!dry){
+        toast('Ledger repaired for '+Number(d.students_rebuilt||0)+' student(s).','success',8000);
+        try{ FeeSegment.load(); }catch(_){}
+        try{ if(window.App&&App.loadDashFees) App.loadDashFees(); }catch(_){}
+      }
+    }catch(e){
+      const msg=String(e.message||e);
+      box.innerHTML='<div class="notice notice-error">'+(/sc_fee_repair_all|schema cache|function/i.test(msg)
+        ? 'The one-click repair needs the V12.62 database pack — run <code>database/v12.60-expert-fix-pack.sql</code> in Supabase, then reload.'
+        : this.esc(msg))+'</div>';
+    }
+  }
+};
+if(document.getElementById('rep-class')) document.addEventListener('DOMContentLoaded',()=>FeeRepair.init());
+
 /* ===== FM — V10.1 (#7): Master financial records export ===== */
 const FM={rows:[],ctx:{},
   esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
@@ -714,6 +1003,18 @@ const FM={rows:[],ctx:{},
     const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='master-financial-records'+(this.ctx.cls?'-'+this.ctx.cls.replace(/\s+/g,'_'):'')+'.csv';a.click();}
 };
 document.addEventListener('DOMContentLoaded',()=>FM.init());FM.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FAM = FAM;
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FM = FM;
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FeeRepair = FeeRepair;
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FeeStatement = FeeStatement;
 </script>
 <script>
 /* V10.9 (#1): FEE LEDGER DOCTOR UI — renders the sc_fee_ledger_doctor scan,
@@ -878,4 +1179,10 @@ const FeeDoctor={
     if(window.App&&App.logActivity)App.logActivity(heal?'fee-doctor-heal':'fee-doctor-scan','fee_payments',String(issues.length)+' finding(s)');
   }
 };
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FeeDoctor = FeeDoctor;
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FeeSegment = FeeSegment;
 </script></body></html>

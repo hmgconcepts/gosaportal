@@ -540,4 +540,7 @@ const AS={
  async addPeriod(){ if(!sb)return; const row={session:document.getElementById('as-p-session').value.trim(),term:document.getElementById('as-p-term').value.trim(),starts_on:document.getElementById('as-start').value||null,ends_on:document.getElementById('as-end').value||null,is_current:document.getElementById('as-current').checked}; if(!row.session||!row.term){toast('Select a registered session and term (add them in the Terms / Sessions / Arms card above first)','warning');return;} if(row.is_current) await sb.from('academic_periods').update({is_current:false}).neq('id','00000000-0000-0000-0000-000000000000'); const {error}=await sb.from('academic_periods').upsert(row,{onConflict:'session,term'}); if(error){toast(error.message,'danger');return;} toast('Academic period saved','success'); this.load(); }
 };
 document.addEventListener('DOMContentLoaded',()=>AS.init()); AS.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.AS = AS;
 </script></body></html>

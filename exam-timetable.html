@@ -825,4 +825,7 @@ const EXT={
   print(){const el=document.getElementById('ex-print-area');if(!el){toast('Nothing to print yet.','warning');return;}const w=window.open('','_blank');if(!w){toast('Allow popups to print.','warning');return;}w.document.write('<html><head><title>Exam Timetable</title><style>@page{size:A4;margin:10mm}body{font-family:Arial;padding:10px}table{width:100%;border-collapse:collapse;margin-bottom:12px}th,td{border:1px solid #111;padding:6px;text-align:left;font-size:12px}th{background:#e2e8f0}h4{margin:10px 0 4px}</style></head><body>'+el.innerHTML+'<script>window.onload=()=>window.print()<\/script></body></html>');w.document.close();}
 };
 document.addEventListener('DOMContentLoaded',()=>EXT.init());EXT.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.EXT = EXT;
 </script></body></html>

@@ -1069,4 +1069,7 @@ const AP={
   }
 };
 document.addEventListener('DOMContentLoaded',()=>AP.init());
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.AP = AP;
 </script></body></html>

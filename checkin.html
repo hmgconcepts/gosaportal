@@ -694,4 +694,7 @@ const CK={ done:[], stream:null, scanning:false, last:'', lastAt:0,
   }
 };
 window.addEventListener('beforeunload',()=>CK.stopCam());
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.CK = CK;
 </script></body></html>

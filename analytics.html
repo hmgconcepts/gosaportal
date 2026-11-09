@@ -732,5 +732,8 @@ const AN={
   exportPDF(){ window.print(); }
 };
 document.addEventListener('DOMContentLoaded',()=>AN.refresh()); AN.refresh();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.AN = AN;
 </script>
 </body></html>

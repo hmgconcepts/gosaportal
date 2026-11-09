@@ -307,6 +307,9 @@ const MR = {
   }
 };
 document.addEventListener('DOMContentLoaded', ()=>{ if(window.App) App.init('midterm-reports'); MR.init(); });
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.MR = MR;
 </script>
 </body>
 </html>

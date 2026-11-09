@@ -582,4 +582,7 @@ const FLUI={
   print(){ if(window.Super) Super.flyer.print(this.opts()); }
 };
 document.addEventListener('DOMContentLoaded',()=>FLUI.render()); FLUI.render();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.FLUI = FLUI;
 </script></body></html>

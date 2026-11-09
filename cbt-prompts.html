@@ -1385,4 +1385,7 @@ rule + '\nFINAL CHECK BEFORE YOU ANSWER\n' + rule + '\n' + checks;
   }
 };
 document.addEventListener('DOMContentLoaded', () => { try { PS.init(); } catch (e) { console.warn('Prompt Studio init failed:', e); } });
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.CPUI = CPUI;
 </script></body></html>

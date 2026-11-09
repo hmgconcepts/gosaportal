@@ -589,4 +589,7 @@ const ST={
       } if(error)throw error; } window.SC_SETTINGS=Object.assign(window.SC_SETTINGS||{},{latitude,longitude,geo_radius_m,enforce_geofence}); window.SCHOOL=Object.assign(window.SCHOOL||{},{latitude,longitude,geoRadius:geo_radius_m,enforceGeofence:enforce_geofence}); ST.renderGeoPreview(); toast('Staff attendance geofence saved.','success'); }catch(e){toast('Could not save geofence: '+(e.message||e),'danger',8000);} }
 };
 document.addEventListener('DOMContentLoaded',ST.init); ST.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.ST = ST;
 </script></body></html>

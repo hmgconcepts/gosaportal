@@ -174,5 +174,8 @@ const PH = {
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(m,t){ alert(m); }
 PH.lookups();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.PH = PH;
 </script>
 </body></html>

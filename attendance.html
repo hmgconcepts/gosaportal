@@ -743,4 +743,7 @@ const AT={
 document.addEventListener('DOMContentLoaded',()=>{ AT.init(); if(window.Super&&Super.scanner) Super.scanner.attach(function(raw){ if(AT.students&&AT.students.length) AT.markScanned(raw); }); });
 // v12 FIX: removed the duplicate immediate AT.init() call that raced with the
 // DOMContentLoaded handler (double-init duplicated parent/student history loads).
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.AT = AT;
 </script></body></html>

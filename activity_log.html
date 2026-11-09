@@ -574,5 +574,8 @@ const ALP={
     toast('Purged '+(r.data||0)+' old entrie(s) ✓ Database space reclaimed.','success',7000);
     if(window.CRUD)CRUD.renderList('activity_log');}
 };
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.ALP = ALP;
 </script>
 </body></html>

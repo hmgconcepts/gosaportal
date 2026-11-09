@@ -577,4 +577,7 @@ const AP={
   async adm(id,status){ const {error}=await sb.from('admissions').update({status:status}).eq('id',id); if(error){toast(error.message,'danger');return;} if(window.App&&App.logActivity)App.logActivity('admission',status,id); toast('Application '+status,'success'); AP.loadAdm(); }
 };
 document.addEventListener('DOMContentLoaded',AP.load); AP.load();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.AP = AP;
 </script></body></html>

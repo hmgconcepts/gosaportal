@@ -923,6 +923,9 @@ const DL={ qs:[],
   }
 };
 document.addEventListener('DOMContentLoaded',()=>DL.init()); DL.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.DL = DL;
 </script>
 <script>
 /* V8.4 #3 — Digital-library points accumulation + push (DLP). */
@@ -1001,4 +1004,7 @@ const DLP={
   }
 };
 document.addEventListener('DOMContentLoaded',()=>DLP.init());
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.DLP = DLP;
 </script></body></html>

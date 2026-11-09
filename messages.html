@@ -629,4 +629,7 @@ const MSG={
   logOnly(){this.log('in-app');},
   async loadLog(){ const box=document.getElementById('msg-log'); try{const r=await sb.from('module_records').select('*').eq('module','inbox').order('created_at',{ascending:false}).limit(80); box.innerHTML=(r.data||[]).length?'<div class="table-wrap"><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Subject</th><th>Channel</th><th>Status</th></tr></thead><tbody>'+(r.data||[]).map(x=>'<tr><td>'+esc((x.created_at||'').slice(0,10))+'</td><td>'+esc((x.data&&x.data.from)||'User')+'</td><td>'+esc((x.data&&x.data.to)||'User')+'</td><td>'+esc(x.title||'')+'</td><td>'+esc((x.data&&x.data.channel)||'in-app')+'</td><td>'+esc(x.status||'')+'</td></tr>').join('')+'</tbody></table></div>':'<p>No messages logged yet.</p>';}catch(e){box.innerHTML='<p>Could not load log.</p>';}}
 }; document.addEventListener('DOMContentLoaded',()=>MSG.init()); MSG.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.MSG = MSG;
 </script></body></html>

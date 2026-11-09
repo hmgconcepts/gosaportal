@@ -578,5 +578,8 @@ const LV={
   }
 };
 document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>LV.load(),900);});
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.LV = LV;
 </script>
 </body></html>
