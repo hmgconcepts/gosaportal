@@ -286,18 +286,171 @@ const ReportEngine = {
   subjects(rows){ return [...new Set(rows.map(r=>r.subject).filter(Boolean))].sort(); },
   studentsFromRows(rows){ return [...new Set(rows.map(r=>r.student_name).filter(Boolean))].sort(); },
 
+  /* ======================================================================
+     V12.64 — FAIR RANKING.  The browser mirror of database/v12.64.
+
+     The reported bug: a learner who sat ONE subject finished 1st, because the
+     overall percentage was the mean of whatever that learner happened to have
+     (38 out of one paper = "38 %") while a learner who sat four papers was
+     averaged over four (138/400 = "34.5 %"). Ranking those two numbers against
+     each other is meaningless.
+
+     Rules applied here, identical to the SQL engine:
+
+       1. A percentage is ALWAYS marks / the full expected load for the class.
+          A missing paper therefore costs its marks; it does not vanish.
+       2. Ranking uses competition ranking — equal percentages share a place
+          and the next place is skipped (1,1,3) — because that is what WAEC,
+          NECO, Cambridge and IB transcripts do.
+       3. Ties are ordered deterministically (more assessments sat, then more
+          subjects, then name) so re-running never reshuffles a class.
+       4. A learner below the participation threshold is NOT ranked. A learner
+          who sat nothing gets no grade at all — never an F.
+       5. Every ranked learner carries the cohort size and a written basis, so
+          any position on the sheet can be defended to a parent.
+     ====================================================================== */
+
+  /** The participation floor. Mirrors sc_report_min_participation() in SQL. */
+  MIN_PARTICIPATION: 0.34,
+
+  /** Grade scale — mirrors sc_report_grade(). '' when there is no evidence. */
+  gradeFor(percentage, satAssessments){
+    if (satAssessments != null && this.n(satAssessments) === 0) return '';
+    return this.grade(percentage);
+  },
+
+  /**
+   * The expected load for a cohort: every assessment the class is meant to sit.
+   * `rows` are normalised result rows; each row's `max` is its own obtainable
+   * total, so the cohort expectation is the largest subject load present,
+   * applied to every subject the class offers.
+   */
+  expectedLoad(rows, knownSubjects){
+    /* NB: build a plain object, not a Map. A Map returned from here is copied
+       into the per-person records by reference; when the caller spreads or
+       serialises it the lookup silently degrades and every learner falls back
+       to their OWN total — which is the very bug being fixed.
+
+       `knownSubjects` is the school's own statement of what this class offers
+       (from assessment_columns / the subjects table). It matters: if it is
+       omitted, a subject that only ONE learner sat disappears from the expected
+       load, and that learner is then measured out of one paper again — the
+       original bug, reintroduced through the back door. */
+    const bySubject = {};
+    (rows||[]).forEach(r=>{
+      const s = String(r.subject||'').trim();
+      if (!s) return;
+      const max = this.n(r.max) || 0;
+      bySubject[s] = Math.max(bySubject[s] || 0, max);
+    });
+    (knownSubjects||[]).forEach(raw=>{
+      const s = String(raw||'').trim();
+      if (!s || bySubject[s] != null) return;
+      /* a subject the class offers but this cohort has no marks for: assume the
+         standard 100-mark paper so it still counts as a paper owed */
+      bySubject[s] = 100;
+    });
+    const subjects = Object.keys(bySubject).sort();
+    let maxTotal = 0;
+    subjects.forEach(k=>{ maxTotal += bySubject[k]; });
+    return { subjects, perSubjectMax: bySubject,
+             subjectCount: subjects.length, maxTotal: maxTotal };
+  },
+
+  /**
+   * Rank a cohort. Returns { byName, expected, cohortSize }.
+   * `rows` must be every student's rows for ONE class/term/session.
+   */
+  rankCohort(rows, knownSubjects){
+    const expected = this.expectedLoad(rows, knownSubjects);
+    const perSubjectMax = expected.perSubjectMax;
+
+    /* fold each learner's rows into one record, measured against the load */
+    const people = new Map();
+    (rows||[]).forEach(r=>{
+      const key = String(r.student_name||'').trim();
+      if (!key) return;
+      if (!people.has(key)) people.set(key, { name:key, total:0, expected:0, subjects:new Set(), maxSubjects:new Set() });
+      const p = people.get(key);
+      p.total += this.n(r.total);
+      /* the denominator is the COHORT's max for this subject, never this
+         learner's own — a learner who sat one paper must still be measured
+         out of four */
+      const subj = String(r.subject||'').trim();
+      const exp = (perSubjectMax[subj] != null) ? Number(perSubjectMax[subj]) : (this.n(r.max) || 0);
+      p.expected += exp;
+      if (this.n(r.total) > 0) p.subjects.add(subj);   /* "sat" means marked, not merely listed */
+      p.maxSubjects.add(String(r.subject||'').trim());
+    });
+
+    const list = [...people.values()].map(p=>{
+      /* THE DENOMINATOR IS THE CLASS LOAD, NOT THIS LEARNER'S SUBMISSION.
+         `p.expected` (the sum of the subjects this learner submitted) is only a
+         fallback for a cohort with no discoverable structure at all. Using it as
+         the primary denominator reproduces the exact reported bug: a learner who
+         submitted one paper is measured out of one paper. */
+      const expectedTotal = expected.maxTotal || p.expected || 0;
+      const pct = expectedTotal > 0 ? (p.total / expectedTotal) * 100 : 0;
+      const sat = p.subjects.size;
+      const exp = expected.subjectCount || p.maxSubjects.size || sat;
+      const ratio = exp > 0 ? sat / exp : 0;
+      return { name:p.name, total:p.total, expected:expectedTotal,
+               percentage: Math.round(pct*100)/100,
+               subjectsSat:sat, subjectsExpected:exp,
+               complete: exp > 0 && sat >= exp && p.total > 0,
+               rankable: p.total > 0 && exp > 0 && ratio >= this.MIN_PARTICIPATION };
+    });
+
+    /* competition ranking on percentage ONLY, so a genuine tie is a tie */
+    const ranked = list.filter(x=>x.rankable)
+      .sort((a,b)=> (b.percentage - a.percentage)
+                 || (b.subjectsSat - a.subjectsSat)
+                 || a.name.localeCompare(b.name));
+    const cohortSize = ranked.length;
+    let lastPct = null, lastPos = 0;
+    ranked.forEach((x,i)=>{
+      const pos = (lastPct !== null && x.percentage === lastPct) ? lastPos : i + 1;
+      x.position = pos; lastPos = pos; lastPct = x.percentage;
+      x.cohortSize = cohortSize;
+      x.basis = x.complete
+        ? 'Ranked ' + pos + ' of ' + cohortSize + ' on ' + x.percentage.toFixed(2) + '% of the full ' + x.subjectsExpected + '-subject load.'
+        : 'Ranked ' + pos + ' of ' + cohortSize + ' on ' + x.percentage.toFixed(2) + '% of the full load, but only '
+          + x.subjectsSat + ' of ' + x.subjectsExpected + ' subjects sat — provisional.';
+    });
+    list.forEach(x=>{
+      if (x.rankable) return;
+      x.position = null; x.cohortSize = cohortSize;
+      x.basis = x.total > 0
+        ? 'Provisional: ' + x.subjectsSat + ' of ' + x.subjectsExpected + ' subjects sat, below the '
+          + Math.round(this.MIN_PARTICIPATION*100) + '% participation threshold — not ranked.'
+        : 'No marks recorded — not ranked.';
+    });
+
+    const byName = {}; list.forEach(x=>{ byName[x.name] = x; });
+    return { byName, expected, cohortSize, list };
+  },
+
   positionsBy(rows, groupKey='student_name'){
-    const totals = {};
-    rows.forEach(r => { totals[r[groupKey]] = (totals[r[groupKey]]||0) + this.n(r.total); });
-    const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-    const pos = {}; sorted.forEach((x,i)=>pos[x[0]]=i+1); return pos;
+    /* V12.64 — percentage-aware. The old version summed raw totals, which ranks
+       a learner with one big paper above a learner with four good ones. */
+    const out = this.rankCohort(rows).byName;
+    const flat = {}; Object.keys(out).forEach(k=>{ flat[k] = out[k].position; });
+    return flat;
   },
 
   subjectPositions(rows){
+    /* Within one subject every learner sits the same paper, so raw totals are
+       comparable here. Ties still share a place (competition ranking). */
     const out = {};
     this.subjects(rows).forEach(sub => {
-      const list = rows.filter(r=>r.subject===sub).sort((a,b)=>this.n(b.total)-this.n(a.total));
-      list.forEach((r,i)=>{ out[r.student_name+'|'+sub]=i+1; });
+      const list = rows.filter(r=>r.subject===sub)
+        .sort((a,b)=>(this.n(b.total)-this.n(a.total)) || String(a.student_name||'').localeCompare(String(b.student_name||'')));
+      let last=null, lastPos=0;
+      list.forEach((r,i)=>{
+        const t=this.n(r.total);
+        const pos=(last!==null&&t===last)?lastPos:i+1;
+        out[r.student_name+'|'+sub]=pos; lastPos=pos; last=t;
+      });
     });
     return out;
   },
@@ -368,7 +521,18 @@ const ReportEngine = {
     const promotion=await this.loadPromotionStatus(first.student_id,first.student_name,ctx.term||first.term,ctx.session||first.session);
     const classTeacher=await this.loadClassTeacherIdentity(first.class||ctx.class);
     const metrics=await this.loadStudentMetrics(first.student_id,first.student_name,first.class||ctx.class,ctx.term||first.term,ctx.session||first.session),metricBMI=this.bmi(metrics);
-    const total = list.reduce((a,b)=>a+this.n(b.total),0); const obtainable=list.reduce((a,b)=>a+this.n(b.max||100),0)||list.length*100;
+    /* V12.64 — the headline percentage. `obtainable` used to be the sum of only
+       the subjects THIS learner submitted, so one paper out of four scored the
+       same as four out of four. It is now the cohort's full expected load. */
+    const cohortRows = rows.filter(r => String(r.class||'').trim().toLowerCase() === String(first.class||'').trim().toLowerCase());
+    /* the class's declared subject list — from the assessment structure when the
+       context loaded one — so a subject only one learner sat still counts */
+    const classSubjects = (data.assessmentColumns||[]).map(c=>String(c.subject||'').trim()).filter(x=>x&&x!=='*');
+    const cohort = this.rankCohort(cohortRows, classSubjects.length?classSubjects:null);
+    const me = cohort.byName[String(first.student_name||'').trim()] || null;
+    const total = list.reduce((a,b)=>a+this.n(b.total),0);
+    const obtainable = (me && me.expected) || cohort.expected.maxTotal
+                       || list.reduce((a,b)=>a+this.n(b.max||100),0) || list.length*100;
     const avg = obtainable ? (total/obtainable*100) : 0;
     const bal = data.feeBalances[first.student_id] ?? data.feeBalances[String(first.student_name||'').toLowerCase()] ?? 0;
     const logo='assets/img/logo.'+sc.logoExt;
@@ -396,18 +560,19 @@ const ReportEngine = {
     }).join('');
     const scoreHead=legacyLayout.map(c=>'<th>'+this.esc(c.name)+'<br>('+this.fmt(c.max_mark)+')</th>').join('');
 
-    // v5: Compute class position
+    /* V12.64 — class position, from the shared fair-ranking engine.
+       Previously this summed raw totals per learner and ordered them, which is
+       exactly how a one-subject learner ended up first. Now: percentage of the
+       expected load, competition ranking, and no position at all for a learner
+       who did not take part. */
     let classPosition = '—'; let classSize = '—';
+    let rankBasis = ''; let rankable = false; let complete = true;
     try{
-      const stName = String(first.student_name||'').toLowerCase();
-      const stClass = first.class;
-      // Compute position from all rows for the same class+term+session
-      const classRows = rows.filter(r => r.class === stClass);
-      const totals = {}; classRows.forEach(r => { totals[r.student_name] = (totals[r.student_name]||0) + this.n(r.total); });
-      const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
-      classSize = sorted.length;
-      const idx = sorted.findIndex(x => x[0].toLowerCase() === stName);
-      classPosition = idx >= 0 ? this.ordinal(idx+1) : '—';
+      classSize = cohort.cohortSize || '—';
+      if (me && me.position != null) { classPosition = this.ordinal(me.position); rankable = true; }
+      else if (me && me.total > 0)   { classPosition = 'Provisional'; }
+      else                           { classPosition = '—'; }
+      if (me) { rankBasis = me.basis || ''; complete = !!me.complete; }
     }catch(_){}
 
     // v5: Try to load affective/psychomotor from v9 tables or fall back to a sensible default
@@ -477,9 +642,15 @@ const ReportEngine = {
     const stampColor = settings.stamp_color || sc.stamp_color || '#1e3a8a';
     const stampText = settings.stamp_text || sc.stamp_text || 'OFFICIAL SCHOOL SEAL';
 
-    const classLearnerAverages={};
-    rows.filter(r=>r.class===first.class).forEach(r=>{const k=r.student_name;(classLearnerAverages[k]||(classLearnerAverages[k]={got:0,max:0}));classLearnerAverages[k].got+=this.n(r.total);classLearnerAverages[k].max+=this.n(r.max);});
-    const classAvgValues=Object.values(classLearnerAverages).map(x=>x.max?x.got/x.max*100:0);
+    /* V12.64 — the class average used each learner's OWN obtainable total as the
+       denominator (`x.max`), so a learner who sat one paper contributed a full
+       100%-scale average. It is now the mean of the same percentages that get
+       ranked — measured against the class's expected load — so the class average
+       printed on the sheet is the average of the numbers on the sheets. */
+    const classCohort = this.rankCohort(
+      rows.filter(r => String(r.class||'').trim().toLowerCase() === String(first.class||'').trim().toLowerCase()),
+      (data.assessmentColumns||[]).map(c=>String(c.subject||'').trim()).filter(x=>x&&x!=='*') || null);
+    const classAvgValues = (classCohort.list||[]).filter(x=>x.total>0).map(x=>x.percentage);
     const classAverage=classAvgValues.length?classAvgValues.reduce((a,b)=>a+b,0)/classAvgValues.length:0;
 
     const stampSvg = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="re-stamp" style="position:relative">
@@ -504,7 +675,7 @@ const ReportEngine = {
       <text x="60" y="88" text-anchor="middle" font-family="Arial, sans-serif" font-size="4" font-weight="700" fill="${stampColor}">${new Date().toLocaleDateString()}</text>
     </svg>`;
 
-    return `<div class="report-sheet sample-report"><div class="head"><img class="logo" src="${logo}" onerror="this.style.display='none'"><div class="school"><h1>${this.esc(sc.name)}</h1><p>📍 ${this.esc(sc.address)} · 📞 ${this.esc(sc.phone)} · ✉️ ${this.esc(sc.email)}</p><p style="font-style:italic;color:#7c2d12">Motto: ${this.esc(sc.motto)}</p></div><div class="photo">${first.photo_url ? `<img src="${this.esc(first.photo_url)}" onerror="this.parentNode.innerHTML='Photo'">` : 'Student<br>Photo'}</div></div><div class="title">TERMINAL REPORT SHEET — ${this.esc(ctx.term||first.term||'TERM')}, ${this.esc(ctx.session||first.session||'SESSION')}</div><table class="info"><tr><td><b>Name:</b> ${this.esc(first.student_name)}</td><td><b>Admission No:</b> ${this.esc(first.admission_no)}</td><td><b>Class:</b> ${this.esc(first.class)}</td></tr><tr><td><b>No. in Class:</b> ${classSize}</td><td><b>Attendance:</b> ${this.esc(attendanceStr)}</td><td><b>Position:</b> <b style="color:#16a34a">${classPosition}</b></td></tr></table><table class="scores" style="margin-top:8px"><thead><tr><th class="left">SUBJECT</th>${scoreHead}<th>TOTAL /<br>ACTIVE MAX</th><th>GRADE</th><th>POSITION</th><th>REMARK</th></tr></thead><tbody>${scoreRows}</tbody></table><table class="info" style="margin-top:8px"><tr><td><b>Total Score:</b> ${this.fmt(total)} / ${this.fmt(obtainable)}</td><td><b>Average:</b> ${this.fmt(avg,1)}%</td><td><b>Class Average:</b> ${this.fmt(classAverage,1)}%</td><td><b>Grade:</b> <span class="grade">${this.grade(avg)}</span></td></tr></table>${promotion?`<div class="promotion-status" style="margin-top:8px;padding:9px 12px;border:1.5px solid ${promotion.color};background:${promotion.background};color:${promotion.color};border-radius:8px;text-align:center"><b style="font-size:13px;letter-spacing:.7px">${this.esc(promotion.label)}</b><div style="font-size:9.5px;margin-top:2px">${this.esc(promotion.detail)}</div></div>`:''}
+    return `<div class="report-sheet sample-report"><div class="head"><img class="logo" src="${logo}" onerror="this.style.display='none'"><div class="school"><h1>${this.esc(sc.name)}</h1><p>📍 ${this.esc(sc.address)} · 📞 ${this.esc(sc.phone)} · ✉️ ${this.esc(sc.email)}</p><p style="font-style:italic;color:#7c2d12">Motto: ${this.esc(sc.motto)}</p></div><div class="photo">${first.photo_url ? `<img src="${this.esc(first.photo_url)}" onerror="this.parentNode.innerHTML='Photo'">` : 'Student<br>Photo'}</div></div><div class="title">TERMINAL REPORT SHEET — ${this.esc(ctx.term||first.term||'TERM')}, ${this.esc(ctx.session||first.session||'SESSION')}</div><table class="info"><tr><td><b>Name:</b> ${this.esc(first.student_name)}</td><td><b>Admission No:</b> ${this.esc(first.admission_no)}</td><td><b>Class:</b> ${this.esc(first.class)}</td></tr><tr><td><b>No. in Class:</b> ${classSize}</td><td><b>Attendance:</b> ${this.esc(attendanceStr)}</td><td><b>Position:</b> <b style="color:${rankable?'#16a34a':'#b45309'}">${classPosition}</b>${classSize&&classSize!=='—'?' <small style="color:#64748b">of '+this.esc(classSize)+'</small>':''}${complete?'':' <small style="color:#b45309;font-weight:700">· incomplete sitting</small>'}</td></tr></table>${rankBasis?'<p class="rank-basis" style="margin:2px 0 0;font-size:9px;color:#64748b;text-align:center">'+this.esc(rankBasis)+'</p>':''}<table class="scores" style="margin-top:8px"><thead><tr><th class="left">SUBJECT</th>${scoreHead}<th>TOTAL /<br>ACTIVE MAX</th><th>GRADE</th><th>POSITION</th><th>REMARK</th></tr></thead><tbody>${scoreRows}</tbody></table><table class="info" style="margin-top:8px"><tr><td><b>Total Score:</b> ${this.fmt(total)} / ${this.fmt(obtainable)}</td><td><b>Average:</b> ${this.fmt(avg,1)}%</td><td><b>Class Average:</b> ${this.fmt(classAverage,1)}%</td><td><b>Grade:</b> <span class="grade">${this.grade(avg)}</span></td></tr></table>${promotion?`<div class="promotion-status" style="margin-top:8px;padding:9px 12px;border:1.5px solid ${promotion.color};background:${promotion.background};color:${promotion.color};border-radius:8px;text-align:center"><b style="font-size:13px;letter-spacing:.7px">${this.esc(promotion.label)}</b><div style="font-size:9.5px;margin-top:2px">${this.esc(promotion.detail)}</div></div>`:''}
 <table class="info" style="margin-top:6px;background:#fffbeb;border:1px solid #fcd34d"><tr><td><b>Previous School Fees Owed:</b> <span style="color:${bal>0?'#b91c1c':'#16a34a'};font-weight:900">${bal===0?'₦0 (FULLY PAID)':'₦'+Number(bal).toLocaleString()}</span></td><td><b>Next Term School Bill:</b> <span style="color:#b45309;font-weight:900">${nextTermBill.fees ? (nextTermBill.currency + Number(nextTermBill.fees).toLocaleString()) : '—'} </span> <small style="color:#92400e">(${this.esc(nextTermBill.note||'Payable before resumption')})</small></td><td><b>Next Term Begins:</b> ${this.esc(nextTermBill.begins ? this.fmtDMY(nextTermBill.begins) : (nextTermBegins||'—'))}</td></tr></table><table class="info" style="margin-top:6px"><tr><td><b>Height:</b> ${metrics&&metrics.height_cm!=null?this.fmt(metrics.height_cm)+' cm':'—'}</td><td><b>Weight:</b> ${metrics&&metrics.weight_kg!=null?this.fmt(metrics.weight_kg)+' kg':'—'}</td><td><b>BMI:</b> ${metricBMI!=null?this.fmt(metricBMI,1):'—'}</td><td><b>Blood pressure:</b> ${this.esc(metrics&&metrics.blood_pressure||'—')}</td></tr><tr><td><b>Vision:</b> ${this.esc(metrics&&metrics.vision||'—')}</td><td><b>Blood group:</b> ${this.esc(metrics&&metrics.blood_group||'—')}</td><td><b>Genotype:</b> ${this.esc(metrics&&metrics.genotype||'—')}</td><td><b>Measured:</b> ${this.esc(metrics&&metrics.measured_on?this.fmtDMY(metrics.measured_on):'—')}</td></tr></table><div class="traits re-traits"><div><table><tr><th colspan="2">⭐ AFFECTIVE DOMAIN</th></tr>${affectiveRows}</table></div><div><table><tr><th colspan="2">🏃 PSYCHOMOTOR DOMAIN</th></tr>${psychomotorRows}</table></div></div><table class="comments" style="margin-top:10px"><tr><td>Class Teacher's Comment</td><td>${this.esc(classTeacherComment)}</td></tr><tr><td>Principal's Comment</td><td>${this.esc(principalComment)}</td></tr><tr><td>Next Term Begins</td><td>${this.esc(nextTermBegins || sc.next_term_begins || 'See school calendar')} &nbsp;·&nbsp; <b>Fees Balance:</b> ${bal===0?'₦0 (FULLY PAID)':'₦'+Number(bal).toLocaleString()}</td></tr></table><div class="sig re-sig"><div><div class="re-sig-script">${this.teacherSignatureInk(classTeacher)}</div><div class="re-sig-line">${this.esc(classTeacher.name||'Class Teacher')}<br><small>Class Teacher's Signature</small></div></div><div style="position:relative">${stampEnabled?'<div class="re-stamp-wrap">'+stampSvg+'</div>':(hasSig?'<img src="'+this.esc(sigUrl)+'" style="max-width:160px;max-height:65px;object-fit:contain;'+(removeSigBg?'mix-blend-mode:multiply;filter:contrast(1.35)':'')+'">':'')}<div class="re-sig-line" style="margin-top:6px">${this.esc(principalName)}<br><small>Principal\'s Signature${stampEnabled?' &amp; Official Stamp':''}</small></div></div></div><p class="note">This is an official computer-generated report sheet. It carries the school stamp with embedded verification code and is valid without physical seal. Verify at the school portal.</p></div>`;
   },
 
@@ -516,16 +687,33 @@ const ReportEngine = {
     const highest=sorted.length?pct(sorted[0]):0,lowest=sorted.length?pct(sorted[sorted.length-1]):0,passRate=sorted.length?sorted.filter(r=>pct(r)>=50).length/sorted.length*100:0;
     let teacher=''; try{const tr=await this.sb.from('subjects').select('teacher').eq('name',ctx.subject||rows[0].subject).maybeSingle();teacher=(tr.data&&tr.data.teacher)||'';}catch(_){}
     const layout=this.assessmentLayout(sorted),legacy=layout.length?layout:[{name:'CA1',max_mark:10,key:'ca1',legacy:'ca1'},{name:'CA2',max_mark:10,key:'ca2',legacy:'ca2'},{name:'CA3 / CBT',max_mark:10,key:'cbt',legacy:'cbt'},{name:'Project',max_mark:10,key:'project',legacy:'project'},{name:'Exam',max_mark:60,key:'paper',legacy:'paper'}],head=legacy.map(c=>'<th>'+this.esc(c.name)+' ('+this.fmt(c.max_mark)+')</th>').join('');
-    const body=sorted.map((r,i)=>`<tr${i===0?' class="top"':''}><td>${i+1}</td><td class="left">${this.esc(r.student_name)}</td><td>${this.esc(r.admission_no)}</td>${legacy.map(c=>'<td>'+(layout.length?this.dynamicScoreCell(r,c):this.scoreCell(r,c.legacy))+'</td>').join('')}<td><b>${this.fmt(r.total)} / ${this.fmt(r.max)}</b></td><td class="grade ${this.grade(pct(r))}">${this.grade(pct(r))}</td><td>${this.ordinal(i+1)}</td><td>${this.remark(pct(r))}</td></tr>`).join('');
+    const body=sorted.map((r,i)=>`<tr${i===0?' class="top"':''}><td>${i+1}</td><td class="left">${this.esc(r.student_name)}</td><td>${this.esc(r.admission_no)}</td>${legacy.map(c=>'<td>'+(layout.length?this.dynamicScoreCell(r,c):this.scoreCell(r,c.legacy))+'</td>').join('')}<td><b>${this.fmt(r.total)} / ${this.fmt(r.max)}</b></td><td class="grade ${this.grade(pct(r))}">${this.grade(pct(r))}</td><td>${x.pos!=null?this.ordinal(x.pos):'—'}</td><td>${this.remark(pct(r))}</td></tr>`).join('');
     return `<div class="sheet subject-sheet"><h1>${this.esc(sc.name)} — SUBJECT BROADSHEET</h1><p class="meta">SUBJECT: ${this.esc(ctx.subject||rows[0].subject)} · CLASS: ${this.esc(ctx.class||rows[0].class||'')} · ${this.esc(ctx.term||rows[0].term||'TERM')}, ${this.esc(ctx.session||rows[0].session||'SESSION')} · Subject Teacher: ${this.esc(teacher||'—')} · ${sorted.length} students</p><table><thead><tr><th>S/N</th><th class="left">FULL NAME</th><th>ADM NO.</th>${head}<th>TOTAL / ACTIVE MAX</th><th>GRADE</th><th>POS</th><th>REMARK</th></tr></thead><tbody>${body}</tbody></table><div class="stat"><div><b>${this.fmt(avg,1)}%</b>Subject Average</div><div><b>${this.fmt(highest,1)}</b>Highest Score</div><div><b>${this.fmt(lowest,1)}</b>Lowest Score</div><div><b>${this.fmt(passRate,1)}%</b>Pass Rate (≥50)</div></div><div class="grading-scale"><b>Grading scale:</b> A (80–100) Excellent · B (70–79) Very Good · C (60–69) Good · D (50–59) Credit · E (40–49) Pass · F (0–39) Fail</div><div class="sig"><div><div class="sig-script">${this.signatureInk('teacher')}</div><div class="sig-line">Subject Teacher's Signature</div></div><div>${this.sealSvg('subjectSeal','EXAMINATIONS OFFICE')}<div class="sig-line">Head of Department's Signature &amp; Stamp</div></div></div><p class="note">Official per-subject scoresheet. Automatic totals, grades, positions and subject statistics. Licensed Platform · HMG Technologies.</p></div>`;
   },
 
   async renderClass(ctx){
     const data=await this.loadContext(ctx); const rows=data.rows; if(!rows.length)return this.empty('No class score records found.');
     const sc=data.school; const subjects=this.subjects(rows); const students=this.studentsFromRows(rows);const classTeacher=await this.loadClassTeacherIdentity(ctx.class||rows[0].class);
-    const aggregates=students.map(st=>{const sr=rows.filter(r=>r.student_name===st),total=sr.reduce((a,b)=>a+this.n(b.total),0),max=sr.reduce((a,b)=>a+this.n(b.max),0)||subjects.length*100,avg=max?total/max*100:0;return{st,sr,total,max,avg};}).sort((a,b)=>b.avg-a.avg);
-    const classAvg=aggregates.reduce((a,b)=>a+b.avg,0)/(aggregates.length||1);
-    const body=aggregates.map((x,i)=>`<tr${i===0?' class="top"':''}><td>${i+1}</td><td class="left"><b>${this.esc(x.st)}</b></td><td>${this.esc((x.sr[0]||{}).admission_no||'')}</td>${subjects.map(s=>{const r=x.sr.find(y=>y.subject===s);return '<td>'+(r?this.fmt(this.n(r.max)?this.n(r.total)/this.n(r.max)*100:r.total):'-')+'</td>';}).join('')}<td><b>${this.fmt(x.total)}</b></td><td>${this.fmt(x.avg,1)}</td><td>${this.ordinal(i+1)}</td><td>${this.grade(x.avg)}</td><td>${this.remark(x.avg)}</td></tr>`).join('');
+    /* V12.64 — one aggregation for the whole broadsheet, through the shared
+       engine. The old version measured each learner against the sum of the
+       subjects THEY submitted (`sr.reduce((a,b)=>a+this.n(b.max))`), so a
+       one-subject learner printed 100% on a row meant to be comparable with a
+       four-subject learner's 60%. The broadsheet is a ranking document; every
+       row must share the same denominator. */
+    const classCohort = this.rankCohort(rows,
+      (data.assessmentColumns||[]).map(c=>String(c.subject||'').trim()).filter(x=>x&&x!=='*') || null);
+    const aggregates = students.map(st=>{
+      const sr = rows.filter(r=>r.student_name===st);
+      const m = classCohort.byName[st] || {};
+      return { st, sr,
+               total: m.total != null ? m.total : sr.reduce((a,b)=>a+this.n(b.total),0),
+               max: m.expected != null ? m.expected : (subjects.length*100),
+               avg: m.percentage != null ? m.percentage : 0,
+               pos: m.position != null ? m.position : null,
+               basis: m.basis || '', complete: m.complete !== false };
+    }).sort((a,b)=> (b.avg-a.avg) || String(a.st).localeCompare(String(b.st)));
+    const classAvg=aggregates.filter(x=>x.total>0).reduce((a,b)=>a+b.avg,0)/(aggregates.filter(x=>x.total>0).length||1);
+    const body=aggregates.map((x,i)=>`<tr${i===0?' class="top"':''}><td>${x.pos!=null?this.ordinal(x.pos):'—'}</td><td class="left"><b>${this.esc(x.st)}</b></td><td>${this.esc((x.sr[0]||{}).admission_no||'')}</td>${subjects.map(s=>{const r=x.sr.find(y=>y.subject===s);return '<td>'+(r?this.fmt(this.n(r.max)?this.n(r.total)/this.n(r.max)*100:r.total):'-')+'</td>';}).join('')}<td><b>${this.fmt(x.total)}</b></td><td>${this.fmt(x.avg,1)}</td><td>${x.pos!=null?this.ordinal(x.pos):'—'}</td><td>${this.grade(x.avg)}</td><td>${this.remark(x.avg)}</td></tr>`).join('');
     return `<div class="sheet class-sheet"><h1>${this.esc(sc.name)} — CLASS BROADSHEET</h1><p class="meta">${this.esc(ctx.term||rows[0].term||'TERM')} · ${this.esc(ctx.session||rows[0].session||'SESSION')} · CLASS: ${this.esc(ctx.class||rows[0].class||'')} · ${students.length} students · Class Average: ${this.fmt(classAvg,1)}% · Max obtainable per subject: 100</p><table><thead><tr><th>S/N</th><th class="left">FULL NAME</th><th>ADM NO.</th>${subjects.map(s=>'<th class="rot"><span>'+this.esc(s)+'</span></th>').join('')}<th>TOTAL</th><th>AVG %</th><th>POS</th><th>GRADE</th><th>REMARK</th></tr></thead><tbody>${body}</tbody></table><div class="grading-scale"><b>Grading scale:</b> A (80–100) Excellent · B (70–79) Very Good · C (60–69) Good · D (50–59) Credit · E (40–49) Pass · F (0–39) Fail</div><div class="sig"><div><div class="sig-script">${this.teacherSignatureInk(classTeacher)}</div><div class="sig-line">${this.esc(classTeacher.name||'Class Teacher')}<br><small>Class Teacher's Signature</small></div></div><div>${this.sealSvg('classSeal','EXAMINATIONS OFFICE')}<div class="sig-line">Principal's Signature &amp; Stamp</div></div></div><p class="note">Official class broadsheet. One row per student, one column per subject, automatic totals, averages, positions and grades. Landscape A4. Licensed Platform · HMG Technologies.</p></div>`;
   },
 
