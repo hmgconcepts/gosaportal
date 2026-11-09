@@ -563,4 +563,7 @@ const SOWUI={ rows:[],
   async confirmTaught(id){ if(!sb)return; const {error}=await sb.from('scheme_of_work').update({status:'covered',confirmed:true,covered_at:new Date().toISOString().slice(0,10)}).eq('id',id); if(error){toast(error.message,'danger');return;} toast('✅ Topic confirmed as taught!','success'); this.load(); },
   async del(id){if(!sb||!confirm('Delete this scheme row?'))return;const r=await SCDelete.byId(sb,'scheme_of_work',id);if(!r.ok){toast(r.error,'danger');return;}toast('Scheme row deleted permanently.','success');this.load();}
 }; document.addEventListener('DOMContentLoaded',()=>SOWUI.init()); SOWUI.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.SOWUI = SOWUI;
 </script></body></html>

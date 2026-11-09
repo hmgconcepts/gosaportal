@@ -802,4 +802,7 @@ const SV={
   }
 };
 document.addEventListener('DOMContentLoaded',()=>SV.refresh()); SV.refresh();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.SV = SV;
 </script></body></html>

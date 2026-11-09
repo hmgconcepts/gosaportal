@@ -979,4 +979,7 @@ const ST={
   async saveGeofence(){ const latitude=Number(document.getElementById('st-lat').value), longitude=Number(document.getElementById('st-lng').value), geo_radius_m=Math.max(20,Number(document.getElementById('st-radius').value)||200), enforce_geofence=document.getElementById('st-enforce-geo').checked; if(!isFinite(latitude)||!isFinite(longitude)){toast('Enter valid latitude and longitude, or use current location.','warning');return;} try{ if(sb){ const {error}=await sb.from('school_settings').upsert({id:1,latitude,longitude,geo_radius_m,enforce_geofence,geo_updated_at:new Date().toISOString()},{onConflict:'id'}); if(error)throw error; } window.SC_SETTINGS=Object.assign(window.SC_SETTINGS||{},{latitude,longitude,geo_radius_m,enforce_geofence}); window.SCHOOL=Object.assign(window.SCHOOL||{},{latitude,longitude,geoRadius:geo_radius_m,enforceGeofence:enforce_geofence}); ST.renderGeoPreview(); toast('Staff attendance geofence saved.','success'); }catch(e){toast('Could not save geofence: '+(e.message||e),'danger',8000);} }
 };
 document.addEventListener('DOMContentLoaded',ST.init); ST.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.ST = ST;
 </script></body></html>

@@ -770,5 +770,8 @@ const VT={
     w.document.close(); }
 };
 document.addEventListener('DOMContentLoaded',()=>VT.refresh());
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.VT = VT;
 </script>
 </body></html>

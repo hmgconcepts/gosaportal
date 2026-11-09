@@ -1251,4 +1251,13 @@ const TTE={
     toast('Access revoked.','success');await this.list();}
 };
 document.addEventListener('DOMContentLoaded',()=>{TTG.init();TTE.init();});TTG.init();TTE.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.PC = PC;
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.TTE = TTE;
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.TTG = TTG;
 </script></body></html>

@@ -602,4 +602,7 @@ const SP={fees:[],student:null,
     w.document.close(); w.focus(); }
 };
 document.addEventListener('DOMContentLoaded',()=>SP.init()); SP.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.SP = SP;
 </script></body></html>

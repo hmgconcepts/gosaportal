@@ -597,4 +597,7 @@ const TT={days:['Monday','Tuesday','Wednesday','Thursday','Friday'],
     w.document.write('<html><head><title>Class Timetables — one per page</title><style>@page{size:A4 landscape;margin:8mm}body{font-family:Arial;margin:0}.page{page-break-after:always;padding:10px}h2,h3{text-align:center;margin:4px 0}table{width:100%;border-collapse:collapse}th,td{border:1px solid #111;padding:6px;text-align:center;font-size:11px}th{background:#e2e8f0}.foot{font-size:9px;color:#64748b}</style></head><body>'+pages+'<script>window.onload=()=>window.print()<\/script></body></html>');
     w.document.close();
   }}; document.addEventListener('DOMContentLoaded',()=>TT.init()); TT.init();
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.TT = TT;
 </script></body></html>
