@@ -342,7 +342,11 @@ const PH={
     {file:'v12.57-report-details-and-atomic-cbt-bulk-push.sql', label:'Printable Midterm detail + authorized batch CBT score push', kind:'rpc', fn:'sc_cbt_bulk_push_batch_v1', args:{p_exam_ids:['00000000-0000-0000-0000-000000000000']}},
     {file:'v12.57-report-details-and-atomic-cbt-bulk-push.sql', label:'RLS-safe CBT result-count preview', kind:'rpc', fn:'sc_cbt_bulk_result_counts_v1', args:{p_exam_ids:[]}}, 
     {file:'v12.58-cbt-bank-alias-repair-and-verified-readback.sql', label:'CBT save/attach aligns csv_data + questions and verifies both aliases', kind:'rpc', fn:'cbt_verify_exam_bank', args:{p_exam_id:'00000000-0000-0000-0000-000000000000'}}, 
-    {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'}
+    {file:'v12.33-cbt-comprehensive-fix.sql', label:'CBT attempt limit column', kind:'col', table:'cbt_exams', col:'attempt_limit'},
+    {file:'v12.64-reporting-standards-fair-ranking.sql', label:'Report ranking — percentage of expected load + participation floor', kind:'rpc', fn:'sc_reports_recompute', args:{p_class:'JSS 1', p_term:'First Term', p_session:'2026/2027', p_dry_run:true}},
+    {file:'v12.64-reporting-standards-fair-ranking.sql', label:'Report card percentage column', kind:'col', table:'report_cards', col:'percentage'},
+    {file:'v12.65-class-diary.sql', label:'Class diary — homework / classwork journal', kind:'col', table:'diary', col:'classwork'},
+    {file:'v12.65-class-diary.sql', label:'Diary acknowledgement RPC', kind:'rpc', fn:'sc_diary_acks', args:{p_diary_id:'00000000-0000-0000-0000-000000000000'}}
   ],
 
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');},
