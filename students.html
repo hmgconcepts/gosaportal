@@ -517,7 +517,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <button class="btn btn-sm btn-outline" style="border-color:#86efac;color:#166534" onclick="CRUD.lockAllDebtors('portal',false)">🔓 Unlock portal — ALL cleared</button>
           <button class="btn btn-sm btn-outline" style="border-color:#b45309;color:#92400e" onclick="CRUD.lockAllDebtors('report',true)">🧾 Hide report cards — ALL debtors</button>
           <button class="btn btn-sm btn-outline" onclick="CRUD.lockAllDebtors('report',false)">🧾 Restore report cards — ALL cleared</button>
-          <span style="font-size:.8rem;color:var(--gray-500)">Tick rows below for a hand-picked selection instead — the bulk bar appears above the table.</span>
+          <button class="btn btn-sm btn-outline" style="border-color:#b91c1c;color:#b91c1c" onclick="CRUD.bulkSelectAllMatching('students').then(function(){})" title="Select EVERY student in the school (or the class you filter to) — then one click blocks them all">⇕ Select all students…</button>
+          <span style="font-size:.8rem;color:var(--gray-500)">Or tick rows below (shift-click selects a range) — the bulk bar appears above the table.</span>
         </div>
       </div>
         <button class="btn btn-outline" onclick="CRUD.renderList('students')">↻ Refresh</button>
