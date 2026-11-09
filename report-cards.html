@@ -495,7 +495,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <div class="form-group"><label>Term</label><select class="form-select" id="rc-term"><option value="">— select term —</option></select></div>
           <div class="form-group"><label>Session</label><select class="form-select" id="rc-session"><option value="">— select session —</option></select></div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><span id="score-grid"></span><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" style="color:#b45309;border-color:#f59e0b" onclick="RC.sweepGhosts()" data-admin-only title="Remove leftover report sheets from deleted columns/students">🧹 Sweep Ghost Report Sheets</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span id="score-grid"></span><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" style="color:#b45309;border-color:#f59e0b" onclick="RC.sweepGhosts()" data-admin-only title="Remove leftover report sheets from deleted columns/students">🧹 Sweep Ghost Report Sheets</button><button class="btn btn-outline" style="color:#7c3aed;border-color:#c4b5fd" onclick="RC.repairRanking()" data-admin-only title="Re-measure every terminal report against the class's full expected subject load and re-rank fairly. Use this on any class generated before V12.64, where a student who sat fewer subjects could be placed above one who sat them all.">🏅 Repair percentages &amp; positions</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
       </div>
       <div id="rc-cols" data-staff-only></div>
       <div id="rc-grid"></div>
@@ -931,6 +931,24 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       };
     },
 
+    /* V12.64 — one-click repair for terminal reports. Mirrors the midterm
+       button and calls the same engine, so both create identical numbers. */
+    async repairRanking(){
+      const c=(this.ctxVals()||{}).class||'', t=(this.ctxVals()||{}).term||'', s=(this.ctxVals()||{}).session||'';
+      if(!c||!t||!s){ toast('Choose a class, term and session first.','warning',6000); return false; }
+      if(!window.sb){ toast('Database not configured.','warning'); return false; }
+      try{
+        const dry=await window.sb.rpc('sc_reports_recompute',{p_class:c,p_term:t,p_session:s,p_dry_run:true});
+        if(dry.error) throw new Error(dry.error.message);
+        const n=Number((dry.data&&dry.data.finding_count)||0);
+        if(!confirm(n?('Found '+n+' card(s) that do not meet the reporting standard in '+c+'.\n\nRe-measure and re-rank now?'):('No defects found in '+c+'.\n\nRe-measure and re-rank anyway? (safe, idempotent)'))) return false;
+        const fix=await window.sb.rpc('sc_reports_recompute',{p_class:c,p_term:t,p_session:s,p_dry_run:false});
+        if(fix.error || !fix.data || fix.data.ok===false) throw new Error((fix.data&&fix.data.error)||fix.error?.message||'Repair failed');
+        toast('Re-ranked '+c+': '+Number(fix.data.midterm_groups_repaired||0)+' midterm and '+Number(fix.data.terminal_groups_repaired||0)+' terminal card(s). '+(n?n+' defect(s) corrected.':'Nothing needed changing.'),'success',12000);
+        await this.load();
+        return true;
+      }catch(e){ toast('Repair failed: '+(e.message||e),'warning',10000); return false; }
+    },
     async load(){
       if (!window.sb) { toast('Database not configured. Add your Supabase keys in assets/js/config.js.', 'warning'); return; }
       if (!this._loaded) await this.init();
