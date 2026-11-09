@@ -627,6 +627,7 @@ const FAM={
       let h='';
       for(const s of studs){
         let f={};try{const fr=await sb.rpc('sc_student_fee_state',{p_student:s.id});f=(fr.data&&fr.data.ok!==false)?fr.data:{};}catch(_){}
+        this._live=this._live||{};this._live[s.id]=f;
         const cur=f.currency||'₦';
         const pr=await sb.from('fee_payments').select('*').eq('student_id',s.id).order('payment_date',{ascending:false}).order('created_at',{ascending:false}).limit(200);
         const pays=pr.data||[];this._pays=this._pays||{};this._pays[s.id]=pays;
@@ -651,6 +652,10 @@ const FAM={
   },
   receipt(studentId,idx){
     const p=(this._pays&&this._pays[studentId]||[])[idx];if(!p)return;
+    /* live figures for the child, so the receipt never disagrees with the screen */
+    const live=(this._live&&this._live[studentId])||{};
+    const liveBill=Number(live.bill||0)||0, livePaid=(live.paid!=null?Number(live.paid):null),
+          liveDue=(live.total_due!=null?Number(live.total_due):null);
     const sc=window.SCHOOL||{};const cur=(sc.currency)||'₦';
     const w=window.open('','_blank');if(!w){toast('Allow popups to print the receipt.','warning');return;}
     const money=n=>cur+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
@@ -660,8 +665,16 @@ const FAM={
       +'<table><tr><td>Receipt for</td><td><b>'+this.esc(p.student_name||'')+'</b></td></tr>'
       +'<tr><td>Date</td><td>'+this.esc(p.payment_date||String(p.created_at||'').slice(0,10))+'</td></tr>'
       +'<tr><td>Amount paid</td><td class="tot">'+money(p.amount_paid)+'</td></tr>'
-      +(p.fee_total?'<tr><td>Total fee for the term</td><td>'+money(p.fee_total)+'</td></tr>':'')
-      +(p.balance!=null&&p.balance!==''?'<tr><td>Remaining balance</td><td><b>'+money(p.balance)+'</b></td></tr>':'')
+      /* V12.61 (#4): p.balance / p.fee_total are the SNAPSHOT taken when that
+         row was written — "what was left after this payment", not today's
+         balance. Reprinting it made an old receipt show a stale debt (and
+         reading it as a live figure is what made "paid" look like it increased
+         what is owed). The receipt now states LIVE figures from the fee engine
+         and keeps the snapshot only as an explicitly-labelled historical line. */
+      +(liveBill?'<tr><td>Total fee for this term</td><td>'+money(liveBill)+'</td></tr>':'')
+      +(livePaid!=null?'<tr><td>Total paid to date</td><td>'+money(livePaid)+'</td></tr>':'')
+      +(liveDue!=null?'<tr><td>Balance now outstanding</td><td><b>'+money(liveDue)+'</b></td></tr>':
+        (p.balance!=null&&p.balance!==''?'<tr><td>Balance after this payment <small>(as at the receipt date)</small></td><td><b>'+money(p.balance)+'</b></td></tr>':''))
       +'<tr><td>Method</td><td>'+this.esc(p.method||'—')+'</td></tr>'
       +'<tr><td>Term / Session</td><td>'+this.esc((p.term||'—')+(p.session?' · '+p.session:''))+'</td></tr>'
       +'<tr><td>Reference</td><td>'+this.esc(p.reference||'—')+'</td></tr>'
@@ -724,7 +737,7 @@ const FeeSegment={
   async init(){
     const sel=document.getElementById('seg-class'); if(!sel) return;
     try{
-      const {data}=await sb.from('students').select('class').limit(5000);
+      const {data}=await sb.from('students').select('class').limit(20000);
       const classes=[...new Set((data||[]).map(x=>String(x.class||'').trim()).filter(Boolean))].sort();
       sel.innerHTML='<option value="">— whole school —</option>'+classes.map(c=>'<option value="'+this.esc(c)+'">'+this.esc(c)+'</option>').join('');
     }catch(_){ }
@@ -752,7 +765,18 @@ const FeeSegment={
         '<span class="badge" style="background:#f1f5f9;color:#0f172a;padding:8px 12px">Billed: <b>'+money(d.billed)+'</b></span>'+
         '<span class="badge" style="background:#dcfce7;color:#166534;padding:8px 12px">Collected: <b>'+money(d.collected)+'</b></span>'+
         '<span class="badge" style="background:#fee2e2;color:#991b1b;padding:8px 12px">Outstanding: <b>'+money(d.outstanding)+'</b></span>'+
-        '<span class="badge" style="background:#eef2ff;color:#3730a3;padding:8px 12px">Collection rate: <b>'+Number(d.collection_rate||0)+'%</b></span>';
+        '<span class="badge" style="background:#eef2ff;color:#3730a3;padding:8px 12px">Collection rate: <b>'+Number(d.collection_rate||0)+'%</b></span>'+
+        /* V12.61 (#5): the SAME four lines the dashboard card prints, so the two
+           screens can be reconciled by eye line by line — bill + aid + arrears
+           − paid = outstanding, identically in both places. */
+        '<div style="flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:.84rem">'+
+          '<b style="color:#334155">Reconciliation:</b>'+
+          '<span>Term bill <b>'+money(d.billed)+'</b></span><span style="color:#15803d">− Aid <b>'+money(d.aid)+'</b></span>'+
+          '<span style="color:#b91c1c">+ Arrears <b>'+money(d.arrears)+'</b></span>'+
+          '<span style="color:#15803d">− Paid <b>'+money(d.collected)+'</b></span>'+
+          '<span>= <b style="color:#b91c1c">Outstanding '+money(d.outstanding)+'</b></span>'+
+          '<span style="color:#64748b">(net bill '+money(d.net_bill)+')</span>'+
+        '</div>';
       const act=document.getElementById('seg-actions'); if(act) act.style.display='flex';
       if(!this.rows.length){
         box.innerHTML='<div class="notice">No students match this filter'+(filter!=='all'?' — try “Everyone”.':'')+'.</div>'; return;
@@ -778,12 +802,32 @@ const FeeSegment={
         : this.esc(msg))+'</div>';
     }
   },
-  lock(kind,locked){
+  async lock(kind,locked){
+    /* V12.61 (#4): unlocking must reach the students the CURRENT FILTER HIDES.
+       With the view on "debtors only", the already-cleared students were not in
+       this.rows, so "unlock" silently restored almost nobody. Locking = the
+       debtors in view; unlocking = the complement of them, fetched from the
+       server. Both still respect the class dropdown. */
+    const cls=(document.getElementById('seg-class')||{}).value||'';
     const debtors=this.rows.filter(x=>Number(x.total_due)>0).map(x=>x.student_id).filter(Boolean);
-    const ids=locked?debtors:this.rows.map(x=>x.student_id).filter(Boolean);
+    let ids=debtors;
+    if(!locked){
+      try{
+        let all=[],from=0;
+        for(;;){ let q=sb.from('students').select('id').order('id').range(from,from+999);
+          if(cls) q=q.eq('class',cls);
+          const {data,error}=await q; if(error) throw error;
+          const rows=data||[]; rows.forEach(r=>all.push(r.id));
+          if(rows.length<1000) break; from+=1000; }
+        const owe=new Set(debtors);
+        ids=all.filter(id=>!owe.has(id));
+      }catch(e){
+        toast('Could not read the full list to unlock — narrow to a class first.','warning',8000);
+        ids=this.rows.map(x=>x.student_id).filter(Boolean);
+      }
+    }
     if(!ids.length){ toast('Nothing to '+(locked?'lock':'unlock')+' in the current view.','warning',6000); return; }
     const extra = locked ? ' Only students who still owe will be locked.' : '';
-    if(!confirm((locked?'LOCK':'UNLOCK')+' '+(kind==='report'?'report cards':'portal access')+' for '+ids.length+' student(s) in the current view?'+extra)) return;
     if(!confirm((locked?'LOCK':'UNLOCK')+' '+(kind==='report'?'report cards':'portal access')+' for '+ids.length+' student(s) in the current view?'+extra)) return;
 
     let msg='';
