@@ -604,6 +604,19 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         <div id="fee-doctor-out" style="margin-top:12px"></div>
       </div>
 
+      <div class="card" style="margin-bottom:16px;border:2px solid #fca5a5" data-admin-only><h2 style="margin-top:0">🔎 Bill coverage audit — where does every “Total fees this term” come from? (V12.68)</h2>
+        <p style="color:var(--gray-600);font-size:.9rem">One question, answered for the whole school at once: for the
+        <b>current term</b>, how many learners are billed from the exact term price list, from the “Current Term” label, from
+        another term of the same session, from the latest structure, from an invoice — and how many have <b>no bill at all</b>.
+        A learner with no bill is reported as <b>unknown, never as ₦0</b>, and the audit names the reason and the page that fixes it.
+        This is the check that proves the Round-9 “₦0 total fees” fault is gone for every learner, not just the two reported.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <div class="form-group" style="margin:0"><label>Class</label><select class="form-select" id="fba-class"><option value="">ALL classes</option></select></div>
+          <button class="btn btn-primary" onclick="FeeBillAudit.run()">🔎 Run the audit</button>
+        </div>
+        <div id="fba-out" style="margin-top:12px"></div>
+      </div>
+
       <div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe" data-admin-only><h2 style="margin-top:0">📑 Master Financial Records — export by class (V10.1)</h2>
         <p style="color:var(--gray-600);font-size:.9rem">One row per student: current-term bill, scholarship/aid, paid so far, balance, previous-term arrears and TOTAL outstanding — computed live by the same engine that powers the dashboards. Print/save as PDF or download CSV. Needs <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>
         <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
@@ -707,6 +720,60 @@ document.addEventListener('DOMContentLoaded',()=>FeeDaily.load());
 window.FeeDaily = FeeDaily;
 </script>
 <script>
+/* ===== V12.68 — BILL COVERAGE AUDIT =====
+   The bursar's one-glance answer to "why does this learner show ₦0?".
+   Reads sc_fee_bill_audit, which walks every active learner through the SAME
+   billing engine the dashboard uses — so the audit can never disagree with the
+   screens it is auditing. */
+const FeeBillAudit = {
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  money(n){return ((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},
+  async fillClasses(){
+    try{const {data}=await sb.from('students').select('class').not('class','is',null).order('class');
+      const set=[...new Set((data||[]).map(x=>x.class).filter(Boolean))];
+      for(const id of ['fba-class']){const el=document.getElementById(id);if(!el)return;
+        set.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o);});}
+    }catch(_){}
+  },
+  async run(){
+    const box=document.getElementById('fba-out');if(!box)return;
+    const cls=((document.getElementById('fba-class')||{}).value||'');
+    box.innerHTML='<span class="pulse">Auditing every learner…</span>';
+    const r=await sb.rpc('sc_fee_bill_audit',{p_class:cls||null});
+    if(r.error){box.innerHTML='<div class="notice notice-error">'+this.esc(r.error.message)+'. This needs the V12.68 database pack (database/v12.68-bill-resolution.sql).</div>';return;}
+    const d=r.data||{};
+    if(d.ok===false){box.innerHTML='<div class="notice notice-error">'+this.esc(d.error||'Could not run the audit')+'</div>';return;}
+    const WHY={invoice:['Invoice raised','Authoritative — nothing to do.'],
+      structure:['Class fee structure','Billed from the published price list.'],
+      override:['Personal total','The bursar set this learner’s own total.'],
+      no_structure_this_term:['No structure FOR THIS TERM','The class has fees, but none for this term. Publish it.'],
+      no_structure:['No structure for this CLASS','Check the class spelling on the student record, then publish.'],
+      no_structures_at_all:['NO fee structure AT ALL','Open 💳 Class Fee Structure and enter the fees — once.']};
+    const rows=Object.entries(d.by_status||{}).sort((a,b)=>b[1]-a[1]);
+    const total=Number(d.students||0), unknown=Number(d.bill_unknown||0);
+    let h='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">'
+      +'<div><div style="font-size:1.5rem;font-weight:900">'+total+'</div><div style="font-size:.7rem;text-transform:uppercase;color:var(--gray-500)">Active learners</div></div>'
+      +'<div><div style="font-size:1.5rem;font-weight:900;color:#15803d">'+Number(d.bill_known||0)+'</div><div style="font-size:.7rem;text-transform:uppercase;color:var(--gray-500)">Billed</div></div>'
+      +'<div><div style="font-size:1.5rem;font-weight:900;color:'+(unknown>0?'#b91c1c':'#15803d')+'">'+unknown+'</div><div style="font-size:.7rem;text-transform:uppercase;color:var(--gray-500)">Bill unknown (not ₦0)</div></div>'
+      +'<div><div style="font-size:1.5rem;font-weight:900">'+this.esc(d.term||'')+'</div><div style="font-size:.7rem;text-transform:uppercase;color:var(--gray-500)">Term · resolved by '+this.esc(d.resolved_by||'—')+'</div></div>'
+      +'</div>';
+    h+='<div class="table-wrap"><table><thead><tr><th style="text-align:left">How the bill was found</th><th>Learners</th><th style="text-align:left">What it means</th></tr></thead><tbody>'
+      +rows.map(([k,v])=>{const w=WHY[k]||[k,''];return '<tr><td style="text-align:left"><b>'+this.esc(w[0])+'</b> <small style="color:var(--gray-500)">'+this.esc(k)+'</small></td><td><b>'+v+'</b></td><td style="text-align:left;font-size:.82rem;color:var(--gray-600)">'+this.esc(w[1])+'</td></tr>';}).join('')
+      +'</tbody></table></div>';
+    const sm=d.samples||[];
+    if(sm.length){
+      h+='<h4 style="margin:12px 0 4px">Learners whose bill is unknown — fix these</h4><div class="table-wrap"><table><thead><tr><th style="text-align:left">Learner</th><th>Class</th><th>Admission no</th><th style="text-align:left">Why</th></tr></thead><tbody>'
+        +sm.map(x=>'<tr><td style="text-align:left"><b>'+this.esc(x.student)+'</b></td><td>'+this.esc(x.class||'')+'</td><td>'+this.esc(x.admission_no||'')+'</td><td style="text-align:left;font-size:.8rem;color:var(--gray-600)">'+this.esc(x.note||x.match_status||'')+'</td></tr>').join('')
+        +'</tbody></table></div>';
+    } else h+='<p style="color:#15803d;font-weight:700;margin:10px 0 0">✅ Every active learner has a bill from a published source. No learner is silently showing ₦0.</p>';
+    box.innerHTML=h;
+  }
+};
+window.FeeBillAudit = FeeBillAudit;
+document.addEventListener('DOMContentLoaded',()=>FeeBillAudit.fillClasses());
+</script>
+
+<script>
 /* ===== FAM — V9.4 (#1): Family fee panel for parents & students =====
    Bold current-term totals per child (sc_student_fee_state), the child's FULL
    payment history, and one-click printable e-receipts. Staff/admin never see
@@ -738,6 +805,21 @@ const FAM={
         h+='<div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">💰 '+this.esc(s.full_name)+' · '+this.esc(s.class||'')+' <small style="color:var(--gray-500)">'+this.esc(s.admission_no||'')+'</small></h3>';
         if(f.ok){
           const owing=Number(f.total_due||0);
+          /* V12.68 (B9) — same provenance sentence as the dashboard card, so a
+             family that compares the two screens never sees a different story. */
+          const mk_=String(f.match_status||''), mb_=String(f.matched_by||''), rb_=String(f.resolved_by||'');
+          const UNK_={no_structures_at_all:'No class fee structure exists on this platform yet — the school must enter it once on 💳 Class Fee Structure.',
+            no_structure_this_term:'This class has a fee structure, but none for '+(f.term||'this term')+'. The bill is unknown, not zero.',
+            no_structure:'No fee structure has ever been published for this class.'};
+          if(f.bill_known===false){
+            h+='<div style="border-left:4px solid #f59e0b;background:#fffbeb;padding:8px 11px;border-radius:8px;font-size:.82rem;color:#78350f">'
+              +'<b>⚠️ '+(UNK_[mk_]||'The bill for this term has not been published yet.')+'</b> The figures below are your payment record, not a statement that nothing is owed.</div>';
+          } else if(mb_ && mb_!=='invoice'){
+            const soft_=(mb_==='session_other_term'||mb_==='latest_structure');
+            const rung_={exact_term:'the fee published for this exact term',current_term_label:'the fee saved as “Current Term”',session_other_term:'another term of the same session',latest_structure:'the most recent published class fee',override:'a personal total set by the bursar'}[mb_]||'';
+            if(rung_) h+='<div style="border-left:4px solid '+(soft_?'#f59e0b':'#16a34a')+';background:'+(soft_?'#fffbeb':'#f0fdf4')+';padding:6px 10px;border-radius:8px;font-size:.78rem;color:#334155">'
+              +(soft_?'⚠️ ':'✅ ')+'Total fees this term comes from '+rung_+'.'+(rb_?' <span style="color:var(--gray-500)">Term resolved by: '+this.esc(rb_)+'</span>':'')+'</div>';
+          }
           h+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px">'
             +'<div><div style="font-size:1.6rem;font-weight:900">'+this.money(cur,f.bill)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Total fees · '+this.esc(f.term||'')+'</div></div>'
             +'<div><div style="font-size:1.6rem;font-weight:900;color:#15803d">'+this.money(cur,f.paid)+'</div><div style="font-size:.72rem;text-transform:uppercase;color:var(--gray-500)">Paid this term</div></div>'
@@ -1063,9 +1145,19 @@ const FeeTruth={
     html+='<p style="margin:0 0 10px;color:var(--gray-600);font-size:.86rem">'+this.esc(per.term||'')+' '+this.esc(per.session||'')
         + ' · generated '+new Date().toLocaleString()+'</p>';
 
+    /* V12.68 — where the term came from and which price list was matched */
+    const pv=d.provenance||{};
+    if(pv.headline){
+      const soft=(pv.tone&&pv.tone!=='ok');
+      html+='<div style="border-left:4px solid '+(pv.tone==='ok'?'#16a34a':(pv.tone==='warn'?'#f59e0b':'#dc2626'))+';background:'
+        +(pv.tone==='ok'?'#f0fdf4':(pv.tone==='warn'?'#fffbeb':'#fef2f2'))+';padding:7px 11px;border-radius:8px;font-size:.8rem;color:#334155;margin-bottom:10px">'
+        +(pv.tone==='ok'?'✅ ':soft?'⚠️ ':'ℹ️ ')+this.esc(pv.headline)
+        +(pv.rung?' <code style="font-size:.74rem;color:#64748b">'+this.esc(pv.rung)+'</code>':'')
+        +(pv.fix?'<div style="margin-top:3px;color:#78350f">'+this.esc(pv.fix)+'</div>':'')+'</div>';
+    }
     /* the five numbers, in the order every screen shows them */
     html+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">'
-      +[['Total fees this term',m(h.net_bill),'#0f172a'],
+      +[['Total fees this term',(h.bill_known===false?'not published':m(h.net_bill)),(h.bill_known===false?'#b45309':'#0f172a')],
         ['Paid',m(h.paid_this_term),'#15803d'],
         ['Balance this term',m(h.balance_this_term),Number(h.balance_this_term)>0?'#b91c1c':'#15803d'],
         ['Previous terms owing',m(h.arrears),Number(h.arrears)>0?'#b91c1c':'#64748b'],
