@@ -125,8 +125,9 @@ begin
   t_term    := coalesce(nullif(btrim(p_term),''),    b->>'term',    '');
   t_session := coalesce(nullif(btrim(p_session),''), b->>'session', '');
   if coalesce(t_term,'') = '' then
-    select term, session into ex from public.academic_periods where is_current limit 1;
-    t_term := coalesce(ex.term,''); t_session := coalesce(ex.session,'');
+    /* V12.68 — one resolver; never a bare is_current probe */
+    b := public.sc_term_resolve(p_term, p_session);
+    t_term := coalesce(b->>'term',''); t_session := coalesce(b->>'session','');
   end if;
 
   select * into ex from public.sc_fee_invoice
@@ -184,15 +185,14 @@ create or replace function public.sc_fee_invoice_sync_all(p_class text default n
                                                           p_session text default null,
                                                           p_prior_terms boolean default false)
 returns jsonb language plpgsql security definer set search_path=public as $$
-declare me uuid := auth.uid(); st record; r jsonb; n_raised int := 0; n_kept int := 0;
-        n_unbilled int := 0; ap record; t_term text; t_session text; skipped jsonb := '[]'::jsonb;
+declare me uuid := auth.uid(); st record; r jsonb; ap jsonb; n_raised int := 0; n_kept int := 0;
+        n_unbilled int := 0; per record; st2 record; t_term text; t_session text; skipped jsonb := '[]'::jsonb;
 begin
   if me is null or not coalesce(public.is_admin(me),false) then
     return jsonb_build_object('ok',false,'error','Only an administrator can raise fee invoices.');
   end if;
-  select term, session into ap from public.academic_periods where is_current limit 1;
-  t_term    := coalesce(nullif(btrim(p_term),''),    ap.term,    '');
-  t_session := coalesce(nullif(btrim(p_session),''), ap.session, '');
+  ap := public.sc_term_resolve(p_term, p_session);
+  t_term    := coalesce(nullif(btrim(p_term),''),    ap->>'term',    '');
 
   for st in select * from public.students
              where (p_class is null or p_class = '' or lower(btrim(class)) = lower(btrim(p_class)))
@@ -216,19 +216,19 @@ begin
      durable, reviewable, correctable invoice is created — never re-derived on
      every read. */
   if coalesce(p_prior_terms,false) then
-    for ap in select term, session from public.academic_periods
+    for per in select term, session from public.academic_periods
                where starts_on is not null
                  and not (lower(coalesce(term,''))    = lower(coalesce(t_term,''))
                       and lower(coalesce(session,'')) = lower(coalesce(t_session,'')))
                order by starts_on
     loop
-      for st in select * from public.students
-                 where (p_class is null or p_class = '' or lower(btrim(class)) = lower(btrim(p_class)))
-                   and coalesce(status,'active') not in ('inactive','left','withdrawn','graduated','deleted')
+      for st2 in select * from public.students s2
+                 where (p_class is null or p_class = '' or lower(btrim(s2.class)) = lower(btrim(p_class)))
+                   and coalesce(s2.status,'active') not in ('inactive','left','withdrawn','graduated','deleted')
                    /* on roll, provably */
-                   and st.created_at::date <= coalesce(ap.ends_on, ap.starts_on)
+                   and s2.created_at::date <= coalesce(per.ends_on, per.starts_on)
       loop
-        r := public.sc_fee_invoice_sync(st.id, ap.term, ap.session, false);
+        r := public.sc_fee_invoice_sync(st2.id, per.term, per.session, false);
         if coalesce(r->>'action','') in ('raised','refreshed') then n_raised := n_raised + 1; end if;
       end loop;
     end loop;
@@ -252,12 +252,12 @@ create or replace function public.sc_fee_prior_terms(p_student uuid,
                                                      p_term text default null,
                                                      p_session text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
-declare cur record; t_term text; t_session text; out_rows jsonb := '[]'::jsonb; i record;
+declare cur jsonb; t_term text; t_session text; out_rows jsonb := '[]'::jsonb; i record;
         paid numeric; owing numeric;
 begin
-  select term, session into cur from public.academic_periods where is_current limit 1;
-  t_term    := coalesce(nullif(btrim(p_term),''),    cur.term,    '');
-  t_session := coalesce(nullif(btrim(p_session),''), cur.session, '');
+  cur := public.sc_term_resolve(p_term, p_session);
+  t_term    := coalesce(nullif(btrim(p_term),''),    cur->>'term',    '');
+  t_session := coalesce(nullif(btrim(p_session),''), cur->>'session', '');
 
   /* NOTE: this walks INVOICES, never the calendar. A learner who was never
      billed for a term has no row here and therefore owes nothing for it. */
@@ -295,12 +295,12 @@ create or replace function public.sc_fee_allocate(p_student uuid,
                                                   p_term text default null,
                                                   p_session text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
-declare cur record; t_term text; t_session text; left_over numeric := greatest(coalesce(p_amount,0),0);
+declare cur jsonb; t_term text; t_session text; left_over numeric := greatest(coalesce(p_amount,0),0);
         i record; paid numeric; owing numeric; alloc jsonb := '[]'::jsonb; take numeric;
 begin
-  select term, session into cur from public.academic_periods where is_current limit 1;
-  t_term    := coalesce(nullif(btrim(p_term),''),    cur.term,    '');
-  t_session := coalesce(nullif(btrim(p_session),''), cur.session, '');
+  cur := public.sc_term_resolve(p_term, p_session);
+  t_term    := coalesce(nullif(btrim(p_term),''),    cur->>'term',    '');
+  t_session := coalesce(nullif(btrim(p_session),''), cur->>'session', '');
 
   /* standard practice: oldest debt first, so the dues report stays meaningful */
   for i in select * from public.sc_fee_invoice inv
@@ -336,7 +336,7 @@ create or replace function public.sc_fee_ledger_for(p_student uuid,
                                                     p_session text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare
-  st record; cur record; b jsonb;
+  st record; cur jsonb; b jsonb;
   t_term text; t_session text;
   inv record;
   net_bill numeric := 0; aid numeric := 0; gross numeric := 0;
@@ -349,9 +349,9 @@ declare
 begin
   select * into st from public.students where id = p_student;
   if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
-  select term, session into cur from public.academic_periods where is_current limit 1;
-  t_term    := coalesce(nullif(btrim(p_term),''),    cur.term,    '');
-  t_session := coalesce(nullif(btrim(p_session),''), cur.session, '');
+  cur := public.sc_term_resolve(p_term, p_session);
+  t_term    := coalesce(nullif(btrim(p_term),''),    cur->>'term',    '');
+  t_session := coalesce(nullif(btrim(p_session),''), cur->>'session', '');
 
   /* ---------- 1. THIS TERM'S BILL ----------
      Read from the invoice when one exists. The invoice is what the school
@@ -794,12 +794,12 @@ create or replace function public.sc_fee_page_rows(p_class text default null,
                                                    p_term text default null,
                                                    p_session text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
-declare cur record; t_term text; t_session text; out_rows jsonb := '[]'::jsonb;
+declare cur jsonb; t_term text; t_session text; out_rows jsonb := '[]'::jsonb;
         s record; led jsonb;
 begin
-  select term, session into cur from public.academic_periods where is_current limit 1;
-  t_term    := coalesce(nullif(btrim(p_term),''),    cur.term,    '');
-  t_session := coalesce(nullif(btrim(p_session),''), cur.session, '');
+  cur := public.sc_term_resolve(p_term, p_session);
+  t_term    := coalesce(nullif(btrim(p_term),''),    cur->>'term',    '');
+  t_session := coalesce(nullif(btrim(p_session),''), cur->>'session', '');
 
   for s in select * from public.students
             where (p_class is null or p_class = '' or lower(btrim(class)) = lower(btrim(p_class)))
