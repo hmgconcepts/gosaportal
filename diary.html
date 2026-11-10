@@ -582,7 +582,7 @@ const DRY={
     }catch(_){}
   },
   async loadEntries(){
-    /* V12.65: sc_diary_feed applies the platform's class scoping on the server
+    /* V12.66: sc_diary_feed applies the platform's class scoping on the server
        (admins see all, staff see all, families see their children's classes). */
     let data=null, err=null;
     try { const r=await sb.rpc('sc_diary_feed',{p_class:null, p_limit:200}); data=r.data; err=r.error; }
@@ -691,7 +691,7 @@ const DRY={
   async ack(id){
     const rec = this.rows.find(x=>x.id===id);
     if(!rec) return;
-    /* V12.65: acknowledge through the RPC so the diary.acks array and the
+    /* V12.66: acknowledge through the RPC so the diary.acks array and the
        diary_ack table are written together and cannot drift apart. A second
        acknowledgement by the same reader updates rather than duplicates. */
     const {data,error}=await sb.rpc('sc_diary_ack',{p_diary_id:id, p_note:'seen'});

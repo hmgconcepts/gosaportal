@@ -87,6 +87,28 @@
         <div id="mr-status" style="margin-top:12px;font-size:.9rem;color:#475569"></div>
       </div>
 
+      <!-- V12.66: the school decides what a midterm report prints -->
+      <div class="card" style="margin-top:16px;border:2px solid #6366f1;background:#eef2ff" data-admin-only id="mr-policy-card">
+        <h3 style="margin-top:0">⚙️ What the midterm report prints — positions</h3>
+        <p style="color:var(--gray-700);font-size:.88rem;margin-top:0">
+          Decide whether midterm reports show a position in class. This switch is separate from the terminal
+          report card, so a school can rank at the end of term and not at midterm — which is what many primary
+          schools do. <b>Marks are never changed</b>; only what is printed changes.
+        </p>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;min-width:170px"><label>Term</label>
+            <select class="form-select" id="mpol-term"><option value="">All terms</option></select></div>
+          <div class="form-group" style="margin:0;min-width:150px"><label>Session</label>
+            <select class="form-select" id="mpol-session"><option value="">All sessions</option></select></div>
+          <button class="btn btn-primary" onclick="ReportPolicy.load('midterm')">Load current setting</button>
+        </div>
+        <div id="mpol-body"><span style="color:var(--gray-500);font-size:.88rem">Press <b>Load current setting</b> to see and change it.</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="ReportPolicy.save('midterm')">💾 Save for this term</button>
+          <button class="btn btn-outline" onclick="ReportPolicy.saveAll('midterm')">💾 Save as the school default</button>
+        </div>
+      </div>
+
       <div class="card" id="mr-family-view" style="display:none;margin-top:16px">
         <h3>👨‍👩‍👧 Your Midterm Sheet</h3>
         <p style="color:#475569">Only your own (or your linked child’s) <b>published</b> midterm report is shown here. Terminal reports remain separate.</p>
