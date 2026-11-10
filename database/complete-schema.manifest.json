@@ -1,15 +1,15 @@
 {
  "_meta": {
-  "built_bytes": 781577,
-  "built_from_bytes": 1063821,
+  "built_bytes": 865248,
+  "built_from_bytes": 1151718,
   "removed": {
-   "banner-rule": 281,
+   "banner-rule": 300,
    "duplicate-grant": 6,
    "progress-select": 159,
    "redundant-add-column": 147,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
-   "superseded-function": 10,
+   "superseded-function": 12,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
@@ -311,6 +311,16 @@
   "column public.sc_heartbeat.updated_at",
   "column public.sc_install_state.applied_at",
   "column public.sc_install_state.installed_at",
+  "column public.sc_report_position_hold.created_by",
+  "column public.sc_report_position_hold.reason",
+  "column public.sc_report_settings.notes",
+  "column public.sc_report_settings.position_label",
+  "column public.sc_report_settings.show_grade",
+  "column public.sc_report_settings.show_position",
+  "column public.sc_report_settings.show_remarks",
+  "column public.sc_report_settings.show_subject_position",
+  "column public.sc_report_settings.updated_at",
+  "column public.sc_report_settings.updated_by",
   "column public.scheme_of_work.admin_affirmed",
   "column public.scheme_of_work.affirmed_at",
   "column public.scheme_of_work.affirmed_by",
@@ -721,6 +731,9 @@
   "sc_cbt_public_question": [
    "p_question jsonb"
   ],
+  "sc_cbt_push_clean": [
+   "p_exam_id uuid, p_destination text default null"
+  ],
   "sc_cbt_question_type": [
    "p_question jsonb"
   ],
@@ -785,6 +798,12 @@
   "sc_fee_bill_for": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
+  "sc_fee_bill_v2": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_doctor_v2": [
+   "p_class text default null, p_student uuid default null, p_dry_run boolean default false"
+  ],
   "sc_fee_ledger_doctor": [
    "p_heal boolean default false"
   ],
@@ -793,6 +812,9 @@
   ],
   "sc_fee_overview": [
    "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_reconcile": [
+   "p_student uuid default null"
   ],
   "sc_fee_repair_all": [
    "p_dry_run boolean default false, p_class text default null, p_student uuid default null"
@@ -805,6 +827,9 @@
   ],
   "sc_fee_sync_snapshots": [
    "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_truth_sheet": [
+   "p_student uuid"
   ],
   "sc_finalise_promotions": [
    ""
@@ -891,6 +916,9 @@
   "sc_normalize_name": [
    "p_text text"
   ],
+  "sc_on_cbt_score_change": [
+   ""
+  ],
   "sc_payroll_posts_loan": [
    ""
   ],
@@ -936,8 +964,26 @@
   "sc_report_hidden_for": [
    "p_uid uuid, p_student uuid"
   ],
+  "sc_report_hold_position": [
+   "p_student_id_ref text, p_class text, p_term text, p_session text, p_kind text default 'terminal', p_reason text default '', p_hold boolean default true"
+  ],
   "sc_report_min_participation": [
    ""
+  ],
+  "sc_report_policy": [
+   "p_kind text default 'terminal', p_term text default null, p_session text default null"
+  ],
+  "sc_report_policy_save": [
+   "p_kind text, p_term text, p_session text, p_show_position boolean default true, p_show_grade boolean default true, p_show_subject_position boolean default true, p_show_remarks boolean default true, p_position_label text default 'Position in class', p_notes text default ''"
+  ],
+  "sc_report_remap_cbt": [
+   "p_exam_id uuid, p_column text default null, p_result_id uuid default null, p_dry_run boolean default false"
+  ],
+  "sc_report_repair_all": [
+   "p_class text default null, p_term text default null, p_session text default null, p_dry_run boolean default false"
+  ],
+  "sc_report_source_audit": [
+   "p_class text default null, p_term text default null, p_session text default null"
   ],
   "sc_reports_recompute": [
    "p_class text default null, p_term text default null, p_session text default null, p_dry_run boolean default false"
@@ -1343,6 +1389,10 @@
   "public.sc_module_access.sma_write",
   "public.sc_module_editors.sme_read",
   "public.sc_module_editors.sme_write",
+  "public.sc_report_position_hold.sc_report_hold_read",
+  "public.sc_report_position_hold.sc_report_hold_write",
+  "public.sc_report_settings.sc_report_settings_read",
+  "public.sc_report_settings.sc_report_settings_write",
   "public.scheme_of_work.sow_scope_select",
   "public.scheme_of_work.sow_scope_write",
   "public.school_products.school_products_read",
@@ -1506,6 +1556,8 @@
   "sc_keepalive_sources": [],
   "sc_module_access": [],
   "sc_module_editors": [],
+  "sc_report_position_hold": [],
+  "sc_report_settings": [],
   "scheme_of_work": [],
   "school_products": [],
   "school_settings": [],
@@ -1542,6 +1594,7 @@
   "trigger trg_cbt_assignment_mirror",
   "trigger trg_cbt_duration_sync",
   "trigger trg_cbt_proctor_required_before_result",
+  "trigger trg_cbt_score_snapshot_sync",
   "trigger trg_community_audience",
   "trigger trg_compute_class_fee_total",
   "trigger trg_compute_fee_payment_balance",
@@ -1567,6 +1620,7 @@
   "public.cbt_results_with_exam",
   "public.parent_children",
   "public.poll_results",
-  "public.report_subject_totals"
+  "public.report_subject_totals",
+  "public.sc_report_hold_list"
  ]
 }
