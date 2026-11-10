@@ -1601,11 +1601,56 @@ const App = {
         const ar = f.arrears_rows || [];
         const paidPct = Number(f.paid_percent || 0);
 
+        /* ================================================================
+           V12.68 (B9) — PROVENANCE ON THE CARD.
+           Round 9 reported "Total fees this term" showing ₦0. A card that
+           prints a number without its source cannot be trusted or challenged,
+           so every card now states, in words, how the figure was arrived at:
+             • where the term came from (calendar / flag / fallback),
+             • which price list matched (exact term, "Current Term", another
+               term of the session, the latest one, or the invoice),
+             • and, when there is no bill at all, WHICH of the three reasons
+               applies — because "no fee structure exists anywhere", "this
+               class has none for this term" and "this class has none at all"
+               need three different actions from the bursar.
+           Nothing about the money changes here; this is the same engine.
+           ================================================================ */
+        const mStatus = String(f.match_status || '');
+        const mBy = String(f.matched_by || '');
+        const rBy = String(f.resolved_by || '');
+        const rungText = {
+          invoice: 'from the invoice raised for this term',
+          exact_term: 'from the class fee structure published for this exact term',
+          current_term_label: 'from the class fee structure saved as “Current Term”',
+          session_other_term: 'from another term of the same session — no structure names this term',
+          latest_structure: 'from the most recent class fee structure — nothing matches this term',
+          override: 'from a personal total set by the bursar'
+        }[mBy] || '';
         if (f.bill_known === false) {
-          h += '<div class="notice notice-warning" style="margin-top:10px;font-size:.83rem">'
-            + '<b>⚠️ The bill for this term has not been published yet.</b><br>'
-            + esc(f.match_note || 'The school has not set the class fee for this term.')
-            + ' What you see below is your payment record — not a statement that nothing is owed.</div>';
+          const unknownWhy = {
+            no_structures_at_all: ['⚠️ No class fee structure exists on this platform yet.',
+              'Open 💳 Class Fee Structure and enter the fees for each class once. Every dashboard then fills itself in — no student record needs editing.'],
+            no_structure_this_term: ['⚠️ This class has a fee structure, but none for ' + (f.term || 'this term') + '.',
+              'Publish the fee for ' + (f.term || 'this term') + (f.session ? ' · ' + f.session : '') + ' on the 💳 Class Fee Structure page. The bill is unknown — not zero.'],
+            no_structure: ['⚠️ No fee structure has ever been published for this learner’s class.',
+              'Check the spelling of the class on the student record against the 💳 Class Fee Structure page, then publish it.']
+          }[mStatus] || ['⚠️ The bill for this term has not been published yet.',
+            'Open the 💳 Class Fee Structure page and publish the fee for this class.'];
+          h += '<div style="margin-top:10px;border-left:4px solid #f59e0b;background:#fffbeb;padding:9px 12px;border-radius:8px;font-size:.83rem">'
+            + '<b>' + unknownWhy[0] + '</b><br>' + unknownWhy[1]
+            + '<div style="margin-top:5px;color:#78350f;font-size:.78rem">'
+            + 'The figures below are your payment record — they are <b>not</b> a statement that nothing is owed.'
+            + (rBy ? ' Term resolved by: <code>' + esc(rBy) + '</code>.' : '') + '</div></div>';
+        } else if (rungText) {
+          /* a bill exists — say where it came from, and warn when the rung is a fallback */
+          const soft = (mBy === 'session_other_term' || mBy === 'latest_structure');
+          h += '<div style="margin-top:10px;border-left:4px solid ' + (soft ? '#f59e0b' : '#16a34a') + ';'
+            + 'background:' + (soft ? '#fffbeb' : '#f0fdf4') + ';padding:7px 11px;border-radius:8px;font-size:.79rem;color:#334155">'
+            + (soft ? '⚠️ ' : '✅ ') + 'This bill is ' + esc(rungText) + '.'
+            + (soft ? ' <b>Publish the fee for ' + esc(f.term || 'this term') + ' so the amount is exact.</b>' : '')
+            + (f.term ? ' <span style="color:var(--gray-500)">Term: ' + esc(f.term) + (f.session ? ' · ' + esc(f.session) : '')
+              + (rBy && rBy !== 'is_current' ? ' (' + esc(rBy) + ')' : '') + '</span>' : '')
+            + '</div>';
         }
         h += '<div style="margin-top:10px;border:1px solid var(--gray-300);border-radius:10px;overflow:hidden">' +
              '<div style="background:var(--gray-100);padding:6px 10px;font-size:.8rem;font-weight:800;color:var(--gray-700)">How this balance is calculated</div>' +

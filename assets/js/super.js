@@ -667,7 +667,7 @@ const Super = {
     },
     /* Contact strip used by the new templates (#10: address + phone + email). */
     contactStrip(s, dark) {
-      const bits = [s.address ? '📍 ' + Super.esc(s.address) : '', s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join(' · ');
+      const bits = [s.address ? 'Address: ' + Super.esc(s.address) : '', s.phone ? 'Tel: ' + Super.esc(s.phone) : '', s.email ? 'Email: ' + Super.esc(s.email) : ''].filter(Boolean).join(' · ');
       return bits ? '<div style="font-size:.58rem;color:' + (dark ? '#94a3b8' : '#475569') + ';text-align:center;padding:5px 10px;line-height:1.5">' + bits + '</div>' : '';
     },
     /* V11.6 LIFETIME CARD helpers: the physical card serves the student for
@@ -718,8 +718,8 @@ const Super = {
       const tpl = person.template || 'horizontal';
       const logo = 'assets/img/logo.' + (s.logoExt || 'svg');
       const contactFooter = '<div style="background:#f1f5f9;padding:7px 14px;font-size:.62rem;color:#475569;text-align:center;line-height:1.5">' +
-        (s.address ? '📍 ' + Super.esc(s.address) + '<br>' : '') +
-        [s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join(' · ') +
+        (s.address ? Super.esc(s.address) + '<br>' : '') +
+        [s.phone ? 'Tel: ' + Super.esc(s.phone) : '', s.email ? Super.esc(s.email) : ''].filter(Boolean).join(' · ') +
         (s.motto ? '<br><em style="color:#64748b">"' + Super.esc(s.motto) + '"</em>' : '') + '</div>';
       const credit = '<div style="background:#0f172a;color:#94a3b8;font-size:.56rem;text-align:center;padding:3px 0">If found, please return to the school office · Powered by HMG Concepts</div>';
       const bigPhoto = photo
@@ -933,7 +933,7 @@ const Super = {
         'Report loss or damage to the class teacher or school office immediately.',
         'Surrender this card to the school office on graduation or withdrawal.'
       ];
-      const contact = [s.address ? '📍 ' + Super.esc(s.address) : '', s.phone ? '📞 ' + Super.esc(s.phone) : '', s.email ? '✉️ ' + Super.esc(s.email) : ''].filter(Boolean).join('<br>');
+      const contact = [s.address ? Super.esc(s.address) : '', s.phone ? 'Tel: ' + Super.esc(s.phone) : '', s.email ? Super.esc(s.email) : ''].filter(Boolean).join('<br>');
       return '<div class="sc-idcard sc-idcard-back" style="width:340px;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff;display:flex;flex-direction:column">' +
         // magnetic-stripe band (classic card realism)
         '<div style="height:34px;background:#1f2937;margin-top:14px"></div>' +
@@ -1140,7 +1140,7 @@ const Super = {
       const s = Super.school || {};
       const logo = `assets/img/logo.${(s.logoExt || 'svg')}`;
       const bullets = (o.bullets || []).map(b => `<p style="margin:7px 0;display:flex;align-items:flex-start;gap:8px"><span style="color:${o.ac};font-weight:900">✓</span><span>${Super.esc(b)}</span></p>`).join('');
-      const contact = o.contactBar !== false ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.25)"><p style="font-weight:700;margin:4px 0">📞 ${Super.esc(s.phone || '')} &nbsp; ✉️ ${Super.esc(s.email || '')}</p><p style="font-size:.78rem;opacity:.9;margin:0">📍 ${Super.esc(s.address || '')}</p></div>` : '';
+      const contact = o.contactBar !== false ? `<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.25)"><p style="font-weight:700;margin:4px 0">Tel: ${Super.esc(s.phone || '')} &nbsp; ✉️ ${Super.esc(s.email || '')}</p><p style="font-size:.78rem;opacity:.9;margin:0">📍 ${Super.esc(s.address || '')}</p></div>` : '';
       const credit = '<p style="margin-top:14px;font-size:.68rem;opacity:.75">Powered by HMG Concepts</p>';
       const sz = this.SIZES[o.size] || this.SIZES.a4portrait;
       // professional decorations
@@ -1174,7 +1174,7 @@ const Super = {
             <h2 style="letter-spacing:2px;color:${o.pc};margin:8px 0 16px">${Super.esc(o.headline)}</h2>
             <div style="text-align:left;max-width:400px;margin:0 auto;color:#1f2937">${bullets}</div>
             <p style="font-weight:800;margin:18px 0;color:${o.pc};font-size:1.1rem">${Super.esc(o.cta)}</p>
-            <div style="border-top:1px solid #e7e2d0;padding-top:12px;color:#6b7280;font-size:.8rem">📞 ${Super.esc(s.phone || '')} · ✉️ ${Super.esc(s.email || '')}<br>📍 ${Super.esc(s.address || '')}</div>
+            <div style="border-top:1px solid #e7e2d0;padding-top:12px;color:#6b7280;font-size:.8rem">Tel: ${Super.esc(s.phone || '')} · Email: ${Super.esc(s.email || '')}<br>${Super.esc(s.address || '')}</div>
           </div></div>`;
       }
       if (o.layout === 'minimal') {
