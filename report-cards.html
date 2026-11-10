@@ -497,6 +497,52 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><span id="score-grid"></span><button class="btn btn-primary" onclick="RC.load()">Load / Build</button><button class="btn btn-outline" onclick="ReportEngine.openBulkCBTExportModal()">🚀 Bulk Push CBT Scores</button><button class="btn btn-outline" onclick="RC.openScoreAudit()">🔎 Audit / Clear Unwanted Scores</button><button class="btn btn-outline" style="color:#b45309;border-color:#f59e0b" onclick="RC.sweepGhosts()" data-admin-only title="Remove leftover report sheets from deleted columns/students">🧹 Sweep Ghost Report Sheets</button><button class="btn btn-outline" style="color:#7c3aed;border-color:#c4b5fd" onclick="RC.repairRanking()" data-admin-only title="Re-measure every terminal report against the class's full expected subject load and re-rank fairly. Use this on any class generated before V12.64, where a student who sat fewer subjects could be placed above one who sat them all.">🏅 Repair percentages &amp; positions</button><button class="btn btn-outline" onclick="RC.openMetrics()">📏 Height / Weight / Health Metrics</button></div>
       </div>
+
+      <!-- V12.66: the school decides what a report prints -->
+      <div class="card" style="margin-top:16px;border:2px solid #6366f1;background:#eef2ff" data-admin-only id="rc-policy-card">
+        <h3 style="margin-top:0">⚙️ What the report prints — positions &amp; columns</h3>
+        <p style="color:var(--gray-700);font-size:.88rem;margin-top:0">
+          A school may rank learners, or it may choose not to. This panel is the switch — it applies to
+          <b>every</b> report, printed or on screen, from now on. Changing it does not touch a single mark;
+          it only decides what is shown.
+        </p>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;min-width:170px"><label>Report type</label>
+            <select class="form-select" id="pol-kind">
+              <option value="terminal">Terminal report card</option>
+              <option value="midterm">Midterm report</option>
+              <option value="subject">Subject broadsheet</option>
+            </select></div>
+          <div class="form-group" style="margin:0;min-width:170px"><label>Term</label>
+            <select class="form-select" id="pol-term"><option value="">All terms</option></select></div>
+          <div class="form-group" style="margin:0;min-width:150px"><label>Session</label>
+            <select class="form-select" id="pol-session"><option value="">All sessions</option></select></div>
+          <button class="btn btn-primary" onclick="ReportPolicy.load()">Load current setting</button>
+        </div>
+        <div id="pol-body"><span style="color:var(--gray-500);font-size:.88rem">Choose a report type and press <b>Load current setting</b>.</span></div>
+        <div id="pol-preview" style="margin-top:12px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="ReportPolicy.save()">💾 Save for this term</button>
+          <button class="btn btn-outline" onclick="ReportPolicy.saveAll()">💾 Save as the school default</button>
+        </div>
+        <p style="font-size:.8rem;color:var(--gray-600);margin-top:10px">
+          <b>Withhold one learner only:</b> a class teacher can hide a single learner's position (for example after a
+          bereavement, or where a mark is under appeal) without hiding anyone else's.
+        </p>
+        <details style="margin-top:6px">
+          <summary style="cursor:pointer;font-weight:700;font-size:.88rem;color:#4338ca">👤 Withhold the position for one learner</summary>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">
+            <div class="form-group" style="margin:0;min-width:200px"><label>Class</label>
+              <select class="form-select" id="pol-class"><option value="">All classes</option></select></div>
+            <button class="btn btn-outline" onclick="ReportPolicy.openHolds()">Show learners</button>
+          </div>
+          <p style="font-size:.79rem;color:var(--gray-600);margin:8px 0 0">
+            A withheld position prints as <i>“Not published”</i>. Every other learner in the class is unaffected, and the
+            marks themselves are never touched.
+          </p>
+        </details>
+      </div>
+
       <div id="rc-cols" data-staff-only></div>
       <div id="rc-grid"></div>
       <!-- V12.16: One-Click Student Report Access Control -->
