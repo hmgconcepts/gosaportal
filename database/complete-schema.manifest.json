@@ -1,15 +1,15 @@
 {
  "_meta": {
-  "built_bytes": 865248,
-  "built_from_bytes": 1151718,
+  "built_bytes": 897028,
+  "built_from_bytes": 1197217,
   "removed": {
-   "banner-rule": 300,
+   "banner-rule": 323,
    "duplicate-grant": 6,
    "progress-select": 159,
    "redundant-add-column": 147,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
-   "superseded-function": 12,
+   "superseded-function": 14,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
@@ -795,6 +795,9 @@
   "sc_fee_account": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
+  "sc_fee_allocate": [
+   "p_student uuid, p_amount numeric, p_term text default null, p_session text default null"
+  ],
   "sc_fee_bill_for": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
@@ -804,14 +807,35 @@
   "sc_fee_doctor_v2": [
    "p_class text default null, p_student uuid default null, p_dry_run boolean default false"
   ],
+  "sc_fee_doctor_v3": [
+   "p_class text default null, p_dry_run boolean default true"
+  ],
+  "sc_fee_invoice_sync": [
+   "p_student uuid, p_term text default null, p_session text default null, p_force boolean default false"
+  ],
+  "sc_fee_invoice_sync_all": [
+   "p_class text default null, p_term text default null, p_session text default null, p_prior_terms boolean default false"
+  ],
   "sc_fee_ledger_doctor": [
    "p_heal boolean default false"
   ],
   "sc_fee_ledger_for": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
+  "sc_fee_opening_to_invoice": [
+   "p_dry_run boolean default true"
+  ],
   "sc_fee_overview": [
    "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_page_rows": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_prior_terms": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_receipt_bill": [
+   "p_payment uuid"
   ],
   "sc_fee_reconcile": [
    "p_student uuid default null"
@@ -827,6 +851,9 @@
   ],
   "sc_fee_sync_snapshots": [
    "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_truth_migrate": [
+   "p_dry_run boolean default true"
   ],
   "sc_fee_truth_sheet": [
    "p_student uuid"
@@ -1131,6 +1158,9 @@
   "public.results_assessment_uidx",
   "public.role_status_log_person_idx_v7",
   "public.role_status_log_school_idx",
+  "public.sc_fee_invoice_student",
+  "public.sc_fee_invoice_term",
+  "public.sc_fee_invoice_unique",
   "public.school_products_school_idx",
   "public.school_products_school_idx_v7",
   "public.school_settings_school_idx",
@@ -1381,6 +1411,8 @@
   "public.role_status_log.v7_role_log_write",
   "public.sc_ai_settings.ai_read",
   "public.sc_ai_settings.ai_write",
+  "public.sc_fee_invoice.sc_fee_invoice_read",
+  "public.sc_fee_invoice.sc_fee_invoice_write",
   "public.sc_heartbeat.hb_read",
   "public.sc_install_state.install_state_read",
   "public.sc_install_state.sis_admin_read",
@@ -1551,6 +1583,7 @@
   "results": [],
   "role_status_log": [],
   "sc_ai_settings": [],
+  "sc_fee_invoice": [],
   "sc_heartbeat": [],
   "sc_install_state": [],
   "sc_keepalive_sources": [],
