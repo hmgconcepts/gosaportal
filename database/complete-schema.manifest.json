@@ -1,15 +1,15 @@
 {
  "_meta": {
-  "built_bytes": 897028,
-  "built_from_bytes": 1197217,
+  "built_bytes": 956172,
+  "built_from_bytes": 1261862,
   "removed": {
-   "banner-rule": 323,
-   "duplicate-grant": 6,
+   "banner-rule": 387,
+   "duplicate-grant": 7,
    "progress-select": 159,
    "redundant-add-column": 147,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
-   "superseded-function": 14,
+   "superseded-function": 16,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
@@ -798,6 +798,9 @@
   "sc_fee_allocate": [
    "p_student uuid, p_amount numeric, p_term text default null, p_session text default null"
   ],
+  "sc_fee_bill_audit": [
+   "p_class text default null"
+  ],
   "sc_fee_bill_for": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
@@ -809,6 +812,9 @@
   ],
   "sc_fee_doctor_v3": [
    "p_class text default null, p_dry_run boolean default true"
+  ],
+  "sc_fee_explain": [
+   "p_student uuid, p_term text default null, p_session text default null"
   ],
   "sc_fee_invoice_sync": [
    "p_student uuid, p_term text default null, p_session text default null, p_force boolean default false"
@@ -848,6 +854,12 @@
   ],
   "sc_fee_rows_autoheal": [
    ""
+  ],
+  "sc_fee_structure_doctor": [
+   ""
+  ],
+  "sc_fee_structure_for": [
+   "p_class text, p_term text default null, p_session text default null"
   ],
   "sc_fee_sync_snapshots": [
    "p_student uuid, p_term text default null, p_session text default null"
@@ -1061,6 +1073,15 @@
    ""
   ],
   "sc_sync_staff_photo_to_profile": [
+   ""
+  ],
+  "sc_term_current": [
+   ""
+  ],
+  "sc_term_resolve": [
+   "p_term text default null, p_session text default null"
+  ],
+  "sc_term_undated": [
    ""
   ],
   "sc_terminal_rank": [
