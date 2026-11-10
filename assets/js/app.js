@@ -1572,7 +1572,12 @@ const App = {
         const f = r.data || {};
         if (f.ok === false) continue;
         const cur = f.currency || '₦';
-        const owingNow = Number(f.balance || 0), arrears = Number(f.arrears || 0), totalDue = Number(f.total_due || 0);
+        /* V12.67 — arrears are unpaid PRIOR INVOICES. Absent an invoice there is
+           nothing owed, so `has_arrears` (server-side) is authoritative and the
+           figure is rendered as blank rather than ₦0. */
+        const owingNow = Number(f.balance || 0);
+        const arrears = (f.has_arrears === false) ? 0 : Number(f.arrears || 0);
+        const totalDue = Number(f.total_due != null ? f.total_due : (owingNow + arrears));
         h += '<div style="border:2px solid ' + (totalDue > 0 ? '#fca5a5' : '#86efac') + ';border-radius:14px;padding:14px;margin-bottom:12px;background:' + (totalDue > 0 ? '#fef2f2' : '#f0fdf4') + '">' +
           '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline">' +
           '<b style="font-size:1.02rem">' + esc(s.full_name) + (f.class ? ' · ' + esc(f.class) : '') + '</b>' +
