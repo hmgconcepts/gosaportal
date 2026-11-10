@@ -21,6 +21,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import fs from 'fs';
 import path from 'path';
+import { schemaText } from './verification/schema-loader.mjs';
 
 const HERE = new URL('.', import.meta.url).pathname;
 const ROOT = path.resolve(HERE, '..');
@@ -40,7 +41,11 @@ let failures = 0;
 const ok = (c, msg) => { console.log(`  ${c ? 'PASS' : 'FAIL'}  ${msg}`); if (!c) failures++; };
 
 function load(p) {
-  return fs.readFileSync(p, 'utf8').replace(/create extension[^;]*;/gi, 'select 1;');
+  /* V12.68 — shared loader. It neutralises only TOP-LEVEL create-extension
+     statements; the schema also has one inside a PL/pgSQL block (pg_cron),
+     where a bare SELECT is a syntax error and the block's own text gets
+     corrupted. See tools/verification/schema-loader.mjs. */
+  return schemaText(p);
 }
 
 async function build(p) {
