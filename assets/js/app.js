@@ -1596,6 +1596,12 @@ const App = {
         const ar = f.arrears_rows || [];
         const paidPct = Number(f.paid_percent || 0);
 
+        if (f.bill_known === false) {
+          h += '<div class="notice notice-warning" style="margin-top:10px;font-size:.83rem">'
+            + '<b>⚠️ The bill for this term has not been published yet.</b><br>'
+            + esc(f.match_note || 'The school has not set the class fee for this term.')
+            + ' What you see below is your payment record — not a statement that nothing is owed.</div>';
+        }
         h += '<div style="margin-top:10px;border:1px solid var(--gray-300);border-radius:10px;overflow:hidden">' +
              '<div style="background:var(--gray-100);padding:6px 10px;font-size:.8rem;font-weight:800;color:var(--gray-700)">How this balance is calculated</div>' +
              '<table style="width:100%;font-size:.84rem;border-collapse:collapse">' +
@@ -1608,7 +1614,8 @@ const App = {
                '<tr><td style="padding:4px 10px;color:#15803d">Less total paid so far</td>' +
                    '<td style="padding:4px 10px;text-align:right;color:#15803d;font-weight:700">−' + money(cur, f.paid) + '</td></tr>' +
                '<tr style="border-top:2px solid var(--gray-300)"><td style="padding:6px 10px"><b>' +
-                   (totalDue > 0 ? 'BALANCE STILL OWED' : 'FULLY SETTLED') + '</b></td>' +
+                   (f.bill_known === false ? 'BILL NOT YET PUBLISHED'
+                     : (totalDue > 0 ? 'BALANCE STILL OWED' : 'FULLY SETTLED')) + '</b></td>' +
                    '<td style="padding:6px 10px;text-align:right"><b style="font-size:1.05rem;color:' + (totalDue > 0 ? '#b91c1c' : '#15803d') + '">' +
                    money(cur, totalDue) + '</b></td></tr>' +
              '</table>' +
@@ -1659,7 +1666,8 @@ const App = {
           }
         } catch (_) { /* the totals above are authoritative even if history fails */ }
 
-        h += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm btn-outline" href="fees.html">🧾 Receipts &amp; e-receipts</a>' + (role === 'parent' ? '<a class="btn btn-sm btn-outline" href="payments_online.html">💳 Pay online</a>' : '') + '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div></div>';
+        h += '<div style="font-size:.74rem;color:var(--gray-500);margin-top:8px">Every figure above is the same one the Fees page prints — both read one server-side engine.</div>';
+        h += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm btn-outline" href="fees.html#fee-truth-card">🧾 Full fee statement</a><a class="btn btn-sm btn-outline" href="fees.html">🧾 Receipts &amp; e-receipts</a>' + (role === 'parent' ? '<a class="btn btn-sm btn-outline" href="payments_online.html">💳 Pay online</a>' : '') + '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div></div>';
       }
       paint(h || '<div style="color:var(--gray-500);font-size:.85rem"><p>💤 No fee structure has been published for the class yet.</p><p>Once the school saves the Class Fee Structure (admin: 💰 School Fee Structure page) and runs the v9.4 database update, the full bill, payments and balance appear here automatically.</p><button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div>');
     } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Fee summary could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Retry</button></p>'); }

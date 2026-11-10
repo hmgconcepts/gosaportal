@@ -430,6 +430,56 @@ const ReportEngine = {
     return { byName, expected, cohortSize, list };
   },
 
+  /* V12.66 — report presentation policy. The school decides, per term and per
+     report kind, whether the position is printed; a class teacher may withhold
+     ONE learner's position without withholding anyone else's. Defaults keep the
+     old behaviour (everything shown) until the school chooses otherwise. */
+  _policy:{show_position:true,show_grade:true,show_subject_position:true,
+           show_remarks:true,position_label:'Position in class'},
+  async loadPolicy(kind, term, session){
+    const fallback = Object.assign({}, this._policy);
+    try{
+      const r = await this.sb.rpc('sc_report_policy',{p_kind:kind||'terminal',
+                                                    p_term:term||null, p_session:session||null});
+      if(!r.error && r.data && r.data.ok !== false){
+        this._policy = {
+          show_position: r.data.show_position !== false,
+          show_grade: r.data.show_grade !== false,
+          show_subject_position: r.data.show_subject_position !== false,
+          show_remarks: r.data.show_remarks !== false,
+          position_label: r.data.position_label || 'Position in class',
+          configured: !!r.data.configured
+        };
+      } else { this._policy = fallback; }
+    }catch(_){ this._policy = fallback; }
+    return this._policy;
+  },
+  policy(){ return this._policy || {show_position:true}; },
+  /* withheld for one learner only */
+  async holdsFor(kind, term, session){
+    if(!this._holds){ this._holds = {}; }
+    const key = [kind,term,session].join('|');
+    if(this._holds[key]) return this._holds[key];
+    const set = {};
+    try{
+      let q = this.sb.from('sc_report_position_hold').select('student_id_ref,student_id');
+      if(term) q = q.eq('term', term);
+      if(session) q = q.eq('session', session);
+      const {data} = await q;
+      (data||[]).forEach(h=>{
+        if(h.student_id_ref) set[String(h.student_id_ref).toLowerCase()] = true;
+        if(h.student_id) set['id:'+h.student_id] = true;
+      });
+    }catch(_){}
+    this._holds[key] = set;
+    return set;
+  },
+  positionWithheld(row, holds){
+    if(!row) return false;
+    const a = String(row.admission_no||row.student_id_ref||'').toLowerCase();
+    const b = row.student_id ? 'id:'+row.student_id : '';
+    return !!(holds && ((a && holds[a]) || (b && holds[b])));
+  },
   positionsBy(rows, groupKey='student_name'){
     /* V12.64 — percentage-aware. The old version summed raw totals, which ranks
        a learner with one big paper above a learner with four good ones. */
@@ -512,6 +562,7 @@ const ReportEngine = {
   dynamicScoreCell(row,col){const key=col.key||(this.labelToken?this.labelToken(col.name):String(col.name||'').toLowerCase().replace(/[^a-z0-9]/g,'')),cell=(row._assessmentCells||[]).find(c=>(this.labelToken?this.labelToken(c.name):String(c.name||'').toLowerCase().replace(/[^a-z0-9]/g,''))===key);return cell&&cell.present?this.fmt(cell.value):'—';},
 
   async renderStudent(ctx){
+    await this._preparePolicy(ctx, ctx.report_kind || 'terminal');
     const data = await this.loadContext(ctx); const rows = data.rows;
     if (!rows.length) return this.empty('No result records found for this student/filter.');
     const name = ctx.student || rows[0].student_name;
@@ -556,7 +607,7 @@ const ReportEngine = {
       const subPosStr = subPos ? this.ordinal(subPos) : '—';
       const subjectPct=this.n(r.max)?this.n(r.total)/this.n(r.max)*100:0;
       const cells=legacyLayout.map(c=>'<td>'+(layout.length?this.dynamicScoreCell(r,c):this.scoreCell(r,c.legacy))+'</td>').join('');
-      return `<tr><td class="left">${this.esc(r.subject)}</td>${cells}<td><b>${this.fmt(r.total)} / ${this.fmt(r.max)}</b></td><td class="grade">${this.grade(subjectPct)}</td><td>${subPosStr}</td><td>${this.remark(subjectPct)}</td></tr>`;
+      return `<tr><td class="left">${this.esc(r.subject)}</td>${cells}<td><b>${this.fmt(r.total)} / ${this.fmt(r.max)}</b></td>${pol.show_grade?'<td class="grade">'+this.grade(subjectPct)+'</td>':''}${pol.show_subject_position?'<td>'+subPosStr+'</td>':''}${pol.show_remarks?'<td>'+this.remark(subjectPct)+'</td>':''}</tr>`;
     }).join('');
     const scoreHead=legacyLayout.map(c=>'<th>'+this.esc(c.name)+'<br>('+this.fmt(c.max_mark)+')</th>').join('');
 
@@ -653,6 +704,17 @@ const ReportEngine = {
     const classAvgValues = (classCohort.list||[]).filter(x=>x.total>0).map(x=>x.percentage);
     const classAverage=classAvgValues.length?classAvgValues.reduce((a,b)=>a+b,0)/classAvgValues.length:0;
 
+    /* V12.66 — presentation policy + per-learner hold */
+    const pol = this.policy();
+    const holds = this._holdsForNow || {};
+    const withheld = !pol.show_position || this.positionWithheld(first, holds);
+    const posLabel = pol.position_label || 'Position in class';
+    const posCell = withheld
+      ? `<b style="color:#64748b">Not published</b> <small style="color:#94a3b8">· positions withheld for this report</small>`
+      : `<b style="color:${rankable?'#16a34a':'#b45309'}">${classPosition}</b>`
+        + (classSize && classSize !== '—' ? ' <small style="color:#64748b">of ' + this.esc(classSize) + '</small>' : '')
+        + (complete ? '' : ' <small style="color:#b45309;font-weight:700">· incomplete sitting</small>');
+
     const stampSvg = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="re-stamp" style="position:relative">
       <defs>
         <path id="stampTopArc_${first.student_id||'r'}" d="M 16,60 A 44,44 0 0,1 104,60" fill="none"/>
@@ -675,11 +737,12 @@ const ReportEngine = {
       <text x="60" y="88" text-anchor="middle" font-family="Arial, sans-serif" font-size="4" font-weight="700" fill="${stampColor}">${new Date().toLocaleDateString()}</text>
     </svg>`;
 
-    return `<div class="report-sheet sample-report"><div class="head"><img class="logo" src="${logo}" onerror="this.style.display='none'"><div class="school"><h1>${this.esc(sc.name)}</h1><p>📍 ${this.esc(sc.address)} · 📞 ${this.esc(sc.phone)} · ✉️ ${this.esc(sc.email)}</p><p style="font-style:italic;color:#7c2d12">Motto: ${this.esc(sc.motto)}</p></div><div class="photo">${first.photo_url ? `<img src="${this.esc(first.photo_url)}" onerror="this.parentNode.innerHTML='Photo'">` : 'Student<br>Photo'}</div></div><div class="title">TERMINAL REPORT SHEET — ${this.esc(ctx.term||first.term||'TERM')}, ${this.esc(ctx.session||first.session||'SESSION')}</div><table class="info"><tr><td><b>Name:</b> ${this.esc(first.student_name)}</td><td><b>Admission No:</b> ${this.esc(first.admission_no)}</td><td><b>Class:</b> ${this.esc(first.class)}</td></tr><tr><td><b>No. in Class:</b> ${classSize}</td><td><b>Attendance:</b> ${this.esc(attendanceStr)}</td><td><b>Position:</b> <b style="color:${rankable?'#16a34a':'#b45309'}">${classPosition}</b>${classSize&&classSize!=='—'?' <small style="color:#64748b">of '+this.esc(classSize)+'</small>':''}${complete?'':' <small style="color:#b45309;font-weight:700">· incomplete sitting</small>'}</td></tr></table>${rankBasis?'<p class="rank-basis" style="margin:2px 0 0;font-size:9px;color:#64748b;text-align:center">'+this.esc(rankBasis)+'</p>':''}<table class="scores" style="margin-top:8px"><thead><tr><th class="left">SUBJECT</th>${scoreHead}<th>TOTAL /<br>ACTIVE MAX</th><th>GRADE</th><th>POSITION</th><th>REMARK</th></tr></thead><tbody>${scoreRows}</tbody></table><table class="info" style="margin-top:8px"><tr><td><b>Total Score:</b> ${this.fmt(total)} / ${this.fmt(obtainable)}</td><td><b>Average:</b> ${this.fmt(avg,1)}%</td><td><b>Class Average:</b> ${this.fmt(classAverage,1)}%</td><td><b>Grade:</b> <span class="grade">${this.grade(avg)}</span></td></tr></table>${promotion?`<div class="promotion-status" style="margin-top:8px;padding:9px 12px;border:1.5px solid ${promotion.color};background:${promotion.background};color:${promotion.color};border-radius:8px;text-align:center"><b style="font-size:13px;letter-spacing:.7px">${this.esc(promotion.label)}</b><div style="font-size:9.5px;margin-top:2px">${this.esc(promotion.detail)}</div></div>`:''}
+    return `<div class="report-sheet sample-report"><div class="head"><img class="logo" src="${logo}" onerror="this.style.display='none'"><div class="school"><h1>${this.esc(sc.name)}</h1><p>📍 ${this.esc(sc.address)} · 📞 ${this.esc(sc.phone)} · ✉️ ${this.esc(sc.email)}</p><p style="font-style:italic;color:#7c2d12">Motto: ${this.esc(sc.motto)}</p></div><div class="photo">${first.photo_url ? `<img src="${this.esc(first.photo_url)}" onerror="this.parentNode.innerHTML='Photo'">` : 'Student<br>Photo'}</div></div><div class="title">TERMINAL REPORT SHEET — ${this.esc(ctx.term||first.term||'TERM')}, ${this.esc(ctx.session||first.session||'SESSION')}</div><table class="info"><tr><td><b>Name:</b> ${this.esc(first.student_name)}</td><td><b>Admission No:</b> ${this.esc(first.admission_no)}</td><td><b>Class:</b> ${this.esc(first.class)}</td></tr><tr><td><b>No. in Class:</b> ${classSize}</td><td><b>Attendance:</b> ${this.esc(attendanceStr)}</td><td><b>${this.esc(posLabel.replace(/\bin class$/i,'').trim())||'Position'}:</b> ${posCell}</td></tr></table>${rankBasis?'<p class="rank-basis" style="margin:2px 0 0;font-size:9px;color:#64748b;text-align:center">'+this.esc(rankBasis)+'</p>':''}<table class="scores" style="margin-top:8px"><thead><tr><th class="left">SUBJECT</th>${scoreHead}<th>TOTAL /<br>ACTIVE MAX</th>${pol.show_grade?'<th>GRADE</th>':''}${pol.show_subject_position?'<th>POSITION</th>':''}${pol.show_remarks?'<th>REMARK</th>':''}</tr></thead><tbody>${scoreRows}</tbody></table><table class="info" style="margin-top:8px"><tr><td><b>Total Score:</b> ${this.fmt(total)} / ${this.fmt(obtainable)}</td><td><b>Average:</b> ${this.fmt(avg,1)}%</td><td><b>Class Average:</b> ${this.fmt(classAverage,1)}%</td><td><b>Grade:</b> <span class="grade">${this.grade(avg)}</span></td></tr></table>${promotion?`<div class="promotion-status" style="margin-top:8px;padding:9px 12px;border:1.5px solid ${promotion.color};background:${promotion.background};color:${promotion.color};border-radius:8px;text-align:center"><b style="font-size:13px;letter-spacing:.7px">${this.esc(promotion.label)}</b><div style="font-size:9.5px;margin-top:2px">${this.esc(promotion.detail)}</div></div>`:''}
 <table class="info" style="margin-top:6px;background:#fffbeb;border:1px solid #fcd34d"><tr><td><b>Previous School Fees Owed:</b> <span style="color:${bal>0?'#b91c1c':'#16a34a'};font-weight:900">${bal===0?'₦0 (FULLY PAID)':'₦'+Number(bal).toLocaleString()}</span></td><td><b>Next Term School Bill:</b> <span style="color:#b45309;font-weight:900">${nextTermBill.fees ? (nextTermBill.currency + Number(nextTermBill.fees).toLocaleString()) : '—'} </span> <small style="color:#92400e">(${this.esc(nextTermBill.note||'Payable before resumption')})</small></td><td><b>Next Term Begins:</b> ${this.esc(nextTermBill.begins ? this.fmtDMY(nextTermBill.begins) : (nextTermBegins||'—'))}</td></tr></table><table class="info" style="margin-top:6px"><tr><td><b>Height:</b> ${metrics&&metrics.height_cm!=null?this.fmt(metrics.height_cm)+' cm':'—'}</td><td><b>Weight:</b> ${metrics&&metrics.weight_kg!=null?this.fmt(metrics.weight_kg)+' kg':'—'}</td><td><b>BMI:</b> ${metricBMI!=null?this.fmt(metricBMI,1):'—'}</td><td><b>Blood pressure:</b> ${this.esc(metrics&&metrics.blood_pressure||'—')}</td></tr><tr><td><b>Vision:</b> ${this.esc(metrics&&metrics.vision||'—')}</td><td><b>Blood group:</b> ${this.esc(metrics&&metrics.blood_group||'—')}</td><td><b>Genotype:</b> ${this.esc(metrics&&metrics.genotype||'—')}</td><td><b>Measured:</b> ${this.esc(metrics&&metrics.measured_on?this.fmtDMY(metrics.measured_on):'—')}</td></tr></table><div class="traits re-traits"><div><table><tr><th colspan="2">⭐ AFFECTIVE DOMAIN</th></tr>${affectiveRows}</table></div><div><table><tr><th colspan="2">🏃 PSYCHOMOTOR DOMAIN</th></tr>${psychomotorRows}</table></div></div><table class="comments" style="margin-top:10px"><tr><td>Class Teacher's Comment</td><td>${this.esc(classTeacherComment)}</td></tr><tr><td>Principal's Comment</td><td>${this.esc(principalComment)}</td></tr><tr><td>Next Term Begins</td><td>${this.esc(nextTermBegins || sc.next_term_begins || 'See school calendar')} &nbsp;·&nbsp; <b>Fees Balance:</b> ${bal===0?'₦0 (FULLY PAID)':'₦'+Number(bal).toLocaleString()}</td></tr></table><div class="sig re-sig"><div><div class="re-sig-script">${this.teacherSignatureInk(classTeacher)}</div><div class="re-sig-line">${this.esc(classTeacher.name||'Class Teacher')}<br><small>Class Teacher's Signature</small></div></div><div style="position:relative">${stampEnabled?'<div class="re-stamp-wrap">'+stampSvg+'</div>':(hasSig?'<img src="'+this.esc(sigUrl)+'" style="max-width:160px;max-height:65px;object-fit:contain;'+(removeSigBg?'mix-blend-mode:multiply;filter:contrast(1.35)':'')+'">':'')}<div class="re-sig-line" style="margin-top:6px">${this.esc(principalName)}<br><small>Principal\'s Signature${stampEnabled?' &amp; Official Stamp':''}</small></div></div></div><p class="note">This is an official computer-generated report sheet. It carries the school stamp with embedded verification code and is valid without physical seal. Verify at the school portal.</p></div>`;
   },
 
   async renderSubject(ctx){
+    await this._preparePolicy(ctx, ctx.report_kind || 'terminal');
     const data=await this.loadContext(ctx); const rows=data.rows; if(!rows.length)return this.empty('No subject score records found.');
     const sc=data.school; const pct=r=>this.n(r.max)?this.n(r.total)/this.n(r.max)*100:0;
     const sorted=rows.slice().sort((a,b)=>pct(b)-pct(a));
@@ -687,11 +750,18 @@ const ReportEngine = {
     const highest=sorted.length?pct(sorted[0]):0,lowest=sorted.length?pct(sorted[sorted.length-1]):0,passRate=sorted.length?sorted.filter(r=>pct(r)>=50).length/sorted.length*100:0;
     let teacher=''; try{const tr=await this.sb.from('subjects').select('teacher').eq('name',ctx.subject||rows[0].subject).maybeSingle();teacher=(tr.data&&tr.data.teacher)||'';}catch(_){}
     const layout=this.assessmentLayout(sorted),legacy=layout.length?layout:[{name:'CA1',max_mark:10,key:'ca1',legacy:'ca1'},{name:'CA2',max_mark:10,key:'ca2',legacy:'ca2'},{name:'CA3 / CBT',max_mark:10,key:'cbt',legacy:'cbt'},{name:'Project',max_mark:10,key:'project',legacy:'project'},{name:'Exam',max_mark:60,key:'paper',legacy:'paper'}],head=legacy.map(c=>'<th>'+this.esc(c.name)+' ('+this.fmt(c.max_mark)+')</th>').join('');
-    const body=sorted.map((r,i)=>`<tr${i===0?' class="top"':''}><td>${i+1}</td><td class="left">${this.esc(r.student_name)}</td><td>${this.esc(r.admission_no)}</td>${legacy.map(c=>'<td>'+(layout.length?this.dynamicScoreCell(r,c):this.scoreCell(r,c.legacy))+'</td>').join('')}<td><b>${this.fmt(r.total)} / ${this.fmt(r.max)}</b></td><td class="grade ${this.grade(pct(r))}">${this.grade(pct(r))}</td><td>${x.pos!=null?this.ordinal(x.pos):'—'}</td><td>${this.remark(pct(r))}</td></tr>`).join('');
+    const body=sorted.map((r,i)=>`<tr${i===0?' class="top"':''}><td>${i+1}</td><td class="left">${this.esc(r.student_name)}</td><td>${this.esc(r.admission_no)}</td>${legacy.map(c=>'<td>'+(layout.length?this.dynamicScoreCell(r,c):this.scoreCell(r,c.legacy))+'</td>').join('')}<td><b>${this.fmt(r.total)} / ${this.fmt(r.max)}</b></td><td class="grade ${this.grade(pct(r))}">${this.grade(pct(r))}</td><td>${i+1}</td><td>${this.remark(pct(r))}</td></tr>`).join('');
     return `<div class="sheet subject-sheet"><h1>${this.esc(sc.name)} — SUBJECT BROADSHEET</h1><p class="meta">SUBJECT: ${this.esc(ctx.subject||rows[0].subject)} · CLASS: ${this.esc(ctx.class||rows[0].class||'')} · ${this.esc(ctx.term||rows[0].term||'TERM')}, ${this.esc(ctx.session||rows[0].session||'SESSION')} · Subject Teacher: ${this.esc(teacher||'—')} · ${sorted.length} students</p><table><thead><tr><th>S/N</th><th class="left">FULL NAME</th><th>ADM NO.</th>${head}<th>TOTAL / ACTIVE MAX</th><th>GRADE</th><th>POS</th><th>REMARK</th></tr></thead><tbody>${body}</tbody></table><div class="stat"><div><b>${this.fmt(avg,1)}%</b>Subject Average</div><div><b>${this.fmt(highest,1)}</b>Highest Score</div><div><b>${this.fmt(lowest,1)}</b>Lowest Score</div><div><b>${this.fmt(passRate,1)}%</b>Pass Rate (≥50)</div></div><div class="grading-scale"><b>Grading scale:</b> A (80–100) Excellent · B (70–79) Very Good · C (60–69) Good · D (50–59) Credit · E (40–49) Pass · F (0–39) Fail</div><div class="sig"><div><div class="sig-script">${this.signatureInk('teacher')}</div><div class="sig-line">Subject Teacher's Signature</div></div><div>${this.sealSvg('subjectSeal','EXAMINATIONS OFFICE')}<div class="sig-line">Head of Department's Signature &amp; Stamp</div></div></div><p class="note">Official per-subject scoresheet. Automatic totals, grades, positions and subject statistics. Licensed Platform · HMG Technologies.</p></div>`;
   },
 
+  async _preparePolicy(ctx, kind){
+    const term = ctx.term || ctx.report_term || null;
+    const session = ctx.session || ctx.report_session || null;
+    try{ await this.loadPolicy(kind || ctx.report_kind || 'terminal', term, session); }catch(_){}
+    try{ this._holdsForNow = await this.holdsFor(ctx.position_kind || kind || 'terminal', term, session); }catch(_){ this._holdsForNow = {}; }
+  },
   async renderClass(ctx){
+    await this._preparePolicy(ctx, ctx.report_kind || 'terminal');
     const data=await this.loadContext(ctx); const rows=data.rows; if(!rows.length)return this.empty('No class score records found.');
     const sc=data.school; const subjects=this.subjects(rows); const students=this.studentsFromRows(rows);const classTeacher=await this.loadClassTeacherIdentity(ctx.class||rows[0].class);
     /* V12.64 — one aggregation for the whole broadsheet, through the shared
@@ -931,3 +1001,181 @@ const ReportEngine = {
 };
 if (typeof sb !== 'undefined') ReportEngine.init(sb);
 window.ReportEngine = ReportEngine;
+
+
+/* =====================================================================
+   V12.66 — ReportPolicy: the school's switch for what a report prints.
+   Backed by sc_report_policy / sc_report_policy_set. The report engine reads
+   the same row, so what you set here is exactly what prints.
+   ===================================================================== */
+const ReportPolicy = {
+  esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
+  _kind:'terminal', _data:{},
+  async initAll(){
+    /* fill the term/session pickers from the same sources the pages use */
+    const fill=async(id,table,col)=>{
+      const el=document.getElementById(id); if(!el) return;
+      try{
+        const {data}=await sb.from(table).select(col).limit(500);
+        [...new Set((data||[]).map(x=>x[col]).filter(Boolean))].sort().forEach(v=>{
+          const o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o);});
+      }catch(_){}
+    };
+    await fill('pol-term','academic_periods','term');
+    await fill('pol-session','academic_periods','session');
+    await fill('mpol-term','academic_periods','term');
+    await fill('mpol-session','academic_periods','session');
+  },
+  async load(kind){
+    this._kind = kind || (document.getElementById('pol-kind')||{}).value || 'terminal';
+    const isMid = this._kind === 'midterm';
+    const p = isMid ? 'mpol' : 'pol';
+    const body = document.getElementById(p+'-body');
+    const term = (document.getElementById(p+'-term')||{}).value || '';
+    const session = (document.getElementById(p+'-session')||{}).value || '';
+    if(body) body.innerHTML='<span class="pulse">Reading current setting…</span>';
+    let d={ok:true,show_position:true,show_grade:true,show_subject_position:true,show_remarks:true,position_label:'Position in class',configured:false};
+    try{
+      const r = await sb.rpc('sc_report_policy',{p_kind:this._kind,p_term:term||null,p_session:session||null});
+      if(!r.error && r.data && r.data.ok!==false) d = r.data;
+      else if(r.error && /sc_report_policy|schema cache|does not exist/i.test(String(r.error.message||'')))
+        throw new Error('The report-settings module needs the V12.66 database pack. Run database/complete-schema.sql in Supabase, then reload this page.');
+    }catch(e){
+      if(body) body.innerHTML='<div class="notice notice-error">'+this.esc(e.message||e)+'</div>';
+      return;
+    }
+    this._data = d;
+    const row=(k,label,hint,on)=>`
+      <tr>
+        <td style="text-align:left"><b>${label}</b>${hint?'<div style="font-size:.78rem;color:var(--gray-600);margin-top:2px">'+hint+'</div>':''}</td>
+        <td style="width:110px">
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" id="${p}-${k}" ${on?'checked':''}>
+            <span style="font-size:.85rem">${on?'On':'Off'}</span>
+          </label>
+        </td>
+      </tr>`;
+    const posOn = d.show_position !== false;
+    const html = `
+      <div class="table-wrap"><table style="font-size:.9rem">
+        <thead><tr><th style="text-align:left">Shown on this report?</th><th>Setting</th></tr></thead>
+        <tbody>
+          ${row('show_position','Show the position in class',
+              'Turn this off and no learner\'s class position appears anywhere on this report — screen or print.',
+              posOn)}
+          ${row('show_subject_position','Show a position for each subject','The per-subject POS column on the subject sheet.', d.show_subject_position !== false)}
+          ${row('show_grade','Show the letter grade','A to F next to each subject and on the summary row.', d.show_grade !== false)}
+          ${row('show_remarks','Show the automatic remark','Excellent / Very good / … printed beside each subject.', d.show_remarks !== false)}
+        </tbody></table></div>
+      <div class="form-group" style="margin-top:12px;max-width:420px">
+        <label>What to call it</label>
+        <input class="form-input" id="${p}-position_label" value="${this.esc(d.position_label||'Position in class')}"
+               placeholder="e.g. Position in class, Rank, or leave blank">
+        <small style="color:var(--gray-600)">Some schools print <i>Rank</i>, some print <i>Overall position</i>. Leave it as it is if you are happy.</small>
+      </div>
+      <p style="font-size:.82rem;color:${d.configured?'#166534':'#92400e'};margin-top:8px">
+        ${d.configured
+          ? '✅ A setting is saved for this report'+(term||session?' and these dates':'')+'.'
+          : '⚠️ No setting saved yet — the report currently shows positions (the old behaviour). Choose above and save.'}
+      </p>`;
+    if(body) body.innerHTML = html;
+    /* live toggle labels */
+    ['show_position','show_subject_position','show_grade','show_remarks'].forEach(k=>{
+      const cb=document.getElementById(p+'-'+k); if(!cb) return;
+      cb.addEventListener('change',()=>{ cb.nextElementSibling.textContent = cb.checked?'On':'Off'; });
+    });
+  },
+  async _write(kind, term, session){
+    const isMid = kind==='midterm'; const p = isMid ? 'mpol' : 'pol';
+    const get=k=>{const el=document.getElementById(p+'-'+k);return el?!!el.checked:true;};
+    const label=(document.getElementById(p+'-position_label')||{}).value||'Position in class';
+    const r = await sb.rpc('sc_report_policy_save',{
+      p_kind: kind,
+      p_term: term||null,
+      p_session: session||null,
+      p_show_position: get('show_position'),
+      p_show_grade: get('show_grade'),
+      p_show_subject_position: get('show_subject_position'),
+      p_show_remarks: get('show_remarks'),
+      p_position_label: label
+    });
+    if(r.error) throw r.error;
+    const d=r.data||{};
+    if(d.ok===false) throw new Error(d.error||'Could not save');
+    return d;
+  },
+  async save(kind){
+    this._kind = kind || this._kind;
+    const isMid = this._kind==='midterm'; const p = isMid ? 'mpol' : 'pol';
+    const term=(document.getElementById(p+'-term')||{}).value||'';
+    const session=(document.getElementById(p+'-session')||{}).value||'';
+    try{
+      const d=await this._write(this._kind, term, session);
+      toast(d.show_position?'Position will now be printed on this report.'
+                          :'Position is now withheld from this report.', 'success', 6000);
+      if(window.ReportEngine) ReportEngine._policy=null;
+      await this.load(this._kind);
+    }catch(e){ toast('Could not save: '+(e.message||e),'error',8000); }
+  },
+  async saveAll(kind){
+    this._kind = kind || this._kind;
+    try{
+      await this._write(this._kind, null, null);
+      toast('Saved as the school default for this report type — it applies to every term that has no setting of its own.','success',7000);
+      await this.load(this._kind);
+    }catch(e){ toast('Could not save: '+(e.message||e),'error',8000); }
+  },
+
+  /* ---- per-learner hold ---- */
+  async openHolds(){
+    const box=document.getElementById('pol-preview'); if(!box) return;
+    box.innerHTML='<span class="pulse">Loading learners…</span>';
+    const cls=(document.getElementById('pol-class')||{}).value||'';
+    /* the hold is stored against ONE class/term/session/kind — capture it now */
+    this._holdCtx = {
+      class: cls,
+      term: (document.getElementById('pol-term')||{}).value||'',
+      session: (document.getElementById('pol-session')||{}).value||'',
+      kind: this._kind || 'terminal'
+    };
+    let q=sb.from('profiles').select('id,full_name,class,admission_no,role').eq('role','student').order('class').limit(2000);
+    if(cls) q=q.eq('class',cls);
+    const {data,error}=await q;
+    if(error){box.innerHTML='<div class="notice notice-error">'+this.esc(error.message)+'</div>';return;}
+    const held={};
+    try{
+      const h=await sb.from('sc_report_position_hold').select('student_id');
+      (h.data||[]).forEach(x=>held[x.student_id]=x.reason||true);
+    }catch(_){}
+    box.innerHTML='<div class="table-wrap"><table style="font-size:.85rem"><thead><tr><th style="text-align:left">Learner</th><th>Class</th><th>Admission no.</th><th>Position</th><th>Why (optional, for the file)</th></tr></thead><tbody>'
+      + (data||[]).slice(0,300).map(s=>`<tr>
+          <td style="text-align:left"><b>${this.esc(s.full_name)}</b></td>
+          <td>${this.esc(s.class||'')}</td>
+          <td>${this.esc(s.admission_no||'')}</td>
+          <td><button class="btn btn-sm ${held[s.id]?'btn-outline':'btn-primary'}" onclick="ReportPolicy.toggleHold('${s.id}',${held[s.id]?'false':'true'},{admission_no:'${this.esc(s.admission_no||'')}',class:'${this.esc(s.class||'')}'})">${held[s.id]?'Withheld':'Shown'}</button></td>
+          <td style="min-width:220px"><input class="form-input" id="hold-reason-${s.id}" value="${this.esc(typeof held[s.id]==='string'?held[s.id]:'')}" placeholder="e.g. mark under appeal"></td>
+        </tr>`).join('')
+      + '</tbody></table></div>';
+  },
+  async toggleHold(id, on, ctx){
+    const reason=(document.getElementById('hold-reason-'+id)||{}).value||'';
+    const c = ctx || this._holdCtx || {};
+    try{
+      const r=await sb.rpc('sc_report_hold_position',{
+        p_student_id_ref: c.admission_no || id,
+        p_class:   c.class   || '',
+        p_term:    c.term    || '',
+        p_session: c.session || '',
+        p_kind:    c.kind    || this._kind || 'terminal',
+        p_reason:  reason || '',
+        p_hold:    !!on
+      });
+      if(r.error) throw r.error;
+      const d=r.data||{}; if(d.ok===false) throw new Error(d.error||'Could not change');
+      toast(on?'Position withheld for this learner only.':'Position restored for this learner.','success',6000);
+      if(window.ReportEngine) ReportEngine._holds=null;
+      await this.openHolds();
+    }catch(e){ toast('Could not change: '+(e.message||e),'error',8000); }
+  }
+};
+document.addEventListener('DOMContentLoaded',()=>ReportPolicy.initAll());
