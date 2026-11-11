@@ -1523,7 +1523,7 @@ const App = {
            the SAME engine's aggregates (sc_fee_overview) so both pages agree. */
         const ovr = await sb.rpc('sc_fee_overview', { p_class: null, p_term: null, p_session: null });
         if (ovr.error || !ovr.data) {
-          paint('<p style="color:var(--gray-500);font-size:.85rem">School-wide fee summary needs the V12.60 database pack (database/v12.60-expert-fix-pack.sql).</p>');
+          paint('<p style="color:var(--gray-500);font-size:.85rem">School-wide fee summary needs the V12.60 database pack (database/complete-schema.sql).</p>');
           return;
         }
         const o = ovr.data || {};
@@ -1568,7 +1568,37 @@ const App = {
       let h = '';
       for (const s of studs) {
         const r = await sb.rpc('sc_student_fee_state', { p_student: s.id });
-        if (r.error) { h += '<p style="color:var(--gray-500);font-size:.85rem">💤 Fee totals need a one-time database update (admin: run database/v9.4-fees-and-exams.sql). Payment history is on the <a href="fees.html">Fees page</a>.</p>'; break; }
+        /* ================================================================
+           V12.68 — STOP LYING ABOUT THE REASON.
+           This branch used to print "run database/complete-schema.sql" for
+           ANY error, which sent the school chasing a file that had been
+           superseded four releases earlier. The fee engine is in the complete
+           schema; the only thing that can genuinely be missing now is a stale
+           PostgREST catalogue. So: name the real cause, keep the technical
+           detail visible for support, and gain a retry that re-reads the cache
+           before giving up.
+           ================================================================ */
+        if (r.error) {
+          const msg = String(r.error.message || r.error || '');
+          const missing = /could not find|does not exist|schema cache|PGRST202|PGRST204|404/i.test(msg);
+          h += '<div class="notice notice-warning" style="font-size:.84rem;margin-top:8px">'
+            + '<b>⚠️ ' + (missing
+                ? 'The fee engine is not visible to the API yet.'
+                : 'The fee summary could not be loaded.') + '</b><br>'
+            + (missing
+                ? 'The database has the fee engine; the API has not noticed it yet. This is a '
+                  + '<b>cache</b> problem, not a missing update — do <b>not</b> run any other SQL. '
+                  + 'Press <b>Retry</b>. If it persists, wait one minute: Supabase reloads the API '
+                  + 'catalogue automatically.'
+                : 'Your payment history is safe. Press <b>Retry</b>.')
+            + '<div style="margin-top:6px;font-size:.74rem;color:var(--gray-500)">'
+            + 'Technical detail: <code>' + esc(msg.slice(0, 220)) + '</code></div>'
+            + '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+            + '<button class="btn btn-sm btn-primary" onclick="App.loadDashFees()">🔄 Retry</button>'
+            + '<a class="btn btn-sm btn-outline" href="fees.html">🧾 Payment history</a>'
+            + '</div></div>';
+          break;
+        }
         const f = r.data || {};
         if (f.ok === false) continue;
         const cur = f.currency || '₦';
@@ -1719,8 +1749,30 @@ const App = {
         h += '<div style="font-size:.74rem;color:var(--gray-500);margin-top:8px">Every figure above is the same one the Fees page prints — both read one server-side engine.</div>';
         h += '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn btn-sm btn-outline" href="fees.html#fee-truth-card">🧾 Full fee statement</a><a class="btn btn-sm btn-outline" href="fees.html">🧾 Receipts &amp; e-receipts</a>' + (role === 'parent' ? '<a class="btn btn-sm btn-outline" href="payments_online.html">💳 Pay online</a>' : '') + '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div></div>';
       }
-      paint(h || '<div style="color:var(--gray-500);font-size:.85rem"><p>💤 No fee structure has been published for the class yet.</p><p>Once the school saves the Class Fee Structure (admin: 💰 School Fee Structure page) and runs the v9.4 database update, the full bill, payments and balance appear here automatically.</p><button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div>');
-    } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Fee summary could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Retry</button></p>'); }
+      /* V12.68 — an EMPTY card is itself a finding. If every learner was skipped
+         (engine returned ok=false, or a record had no id) the old fallback blamed
+         "no fee structure" and told the school to run a superseded SQL file.
+         Say what is actually true and give the next step. */
+      paint(h || ('<div style="color:var(--gray-600);font-size:.85rem">'
+        + '<p><b>No fee figures were returned for ' + studs.length + ' linked learner(s).</b></p>'
+        + '<p style="font-size:.8rem">The bill comes from the class fee structure. Check that the '
+        + 'learner’s <b>class</b> on their student record matches a class on the '
+        + '<a href="school-fees.html">💰 Class Fee Structure</a> page — a typo in the class '
+        + 'is the usual cause — then press Refresh.</p>'
+        + '<p style="font-size:.74rem;color:var(--gray-500)">Every fee figure is computed by '
+        + 'database/complete-schema.sql; no other SQL file is needed.</p>'
+        + '<button class="btn btn-sm btn-outline" onclick="App.loadDashFees()">🔄 Refresh</button></div>'));
+    } catch (e) {
+      /* V12.68 — an unexpected exception must never hide what it was. A bursar
+         can copy this line to support; a developer gets the real cause. */
+      console.error('[dash-fees]', e);
+      paint('<div style="font-size:.85rem;color:var(--gray-600)">'
+        + '<b>⚠️ The fee summary could not be built.</b><br>'
+        + '<span style="font-size:.78rem">Your payment records are safe. Try again; if it repeats, send this line to support.</span>'
+        + '<div style="margin-top:5px;font-size:.74rem;color:var(--gray-500)">'
+        + '<code>' + esc(String(e && e.message || e).slice(0, 200)) + '</code></div>'
+        + '<button class="btn btn-sm btn-outline" style="margin-top:8px" onclick="App.loadDashFees()">🔄 Retry</button></div>');
+    }
   },
   /* V10 (#3): MY PAY & BENEFITS — every staff member sees their own payslips,
      loans/advances (with balance) and bonuses on the dashboard, newest first.
@@ -1739,7 +1791,7 @@ const App = {
          fee card. */
       const r = await sb.rpc('sc_staff_pay_state');
       if (r.error) {
-        if (/could not find|does not exist|schema cache/i.test(r.error.message||'')) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">💤 Pay summary needs a one-time database update — admin: run <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>'; return; }
+        if (/could not find|does not exist|schema cache/i.test(r.error.message||'')) { box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">💤 Pay summary needs a one-time database update — admin: run <code>database/complete-schema.sql</code>.</p>'; return; }
         box.innerHTML=''; return;
       }
       const f = r.data || {};
@@ -1814,7 +1866,7 @@ const App = {
       let q = sb.from('exam_timetable').select('*').gte('exam_date', new Date().toISOString().slice(0, 10)).order('exam_date').order('start_time').limit(60);
       if (classes.length) q = q.in('class', classes);
       const r = await q;
-      if (r.error) { paint('<p style="color:var(--gray-500);font-size:.85rem">💤 The exam timetable appears here after a one-time database update (admin: run database/v9.4-fees-and-exams.sql or complete-schema.sql).</p>'); return; }
+      if (r.error) { paint('<p style="color:var(--gray-500);font-size:.85rem">💤 The exam timetable appears here after a one-time database update (admin: run database/complete-schema.sql or complete-schema.sql).</p>'); return; }
       const rows = r.data || [];
       if (!rows.length) { paint('<p style="color:var(--gray-500);font-size:.85rem">📭 No upcoming exam papers scheduled' + (classes.length ? ' for ' + classes.join(', ') : '') + ' yet — new papers appear here the moment the school publishes them. <a href="exam-timetable.html">Open the Exam Timetable →</a></p>'); return; }
       let h = '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th>' + (classes.length === 1 ? '' : '<th>Class</th>') + '<th>Subject</th><th>Venue</th></tr></thead><tbody>';
@@ -2342,7 +2394,7 @@ else App.init();
     window.sb.rpc('sc_keep_alive',{src:'site-visit'}).then(function(r){
       if(!r.error){ localStorage.setItem(KEY,String(Date.now()));
         console.log('[School Connect] Supabase keep-alive heartbeat ok.'); }
-      else console.warn('[School Connect] keep-alive RPC missing — run database/keep-alive.sql:',r.error.message);
+      else console.warn('[School Connect] keep-alive RPC missing — run database/complete-schema.sql:',r.error.message);
     }).catch(function(){});
   }catch(_){/* never break the page for a heartbeat */}
 })();

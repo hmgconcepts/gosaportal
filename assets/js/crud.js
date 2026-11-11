@@ -2166,7 +2166,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
           if (onEl) patch.opening_arrears_note = onEl.value || '';
           const ur = await this.sb.from('students').update(patch).eq('id', stuId);
           if (ur.error && /opening_arrears/.test(ur.error.message || '')) {
-            toast('Opening-arrears needs a one-time database update — admin: run database/v10.7-fee-locks-arrears.sql. The payment itself still saves.', 'warning', 10000);
+            toast('Opening-arrears needs a one-time database update — admin: run database/complete-schema.sql. The payment itself still saves.', 'warning', 10000);
           } else if (!ur.error && patch.opening_arrears > 0) {
             toast('🧾 Opening arrears of ' + patch.opening_arrears.toLocaleString() + ' saved on the student record — it now joins every total-due computation until cleared (enter 0 to clear).', 'info', 9000);
           }
@@ -2253,7 +2253,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       const bad = m && (m[1] || m[2] || m[3] || m[4]);
       if (!bad || !(bad in payload)) break;
       if (d.generic || d.table === 'module_records') { payload.data = payload.data || {}; payload.data[bad] = payload[bad]; }
-      console.warn('[CRUD] Column "' + bad + '" missing in DB — retrying without it. Run database/update-v6-schema.sql to add it permanently.');
+      console.warn('[CRUD] Column "' + bad + '" missing in DB — retrying without it. Run database/complete-schema.sql to add it permanently.');
       delete payload[bad]; guard++;
       res = await runSave(payload);
     }
@@ -2495,7 +2495,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: [studentId], p_kind: kind, p_locked: lock, p_message: message || '' });
     if (r.error || !r.data || r.data.ok === false) {
       const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Lock update failed';
-      if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v10.7-fee-locks-arrears.sql once in Supabase.', 'warning', 12000);
+      if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/complete-schema.sql once in Supabase.', 'warning', 12000);
       else toast(msg, 'danger', 9000);
       return;
     }
@@ -2550,7 +2550,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     } catch (e) {
       const msg = String(e.message || e);
       if (/sc_set_student_locks_by_filter|could not find the function|does not exist|schema cache/i.test(msg)) {
-        toast('One-click locking needs the V12.60 pack — run database/v12.60-expert-fix-pack.sql in Supabase.', 'warning', 12000);
+        toast('One-click locking needs the V12.60 pack — run database/complete-schema.sql in Supabase.', 'warning', 12000);
       } else toast('Bulk lock failed: ' + msg, 'danger', 9000);
     }
   },
@@ -2580,7 +2580,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       const r = await this.sb.rpc('sc_set_student_locks', { p_student_ids: chunk, p_kind: kind, p_locked: lock, p_message: message || '' });
       if (r.error || !r.data || r.data.ok === false) {
         const msg = (r.data && r.data.error) || (r.error && r.error.message) || 'Bulk lock failed';
-        if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/v12.60-expert-fix-pack.sql once in Supabase.', 'warning', 12000);
+        if (/sc_set_student_locks|schema cache|function/i.test(String(msg))) toast('The lock engine is not installed yet — admin: run database/complete-schema.sql once in Supabase.', 'warning', 12000);
         else toast(msg, 'danger', 9000);
         if (updated) { this.invalidateTableCaches('students'); this.renderList('students'); }
         return;
@@ -2624,7 +2624,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       const { data: msg, error: rpcErr } = await this.sb.rpc('sc_delete_user', { p_user: id });
       if (rpcErr) {
         if (/could not find|does not exist|schema cache/i.test(rpcErr.message || '')) {
-          toast('Database update needed: run database/v9.0-user-lifecycle.sql (or complete-schema.sql) in the Supabase SQL Editor, then retry.', 'danger', 10000);
+          toast('Database update needed: run database/complete-schema.sql (or complete-schema.sql) in the Supabase SQL Editor, then retry.', 'danger', 10000);
         } else { toast(rpcErr.message, 'danger', 8000); }
         return;
       }
@@ -2667,7 +2667,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     try {
       const r = await this.sb.rpc('sc_recompute_fee_rows', { p_student: studentId, p_term: term || '', p_session: session || '' });
       if (r.error) {
-        if (/sc_recompute_fee_rows|schema cache|function/i.test(String(r.error.message||''))) toast('Ledger self-healing needs a one-time database update — admin: run database/v10.8-fee-recompute.sql in Supabase. Until then, re-check this student\'s other payment rows manually.', 'warning', 12000);
+        if (/sc_recompute_fee_rows|schema cache|function/i.test(String(r.error.message||''))) toast('Ledger self-healing needs a one-time database update — admin: run database/complete-schema.sql in Supabase. Until then, re-check this student\'s other payment rows manually.', 'warning', 12000);
         else toast(r.error.message, 'warning', 8000);
         return null;
       }

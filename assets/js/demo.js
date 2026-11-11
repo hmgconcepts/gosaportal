@@ -23,7 +23,7 @@
   if (!D.enabled) return;
 
   /* Demo accounts — created in the Supabase Dashboard ("Add user", Auto Confirm
-     ON) and approved by database/demo-users.sql v6 (DEMO-SETUP.md). On the
+     ON) and approved by database/complete-schema.sql (DEMO-SETUP.md). On the
      newest hosted GoTrue, Dashboard-created accounts always log in while
      SQL-created auth rows cannot — so v6 never creates users in SQL. */
   var ACCOUNTS = [
@@ -58,16 +58,16 @@
   function hintFor(msg) {
     var m = (msg || '').toLowerCase();
     if (/database error|unexpected_failure|querying schema|finding user/.test(m))
-      return 'The auth service is choking on an old SQL-created auth row. Fix: Supabase Dashboard → Authentication → Users → delete the broken demo user, re-create it with \"Add user\" (same email + password from DEMO-SETUP.md, Auto Confirm ON), then run database/demo-users.sql v6 to approve its profile. See DEMO-SETUP.md.';
+      return 'The auth service is choking on an old SQL-created auth row. Fix: Supabase Dashboard → Authentication → Users → delete the broken demo user, re-create it with \"Add user\" (same email + password from DEMO-SETUP.md, Auto Confirm ON), then run database/complete-schema.sql to approve its profile. See DEMO-SETUP.md.';
     if (/invalid login|invalid credentials|email or password/.test(m))
-      return 'This guest account is missing or its password differs. Fix: Dashboard → Authentication → Users → create it (or Edit user → set the password to the one shown on the login panel / DEMO-SETUP.md), Auto Confirm ON — then run database/demo-users.sql v6 in the SAME project as the URL in assets/js/config.js to approve the profile.';
+      return 'This guest account is missing or its password differs. Fix: Dashboard → Authentication → Users → create it (or Edit user → set the password to the one shown on the login panel / DEMO-SETUP.md), Auto Confirm ON — then run database/complete-schema.sql in the SAME project as the URL in assets/js/config.js to approve the profile.';
     if (/email not confirmed|confirm your email/.test(m))
-      return 'Emails must be pre-confirmed for guest accounts. Fix: re-run database/demo-users.sql v6 (it confirms them), or Dashboard → Users → Edit user → Confirm email, or Auth → Providers → Email → turn OFF "Confirm email".';
+      return 'Emails must be pre-confirmed for guest accounts. Fix: re-run database/complete-schema.sql (it confirms them), or Dashboard → Users → Edit user → Confirm email, or Auth → Providers → Email → turn OFF "Confirm email".';
     if (/failed to fetch|network|load failed|fetcherror|err_failed/.test(m))
       return 'The site cannot reach Supabase. Check SUPABASE_URL + SUPABASE_ANON_KEY in assets/js/config.js belong to this demo project.';
     if (/paused|inactive|unavailable|503/.test(m))
       return 'The free Supabase project is paused (7-day inactivity rule). Open the Supabase dashboard and click "Restore project", then retry.';
-    return 'Open the browser console (F12) for the full error. Most causes are fixed by (re)running database/demo-users.sql in the correct project — see DEMO-SETUP.md.';
+    return 'Open the browser console (F12) for the full error. Most causes are fixed by (re)running database/complete-schema.sql in the correct project — see DEMO-SETUP.md.';
   }
 
   async function signInAs(acc) {

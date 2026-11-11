@@ -16,7 +16,7 @@ const Voting = {
     this.bindUI();
   },
 
-  /* Ensure schema (calls /database/voting-schema.sql on first run) */
+  /* Ensure schema (calls /database/complete-schema.sql on first run) */
   async ensureSchema() {
     const supabase = this.sb || window.sb || null;
     if (!supabase) return;
@@ -99,7 +99,7 @@ const Voting = {
       const p2 = Object.assign({}, payload); delete p2.class_scope;
       const retry2 = await supabase.from('polls').insert(p2).select().single();
       data = retry2.data; error = retry2.error;
-      if (!error && typeof toast === 'function') toast('Class-scope column missing — run database/v8.2-voting-scope-and-dl.sql to enforce class-only voting.', 'warning', 9000);
+      if (!error && typeof toast === 'function') toast('Class-scope column missing — run database/complete-schema.sql to enforce class-only voting.', 'warning', 9000);
     }
     if (error) return { error: error.message };
     await this.broadcastPollOpened(data);

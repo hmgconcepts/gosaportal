@@ -345,7 +345,7 @@ const CBT = {
       const who = (window.SC_PROFILE && (SC_PROFILE.full_name || SC_PROFILE.email)) || 'your account';
       res.error = { ...res.error, message:
         'The database refused this exam for ' + who + ' (row-level security). Likely causes, in order:\n' +
-        '1) Your school database has not run database/v10.4-cbt-multisubject-rls.sql — required for MULTI-SUBJECT packages created by teachers (admin: run it once in Supabase).\n' +
+        '1) Your school database is missing the latest policies — run database/complete-schema.sql once in the Supabase SQL Editor (it is the only file needed, and it is safe to re-run).\n' +
         '2) The subject "' + (exam.subject||'') + '" is not assigned to you on the Subjects page (admin can assign it, or an admin account can create the exam).\n' +
         '3) Your profile had not finished loading — wait two seconds after sign-in and try again.\n' +
         'Admins are never blocked; ask an admin to create it if urgent.' };

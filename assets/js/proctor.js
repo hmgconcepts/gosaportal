@@ -228,7 +228,7 @@ const Proctor = {
       const path = this._ctx.exam + '/' + this._ctx.candidate + '/' + Date.now() + '-' + (reason || 'interval') + '.jpg';
       const up = await this.sb().storage.from(this.BUCKET).upload(path, blob, { contentType: 'image/jpeg', upsert: false });
       if (!up.error) { this.snaps++; }
-      else if (this.snaps === 0) console.warn('[Proctor] upload failed:', up.error.message, '— run database/v6.3-role-access-fixes.sql to create the proctor bucket (1 GB storage, not 500 MB DB).');
+      else if (this.snaps === 0) console.warn('[Proctor] upload failed:', up.error.message, '— run database/complete-schema.sql to create the proctor bucket (1 GB storage, not 500 MB DB).');
     } catch (e) { console.warn('[Proctor] snapshot skipped:', e.message || e); }
   },
 
@@ -294,7 +294,7 @@ const Proctor = {
     const db = this.sb(); if (!db) throw new Error('Database not configured.');
     const root = this.slug(examCode); const out = [];
     const top = await db.storage.from(this.BUCKET).list(root, { limit: 200 });
-    if (top.error) throw new Error(top.error.message + ' — has database/v6.3-role-access-fixes.sql been run (creates the proctor bucket proctor, 1 GB storage, not 500 MB DB)?');
+    if (top.error) throw new Error(top.error.message + ' — has database/complete-schema.sql been run (creates the proctor bucket proctor, 1 GB storage, not 500 MB DB)?');
     for (const entry of (top.data || [])) {
       if (entry.id) { out.push({ path: root + '/' + entry.name, size: (entry.metadata || {}).size || 0, created: entry.created_at }); continue; }
       const sub = await db.storage.from(this.BUCKET).list(root + '/' + entry.name, { limit: 500 });
