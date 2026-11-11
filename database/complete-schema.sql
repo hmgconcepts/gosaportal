@@ -7,7 +7,7 @@
 -- platform needs. Safe on a new or an existing project, and safe to
 -- run more than once.
 --
--- Size: 952,655 bytes - inside the Supabase SQL Editor 1 MB request cap.
+-- Size: 955,109 bytes - inside the Supabase SQL Editor 1 MB request cap.
 -- Paste the whole file into SQL Editor and press Run once.
 -- If your editor still refuses it, split at the "-- ===" section
 -- banners: every section is independently re-runnable.
@@ -13309,7 +13309,7 @@ begin
     'class', coalesce(st.class,''),
     'arm', coalesce(st.arm,''),
     'term', t_term, 'session', t_session,
-    'currency', coalesce((select currency from public.school_settings limit 1),'₦'),
+    'currency', public.sc_currency(),
     'bill', net_bill,          -- "Total fees this term"
     'gross_bill', gross,
     'aid', aid,
@@ -13900,7 +13900,7 @@ begin
       'override', (coalesce(inv.source,'') = 'override'),
       'match_status','invoice', 'matched', true, 'bill_known', true, 'matched_by','invoice',
       'match_note', coalesce(inv.note,'The bill recorded on this learner''s invoice.'),
-      'currency', coalesce((select currency from public.school_settings limit 1),'₦'),
+      'currency', public.sc_currency(),
       'due_date', null, 'note', coalesce(inv.note,''),
       'working','Invoice raised for '||t_term||' '||coalesce(t_session,'')||' = '||to_char(coalesce(inv.net_amount,0),'FM999,999,990.00'));
   end if;
@@ -14463,7 +14463,7 @@ begin
     'has_arrears', coalesce((led->>'has_arrears')::boolean,false),
     'total_due', coalesce((led->>'total_due')::numeric,0),
     'invoice_raised', coalesce((led->>'invoiced')::boolean,false),
-    'currency', coalesce((select currency from public.school_settings limit 1),'₦'));
+    'currency', public.sc_currency());
 end $$;
 revoke all on function public.sc_fee_explain(uuid,text,text) from public, anon;
 grant execute on function public.sc_fee_explain(uuid,text,text) to authenticated;
@@ -14562,6 +14562,56 @@ begin
 end $$;
 revoke all on function public.sc_fee_truth_sheet(uuid) from public, anon;
 grant execute on function public.sc_fee_truth_sheet(uuid) to authenticated;
+-- B12. THE CURRENCY SYMBOL MUST NEVER BREAK THE FEE ENGINE
+--
+--  Reported: every learner's 💰 School Fees card said
+--      Technical detail: column "currency" does not exist
+--
+--  Three functions read the symbol with `select currency from school_settings
+--  limit 1`. If that column is absent the whole RPC aborts — so a missing
+--  *display* character takes down the entire fee statement. A currency symbol
+--  is decoration; a bill is money. Decoration must never be able to fail.
+--
+--  Two independent defects fixed here:
+--
+--    1. THE READ WAS UNGUARDED. The lookup is now ONE helper, `sc_currency()`,
+--       which resolves the symbol from a jsonb row (`to_jsonb(school_settings)`)
+--       so it cannot depend on a column existing at all, and falls back ₦.
+--       Every fee function calls it. No fee function names the column again.
+--
+--    2. THE COLUMN COULD NOT COME BACK. `create table if not exists` does
+--       nothing when the table already exists, so on a database whose
+--       school_settings predates `currency`, re-running the complete schema did
+--       NOT restore it — the school stayed broken no matter how many times they
+--       ran the file. The column is now added explicitly, with `if not exists`,
+--       so the schema is genuinely self-healing. No data is touched: only a
+--       missing column is added, and an existing one (and its value) is left
+--       exactly as it is.
+
+-- 1. heal the table itself (additive, idempotent, no data touched)
+alter table public.school_settings add column if not exists currency text default '₦';
+update public.school_settings
+   set currency = '₦'
+ where id = 1 and nullif(btrim(coalesce(currency,'')), '') is null;
+-- 2. one guarded reader. jsonb cannot fail on a missing key.
+create or replace function public.sc_currency()
+returns text language plpgsql stable security definer set search_path=public as $$
+declare sym text;
+begin
+  begin
+    select nullif(btrim(coalesce(to_jsonb(ss)->>'currency','')), '') into sym
+      from public.school_settings ss limit 1;
+  exception when others then
+    /* the table itself may be missing on an odd install — a symbol is never
+       worth failing a financial statement over */
+    sym := null;
+  end;
+  return coalesce(sym, '₦');
+end $$;
+revoke all on function public.sc_currency() from public, anon;
+grant execute on function public.sc_currency() to authenticated, anon;
+comment on function public.sc_currency() is
+  'V12.68 — the one place the fee engine reads the currency symbol. Never fails: returns ₦ when the setting (or the table, or the column) is absent.';
 
 -- ---------------------------------------------------------------------
 -- V12.68: LAST STATEMENT IN THE FILE, DELIBERATELY.
