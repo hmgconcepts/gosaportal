@@ -69,7 +69,8 @@ DB = os.path.join(ROOT, 'database')
 SRC = os.path.join(DB, 'complete-schema.sql')
 MANIFEST = os.path.join(DB, 'complete-schema.manifest.json')
 
-LIMIT = 1_000_000        # Supabase Studio SQL Editor request cap
+LIMIT = int(os.environ.get('SC_SCHEMA_CAP', 1_000_000))  # Supabase Studio SQL Editor cap — BYTES
+# (SC_SCHEMA_CAP exists only so the guard itself can be tested; never set it in production.)
 MARKER = '-- SC-BUILD: complete-schema (generated, do not hand-edit the banner)'
 TARGET = 900_000         # designed-in headroom (paste/CRLF inflation)
 
@@ -298,6 +299,51 @@ def build(raw: str) -> tuple[str, dict]:
             else:
                 first[s.key] = s
 
+    # ---- 9b. SUPERSEDED COMMENT BLOCKS --------------------------------
+    # V12.69 — a comment that explains a body which no longer exists is not
+    # documentation, it is a lie: `comment on function f` executed N times ends
+    # up describing the LAST body, so every earlier one is dead weight AND
+    # misleading. Keep the last comment per object; drop the earlier ones.
+    last_comment = {}
+    for s in st:
+        b = body_of(s).lstrip()
+        m = re.match(r'comment\s+on\s+(?:function|table|column|view)\s+([^\s]+)', b, re.I)
+        if m:
+            last_comment[m.group(1).lower()] = s
+    for s in st:
+        b = body_of(s).lstrip()
+        m = re.match(r'comment\s+on\s+(?:function|table|column|view)\s+([^\s]+)', b, re.I)
+        if m and last_comment.get(m.group(1).lower()) is not s:
+            kill(s, 'superseded-comment')
+
+    # ---- 9c. LONG HISTORICAL PACK BANNERS -----------------------------
+    # V12.69 — the cumulative file carries a multi-paragraph essay at the head
+    # of each old release explaining what was once broken. That reasoning is
+    # worth keeping, but it is worth keeping in the release report, not in a
+    # file bounded by Supabase's 1 MB paste limit. Any run of 8+ comment lines
+    # is cut to its first 3 with a pointer. Nothing executable is touched.
+    def _trim_banner(text):
+        lines = text.split('\n')
+        out, i, trimmed = [], 0, 0
+        while i < len(lines):
+            if lines[i].lstrip().startswith('--'):
+                j = i
+                while j < len(lines) and lines[j].lstrip().startswith('--'):
+                    j += 1
+                run = lines[i:j]
+                prose = [x for x in run if len(x.strip()) > 3]
+                if len(run) >= 8 and len(prose) >= 6:
+                    out.extend(run[:3])
+                    out.append('-- (full history: release report; trimmed to fit the SQL editor limit)')
+                    trimmed += 1
+                else:
+                    out.extend(run)
+                i = j
+                continue
+            out.append(lines[i]); i += 1
+        stats['banner-trimmed'] += trimmed
+        return '\n'.join(out)
+
     # ---- 10. decorative rule lines ----------------------------------------
     built = []
     for s in st:
@@ -327,6 +373,7 @@ def build(raw: str) -> tuple[str, dict]:
         built.append('\n'.join(keep))
 
     out = '\n'.join(built)
+    out = _trim_banner(out)
     out = re.sub(r'\A(?:\s*--[^\n]*\n)+?\s*(?=create|comment|do|alter|grant|--   )', '', out, count=1)
     out = re.sub(r'\n{3,}', '\n\n', out)
     out = out.rstrip() + '\n'
@@ -394,10 +441,11 @@ def main():
     print()
     print('  School Connect - complete schema build')
     print('  ' + '-' * 56)
+    out_bytes = len(out.encode('utf-8'))
     print(f'  source        {raw_bytes:>10,} B  ({raw.count(chr(10)):>6,} lines)')
-    print(f'  rebuilt       {len(out):>10,} B  ({out.count(chr(10)):>6,} lines)')
-    print(f'  removed       {raw_bytes-len(out):>10,} B  ({(raw_bytes-len(out))/raw_bytes*100:5.1f}%)')
-    print(f'  supabase cap  {LIMIT:>10,} B   headroom {LIMIT-len(out):>9,} B')
+    print(f'  rebuilt       {out_bytes:>10,} B  ({out.count(chr(10)):>6,} lines)')
+    print(f'  removed       {raw_bytes-out_bytes:>10,} B  ({(raw_bytes-out_bytes)/raw_bytes*100:5.1f}%)')
+    print(f'  supabase cap  {LIMIT:>10,} B   headroom {LIMIT-out_bytes:>9,} B')
     print(f'  design target {TARGET:>10,} B      -> ', end='')
     print('OK' if len(out) <= TARGET else 'over target (still inside the cap)')
     print()
@@ -433,6 +481,16 @@ def main():
         '-- ' + '=' * 74 + '\n\n'
     ) % f'{len(out):,}'
     out = header + out
+    # V12.70: the cap is documented as a hard limit, so enforce it here rather
+    # than only printing it. The whole point of this build is that the school
+    # pastes ONE file into the SQL Editor; a file over the cap silently breaks
+    # that promise, and the failure would only show up in Supabase.
+    final_bytes = len(out.encode('utf-8'))
+    if final_bytes > LIMIT:
+        print(f'  REFUSING TO WRITE: {final_bytes:,} B exceeds the {LIMIT:,} B Supabase cap '
+              f'by {final_bytes - LIMIT:,} B.')
+        print('  Remove or compact schema objects before shipping this build.')
+        return 2
     open(SRC, 'w', encoding='utf-8').write(out)
 
     # manifest = the objects the REBUILT file declares (kept statement set)
