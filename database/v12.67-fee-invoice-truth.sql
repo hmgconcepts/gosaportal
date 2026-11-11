@@ -427,7 +427,7 @@ begin
     'class', coalesce(st.class,''),
     'arm', coalesce(st.arm,''),
     'term', t_term, 'session', t_session,
-    'currency', coalesce((select currency from public.school_settings limit 1),'₦'),
+    'currency', public.sc_currency(),
     'bill', net_bill,          -- "Total fees this term"
     'gross_bill', gross,
     'aid', aid,
