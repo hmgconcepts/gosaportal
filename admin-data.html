@@ -529,7 +529,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
             <div class="form-group"><label>Every (days)</label><input class="form-input" id="gd-days" type="number" min="1" value="7"></div>
             <div style="display:flex;align-items:end"><button class="btn btn-primary" onclick="GD.save()">💾 Save Drive settings</button></div>
           </div>
-          <p style="font-size:.82rem;color:var(--gray-500);margin:6px 0 0">How auto-sync works on a free stack: whenever an admin opens any page and a backup is due, it uploads silently in the background (after the first authorisation in that browser). Full setup steps: <code>docs/GOOGLE-DRIVE-SYNC-GUIDE.md</code> in this package. One-time DB update for older installs: run <code>database/drive-sync.sql</code>.</p>
+          <p style="font-size:.82rem;color:var(--gray-500);margin:6px 0 0">How auto-sync works on a free stack: whenever an admin opens any page and a backup is due, it uploads silently in the background (after the first authorisation in that browser). Full setup steps: <code>docs/GOOGLE-DRIVE-SYNC-GUIDE.md</code> in this package. One-time DB update for older installs: run <code>database/complete-schema.sql</code>.</p>
         </details>
       </div>
       <div class="card" style="margin-bottom:16px;border:2px solid #38bdf8" data-admin-only>

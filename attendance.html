@@ -584,7 +584,7 @@ const AT={
     const start=document.getElementById('atp-start').value,end=document.getElementById('atp-end').value;
     if(!start||!end){toast('Enter the term start and end dates.','warning');return;}
     const r=await sb.rpc('sc_push_attendance_to_reports',{p_class:cls,p_term:term,p_session:session,p_start:start,p_end:end});
-    if(r.error){toast(/could not find|does not exist|schema cache/i.test(r.error.message||'')?'Run database/v10.1-staffpay-attendance-vetting.sql once, then push again.':r.error.message,'danger',9000);return;}
+    if(r.error){toast(/could not find|does not exist|schema cache/i.test(r.error.message||'')?'Run database/complete-schema.sql once, then push again.':r.error.message,'danger',9000);return;}
     const d=r.data||{};
     if(d.ok===false){toast(d.error||'Push failed.','danger',8000);return;}
     closeModal();toast('🚀 Attendance pushed for '+(d.students||0)+' student(s) · '+(d.school_days||0)+' school day(s) counted. Report sheets now show present/total automatically.','success',9000);

@@ -876,7 +876,7 @@ const AP={
     }).filter(Boolean);
     if(!rows.length){toast('Enter at least one score.','warning');return;}
     const r=await sb.from('assignment_scores').upsert(rows,{onConflict:'assignment_id,student_id'});
-    if(r.error){toast(/assignment_scores/.test(r.error.message)?'Run database/v8.4-assignment-dl-points.sql (or the latest complete-schema.sql) first.':r.error.message,'danger',9000);return;}
+    if(r.error){toast(/assignment_scores/.test(r.error.message)?'Run database/complete-schema.sql (or the latest complete-schema.sql) first.':r.error.message,'danger',9000);return;}
     closeModal();toast('💾 Saved '+rows.length+' score(s). They now count in the accumulated totals.','success',7000);
     try{if(this._matrix)this.matrix();}catch(_){ } /* live-refresh the open score sheet */
   },
@@ -888,7 +888,7 @@ const AP={
     let cp={};try{cp=await (window.CRUD&&CRUD.currentPeriod?CRUD.currentPeriod():{});}catch(_){ }
     let q=sb.from('assignment_scores').select('*').eq('class',cls).limit(5000);
     const r=await q;
-    if(r.error){box.innerHTML='<p style="color:#b91c1c">'+AP.esc(/assignment_scores/.test(r.error.message)?'Run database/v8.4-assignment-dl-points.sql first.':r.error.message)+'</p>';return;}
+    if(r.error){box.innerHTML='<p style="color:#b91c1c">'+AP.esc(/assignment_scores/.test(r.error.message)?'Run database/complete-schema.sql first.':r.error.message)+'</p>';return;}
     let filtered=(r.data||[]).filter(s=>{
       const sSubj=String(s.subject||'').toLowerCase();
       const req=String(sub||'').toLowerCase();

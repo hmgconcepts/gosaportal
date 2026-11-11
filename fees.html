@@ -618,7 +618,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       </div>
 
       <div class="card" style="margin-bottom:16px;border:2px solid #c7d2fe" data-admin-only><h2 style="margin-top:0">📑 Master Financial Records — export by class (V10.1)</h2>
-        <p style="color:var(--gray-600);font-size:.9rem">One row per student: current-term bill, scholarship/aid, paid so far, balance, previous-term arrears and TOTAL outstanding — computed live by the same engine that powers the dashboards. Print/save as PDF or download CSV. Needs <code>database/v10.1-staffpay-attendance-vetting.sql</code>.</p>
+        <p style="color:var(--gray-600);font-size:.9rem">One row per student: current-term bill, scholarship/aid, paid so far, balance, previous-term arrears and TOTAL outstanding — computed live by the same engine that powers the dashboards. Print/save as PDF or download CSV. Needs <code>database/complete-schema.sql</code>.</p>
         <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
           <div class="form-group" style="margin:0"><label>Class</label><select class="form-select" id="fm-class"><option value="">ALL classes</option></select></div>
           <button class="btn btn-primary" onclick="FM.load()">📊 Build master sheet</button>
@@ -740,7 +740,7 @@ const FeeBillAudit = {
     const cls=((document.getElementById('fba-class')||{}).value||'');
     box.innerHTML='<span class="pulse">Auditing every learner…</span>';
     const r=await sb.rpc('sc_fee_bill_audit',{p_class:cls||null});
-    if(r.error){box.innerHTML='<div class="notice notice-error">'+this.esc(r.error.message)+'. This needs the V12.68 database pack (database/v12.68-bill-resolution.sql).</div>';return;}
+    if(r.error){box.innerHTML='<div class="notice notice-error">'+this.esc(r.error.message)+'. This needs the V12.68 database pack (database/complete-schema.sql).</div>';return;}
     const d=r.data||{};
     if(d.ok===false){box.innerHTML='<div class="notice notice-error">'+this.esc(d.error||'Could not run the audit')+'</div>';return;}
     const WHY={invoice:['Invoice raised','Authoritative — nothing to do.'],
@@ -1100,7 +1100,7 @@ const FeeRepair={
     }catch(e){
       const msg=String(e.message||e);
       box.innerHTML='<div class="notice notice-error">'+(/sc_fee_repair_all|schema cache|function/i.test(msg)
-        ? 'The one-click repair needs the V12.62 database pack — run <code>database/v12.60-expert-fix-pack.sql</code> in Supabase, then reload.'
+        ? 'The one-click repair needs the V12.62 database pack — run <code>database/complete-schema.sql</code> in Supabase, then reload.'
         : this.esc(msg))+'</div>';
     }
   }
@@ -1281,7 +1281,7 @@ const FM={rows:[],ctx:{},
     const cls=(document.getElementById('fm-class')||{}).value||'';
     const box=document.getElementById('fm-out');box.innerHTML='<span class="pulse">Computing every student\'s financial state…</span>';
     const r=await sb.rpc('sc_class_fee_master',{p_class:cls});
-    if(r.error){box.innerHTML='<div class="notice notice-error">'+this.esc(/could not find|does not exist|schema cache/i.test(r.error.message||'')?'Run database/v10.1-staffpay-attendance-vetting.sql once, then rebuild.':r.error.message)+'</div>';return;}
+    if(r.error){box.innerHTML='<div class="notice notice-error">'+this.esc(/could not find|does not exist|schema cache/i.test(r.error.message||'')?'Run database/complete-schema.sql once, then rebuild.':r.error.message)+'</div>';return;}
     const d=r.data||{};if(d.ok===false){box.innerHTML='<div class="notice notice-error">'+this.esc(d.error||'Failed')+'</div>';return;}
     this.rows=d.rows||[];this.ctx={cls:cls,term:d.term,session:d.session};
     if(!this.rows.length){box.innerHTML='<p style="color:var(--gray-500)">No students found'+(cls?' in '+this.esc(cls):'')+'.</p>';return;}
@@ -1397,7 +1397,7 @@ const FeeSegment={
     }catch(e){
       const msg=String(e.message||e);
       box.innerHTML='<div class="notice notice-error">'+(/could not find the function|does not exist|schema cache/i.test(msg)
-        ? 'Run <code>database/v12.60-expert-fix-pack.sql</code> in Supabase to enable fee segmentation.'
+        ? 'Run <code>database/complete-schema.sql</code> in Supabase to enable fee segmentation.'
         : this.esc(msg))+'</div>';
     }
   },
@@ -1466,7 +1466,7 @@ const FeeDoctor={
     const r=await sb.rpc('sc_fee_ledger_doctor',{p_heal:wantFix});
     if(r.error||!r.data||r.data.ok===false){
       const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Scan failed';
-      box.innerHTML='<p style="color:#b91c1c">'+(/sc_fee_ledger_doctor|schema cache|function/i.test(String(msg))?'The Fee Doctor needs a one-time database update — run database/v10.9b-fee-doctor.sql (or the latest complete-schema.sql) in Supabase.':this.esc(msg))+'</p>';
+      box.innerHTML='<p style="color:#b91c1c">'+(/sc_fee_ledger_doctor|schema cache|function/i.test(String(msg))?'The Fee Doctor needs a one-time database update — run database/complete-schema.sql (or the latest complete-schema.sql) in Supabase.':this.esc(msg))+'</p>';
       return;
     }
     const d=r.data, issues=d.issues||[];

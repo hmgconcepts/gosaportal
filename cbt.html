@@ -932,7 +932,7 @@ window.CBTUI = {
         if(!payload || !payload.exam_id){ toast('This file is not a School Connect exam backup.','danger'); return; }
         if(!sb){ toast('Database not configured.','warning'); return; }
         var res; try{ res=await sb.rpc('cbt_import_backup',{p_payload:payload}); }catch(e){ res={error:e}; }
-        if(res.error || !res.data || !res.data.saved){ toast('Import failed: '+((res.data&&res.data.error)||(res.error&&res.error.message)||'run database/update-v8-schema.sql first'),'danger',8000); return; }
+        if(res.error || !res.data || !res.data.saved){ toast('Import failed: '+((res.data&&res.data.error)||(res.error&&res.error.message)||'run database/complete-schema.sql first'),'danger',8000); return; }
         toast('✅ Backup imported — '+(payload.student_name||'candidate')+' result saved to '+(res.data.title||'exam')+'.','success',7000);
       };
       r.readAsText(f);
@@ -1262,7 +1262,7 @@ window.CBTUI = {
       if(error) throw error;
       sum=data;
     }catch(e){
-      openModal('Flagged questions', '<div class="notice notice-error"><b>Flag review is not installed in this database yet.</b><p>Run <code>database/v12.60-expert-fix-pack.sql</code> in the Supabase SQL editor, then reload.</p><small>'+esc(e.message||e)+'</small></div>','<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+      openModal('Flagged questions', '<div class="notice notice-error"><b>Flag review is not installed in this database yet.</b><p>Run <code>database/complete-schema.sql</code> in the Supabase SQL editor, then reload.</p><small>'+esc(e.message||e)+'</small></div>','<button class="btn btn-outline" onclick="closeModal()">Close</button>');
       return;
     }
     if(!sum||sum.ok===false){ openModal('Flagged questions','<div class="notice notice-error">'+esc((sum&&sum.error)||'Could not load flags.')+'</div>','<button class="btn btn-outline" onclick="closeModal()">Close</button>'); return; }
@@ -1343,7 +1343,7 @@ window.CBTUI = {
     const r = await sb.rpc('cbt_allow_retake', {p_exam_id: examId, p_student_ref: studentRef, p_reason: reason||''});
     if(r.error || !r.data || r.data.ok === false){
       const msg = (r.data&&r.data.error) || (r.error&&r.error.message) || 'Allow retake failed';
-      if(/cbt_allow_retake|schema cache|function/i.test(String(msg))) toast('Retake engine not installed — admin must run database/v12.31-cbt-retake-robust.sql once.','warning',10000);
+      if(/cbt_allow_retake|schema cache|function/i.test(String(msg))) toast('Retake engine not installed — admin must run database/complete-schema.sql once.','warning',10000);
       else toast(msg,'danger',8000);
       return;
     }
@@ -1562,7 +1562,7 @@ window.CBTUI = {
     const r=await sb.rpc('cbt_review_result',{p_result_id:resultId,p_awards:awards});
     if(r.error||!r.data||r.data.ok===false){
       const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Review failed';
-      if(/cbt_review_result|schema cache|function/i.test(String(msg)))toast('The review engine is not installed in this database yet — an administrator must run database/v10.6-cbt-review-community.sql once.','warning',12000);
+      if(/cbt_review_result|schema cache|function/i.test(String(msg)))toast('The review engine is not installed in this database yet — an administrator must run database/complete-schema.sql once.','warning',12000);
       else toast(msg,'danger',9000);
       return;
     }
@@ -1683,7 +1683,7 @@ document.addEventListener('DOMContentLoaded', CBTUI.refresh); CBTUI.refresh();
     if(!sb){toast('Database not configured.','warning');return;}
     if(!confirm('Recalculate every saved result for this exam from its retained answers_data using V5.1? Rows without answers or with missing bank keys are left unchanged and reported.'))return;
     const {data,error}=await sb.rpc('cbt_regrade_exam_results_v5',{p_exam_id:id});
-    if(error){toast('Regrade function unavailable. Run database/cbt-v5.1-zero-score-hotfix.sql. '+error.message,'danger',12000);return;}
+    if(error){toast('Regrade function unavailable. Run database/complete-schema.sql. '+error.message,'danger',12000);return;}
     if(!data||data.ok===false){toast('Regrade failed: '+((data&&data.message)||'Unknown error'),'danger',10000);return;}
     toast('✅ Regraded '+Number(data.regraded_count||0)+' result(s). Unchanged: '+Number(data.skipped_no_answer_rows||0)+' without saved answers, '+Number(data.skipped_missing_key_rows||0)+' with missing keys.','success',12000);
     this.results(id,'');

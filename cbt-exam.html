@@ -654,7 +654,7 @@ textarea.form-input{min-height:80px;resize:vertical}
 
     if (error || !data) {
       const missingRpc=error&&/cbt_get_public_exam_v6|schema cache|function/i.test(String(error.message||error));
-      const msg=missingRpc?'The registered/open V5.5 exam reader is not installed in Supabase. The administrator must run database/cbt-v5.1-zero-score-hotfix.sql.':('Could not contact the exam service. '+esc(error&&error.message||''));
+      const msg=missingRpc?'The registered/open V5.5 exam reader is not installed in Supabase. The administrator must run database/complete-schema.sql.':('Could not contact the exam service. '+esc(error&&error.message||''));
       this.root().innerHTML = '<div class="card"><div class="notice notice-error"><h2 style="margin-top:0">❌ Exam service unavailable</h2><p>'+msg+'</p><p><b>Code entered:</b> '+esc(code)+'</p></div>' + this.codeEntryHTML(code) + '</div>';
       return;
     }

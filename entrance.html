@@ -629,7 +629,7 @@ const EN={ rows:[], exam:null,
         if(!sb){ toast('Database not configured.','warning'); return; }
         var res; try{ res=await sb.rpc('cbt_import_backup',{p_payload:payload}); }catch(e){ res={error:e}; }
         if(res.error || !res.data || !res.data.saved){
-          toast('Import failed: '+((res.data&&res.data.error)||(res.error&&res.error.message)||'run database/update-v8-schema.sql first'),'danger',8000); return;
+          toast('Import failed: '+((res.data&&res.data.error)||(res.error&&res.error.message)||'run database/complete-schema.sql first'),'danger',8000); return;
         }
         toast('✅ Backup imported for '+(payload.student_name||'candidate')+' — result saved.','success',7000);
         if(EN.exam) EN.loadResults();

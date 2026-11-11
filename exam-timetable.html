@@ -571,7 +571,7 @@ const EXT={
     let q=sb.from('exam_timetable').select('*').order('exam_date').order('start_time').limit(2000);
     if(c.cls)q=q.eq('class',c.cls);if(c.term)q=q.eq('term',c.term);if(c.session)q=q.eq('session',c.session);
     const {data,error}=await q;const box=document.getElementById('ex-view');
-    if(error){box.innerHTML='<div class="card">'+(/does not exist|schema cache/i.test(error.message)?'Database update needed: run <code>database/v9.1-enterprise-pack.sql</code> (or complete-schema.sql) once in the Supabase SQL Editor.':esc(error.message))+'</div>';return;}
+    if(error){box.innerHTML='<div class="card">'+(/does not exist|schema cache/i.test(error.message)?'Database update needed: run <code>database/complete-schema.sql</code> (or complete-schema.sql) once in the Supabase SQL Editor.':esc(error.message))+'</div>';return;}
     const rows=data||[];this.rows=rows;
     /* clash detection: same class, same date, overlapping time */
     const clashes=[];for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++){const a=rows[i],b=rows[j];

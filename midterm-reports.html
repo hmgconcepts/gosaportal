@@ -365,7 +365,7 @@ const MR = {
     }catch(e){
       const msg=String(e.message||e);
       if(/could not find the function|does not exist|schema cache/i.test(msg)){
-        toast('Run database/v12.60-expert-fix-pack.sql in Supabase to enable one-click publish.','danger',12000);
+        toast('Run database/complete-schema.sql in Supabase to enable one-click publish.','danger',12000);
       } else { toast('Bulk '+verb+' failed: '+msg,'danger',10000); }
     }finally{ if(btn){ btn.disabled=false; btn.innerHTML=restore; } }
   },

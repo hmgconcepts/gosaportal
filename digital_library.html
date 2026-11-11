@@ -657,8 +657,8 @@ const DL={ qs:[],
       max_score:Number(document.getElementById('dl-max').value||0), cbt_code:cbt,
       attempts_allowed:Number((document.getElementById('dl-attempts')||{}).value??1) };
     var {error}=await sb.from('digital_library').insert(rec);
-    if(error&&/attempts_allowed/.test(error.message||'')){delete rec.attempts_allowed;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Attempt-limit column missing on this database — run database/v8.7-payroll-rebuild.sql to enforce limits.','warning',9000);}
-    if(error&&/cbt_code/.test(error.message||'')){delete rec.cbt_code;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Linked-CBT column missing on this database — run database/v10.5-dl-cbt-link.sql to store CBT links with readings.','warning',10000);}
+    if(error&&/attempts_allowed/.test(error.message||'')){delete rec.attempts_allowed;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Attempt-limit column missing on this database — run database/complete-schema.sql to enforce limits.','warning',9000);}
+    if(error&&/cbt_code/.test(error.message||'')){delete rec.cbt_code;({error}=await sb.from('digital_library').insert(rec));if(!error)toast('Linked-CBT column missing on this database — run database/complete-schema.sql to store CBT links with readings.','warning',10000);}
     if(error){toast(error.message,'danger',6000);return;} toast('Reading saved ✓'+(cbt&&rec.cbt_code?' · linked CBT '+cbt:''),'success'); this.qs=[]; this.render(); var de=document.getElementById('dl-cbt'); if(de)de.value=''; this.list();
   },
   _books:[],
@@ -771,7 +771,7 @@ const DL={ qs:[],
     /* V10.5: verify a non-empty linked code before saving. */
     if (patch.cbt_code) { const chk = await this.cbtVerify(patch.cbt_code); if (!chk.ok) { toast('⚠️ ' + chk.msg, 'warning', 10000); return; } }
     let { error } = await window.sb.from('digital_library').update(patch).eq('id', b.id);
-    if (error && /cbt_code/.test(error.message||'')) { delete patch.cbt_code; ({ error } = await window.sb.from('digital_library').update(patch).eq('id', b.id)); if (!error) toast('Linked-CBT column missing — run database/v10.5-dl-cbt-link.sql to store CBT links with readings.', 'warning', 10000); }
+    if (error && /cbt_code/.test(error.message||'')) { delete patch.cbt_code; ({ error } = await window.sb.from('digital_library').update(patch).eq('id', b.id)); if (!error) toast('Linked-CBT column missing — run database/complete-schema.sql to store CBT links with readings.', 'warning', 10000); }
     if (error) { toast(error.message, 'danger', 6000); return; }
     if (window.App) App.logActivity('update', 'digital_library', b.id);
     closeModal();
@@ -847,7 +847,7 @@ const DL={ qs:[],
        🧪 Take CBT button appears for students the moment it is opened. */
     var newCode=(res.data&&res.data.code)||code;
     try{ var lr=await sb.from('digital_library').update({cbt_code:newCode}).eq('id',b.id);
-      if(lr.error&&/cbt_code/.test(lr.error.message||''))toast('Reading↔CBT auto-link needs database/v10.5-dl-cbt-link.sql — the exam was still created (code '+newCode+'); paste it into the reading\'s "Linked CBT" box after the update.','warning',12000);
+      if(lr.error&&/cbt_code/.test(lr.error.message||''))toast('Reading↔CBT auto-link needs database/complete-schema.sql — the exam was still created (code '+newCode+'); paste it into the reading\'s "Linked CBT" box after the update.','warning',12000);
       else b.cbt_code=newCode;
     }catch(_){}
     toast('✅ CBT exam created from "'+(b.title||'reading')+'" — code '+newCode+' — and linked to this reading (🧪 Take CBT button). It is CLOSED until you open it in the CBT Manager (review questions, set schedule, then Open).','success',12000);
