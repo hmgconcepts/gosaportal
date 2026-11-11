@@ -1,16 +1,17 @@
 {
  "_meta": {
-  "built_bytes": 956199,
-  "built_from_bytes": 1264465,
+  "built_bytes": 976057,
+  "built_from_bytes": 1345636,
   "removed": {
-   "banner-rule": 389,
-   "duplicate-grant": 7,
+   "banner-rule": 416,
+   "banner-trimmed": 36,
+   "duplicate-grant": 12,
    "notify-moved-last": 1,
    "progress-select": 159,
    "redundant-add-column": 147,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
-   "superseded-function": 16,
+   "superseded-function": 20,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
@@ -162,6 +163,7 @@
   "column public.fee_payments.total_overridden",
   "column public.health.student_id",
   "column public.health.student_name",
+  "column public.idcards.full_name",
   "column public.idcards.person_id",
   "column public.idcards.person_type",
   "column public.inventory.asset_tag",
@@ -739,6 +741,9 @@
   "sc_cbt_question_type": [
    "p_question jsonb"
   ],
+  "sc_cbt_report_column_changed": [
+   ""
+  ],
   "sc_cbt_require_proctor_before_result": [
    ""
   ],
@@ -800,8 +805,14 @@
   "sc_fee_account": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
+  "sc_fee_account_for": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
   "sc_fee_allocate": [
    "p_student uuid, p_amount numeric, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_backfill_invoices": [
+   "p_term text default null, p_session text default null, p_dry_run boolean default true"
   ],
   "sc_fee_bill_audit": [
    "p_class text default null"
@@ -810,6 +821,9 @@
    "p_student uuid, p_term text default null, p_session text default null"
   ],
   "sc_fee_bill_v2": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_bill_v2_structure": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
   "sc_fee_doctor_v2": [
@@ -833,8 +847,14 @@
   "sc_fee_ledger_for": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
+  "sc_fee_opening_line": [
+   "p_student uuid"
+  ],
   "sc_fee_opening_to_invoice": [
    "p_dry_run boolean default true"
+  ],
+  "sc_fee_opening_touch": [
+   ""
   ],
   "sc_fee_overview": [
    "p_class text default null, p_term text default null, p_session text default null"
@@ -843,6 +863,9 @@
    "p_class text default null, p_term text default null, p_session text default null"
   ],
   "sc_fee_prior_terms": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_prove": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
   "sc_fee_receipt_bill": [
@@ -859,6 +882,9 @@
   ],
   "sc_fee_rows_autoheal": [
    ""
+  ],
+  "sc_fee_selfcheck": [
+   "p_class text default null"
   ],
   "sc_fee_structure_doctor": [
    ""
@@ -1011,6 +1037,9 @@
   "sc_report_hold_position": [
    "p_student_id_ref text, p_class text, p_term text, p_session text, p_kind text default 'terminal', p_reason text default '', p_hold boolean default true"
   ],
+  "sc_report_mark_audit": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
   "sc_report_min_participation": [
    ""
   ],
@@ -1019,6 +1048,9 @@
   ],
   "sc_report_policy_save": [
    "p_kind text, p_term text, p_session text, p_show_position boolean default true, p_show_grade boolean default true, p_show_subject_position boolean default true, p_show_remarks boolean default true, p_position_label text default 'Position in class', p_notes text default ''"
+  ],
+  "sc_report_recolumn": [
+   "p_exam_id uuid, p_new_column text, p_dry_run boolean default false"
   ],
   "sc_report_remap_cbt": [
    "p_exam_id uuid, p_column text default null, p_result_id uuid default null, p_dry_run boolean default false"
@@ -1083,8 +1115,14 @@
   "sc_term_current": [
    ""
   ],
+  "sc_term_ordinal": [
+   "p_term text, p_session text"
+  ],
   "sc_term_resolve": [
    "p_term text default null, p_session text default null"
+  ],
+  "sc_term_rollover": [
+   "p_new_term text, p_new_session text, p_dry_run boolean default true"
   ],
   "sc_term_undated": [
    ""
@@ -1162,6 +1200,7 @@
   "public.idx_promotions_hist",
   "public.idx_reading_scores_ctx",
   "public.idx_report_scores_hist",
+  "public.idx_report_scores_over_max",
   "public.idx_results_hist",
   "public.ix_exam_tt_class",
   "public.messages_created_idx",
@@ -1181,6 +1220,7 @@
   "public.punctuality_awards_student_idx",
   "public.report_comment_bands_context_idx",
   "public.report_scores_lookup_idx_v7",
+  "public.report_scores_push_join_idx_v12_70",
   "public.results_assessment_uidx",
   "public.role_status_log_person_idx_v7",
   "public.role_status_log_school_idx",
@@ -1653,6 +1693,7 @@
   "trigger trg_cbt_assignment_mirror",
   "trigger trg_cbt_duration_sync",
   "trigger trg_cbt_proctor_required_before_result",
+  "trigger trg_cbt_report_column_moves_scores",
   "trigger trg_cbt_score_snapshot_sync",
   "trigger trg_community_audience",
   "trigger trg_compute_class_fee_total",
@@ -1668,6 +1709,7 @@
   "trigger trg_payroll_posts_loan",
   "trigger trg_profiles_auto_link",
   "trigger trg_profiles_photo_sync",
+  "trigger trg_sc_fee_opening_touch",
   "trigger trg_sc_generate_admission_no",
   "trigger trg_sc_generate_staff_no",
   "trigger trg_staff_photo_sync",
