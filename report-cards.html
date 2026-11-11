@@ -1186,7 +1186,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       try { rpcRes = await window.sb.rpc('sc_save_report_score', { p_rows: row }); } catch(_) { rpcRes = { error: { message: 'rpc unavailable' } }; }
       if (rpcRes.error && /could not find|does not exist|schema cache|rpc unavailable/i.test(String(rpcRes.error.message||''))) {
         const { error } = await window.sb.from('report_scores').upsert(row, { onConflict: 'column_id,student_id_ref,student_name,class,subject,term,session' });
-        if (error) { const em=String(error.message||error); toast(em.includes('row-level security') ? 'Score not saved: this database needs one update. Admin: run the latest database/complete-schema.sql (or database/v6.9-report-score-save.sql) once in the Supabase SQL Editor, then saving works for every teacher.' : ('Score not saved: ' + em), 'danger', 10000); return; }
+        if (error) { const em=String(error.message||error); toast(em.includes('row-level security') ? 'Score not saved: this database needs one update. Admin: run the latest database/complete-schema.sql (or database/complete-schema.sql) once in the Supabase SQL Editor, then saving works for every teacher.' : ('Score not saved: ' + em), 'danger', 10000); return; }
       } else if (rpcRes.error) { toast('Score not saved: ' + rpcRes.error.message, 'danger', 9000); return; }
       else {
         const d = rpcRes.data || {};
@@ -1255,7 +1255,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
             else { await this.syncScoreToResults(e.el, e.v); ok++; }
           }
           if (fail && lastError && String(lastError.message||'').includes('row-level security')) {
-            lastError = { message: 'This database needs one update — Admin: run the latest database/complete-schema.sql (or database/v6.9-report-score-save.sql) once in the Supabase SQL Editor, then saving works for every teacher.' };
+            lastError = { message: 'This database needs one update — Admin: run the latest database/complete-schema.sql (or database/complete-schema.sql) once in the Supabase SQL Editor, then saving works for every teacher.' };
           }
         }
       } else {
@@ -1409,7 +1409,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       const cls=this.ctx.class||($('rc-class')||{}).value||'', term=this.ctx.term||($('rc-term')||{}).value||'', ses=this.ctx.session||($('rc-session')||{}).value||'';
       if(!confirm('Sweep ghost report sheets'+(cls?' for '+cls:'')+(term?' — '+term:'')+(ses?' ('+ses+')':'')+'?\n\nRemoves:\n• leftover sheets from report columns you deleted/re-created\n• score rows of students who were deleted\n\nLive scores backed by existing columns and students are NEVER touched.'))return;
       const r=await window.sb.rpc('sc_sweep_report_ghosts',{p_class:cls,p_term:term,p_session:ses});
-      if(r.error){toast(/could not find|does not exist|schema cache/i.test(String(r.error.message||''))?'This database needs one update — run the latest database/complete-schema.sql (or database/v7.0-clean-data-lifecycle.sql) once in the Supabase SQL Editor.':('Sweep failed: '+r.error.message),'danger',9000);return;}
+      if(r.error){toast(/could not find|does not exist|schema cache/i.test(String(r.error.message||''))?'This database needs one update — run the latest database/complete-schema.sql (or database/complete-schema.sql) once in the Supabase SQL Editor.':('Sweep failed: '+r.error.message),'danger',9000);return;}
       const d=r.data||{};
       toast('🧹 Ghost sweep complete: '+(d.mirrored_removed||0)+' leftover sheet row(s), '+(d.orphan_scores_removed||0)+' orphan score(s), '+(d.ghost_results_removed||0)+' ghost result(s) removed. Regenerate the report cards now — only current data prints.','success',10000);
       if(window.App&&App.logActivity)App.logActivity('sweep-ghosts','report_scores',cls+'|'+term+'|'+ses);

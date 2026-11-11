@@ -578,7 +578,7 @@ var Punct = {
   },
   setupNeeded() {
     const z = this.el('punct-setup'); z.style.display = 'block';
-    z.innerHTML = '<h3>🛠 One-time database step needed</h3><p>The Punctuality Points engine needs its tables + functions. Run <b>database/punctuality-points.sql</b> (or simply re-run the full <b>database/complete-schema.sql</b> — it is idempotent) in your Supabase SQL Editor, then reload this page. New builds (schema v12.4+) already include it.</p>';
+    z.innerHTML = '<h3>🛠 One-time database step needed</h3><p>The Punctuality Points engine needs its tables + functions. Run <b>database/complete-schema.sql</b> (or simply re-run the full <b>database/complete-schema.sql</b> — it is idempotent) in your Supabase SQL Editor, then reload this page. New builds (schema v12.4+) already include it.</p>';
   },
   pickDefaults() {
     const today = new Date().toISOString().slice(0, 10);
@@ -739,7 +739,7 @@ var Punct = {
     const r = await sb.rpc('sc_push_punctuality_to_report', p);
     if (r.error) {
       const em = String(r.error.message || '');
-      if (/could not find|does not exist|schema cache/i.test(em)) { toast('Push failed: your database is missing the V6.4 update. Admin: run database/v6.4-hard-scope-fixes.sql once in the Supabase SQL Editor, then push again.', 'danger', 10000); return; }
+      if (/could not find|does not exist|schema cache/i.test(em)) { toast('Push failed: your database is missing the V6.4 update. Admin: run database/complete-schema.sql once in the Supabase SQL Editor, then push again.', 'danger', 10000); return; }
       toast('Push failed: ' + em, 'danger', 8000); return;
     }
     toast('✅ Punctuality points pushed for ' + (r.data || 0) + ' student(s) into the report-card column "' + colLabel + '" (subject line: PUNCTUALITY). Open Report Cards to see them.', 'success', 9000);
@@ -752,7 +752,7 @@ var Punct = {
     if (!r.data || !r.data.length) { toast('No awards in that scope.', 'info'); return 0; }
     const sums = {}; r.data.forEach(function (x) { const b = sums[x.student_id] || (sums[x.student_id] = { name: x.student_name, ref: x.student_id_ref, cls: x.class, pts: 0 }); b.pts += Number(x.points || 0); });
     const col = (p.p_column || '').toLowerCase();
-    if (['ca1', 'ca2', 'ca3', 'exam'].indexOf(col) < 0) { toast('Fallback push supports ca1/ca2/ca3/exam only — run database/punctuality-points.sql for custom columns.', 'warning', 7000); return false; }
+    if (['ca1', 'ca2', 'ca3', 'exam'].indexOf(col) < 0) { toast('Fallback push supports ca1/ca2/ca3/exam only — run database/complete-schema.sql for custom columns.', 'warning', 7000); return false; }
     let ok = 0;
     for (const id of Object.keys(sums)) {
       const b = sums[id], ref = await this._uuid('punctuality|' + id + '|' + p.p_term + '|' + p.p_session + '|' + col + '|' + (p.p_class || b.cls || ''));

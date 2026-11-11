@@ -900,7 +900,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
       +(mismatch.length?'<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;padding:6px 10px;font-size:.83rem;margin-top:4px"><b style="color:#b91c1c">⛔ Not mapped to this subject:</b> '+mismatch.map(esc).join(', ')+' — the Subjects page says these classes do NOT take it. Untick them, or update the subject\'s class list on the Subjects page if the mapping is outdated.</div>':'');},
   dayToggled(cb){const host=document.getElementById('tt-day-periods');if(!host)return;const id='ttdp-'+cb.value;if(cb.checked){if(!document.getElementById(id)){const w=document.createElement('div');w.id=id;w.style.cssText='margin:4px 0';w.innerHTML='<label style="display:inline-flex;gap:8px;align-items:center">'+cb.value+' periods: <input class="form-input tt-dp" data-day="'+cb.value+'" placeholder="e.g. 1,2,3 (blank = any)" style="width:220px"></label>';host.appendChild(w);}}else{const w=document.getElementById(id);if(w)w.remove();}},
   collectDayPeriods(){const out={};let any=false;[...document.querySelectorAll('.tt-dp')].forEach(inp=>{const day=inp.dataset.day,v=String(inp.value||'').trim();if(!v)return;const arr=v.split(/[\s,;]+/).map(x=>parseInt(x,10)).filter(x=>x>=1&&x<=12);if(arr.length){out[day]=arr;any=true;}});return any?out:null;},
-  async addBlock(){const cls=this.val('tb-class')||'ALL',day=this.val('tb-day'),per=Number(this.val('tb-period'))||0,label=this.val('tb-label')||'Free period';if(!day||per<1){toast('Pick a day and period number.','warning');return;}const r=await sb.from('timetable_blocks').upsert({class:cls,day:day,period:per,label:label},{onConflict:'class,day,period'});if(r.error){toast(/timetable_blocks/.test(r.error.message)?'Run the latest complete-schema.sql (or database/v7.9-timetable-flex-and-class-scope.sql) first to enable reserved slots.':r.error.message,'danger',9000);return;}toast('⛔ Reserved: '+cls+' · '+day+' · period '+per+' — '+label,'success');this.listBlocks();},
+  async addBlock(){const cls=this.val('tb-class')||'ALL',day=this.val('tb-day'),per=Number(this.val('tb-period'))||0,label=this.val('tb-label')||'Free period';if(!day||per<1){toast('Pick a day and period number.','warning');return;}const r=await sb.from('timetable_blocks').upsert({class:cls,day:day,period:per,label:label},{onConflict:'class,day,period'});if(r.error){toast(/timetable_blocks/.test(r.error.message)?'Run the latest complete-schema.sql (or database/complete-schema.sql) first to enable reserved slots.':r.error.message,'danger',9000);return;}toast('⛔ Reserved: '+cls+' · '+day+' · period '+per+' — '+label,'success');this.listBlocks();},
   async listBlocks(){const host=document.getElementById('tb-list');if(!host)return;try{const cur=this.val('tt-class');const r=await sb.from('timetable_blocks').select('*').order('day').order('period');if(r.error)throw r.error;const rows=(r.data||[]).filter(b=>b.class==='ALL'||!cur||b.class===cur);host.innerHTML=rows.length?'<div class="table-wrap"><table><thead><tr><th>Class</th><th>Day</th><th>Period</th><th>Label</th><th></th></tr></thead><tbody>'+rows.map(b=>'<tr><td>'+esc(b.class)+'</td><td>'+esc(b.day)+'</td><td>'+b.period+'</td><td>'+esc(b.label||'')+'</td><td><button class="btn btn-sm btn-outline" onclick="TTG.removeBlock(\''+b.id+'\')">Remove</button></td></tr>').join('')+'</tbody></table></div>':'<p style="color:var(--gray-500);font-size:.85rem">No reserved slots yet.</p>';}catch(e){host.innerHTML='<p style="color:var(--gray-500);font-size:.85rem">Reserved slots need the v7.9 SQL update.</p>';}},
   async removeBlock(id){const r=await sb.from('timetable_blocks').delete().eq('id',id);if(r.error){toast(r.error.message,'danger');return;}this.listBlocks();},
   collectDayCounts(){const out={};let any=false;[...document.querySelectorAll('.pc-day-count')].forEach(inp=>{const v=String(inp.value||'').trim();if(v==='')return;const n=parseInt(v,10);if(n>=0&&n<=12){out[inp.dataset.day]=n;any=true;}});return any?out:null;},
@@ -1058,7 +1058,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     const r=await sb.rpc('sc_timetable_capacity',{p_classes:classes,p_periods_per_day:Number(c.ppd)||6,p_day_periods:dayCounts});
     if(r.error||!r.data||r.data.ok===false){
       const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Analyzer failed';
-      if(/sc_timetable_capacity|schema cache|function/i.test(String(msg)))toast('The Overload Analyzer needs a one-time database update — run database/v11.0-timetable-pro.sql in Supabase.','warning',12000);
+      if(/sc_timetable_capacity|schema cache|function/i.test(String(msg)))toast('The Overload Analyzer needs a one-time database update — run database/complete-schema.sql in Supabase.','warning',12000);
       else toast(msg,'danger',9000);
       return;
     }
@@ -1097,7 +1097,7 @@ const TTG={reqs:[],lookups:{classes:[],subjects:[],teachers:[],terms:[],sessions
     }
     if(engineStale)openModal('⚠️ Database engine is OUTDATED',
       '<p>The timetable was generated by an <b>older database engine</b> — that is exactly why double periods can be missing and why stale subjects can slip in.</p>'+
-      '<p><b>Fix (one time, 2 minutes):</b> run <code>database/v11.0-timetable-pro.sql</code> (or the full <code>complete-schema.sql</code>) in the Supabase SQL Editor, then click Generate again.</p>'+
+      '<p><b>Fix (one time, 2 minutes):</b> run <code>database/complete-schema.sql</code> in the Supabase SQL Editor, then click Generate again.</p>'+
       '<p style="font-size:.85rem;color:var(--gray-600)">The V11 engine places restricted-period subjects FIRST (fair across classes), then doubles, then singles — and finishes with a repair-swap pass that fills the dead-end slots older engines left empty.</p>',
       '<button class="btn btn-primary" onclick="closeModal()">OK — I will run the SQL</button>');
     /* V9.5 (BUG D): post-generation RECONCILIATION — verify the grid matches
@@ -1234,7 +1234,7 @@ const TTE={
   }catch(_){}},
   async list(){const box=document.getElementById('tte-list');if(!box)return;
     const r=await sb.from('sc_module_editors').select('*').eq('module','timetable').order('granted_at');
-    if(r.error){box.innerHTML='<p style="font-size:.8rem;color:#b45309">'+(/does not exist|schema cache/i.test(r.error.message)?'Run database/v9.2-access-and-fixes.sql to activate editor control. Until then, database rules still apply from your previous update.':esc(r.error.message))+'</p>';return;}
+    if(r.error){box.innerHTML='<p style="font-size:.8rem;color:#b45309">'+(/does not exist|schema cache/i.test(r.error.message)?'Run database/complete-schema.sql to activate editor control. Until then, database rules still apply from your previous update.':esc(r.error.message))+'</p>';return;}
     const rows=r.data||[];
     if(!rows.length){box.innerHTML='<p style="font-size:.82rem;color:var(--gray-500)">No extra editors — only the admin tier can modify timetables right now.</p>';return;}
     const ids=rows.map(x=>x.user_id);
@@ -1243,7 +1243,7 @@ const TTE={
     box.innerHTML='<div class="table-wrap"><table><thead><tr><th>Authorized editor</th><th>Since</th><th></th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(names.get(x.user_id)||x.user_id)+'</b></td><td>'+esc(new Date(x.granted_at).toLocaleDateString())+'</td><td><button class="btn btn-sm btn-outline" onclick="TTE.revoke(\''+x.id+'\')">🚫 Revoke</button></td></tr>').join('')+'</tbody></table></div>';},
   async grant(){const uid=document.getElementById('tte-user').value;if(!uid){toast('Choose a staff member.','warning');return;}
     const r=await sb.from('sc_module_editors').upsert({module:'timetable',user_id:uid,granted_by:(window.SC_PROFILE&&SC_PROFILE.id)||null},{onConflict:'module,user_id'});
-    if(r.error){toast(/does not exist|schema cache/i.test(r.error.message)?'Run database/v9.2-access-and-fixes.sql first.':r.error.message,'danger',8000);return;}
+    if(r.error){toast(/does not exist|schema cache/i.test(r.error.message)?'Run database/complete-schema.sql first.':r.error.message,'danger',8000);return;}
     toast('✅ Edit access granted for timetables (published + wizard + exam).','success');await this.list();},
   async revoke(id){if(!confirm('Revoke this editor\'s timetable access?'))return;
     const r=await sb.from('sc_module_editors').delete().eq('id',id);

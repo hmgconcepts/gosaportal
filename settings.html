@@ -640,7 +640,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <!-- V9.9 (#7): per-module leadership access + authorized editors -->
       <div class="card" style="margin-top:16px" id="acl-card" data-owner-only>
         <h3 style="margin-top:0">🔐 Module Access Control — leadership & authorized editors</h3>
-        <p style="color:var(--gray-600);font-size:.87rem;line-height:1.6">For each protected module below, the owner tier (Super Admin / Admin / Proprietor) decides whether <b>Principal, Head Teacher and Bursar</b> get <b>Full read/write</b> (default) or <b>Read-only</b>. Individual staff can additionally be granted edit rights per module (same mechanism as the timetable's Authorized Editors). Enforced in the DATABASE (RLS + sc_can_edit) and mirrored in the UI. Needs <code>database/v9.9-aid-editors-subjects.sql</code>.</p>
+        <p style="color:var(--gray-600);font-size:.87rem;line-height:1.6">For each protected module below, the owner tier (Super Admin / Admin / Proprietor) decides whether <b>Principal, Head Teacher and Bursar</b> get <b>Full read/write</b> (default) or <b>Read-only</b>. Individual staff can additionally be granted edit rights per module (same mechanism as the timetable's Authorized Editors). Enforced in the DATABASE (RLS + sc_can_edit) and mirrored in the UI. Needs <code>database/complete-schema.sql</code>.</p>
         <div id="acl-grid"><span class="pulse">Loading module access…</span></div>
       </div>
       <!-- V9.1: OPTIONAL AI assistant — bring-your-own-key, OFF by default -->
@@ -672,7 +672,7 @@ var ACL={
       var role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
       if(!(window.App&&App.isOwnerRole&&App.isOwnerRole(role))){var c=document.getElementById('acl-card');if(c)c.style.display='none';return;}
       var acc=await sb.from('sc_module_access').select('*');
-      if(acc.error){box.innerHTML='<p style="color:#b45309;font-size:.85rem">Run <code>database/v9.9-aid-editors-subjects.sql</code> once in the Supabase SQL Editor to activate this panel.</p>';return;}
+      if(acc.error){box.innerHTML='<p style="color:#b45309;font-size:.85rem">Run <code>database/complete-schema.sql</code> once in the Supabase SQL Editor to activate this panel.</p>';return;}
       var map={};(acc.data||[]).forEach(function(x){map[x.module]=x.leadership;});
       var eds=await sb.from('sc_module_editors').select('*');
       var edsByMod={};(eds.data||[]).forEach(function(x){(edsByMod[x.module]=edsByMod[x.module]||[]).push(x);});
@@ -726,7 +726,7 @@ var AISET={
     var row={id:1,enabled:document.getElementById('ai-enabled').value==='true',model:(document.getElementById('ai-model').value||'').trim(),base_url:(document.getElementById('ai-base').value||'').trim(),api_key:(document.getElementById('ai-key').value||'').trim(),updated_at:new Date().toISOString()};
     if(row.enabled&&(!row.base_url||!row.api_key)){m.textContent='Base URL and API key are required to enable.';return;}
     var r=await sb.from('sc_ai_settings').upsert(row,{onConflict:'id'});
-    if(r.error){m.textContent=/does not exist|schema cache/i.test(r.error.message)?'Run database/v9.1-enterprise-pack.sql first.':('Error: '+r.error.message);return;}
+    if(r.error){m.textContent=/does not exist|schema cache/i.test(r.error.message)?'Run database/complete-schema.sql first.':('Error: '+r.error.message);return;}
     m.textContent='Saved ✔'+(row.enabled?' — staff now see ✨ AI buttons after their next page load.':' — AI assistant disabled.');
     if(window.AI)AI.reload();},
   async test(){var m=document.getElementById('ai-msg');m.textContent='Testing…';
@@ -815,7 +815,7 @@ const ST={
     if(blob.size>190000){toast('Signature image too large — click Clear and draw again with fewer strokes.','warning');return;}
     const path='signatures/principal-'+Date.now()+'.png';
     const up=await sb.storage.from('branding').upload(path,blob,{contentType:'image/png',upsert:false});
-    if(up.error){toast('Upload failed: '+up.error.message+' — if the bucket is missing, run database/branding-bucket.sql once in the Supabase SQL Editor (creates the public branding bucket).','danger',10000);return;}
+    if(up.error){toast('Upload failed: '+up.error.message+' — if the bucket is missing, run database/complete-schema.sql once in the Supabase SQL Editor (creates the public branding bucket).','danger',10000);return;}
     const pub=sb.storage.from('branding').getPublicUrl(path);
     const url=(pub.data&&pub.data.publicUrl)||'';
     if(!url){toast('Uploaded, but could not read the public URL. Check the bucket is public.','warning');return;}

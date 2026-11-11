@@ -527,7 +527,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           <button class="btn btn-outline" onclick="VT.list()">📂 List vault archives</button>
         </div>
         <div id="vt-list" style="margin-top:12px"></div>
-        <p style="font-size:.82rem;color:var(--gray-500);margin:8px 0 0">One-time setup: run <code>database/storage-offload.sql</code> in the Supabase SQL Editor (creates the private <code>archives</code> bucket; already included in new installs of <code>complete-schema.sql</code>).</p>
+        <p style="font-size:.82rem;color:var(--gray-500);margin:8px 0 0">One-time setup: run <code>database/complete-schema.sql</code> in the Supabase SQL Editor (creates the private <code>archives</code> bucket; already included in new installs of <code>complete-schema.sql</code>).</p>
       </div>
       <div class="card" data-admin-only>
         <h3>🧹 Purge old rows (after archiving/exporting!)</h3>
