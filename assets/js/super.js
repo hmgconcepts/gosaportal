@@ -910,9 +910,36 @@ const Super = {
          • magnetic-stripe-style band + barcode for realism,
          • matches the chosen template's colours automatically.
        ================================================================ */
-    backHtml(person) {
+    /* V12.70 — ISSUE 1: THE BACK WAS ALWAYS PORTRAIT.
+       ------------------------------------------------------------------
+       The back face was emitted as a fixed 340px-wide stacked block, while the
+       front takes the width of whichever template is chosen (520px for
+       'premium', 420px for 'executive', …). Printed on a landscape card the
+       front filled the card and the back appeared as a narrow portrait column
+       floating in the middle — "the back is always portrait".
+       The back is now drawn to the SAME canvas as the front and re-lays itself
+       out for the shape it is given: wide cards get two columns, tall cards
+       stack. `opts` carries the finished size in millimetres (or the front's
+       pixel width), so front and back can never disagree again. */
+    backAspect(opts) {
+      const w = Number(opts && (opts.widthMm || opts.width)), h = Number(opts && (opts.heightMm || opts.height));
+      if (w > 0 && h > 0) return w > h ? 'landscape' : 'portrait';
+      /* no explicit size: fall back to the front template's own proportions */
+      const t = (opts && opts.template) || 'horizontal';
+      return (t === 'badge' || t === 'vertical') ? 'portrait' : 'landscape';
+    },
+    backHtml(person, opts) {
+      opts = opts || {};
       const s = Super.school || {};
       const isStaff = (person.type === 'staff');
+      const portrait = this.backAspect(opts) === 'portrait';
+      /* the back fills the same canvas the front was drawn on: prefer the
+         exact millimetres, then an explicit pixel width, and only then the
+         legacy 340px default. */
+      const mmW = Number(opts.widthMm), mmH = Number(opts.heightMm);
+      const boxW = (mmW > 0 ? Math.round(mmW * 96 / 25.4) : 0) || Number(opts.widthPx) || 340;
+      const boxH = (mmH > 0 ? Math.round(mmH * 96 / 25.4) : 0) || Number(opts.heightPx)
+                 || (portrait ? Math.round(boxW * 1.586) : Math.round(boxW / 1.586));
       const idNo = person.admission_no || person.staff_no || person.id || '';
       const pc = person.pc || s.primary || '#1e3a8a';
       const ac = person.ac || s.accent || '#0ea5e9';
@@ -934,38 +961,41 @@ const Super = {
         'Surrender this card to the school office on graduation or withdrawal.'
       ];
       const contact = [s.address ? Super.esc(s.address) : '', s.phone ? 'Tel: ' + Super.esc(s.phone) : '', s.email ? Super.esc(s.email) : ''].filter(Boolean).join('<br>');
-      return '<div class="sc-idcard sc-idcard-back" style="width:340px;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff;display:flex;flex-direction:column">' +
-        // magnetic-stripe band (classic card realism)
-        '<div style="height:34px;background:#1f2937;margin-top:14px"></div>' +
-        '<div style="padding:10px 14px 4px;display:flex;gap:12px;align-items:flex-start">' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="font-size:.6rem;font-weight:900;letter-spacing:1.6px;color:' + pc + ';margin-bottom:4px">CARD RULES · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>' +
-            '<ol style="margin:0;padding-left:14px;font-size:.56rem;line-height:1.55;color:#334155">' + rules.map(r => '<li>' + r + '</li>').join('') + '</ol>' +
-          '</div>' +
-          '<div style="flex-shrink:0;text-align:center;width:86px">' +
-            '<img src="' + qr + '" style="width:78px;height:78px" alt="QR">' +
-            '<div style="font-size:.5rem;font-weight:900;letter-spacing:1px;color:' + pc + '">SCAN TO VERIFY</div>' +
-            (person.blood_group ? '<div style="margin-top:5px;background:#dc2626;color:#fff;border-radius:7px;font-size:.6rem;font-weight:900;padding:2px 0">🩸 ' + Super.esc(person.blood_group) + '</div>' : '') +
-          '</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:12px;padding:6px 14px;align-items:flex-end">' +
-          '<div style="flex:1;font-size:.56rem;color:#475569;line-height:1.55">' +
-            '<b style="color:#0f172a">If found, please return to:</b><br>' +
-            '<b>' + Super.esc(s.name || 'the school') + '</b><br>' + contact +
-            (person.phone ? '<br><b style="color:#0f172a">' + (isStaff ? 'Holder\u2019s line' : 'Emergency contact') + ':</b> ' + Super.esc(person.phone) : '') +
-          '</div>' +
-          '<div style="flex-shrink:0;text-align:center">' +
-            this.signBlock(pc, 88) +
-            '<div style="font-size:.5rem;color:#64748b;margin-top:2px">Issued ' + Super.esc(issued) + ' · ' + this.validityNote(isStaff) + '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 8px">' +
-          '<img src="' + logo + '" style="width:20px;height:20px;object-fit:contain" onerror="this.style.display=\'none\'">' +
-          '<div style="flex:1;display:flex;justify-content:center">' + this.barcodeImg(idNo, 32) + '</div>' +
-          '<span style="font-size:.52rem;font-weight:800;color:#0f172a">' + Super.esc(idNo) + '</span>' +
-        '</div>' +
-        '<div style="background:linear-gradient(90deg,' + pc + ',' + ac + ');color:#fff;font-size:.52rem;text-align:center;padding:3px 0;font-weight:700">' + Super.esc(s.motto || '') + (s.motto ? ' · ' : '') + 'Powered by HMG Concepts</div>' +
-      '</div>';
+      /* one card box, sized to the face it sits on */
+      const box = 'class="sc-idcard sc-idcard-back" style="width:' + boxW + 'px;height:' + boxH + 'px;'
+        + 'border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;'
+        + "font-family:'Segoe UI',Arial,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.12);background:#fff;"
+        + 'display:flex;flex-direction:column"';
+      const rulesHtml = '<div style="font-size:.6rem;font-weight:900;letter-spacing:1.6px;color:' + pc + ';margin-bottom:4px">CARD RULES · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>'
+        + '<ol style="margin:0;padding-left:14px;font-size:.56rem;line-height:1.55;color:#334155">' + rules.map(r => '<li>' + r + '</li>').join('') + '</ol>';
+      const qrHtml = '<div style="flex-shrink:0;text-align:center;width:86px">'
+        + '<img src="' + qr + '" style="width:78px;height:78px" alt="QR">'
+        + '<div style="font-size:.5rem;font-weight:900;letter-spacing:1px;color:' + pc + '">SCAN TO VERIFY</div>'
+        + (person.blood_group ? '<div style="margin-top:5px;background:#dc2626;color:#fff;border-radius:7px;font-size:.6rem;font-weight:900;padding:2px 0">🩸 ' + Super.esc(person.blood_group) + '</div>' : '')
+        + '</div>';
+      const contactHtml = '<div style="flex:1;font-size:.56rem;color:#475569;line-height:1.55">'
+        + '<b style="color:#0f172a">If found, please return to:</b><br>'
+        + '<b>' + Super.esc(s.name || 'the school') + '</b><br>' + contact
+        + (person.phone ? '<br><b style="color:#0f172a">' + (isStaff ? 'Holder\u2019s line' : 'Emergency contact') + ':</b> ' + Super.esc(person.phone) : '')
+        + '</div>';
+      const signHtml = '<div style="flex-shrink:0;text-align:center">' + this.signBlock(pc, 88)
+        + '<div style="font-size:.5rem;color:#64748b;margin-top:2px">Issued ' + Super.esc(issued) + ' · ' + this.validityNote(isStaff) + '</div></div>';
+      const stripHtml = '<div style="display:flex;align-items:center;gap:8px;padding:4px 14px 8px">'
+        + '<img src="' + logo + '" style="width:20px;height:20px;object-fit:contain" onerror="this.style.display=\'none\'">'
+        + '<div style="flex:1;display:flex;justify-content:center">' + this.barcodeImg(idNo, 32) + '</div>'
+        + '<span style="font-size:.52rem;font-weight:800;color:#0f172a">' + Super.esc(idNo) + '</span></div>';
+      const footHtml = '<div style="background:linear-gradient(90deg,' + pc + ',' + ac + ');color:#fff;font-size:.52rem;text-align:center;padding:3px 0;font-weight:700">'
+        + Super.esc(s.motto || '') + (s.motto ? ' · ' : '') + 'Powered by HMG Concepts</div>';
+      const stripe = '<div style="height:34px;background:#1f2937;margin-top:14px;flex-shrink:0"></div>';
+      /* WIDE face (landscape card): rules beside the QR, contacts and signature
+         side by side — the same reading order as the printed PDF back.
+         TALL face (portrait card): the blocks stack. */
+      const body = portrait
+        ? '<div style="padding:10px 14px 4px;display:flex;gap:12px;align-items:flex-start"><div style="flex:1;min-width:0">' + rulesHtml + '</div>' + qrHtml + '</div>'
+          + '<div style="display:flex;gap:12px;padding:6px 14px;align-items:flex-end">' + contactHtml + signHtml + '</div>'
+        : '<div style="padding:10px 16px 2px;display:flex;gap:16px;align-items:flex-start"><div style="flex:2;min-width:0">' + rulesHtml + '</div>' + qrHtml + '</div>'
+          + '<div style="display:flex;gap:16px;padding:4px 16px;align-items:flex-end">' + contactHtml + signHtml + '</div>';
+      return '<div ' + box + '>' + stripe + body + stripHtml + footHtml + '</div>';
     },
     /* Front + back pair, laid side-by-side for printing & cutting (or duplex). */
     pairHtml(person) {

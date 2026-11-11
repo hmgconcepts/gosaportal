@@ -1628,9 +1628,14 @@ const App = {
         /* V12.67 — arrears are unpaid PRIOR INVOICES. Absent an invoice there is
            nothing owed, so `has_arrears` (server-side) is authoritative and the
            figure is rendered as blank rather than ₦0. */
-        const owingNow = Number(f.balance || 0);
+        /* V12.69 — three separate debts, and ONE total. The opening balance is
+           no longer invisible: it is read from the ledger and printed on its
+           own tile, so a learner who owes from before the platform is never
+           shown as settled. */
+        const opening = (f.has_opening === false) ? 0 : Number(f.opening_arrears || 0);
+        const owingNow = Number(f.balance || 0);          /* this term alone */
         const arrears = (f.has_arrears === false) ? 0 : Number(f.arrears || 0);
-        const totalDue = Number(f.total_due != null ? f.total_due : (owingNow + arrears));
+        const totalDue = Number(f.total_due != null ? f.total_due : (owingNow + arrears + opening));
         h += '<div style="border:2px solid ' + (totalDue > 0 ? '#fca5a5' : '#86efac') + ';border-radius:14px;padding:14px;margin-bottom:12px;background:' + (totalDue > 0 ? '#fef2f2' : '#f0fdf4') + '">' +
           '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:baseline">' +
           '<b style="font-size:1.02rem">' + esc(s.full_name) + (f.class ? ' · ' + esc(f.class) : '') + '</b>' +
@@ -1638,7 +1643,8 @@ const App = {
           '<div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px">' +
           '<div><div style="font-size:1.5rem;font-weight:900;color:#0f172a">' + money(cur, f.bill) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Total fees this term</div></div>' +
           '<div><div style="font-size:1.5rem;font-weight:900;color:#15803d">' + money(cur, f.paid) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Paid</div></div>' +
-          '<div><div style="font-size:1.5rem;font-weight:900;color:' + (owingNow > 0 ? '#b91c1c' : '#15803d') + '">' + money(cur, owingNow) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Balance this term</div></div>' +
+          (opening > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b45309">' + money(cur, opening) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#b45309">Opening balance (before School&nbsp;Connect)</div></div>' : '') +
+          '<div><div style="font-size:1.5rem;font-weight:900;color:' + ((owingNow + arrears + opening) > 0 ? '#b91c1c' : '#15803d') + '">' + money(cur, owingNow + arrears + opening) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Balance outstanding</div></div>' +
           (Number(f.aid || 0) > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#7c3aed">−' + money(cur, f.aid) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#7c3aed">🎓 Scholarship / aid</div></div>' : '') +
           (arrears > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, arrears) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">Previous terms owing</div></div>' : '') +
           (totalDue > 0 ? '<div><div style="font-size:1.5rem;font-weight:900;color:#b91c1c">' + money(cur, totalDue) + '</div><div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#b91c1c">TOTAL OUTSTANDING</div></div>' : '<div style="align-self:center;font-weight:800;color:#15803d">✅ Fully paid</div>') +
@@ -1708,6 +1714,10 @@ const App = {
         h += '<div style="margin-top:10px;border:1px solid var(--gray-300);border-radius:10px;overflow:hidden">' +
              '<div style="background:var(--gray-100);padding:6px 10px;font-size:.8rem;font-weight:800;color:var(--gray-700)">How this balance is calculated</div>' +
              '<table style="width:100%;font-size:.84rem;border-collapse:collapse">' +
+               (opening > 0
+                 ? '<tr><td style="padding:4px 10px;color:#b45309">Opening balance — owed before School Connect' +
+                     (f.opening_source === 'invoice' ? ' <span style="font-size:.7rem;color:var(--gray-500)">(recorded as an invoice)</span>' : '') +
+                     '</td><td style="padding:4px 10px;text-align:right;color:#b45309;font-weight:700">+' + money(cur, opening) + '</td></tr>' : '') +
                '<tr><td style="padding:4px 10px">Total fees this term</td>' +
                    '<td style="padding:4px 10px;text-align:right;font-weight:700">' + money(cur, f.bill) + '</td></tr>' +
                (Number(f.aid || 0) > 0

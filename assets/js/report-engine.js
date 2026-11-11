@@ -563,6 +563,15 @@ const ReportEngine = {
 
   async renderStudent(ctx){
     await this._preparePolicy(ctx, ctx.report_kind || 'terminal');
+    /* V12.70 BUG FIX — `pol` was declared 140 lines BELOW this point, but the
+       subject-row builder at the top of this function already reads it for the
+       GRADE / POSITION / REMARK columns. In a `const` binding that is a
+       temporal-dead-zone ReferenceError, thrown on EVERY single-student report
+       card that had any rows to print. The page caught it and showed
+       "Could not generate report card", so the visible symptom was simply that
+       report cards would not generate. Read the policy once, here, and use it
+       throughout. */
+    const pol = this.policy();
     const data = await this.loadContext(ctx); const rows = data.rows;
     if (!rows.length) return this.empty('No result records found for this student/filter.');
     const name = ctx.student || rows[0].student_name;
@@ -704,8 +713,8 @@ const ReportEngine = {
     const classAvgValues = (classCohort.list||[]).filter(x=>x.total>0).map(x=>x.percentage);
     const classAverage=classAvgValues.length?classAvgValues.reduce((a,b)=>a+b,0)/classAvgValues.length:0;
 
-    /* V12.66 — presentation policy + per-learner hold */
-    const pol = this.policy();
+    /* V12.66 — per-learner hold (the policy itself is read at the top of this
+       function; see the V12.70 note there) */
     const holds = this._holdsForNow || {};
     const withheld = !pol.show_position || this.positionWithheld(first, holds);
     const posLabel = pol.position_label || 'Position in class';
@@ -879,7 +888,26 @@ const ReportEngine = {
       const count=this._bulkCBT.counts[e.id]||0,unknown=!!this._bulkCBT.countsUnknown;
       return '<tr><td><input class="be-exam" type="checkbox" value="'+this.esc(e.id)+'" '+(unknown?'':' '+(count?'checked':'disabled'))+'></td><td><b>'+this.esc(e.code||'')+'</b><br>'+this.esc(e.title||'')+'<br><small>'+this.esc(this.cbtPurposeLabel(e.assessment_type))+'</small></td><td>'+this.esc(e.class||'—')+'</td><td>'+this.esc(this.examSubjects(e).join(', ')||'—')+'</td><td>'+this.esc(e.term||'—')+'<br>'+this.esc(e.session||'—')+'</td><td><b>'+(unknown?'Server will check':count)+'</b></td><td>'+this.esc(target)+(col?'<br><span style="color:#166534">Ready · max '+Number(col.max_mark||0)+'</span>':'<br><span style="color:#b45309">Missing — '+(document.getElementById('be-create')?.checked?'server will create safely':'enable auto-create')+'</span>')+'</td></tr>';
     }).join('');
-    host.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0"><b>'+filtered.length+' exam(s) match · '+(this._bulkCBT.countsUnknown?'server will validate result counts':filtered.reduce((a,e)=>a+(this._bulkCBT.counts[e.id]||0),0)+' result row(s)')+'</b><label><input type="checkbox" checked onchange="document.querySelectorAll(\'.be-exam:not(:disabled)\').forEach(x=>x.checked=this.checked)"> Select all</label></div><div class="table-wrap"><table><thead><tr><th>Push</th><th>Exam / purpose</th><th>Class</th><th>Subject(s)</th><th>Term / Session</th><th>Attempts</th><th>Destination</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">No exams match these filters.</td></tr>')+'</tbody></table></div><p style="font-size:.8rem;color:#64748b">One verified score per student + subject + destination is pushed. Multiple attempts use the policy chosen above. The server creates columns and writes scores under an authorized, audited transaction; duplicate rows and browser-side RLS failures are prevented.</p>';
+    /* V12.70 — say BEFORE the push that two different exams cannot share one
+       cell. The server refuses such a batch (it used to merge them and drop
+       marks silently), so the preview must show the same truth rather than
+       letting the bursar discover it from an error dialog. */
+    const cellMap={};
+    filtered.forEach(e=>{
+      const target=dest==='__exam__'?(e.report_column||'CBT / Online Exam'):dest;
+      const key=[String(e.class||'').trim().toLowerCase(),String(e.term||'').trim().toLowerCase(),
+                 String(e.session||'').trim().toLowerCase(),String(e.subject||'').trim().toLowerCase(),
+                 String(target).trim().toLowerCase()].join('|');
+      (cellMap[key]=cellMap[key]||[]).push(e.code||e.id);
+    });
+    const clashes=Object.keys(cellMap).filter(k=>cellMap[k].length>1).map(k=>cellMap[k]);
+    const clashNote=clashes.length
+      ? '<div class="notice notice-error" style="margin:8px 0"><b>'+clashes.length+' group(s) of exams share one report cell.</b><br>'
+        +clashes.map(g=>g.join(' + ')).join('; ')
+        +'<br>A report column is a single cell, so pushing these together would keep only one mark per student. '
+        +'Give each exam its own <b>Report column</b> in the CBT editor, or push them separately to different columns.</div>'
+      : '';
+    host.innerHTML=clashNote+'<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0"><b>'+filtered.length+' exam(s) match · '+(this._bulkCBT.countsUnknown?'server will validate result counts':filtered.reduce((a,e)=>a+(this._bulkCBT.counts[e.id]||0),0)+' result row(s)')+'</b><label><input type="checkbox" checked onchange="document.querySelectorAll(\'.be-exam:not(:disabled)\').forEach(x=>x.checked=this.checked)"> Select all</label></div><div class="table-wrap"><table><thead><tr><th>Push</th><th>Exam / purpose</th><th>Class</th><th>Subject(s)</th><th>Term / Session</th><th>Attempts</th><th>Destination</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7">No exams match these filters.</td></tr>')+'</tbody></table></div><p style="font-size:.8rem;color:#64748b">One verified score per student + subject + destination is pushed. Multiple attempts use the policy chosen above. The server creates columns and writes scores under an authorized, audited transaction; duplicate rows and browser-side RLS failures are prevented.</p>';
   },
 
   async pushOneCBTExam(exam,targetName,opts){
@@ -1138,10 +1166,24 @@ const ReportPolicy = {
       session: (document.getElementById('pol-session')||{}).value||'',
       kind: this._kind || 'terminal'
     };
-    let q=sb.from('profiles').select('id,full_name,class,admission_no,role').eq('role','student').order('class').limit(2000);
+    /* V12.70 (item 4) — this asked `profiles` for `class` and `admission_no`.
+       `profiles` has NEITHER: class lives on `students`. PostgREST therefore
+       returned 42703 every time, the branch below rendered the error text, and
+       the "withhold this learner's position" panel showed nothing at all. A
+       teacher could not withhold anyone, and the screen blamed the database.
+       Learners are in `students`; that is what the panel is listing. */
+    const cols='id,full_name,class,admission_no';
+    let q=(sb.from('students').select(cols).order('class').limit(2000));
     if(cls) q=q.eq('class',cls);
-    const {data,error}=await q;
-    if(error){box.innerHTML='<div class="notice notice-error">'+this.esc(error.message)+'</div>';return;}
+    let {data,error}=await q;
+    if(error){
+      /* Older projects may not expose `students` to this role yet; fall back to
+         the register via the students table without the class filter so the
+         panel still works rather than dying. */
+      try{ const r2=await sb.from('students').select('id,full_name,admission_no').limit(2000); data=r2.data||[]; error=r2.error; }
+      catch(e){ error=error||e; }
+    }
+    if(error){box.innerHTML='<div class="notice notice-error">Could not load the learner list: '+this.esc(error.message||error)+'</div>';return;}
     const held={};
     try{
       const h=await sb.from('sc_report_position_hold').select('student_id');

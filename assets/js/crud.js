@@ -211,11 +211,12 @@ const CRUD = {
     fees: { table:'fee_payments', title:'Fee payment', help:'V9.4: pick the student and the SYSTEM fills the total due (class fee structure + any previous-term arrears) and computes the balance live as you type the amount paid — no manual maths, no typing errors.', cols:[
       {key:'student_id',label:'Student',type:'ref',refTable:'students',refValue:'full_name',refExtra:['class','admission_no'],refStore:'id',groupBy:'class',searchable:true,required:true,autofill:{student_name:'full_name'}},
       {key:'student_name',label:'Student name (auto)',type:'text',readonly:true},
+      {key:'opening_arrears_display',label:'Account at a glance (auto)',type:'text',readonly:true,computeOnly:true,form:true,help:'Read-only summary of the whole account — opening balance, this term\'s bill, unpaid earlier terms, payments so far and the resulting balance. It is here so the bursar can check the arithmetic before saving.'},
       {key:'fee_total',label:'Term bill (auto — what this learner was billed this term)',type:'number',readonly:true,help:'V12.67: this is the BILL for this term only — from the invoice if one has been raised, otherwise from the Class Fee Structure. It deliberately does NOT include previous-term arrears or money already paid: those belong to the learner\'s account, not to a single receipt. Writing the running total here is what made the Fees page disagree with the dashboard. Admin can still adjust after unlock (double-click).'},
-      {key:'opening_arrears',label:'Opening arrears — debt from BEFORE School Connect (optional)',type:'number',computeOnly:true,help:'V10.7: for schools that adopted School Connect mid-session. Enter the student\'s outstanding balance from previous terms that were never captured here. Saved ON THE STUDENT RECORD (not this payment) and automatically added to every future total-due, dashboard and receipt until cleared. Enter 0 to clear it.'},
+      {key:'opening_arrears',label:'Opening balance — owed from BEFORE School Connect (optional)',type:'number',computeOnly:true,blankWhenEmpty:true,help:'Leave this BLANK if the learner owes nothing from before the platform was adopted — blank is not the same as zero and nothing is recorded either way. Anything you type here becomes its own line in the account: it is added to the total outstanding, and it is deliberately NOT added to the term bill (a parent must be able to compare the term bill against the published fee structure). Saved on the student record, counted exactly once, and shown to the family as "Before School Connect". Type 0 explicitly only to clear a figure you entered earlier.'},
       {key:'opening_arrears_note',label:'Opening arrears note (e.g. "2nd Term 2025/2026 balance")',type:'text',computeOnly:true,help:'Shown to the family in the fee breakdown so they know exactly what the old debt covers.'},
       {key:'amount_paid',label:'Amount paid now',type:'number',required:true},
-      {key:'balance',label:'Remaining balance (computed)',type:'number',readonly:true,help:'Always total due − amount paid. Computed live — never typed.'},
+      {key:'balance',label:'Remaining balance (computed by the account)',type:'number',readonly:true,blankWhenEmpty:true,help:'The learner\'s closing balance: opening balance + fees for this term + unpaid earlier terms − every payment received, including the one you are entering now. Computed by the database, never typed, and identical to the figure on the dashboard and the e-receipt.'},
       {key:'method',label:'Method',type:'select',options:['cash','transfer','pos','online']},
       {key:'reference',label:'Reference',type:'text'},{key:'term',label:'Term',type:'lookup',lookupKind:'term'},{key:'session',label:'Session',type:'lookup',lookupKind:'session'}
     ]},
@@ -1664,7 +1665,11 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       // V6.3: columns marked adminOnly are hidden from non-admin users entirely
       // (e.g. leave-request status — only admin approves/rejects; RLS enforces it too).
       if (c.adminOnly && !(window.App && App.isOwnerRole && App.isOwnerRole((window.SC_PROFILE||{}).role))) continue;
-      const rv = getVal(c.key);
+      let rv = getVal(c.key);
+      /* V12.69 — a field marked blankWhenEmpty must never open showing 0 for a
+         balance nobody has entered. "Nothing owed" and "zero recorded" are
+         different facts and the bursar must be able to see which is which. */
+      if (c.blankWhenEmpty && (rv === 0 || rv === '0' || rv === 0.0)) rv = null;
       const val = rv != null ? rv : (c.default != null ? c.default : '');
       const req = c.required ? ' required' : '';
       let field;
@@ -1897,12 +1902,46 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
             const totEl = document.getElementById('cf-' + CRUD.fid('fee_total'));
             const paidEl = document.getElementById('cf-' + CRUD.fid('amount_paid'));
             const balEl = document.getElementById('cf-' + CRUD.fid('balance'));
+            const oaEl0 = document.getElementById('cf-' + CRUD.fid('opening_arrears'));
+            const glanceEl = document.getElementById('cf-' + CRUD.fid('opening_arrears_display'));
             const stuId = sel.value;
             if (!stuId || !totEl) return;
             totEl.placeholder = 'Loading fee record…';
-            const fr = await this.sb.rpc('sc_student_fee_state', { p_student: stuId });
-            const f = (fr && fr.data) || {};
-            const recompute = () => { if (balEl) balEl.value = Math.max(0, (Number(totEl.value) || 0) - (Number(paidEl && paidEl.value) || 0)).toFixed(2); };
+            /* V12.69 — THE FORM DOES NOT OWN ANY MONEY.
+               Every figure below is read from sc_fee_account_for, the same call
+               the dashboard, the e-receipt and the Fees table use. The old code
+               did `balance = fee_total − amount_paid` in the browser, which is
+               how the form came to disagree with the card by ₦10,000 for the
+               same learner on the same day. The only client-side arithmetic
+               left is a PREVIEW while typing, clearly labelled, recomputed from
+               the account's own figures and corrected by the server on save. */
+            let ACC = null;
+            const rpcAcc = async (term, session) => {
+              let r = await this.sb.rpc('sc_fee_account_for', { p_student: stuId, p_term: term || null, p_session: session || null });
+              return (r && !r.error && r.data) ? r.data : null;
+            };
+            ACC = await rpcAcc(null, null);
+            const fr = { error: ACC ? null : 'lookup failed', data: ACC };
+            const f = ACC || {};
+            const cur = f.currency || '₦';
+            const money = n => cur + Number(n || 0).toLocaleString();
+            /* draw the whole account, so the bursar can check the sum */
+            const paintGlance = () => {
+              if (!glanceEl) return;
+              if (!ACC) { glanceEl.value = 'Account unavailable'; return; }
+              const oa = Number(oaEl0 && String(oaEl0.value).trim() !== '' ? oaEl0.value : (ACC.opening_balance || 0)) || 0;
+              const extra = paidEl ? Math.max(0, Number(paidEl.value) || 0) : 0;
+              const parts = [];
+              if (oa > 0) parts.push('opening ' + money(oa));
+              parts.push('this term ' + money(ACC.charges));
+              if (Number(ACC.arrears) > 0) parts.push('earlier terms ' + money(ACC.arrears));
+              const already = Number(ACC.paid) || 0;
+              if (already > 0 || extra > 0) parts.push('− paid ' + money(already + extra));
+              const closing = Math.max(0, oa + Number(ACC.charges || 0) + Number(ACC.arrears || 0) - already - extra);
+              glanceEl.value = parts.join('  ·  ') + '  =  ' + money(closing) + ' outstanding';
+            };
+            /* live preview ONLY — the database decides */
+            const recompute = () => { if (balEl) { balEl.value = ''; } paintGlance(); };
             if (fr.error || f.ok === false) {
               totEl.readOnly = false;
               if (typeof toast === 'function') toast(fr.error ? 'Auto fee lookup needs the v9.4 database update — enter the total manually for now.' : (f.error || 'Fee lookup failed.'), 'warning', 8000);
@@ -1923,18 +1962,18 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
                  the ledger. They were never going to agree.
                  A receipt carries the TERM BILL. Nothing else. The arrears and the
                  already-paid figures are information for the bursar, not a bill. */
-              const due = Number(f.total_due || 0);
-              const termBill = Number(f.bill || 0);
+              const due = Number(f.closing || 0);
+              const termBill = Number(f.charges || 0);
               totEl.value = termBill.toFixed(2);
               totEl.dataset.scTermBill = String(termBill);
               totEl.dataset.scTotalDue = String(due);
-              const bits = ['term bill ' + (f.currency||'₦') + termBill.toLocaleString()];
-              if (Number(f.paid||0) > 0) bits.push('already paid ' + (f.currency||'₦') + Number(f.paid).toLocaleString());
-              if (Number(f.arrears||0) > 0) bits.push('previous terms owing ' + (f.currency||'₦') + Number(f.arrears).toLocaleString());
-              if (Number(f.opening_arrears||0) > 0) bits.push('incl. pre-School-Connect balance ' + (f.currency||'₦') + Number(f.opening_arrears).toLocaleString());
-              if (typeof toast === 'function') toast('💰 This receipt records the term bill: ' + (f.currency||'₦') + termBill.toLocaleString()
-                + (due !== termBill ? ' (total outstanding is ' + (f.currency||'₦') + due.toLocaleString() + ' including earlier terms — shown on the dashboard, not stored on this receipt)' : '')
-                + '. Double-click the field to override.', 'info', 11000);
+              const bits = ['term bill ' + cur + termBill.toLocaleString()];
+              if (Number(f.opening_balance||0) > 0) bits.push('opening balance ' + cur + Number(f.opening_balance).toLocaleString());
+              if (Number(f.arrears||0) > 0) bits.push('earlier terms owing ' + cur + Number(f.arrears).toLocaleString());
+              if (Number(f.paid||0) > 0) bits.push('already paid ' + cur + Number(f.paid).toLocaleString());
+              if (typeof toast === 'function') toast('💰 ' + bits.join(' · ')
+                + '. Outstanding now: ' + cur + due.toLocaleString()
+                + ' — this is the same figure the dashboard and the e-receipt show. Double-click the bill to override it for this learner.', 'info', 11000);
               const tEl = document.getElementById('cf-' + CRUD.fid('term')), sEl = document.getElementById('cf-' + CRUD.fid('session'));
               if (tEl && !tEl.value && f.term) tEl.value = f.term;
               if (sEl && !sEl.value && f.session) sEl.value = f.session;
@@ -1948,19 +1987,29 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
               if (oaEl || onEl) {
                 const sr = await this.sb.from('students').select('opening_arrears,opening_arrears_note').eq('id', stuId).maybeSingle();
                 if (!sr.error && sr.data) {
-                  if (oaEl && oaEl.value === '') { oaEl.value = Number(sr.data.opening_arrears || 0) || ''; oaEl.dataset.scLoaded = String(Number(sr.data.opening_arrears || 0)); }
+                  /* V12.69 — BLANK MEANS BLANK. This used to write `|| ''` on
+                     the number, which turned "nothing owed" into a visible 0
+                     the moment the form opened. Now a zero is left empty, so
+                     the bursar can tell "no opening debt" from "recorded as
+                     nothing", and an existing figure loads as a figure. */
+                  if (oaEl && oaEl.value === '') {
+                    const was = Number(sr.data.opening_arrears || 0);
+                    oaEl.value = was > 0.005 ? was : '';
+                    oaEl.placeholder = 'Blank = nothing owed from before';
+                    oaEl.dataset.scLoaded = String(was);
+                  }
                   if (onEl && !onEl.value) { onEl.value = sr.data.opening_arrears_note || ''; onEl.dataset.scLoaded = sr.data.opening_arrears_note || ''; }
                 }
+                /* the opening balance NEVER edits the term bill — it is its own
+                   line in the account. Typing here re-paints the summary only. */
                 if (oaEl && !oaEl._scWired) { oaEl._scWired = true;
                   oaEl.addEventListener('input', () => {
-                    const base = Number(totEl.value) || 0;
-                    const was = Number(oaEl.dataset.scLoaded || 0);
-                    const now = Number(oaEl.value) || 0;
-                    /* live preview: adjust total by the CHANGE in opening arrears */
-                    totEl.value = Math.max(0, base - was + now).toFixed(2);
-                    oaEl.dataset.scLoaded = String(now);
-                    recompute();
+                    oaEl.dataset.scDirty = '1';
+                    paintGlance();
                   });
+                }
+                if (onEl && !onEl._scWired) { onEl._scWired = true;
+                  onEl.addEventListener('input', () => { onEl.dataset.scDirty = '1'; paintGlance(); });
                 }
               }
             } catch(_) {}
@@ -1979,7 +2028,8 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
               const auto = Number(totEl.dataset.scAutoTotal || 0);
               totEl.dataset.scOverridden = (!totEl.readOnly && Math.abs((Number(totEl.value) || 0) - auto) > 0.005) ? '1' : '';
             };
-            if (paidEl) paidEl.oninput = recompute;
+            if (paidEl) paidEl.oninput = () => { recompute(); if (balEl) balEl.value = ''; };
+            paintGlance();
             recompute();
           } catch (_) {}
         })();
@@ -2119,27 +2169,38 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
        the whole ledger is re-derived afterwards by sc_fee_sync_snapshots().
        ================================================================= */
     if (d.table === 'fee_payments') {
+      /* V12.69 — THE RECEIPT CARRIES NO ARITHMETIC OF ITS OWN.
+         `fee_total` is the term bill; `balance` is the account's closing
+         balance AFTER this receipt. Both are read from sc_fee_account_for, the
+         one function every screen quotes. The client never subtracts.
+         The database's own BEFORE trigger (compute_fee_payment_balance) is the
+         final authority and recomputes the same figure on the way in, so a row
+         written by an old page or an import is corrected too. */
       try {
-        const isOverride = payload.total_overridden === true;
         if (payload.student_id) {
-          const acct = await this.sb.rpc('sc_fee_account', { p_student: payload.student_id, p_term: payload.term || null, p_session: payload.session || null });
-          const a = (acct && acct.data) || {};
-          if (!acct.error && a.ok !== false && Number(a.bill || 0) > 0 && !isOverride) {
-            /* fee_total on the row = the BILL at the time of this receipt. */
-            payload.fee_total = Number(a.bill);
-            if (payload.balance == null) {
-              payload.balance = Math.max(0, Number(a.bill) - (Number(a.paid || 0) + (Number(payload.amount_paid) || 0)));
+          const acct = await this.sb.rpc('sc_fee_account_for', {
+            p_student: payload.student_id,
+            p_term: payload.term || null,
+            p_session: payload.session || null
+          });
+          const a = (acct && !acct.error && acct.data) ? acct.data : null;
+          if (a && a.ok !== false) {
+            if (payload.total_overridden === true) {
+              /* the bursar's deliberate per-learner figure replaces the bill */
+              payload.fee_total = Number(payload.fee_total) || Number(a.charges) || 0;
+            } else {
+              payload.fee_total = Number(a.charges) || 0;
             }
-          } else if (payload.balance == null && payload.fee_total != null) {
-            payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
+            const billed = (payload.total_overridden === true
+                              ? Number(payload.fee_total) || 0
+                              : Number(a.total_billed) || 0);
+            const paidSoFar = Number(a.paid) || 0;
+            payload.balance = Math.max(0, billed - paidSoFar - (Number(payload.amount_paid) || 0));
           }
-        } else if (payload.balance == null && payload.fee_total != null) {
-          payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
         }
       } catch (e) {
-        if (payload.balance == null && payload.fee_total != null) {
-          payload.balance = Math.max(0, (Number(payload.fee_total) || 0) - (Number(payload.amount_paid) || 0));
-        }
+        /* leave the balance to the database trigger rather than guess */
+        console.warn('[fees] account lookup failed; the database will compute the balance', e && e.message);
       }
     }
     /* V10.3 (#4): persist the DELIBERATE total-due override flag. Only set
@@ -2161,14 +2222,25 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
         const oaEl = document.getElementById('cf-' + this.fid('opening_arrears'));
         const onEl = document.getElementById('cf-' + this.fid('opening_arrears_note'));
         const stuId = payload.student_id;
-        if (stuId && oaEl && String(oaEl.value).trim() !== '') {
-          const patch = { opening_arrears: Number(oaEl.value) || 0 };
+        /* V12.69 — an untouched or blank field writes NOTHING. Only a field the
+           bursar actually edited changes the record, so re-saving a receipt can
+           never silently zero an opening balance that was already there. */
+        const touched = oaEl && (oaEl.dataset.scDirty === '1' || onEl && onEl.dataset.scDirty === '1');
+        if (stuId && touched) {
+          const raw = oaEl ? String(oaEl.value).trim() : '';
+          const patch = { opening_arrears: raw === '' ? 0 : (Number(raw) || 0) };
           if (onEl) patch.opening_arrears_note = onEl.value || '';
           const ur = await this.sb.from('students').update(patch).eq('id', stuId);
           if (ur.error && /opening_arrears/.test(ur.error.message || '')) {
-            toast('Opening-arrears needs a one-time database update — admin: run database/complete-schema.sql. The payment itself still saves.', 'warning', 10000);
-          } else if (!ur.error && patch.opening_arrears > 0) {
-            toast('🧾 Opening arrears of ' + patch.opening_arrears.toLocaleString() + ' saved on the student record — it now joins every total-due computation until cleared (enter 0 to clear).', 'info', 9000);
+            toast('The opening balance needs a one-time database update — admin: run database/complete-schema.sql. The payment itself still saves.', 'warning', 10000);
+          } else if (!ur.error) {
+            if (patch.opening_arrears > 0) {
+              toast('🧾 Opening balance of ' + patch.opening_arrears.toLocaleString() + ' saved on the student record. It is now its own line in the account — added to the outstanding total, NOT to the term bill — until you clear it.', 'info', 11000);
+            } else {
+              toast('🧾 Opening balance cleared for this learner — the account now stands on this term\'s bill and earlier terms alone.', 'info', 8000);
+            }
+            if (oaEl) oaEl.dataset.scDirty = '';
+            if (onEl) onEl.dataset.scDirty = '';
           }
         }
       } catch(_) {}
@@ -2434,6 +2506,17 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     if (!this.sb) return;
     const { data: f } = await this.sb.from('fee_payments').select('*').eq('id', id).maybeSingle();
     if (!f) return;
+    /* V12.69 — a receipt quotes the ACCOUNT, not just its own row. This is the
+       same sc_fee_account_for the dashboard card and the Fees table use, so the
+       three can never print different balances again. */
+    let ACC = null;
+    try {
+      if (f.student_id) {
+        const ar = await this.sb.rpc('sc_fee_account_for', {
+          p_student: f.student_id, p_term: f.term || null, p_session: f.session || null });
+        if (ar && !ar.error && ar.data && ar.data.ok !== false) ACC = ar.data;
+      }
+    } catch (_) {}
     let stu = null;
     try { if (f.student_id) { const r = await this.sb.from('students').select('full_name,class,admission_no').eq('id', f.student_id).maybeSingle(); stu = r.data; } } catch(_) {}
     const sc = window.SCHOOL || {}, stg = window.SC_SETTINGS || {};
@@ -2444,7 +2527,8 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const pn = localStorage.getItem('sc-principal-name') || stg.principal_name || sc.principalName || sc.principal_name || 'Bursar / Principal';
     const total = Number(f.fee_total || 0) || 0;
     const paid = Number(f.amount_paid || 0) || 0;
-    const bal = Math.max(0, (f.balance != null ? Number(f.balance) : (total ? total - paid : 0)) || 0);
+    const bal = (ACC && ACC.closing != null) ? Math.max(0, Number(ACC.closing) || 0)
+              : Math.max(0, (f.balance != null ? Number(f.balance) : (total ? total - paid : 0)) || 0);
     // Persist auto-computed balance back to DB so every record and future e-receipt reflects it.
     try { if (f.balance == null || Number(f.balance) !== bal) await this.sb.from('fee_payments').update({ balance: bal }).eq('id', id); } catch(_) {}
     const rdate = CRUD.formatDate(f.created_at || new Date().toISOString());
@@ -2459,8 +2543,17 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       row('Term / Session', esc(f.term || '-') + ' · ' + esc(f.session || '-')) +
       row('Payment Method', esc(f.method || '-') + (f.reference ? ' · Ref: ' + esc(f.reference) : '')) +
       (total ? row('Total Fee for Term', fmtMoney(total)) : '') +
+      (ACC && Number(ACC.opening_balance) > 0 ? row('Opening balance (before School Connect)', fmtMoney(ACC.opening_balance)) : '') +
+      (ACC && Number(ACC.arrears) > 0 ? row('Unpaid earlier terms', fmtMoney(ACC.arrears)) : '') +
+      (ACC && Number(ACC.aid) > 0 ? row('Scholarship / bursary applied', '− ' + fmtMoney(ACC.aid)) : '') +
+      (ACC && Number(ACC.paid) > 0 ? row('Payments received (all receipts)', fmtMoney(ACC.paid)) : '') +
       '<div class="paid"><div style="font-size:.75rem;color:#334155">AMOUNT PAID</div><div class="amt">' + fmtMoney(paid) + '</div></div>' +
       (bal === 0 ? '<div class="bal full">Remaining Balance: ' + cur + '0 — FULLY PAID ✔</div>' : '<div class="bal">Remaining Balance: <b>' + fmtMoney(bal) + '</b></div>') +
+      (ACC ? '<p class="sub" style="margin-top:6px;text-align:center">Balance shown is this learner\'s whole account: '
+              + (Number(ACC.opening_balance) > 0 ? 'opening ' + fmtMoney(ACC.opening_balance) + ' + ' : '')
+              + 'this term ' + fmtMoney(ACC.charges)
+              + (Number(ACC.arrears) > 0 ? ' + earlier terms ' + fmtMoney(ACC.arrears) : '')
+              + ' − payments ' + fmtMoney(ACC.paid) + '</p>' : '') +
       '<div class="sig">' + (sig ? '<img src="' + esc(sig) + '" referrerpolicy="no-referrer" style="max-width:150px;max-height:60px;object-fit:contain;mix-blend-mode:multiply;filter:contrast(1.3) brightness(1.05)">' : '<span class="script">' + esc((pn||'').split(/\s+/).map(x=>x[0]||'').join('').slice(0,3) || 'Sign') + '</span>') + '<div style="border-top:1px solid #111;width:180px;margin:2px auto 0;padding-top:2px"><b>' + esc(pn) + '</b> — Bursar / Principal</div></div>' +
       '<p class="note">This is an official computer-generated e-receipt. It carries the school logo, authorised signature, and is valid without a physical stamp. Official E-Receipt · Licensed Platform.</p></div>';
     const css = '<style>body{font-family:Arial,sans-serif;color:#111;background:#f1f5f9;margin:0;padding:18px;display:flex;justify-content:center}.receipt{width:520px;max-width:100%;border:2px solid #111;padding:26px;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.15)}.rh{display:flex;align-items:center;justify-content:center;gap:12px;border-bottom:2px solid #111;padding-bottom:10px}.logo{width:58px;height:58px;border-radius:12px;background:linear-gradient(135deg,#1e2a5e,#4f46e5);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.5rem;object-fit:contain}h2{margin:0;font-size:1.15rem}.sub{margin:2px 0 0;font-size:.72rem;color:#334155}.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed #cbd5e1;font-size:.9rem}.row b{color:#0f172a;text-align:right}.paid{background:#f0fdf4;border:1px dashed #16a34a;border-radius:10px;padding:10px;text-align:center;margin-top:12px}.paid .amt{font-size:1.5rem;font-weight:900;color:#16a34a}.bal{background:#fef2f2;border:1px dashed #dc2626;border-radius:10px;padding:8px;text-align:center;margin-top:8px;font-size:.9rem}.bal b{color:#dc2626;font-size:1.1rem}.full{background:#f0fdf4;border:1px solid #16a34a;color:#16a34a;font-weight:800}.sig{margin-top:22px;text-align:center;font-size:.8rem}.sig .script{font-family:\'Segoe Script\',cursive;font-size:1.3rem;color:#1e2a5e}.note{margin-top:12px;font-size:.62rem;color:#94a3b8;text-align:center}@media print{body{background:#fff;padding:0}.receipt{box-shadow:none}}</style>';
