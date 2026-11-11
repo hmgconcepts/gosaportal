@@ -1,10 +1,11 @@
 {
  "_meta": {
-  "built_bytes": 956172,
+  "built_bytes": 953745,
   "built_from_bytes": 1261862,
   "removed": {
    "banner-rule": 387,
    "duplicate-grant": 7,
+   "notify-moved-last": 1,
    "progress-select": 159,
    "redundant-add-column": 147,
    "redundant-drop-index": 15,

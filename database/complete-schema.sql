@@ -7,7 +7,7 @@
 -- platform needs. Safe on a new or an existing project, and safe to
 -- run more than once.
 --
--- Size: 955,082 bytes - inside the Supabase SQL Editor 1 MB request cap.
+-- Size: 952,655 bytes - inside the Supabase SQL Editor 1 MB request cap.
 -- Paste the whole file into SQL Editor and press Run once.
 -- If your editor still refuses it, split at the "-- ===" section
 -- banners: every section is independently re-runnable.
@@ -1648,7 +1648,7 @@ drop function if exists public.generate_timetable(text,text,text,integer);
 -- each subject's remaining singles from what phase 1 actually placed, so the
 -- weekly count is always exact.
 -- (generate_timetable superseded by the ENGINE 11 definition embedded below — single authoritative copy)
-notify pgrst,'reload schema';
+
 -- SECTION 7b: DYNAMIC POLICY BLOCKS (2 — run after functions exist)
 -- ---- Generic: any authenticated user reads; staff writes ----
 -- (scheme_of_work is now spelled correctly — no more 'sow' alias bug.)
@@ -2587,7 +2587,7 @@ grant  execute on function public.extract_admission(uuid) to authenticated;
 
 -- PostgREST caches the OpenAPI schema; after DDL it can briefly serve
 -- "Could not find the table 'public.X' in the schema cache". Request a reload.
-notify pgrst, 'reload schema';
+
 -- Enhanced admission number and staff ID format settings
 alter table public.school_settings add column if not exists admission_format text default 'prefix-dash';
 alter table public.school_settings add column if not exists admission_start_num integer default 1;
@@ -2629,7 +2629,7 @@ alter table public.admission_links add column if not exists class_applied text d
 alter table public.admission_links add column if not exists exam_code text default '';
 alter table public.admission_links add column if not exists expires_at timestamptz;
 alter table public.admission_links add column if not exists notes text default '';
-notify pgrst, 'reload schema';
+
 -- SECTION 21: DEFINITIVE CBT GRADING, IDENTITY AND MULTI-SUBJECT ENGINE
 -- A distinct RPC name prevents stale/legacy PostgREST overloads from silently
 -- returning zero. Legacy answer-key spellings are normalised case-insensitively.
@@ -2823,7 +2823,7 @@ revoke execute on function public.sc_cbt_normalize_question(jsonb)from public,an
 grant execute on function public.cbt_diagnose_exam(uuid)to authenticated;
 grant execute on function public.cbt_repair_exam_scoring(uuid)to authenticated;
 grant execute on function public.cbt_import_backup(jsonb)to authenticated;
-notify pgrst,'reload schema';
+
 select 'School Connect CBT V5.1 definitive grading engine installed — use RPC cbt_submit_v5 ✅'as status;
 -- V5.1 public question redaction: remove answer aliases case-insensitively.
 -- (sc_cbt_public_question superseded by the V10.3 definition embedded below — single authoritative copy)
@@ -2844,18 +2844,18 @@ create or replace function public.cbt_get_public_exam_v2(p_code text)returns jso
 -- (sc_cbt_public_question revoke issued with the V10.3 definition embedded below)
 grant execute on function public.cbt_get_public_exam(text)to anon,authenticated;
 grant execute on function public.cbt_get_public_exam_v2(text)to anon,authenticated;
-notify pgrst,'reload schema';
+
 -- Regrade historical zero/incorrect result rows whose answers_data was retained.
 -- (cbt_regrade_exam_results_v5 superseded by the fraction-aware V10.3 definition embedded below)
 -- (cbt_regrade_exam_results_v5 grants issued with the V10.3 definition embedded below)
-notify pgrst,'reload schema';
+
 -- V5.2 promotion/report integrity: pending is a valid decision state and every
 -- report can resolve the student by id or legacy name.
 alter table public.promotions drop constraint if exists promotions_action_check;
 alter table public.promotions add constraint promotions_action_check check(action in('promote','graduate','repeat','pending','delete'));
 create index if not exists promotions_report_lookup_idx on public.promotions(student_id,session,term,created_at desc);
 create index if not exists promotions_name_lookup_idx on public.promotions(student_name,session,term,created_at desc);
-notify pgrst,'reload schema';
+
 alter table public.school_settings add column if not exists motto text default '';
 alter table public.school_settings add column if not exists address text default '';
 alter table public.school_settings add column if not exists phone text default '';
@@ -2894,7 +2894,7 @@ exception when others then
 end$$;
 revoke execute on function public.cbt_get_public_exam_v5(text)from public;
 grant execute on function public.cbt_get_public_exam_v5(text)to anon,authenticated;
-notify pgrst,'reload schema';
+
 select 'School Connect CBT V5.1.1 getter compatibility fix installed — legacy school settings supported ✅'as status;
 -- V5.3 teacher-owned signatures for class report cards.
 alter table public.profiles add column if not exists signature_url text default '';
@@ -2916,7 +2916,7 @@ begin
 end$$;
 revoke execute on function public.get_class_teacher_identity(text)from public,anon;
 grant execute on function public.get_class_teacher_identity(text)to authenticated;
-notify pgrst,'reload schema';
+
 select 'School Connect V5.3 teacher signature and class-report identity installed ✅'as status;
 -- V5.4 beginning-of-term student physical/health metrics printed on reports.
 create table if not exists public.student_term_metrics(
@@ -2933,7 +2933,7 @@ drop policy if exists metrics_staff_all on public.student_term_metrics;
 create policy metrics_staff_all on public.student_term_metrics for all using(public.is_staff(auth.uid()))with check(public.is_staff(auth.uid()));
 drop policy if exists metrics_family_read on public.student_term_metrics;
 create index if not exists student_term_metrics_lookup_idx on public.student_term_metrics(student_id,class,term,session);
-notify pgrst,'reload schema';
+
 select 'School Connect V5.4 portable archives, CBT organization and student metrics installed ✅'as status;
 -- V5.5 registered-exam identity: admission number resolves the official student. (V12.34 attempt limit enforcement)
 create or replace function public.cbt_get_public_exam_v6(p_code text,p_admission_no text default '')
@@ -3025,7 +3025,7 @@ revoke execute on function public.cbt_get_public_exam_v6(text,text)from public;
 grant execute on function public.cbt_get_public_exam_v6(text,text)to anon,authenticated;
 revoke execute on function public.cbt_submit_v6(jsonb)from public;
 grant execute on function public.cbt_submit_v6(jsonb)to anon,authenticated;
-notify pgrst,'reload schema';
+
 select 'School Connect V5.5 registered CBT identity installed ✅'as status;
 select 'School Connect V5.5 installed — flexible report headings, registered CBT identity, recovery-ready auth and academic insights ✅'as status;
 -- V5.6 daily fee collection authority (Africa/Lagos school date).
@@ -3034,7 +3034,7 @@ alter table public.fee_payments add column if not exists received_by_name text d
 update public.fee_payments set payment_date=(created_at at time zone 'Africa/Lagos')::date where payment_date is null;
 create index if not exists fee_payments_daily_idx on public.fee_payments(payment_date,created_at desc);
 create index if not exists fee_payments_method_daily_idx on public.fee_payments(payment_date,method);
-notify pgrst,'reload schema';
+
 select 'School Connect V5.6 daily fee collection fields installed ✅'as status;
 -- V5.6 controlled CBT result reset for exam reuse.
 create or replace function public.cbt_clear_exam_results(p_exam_id uuid,p_confirm_code text)
@@ -3064,7 +3064,7 @@ begin
 end$$;
 revoke execute on function public.cbt_clear_exam_results(uuid,text) from public, anon;
 grant execute on function public.cbt_clear_exam_results(uuid,text) to authenticated;
-notify pgrst,'reload schema';
+
 select 'School Connect V5.6 controlled CBT result reset installed ✅'as status;
 -- V5.6 strict teacher subject/class isolation. Admin roles retain full control.
 create or replace function public.teacher_can_manage_subject_class(p_uid uuid,p_subject text default '',p_class text default '')
@@ -3122,7 +3122,7 @@ alter table public.report_comments add column if not exists teacher_id uuid refe
 create policy comments_scope_select on public.report_comments for select using(public.is_admin(auth.uid())or public.teacher_can_manage_student(auth.uid(),student_id)or exists(select 1 from public.students s where s.id=report_comments.student_id and(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))));
 -- School structure is admin-managed; teachers read it through existing select policies.
 do $$declare t text;p record;begin foreach t in array array['classes','subjects','departments','timetable_requirements','teacher_availability']loop for p in select policyname from pg_policies where schemaname='public'and tablename=t and cmd<>'SELECT'loop execute format('drop policy if exists %I on public.%I',p.policyname,t);end loop;execute format('create policy %I on public.%I for all using(public.is_admin(auth.uid()))with check(public.is_admin(auth.uid()))','admin_manage_'||t,t);end loop;end$$;
-notify pgrst,'reload schema';
+
 select 'School Connect V5.6 strict teacher subject/class isolation installed ✅'as status;
 drop policy if exists authenticated_read_classes on public.classes;
 create policy authenticated_read_classes on public.classes for select using(auth.role()='authenticated');
@@ -3134,7 +3134,7 @@ drop policy if exists scoped_read_timetable_requirements on public.timetable_req
 create policy scoped_read_timetable_requirements on public.timetable_requirements for select using(public.is_admin(auth.uid())or public.teacher_can_manage_subject_class(auth.uid(),subject,class));
 drop policy if exists scoped_read_teacher_availability on public.teacher_availability;
 create policy scoped_read_teacher_availability on public.teacher_availability for select using(public.is_admin(auth.uid())or lower(trim(teacher))=lower(trim(coalesce((select full_name from public.profiles where id=auth.uid()),''))));
-notify pgrst,'reload schema';
+
 -- Additional teacher-owned/class-scoped operational records.
 alter table public.digital_library add column if not exists teacher_id uuid references public.profiles(id)on delete set null;
 alter table public.conduct add column if not exists recorded_by_id uuid references public.profiles(id)on delete set null;
@@ -3148,7 +3148,7 @@ create policy support_teacher_write on public.support_plans for all using(public
 create policy diary_teacher_write on public.student_diary for all using(public.is_admin(auth.uid())or(created_by=auth.uid()and public.teacher_can_manage_subject_class(auth.uid(),subject,class)))with check(public.is_admin(auth.uid())or(created_by=auth.uid()and public.teacher_can_manage_subject_class(auth.uid(),subject,class)));
 drop policy if exists metrics_staff_all on public.student_term_metrics;
 create policy metrics_teacher_write on public.student_term_metrics for all using(public.is_admin(auth.uid())or(recorded_by=auth.uid()and public.teacher_can_manage_student(auth.uid(),student_id)))with check(public.is_admin(auth.uid())or(recorded_by=auth.uid()and public.teacher_can_manage_student(auth.uid(),student_id)));
-notify pgrst,'reload schema';
+
 select 'School Connect V5.6 extended teacher ownership installed ✅'as status;
 drop policy if exists dl_scope_read on public.digital_library;
 create policy dl_scope_read on public.digital_library for select using(auth.role()='authenticated');
@@ -3162,7 +3162,7 @@ drop policy if exists support_scope_read on public.support_plans;
 create policy support_scope_read on public.support_plans for select using(public.is_admin(auth.uid())or public.teacher_can_manage_student(auth.uid(),student_id)or exists(select 1 from public.students s where s.id=support_plans.student_id and(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))));
 drop policy if exists diary_scope_read on public.student_diary;
 create policy diary_scope_read on public.student_diary for select using(public.is_admin(auth.uid())or public.teacher_can_manage_subject_class(auth.uid(),subject,class)or exists(select 1 from public.students s where s.id=student_diary.student_id and(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))));
-notify pgrst,'reload schema';
+
 -- V5.6 legacy-row claim rule: assigned teachers may claim an unowned row once;
 -- owned rows remain editable/deletable only by that owner or admin.
 drop policy if exists results_scope_update on public.results;
@@ -3187,7 +3187,7 @@ drop policy if exists report_score_scope_delete on public.report_scores;
 drop policy if exists affective_scope_write on public.affective_traits;
 drop policy if exists psychomotor_scope_write on public.psychomotor_traits;
 drop policy if exists comments_scope_write on public.report_comments;
-notify pgrst,'reload schema';
+
 -- V5.7 FINAL PROFESSIONAL AUDIT ENHANCEMENTS
 alter table public.school_settings add column if not exists principal_signature_bg_removed boolean not null default true;
 alter table public.school_settings add column if not exists proprietor_name text default '';
@@ -3250,7 +3250,7 @@ create policy v7_settings_write on school_settings for all using(is_school_leade
 drop policy if exists role_status_log_write on role_status_log;
 drop policy if exists v7_role_log_write on role_status_log;
 create policy v7_role_log_write on role_status_log for all using(is_owner(auth.uid()))with check(is_owner(auth.uid()));
-notify pgrst,'reload schema';
+
 select 'School Connect V5.7 professional audit enhancements installed ✅'as status;
 -- V5.8 VERIFIED DELETION, ID AUTHORITY AND FREE-TIER DATA EFFICIENCY
 create table if not exists public.data_retention_settings(
@@ -3306,7 +3306,7 @@ returns trigger language plpgsql set search_path=public as $$declare j jsonb:=to
  end loop;return new;
 end$$;
 do $$declare t text;begin foreach t in array array['school_settings','profiles','students','staff','parents','admissions','gallery','eresources','digital_library','certificate_designs','certificates']loop if to_regclass('public.'||t)is not null then execute format('drop trigger if exists sc_external_media_only on public.%I',t);execute format('create trigger sc_external_media_only before insert or update on public.%I for each row execute function public.sc_prevent_embedded_media()',t);end if;end loop;end$$;
-notify pgrst,'reload schema';
+
 select 'School Connect V5.8 deletion, ID-format and free-tier efficiency safeguards installed ✅'as status;
 -- FINAL V5.8 SELF-SUFFICIENCY CHECK AND POSTGREST RELOAD
 do $$declare missing text[]:='{}';begin
@@ -3329,7 +3329,7 @@ do $$declare missing text[]:='{}';begin
  -- (generate_timetable existence is verified by the V11.0 pack itself at the end of this file)
  if coalesce(array_length(missing,1),0)>0 then raise exception 'School Connect V5.8 incomplete installation: %',array_to_string(missing,', ');end if;
 end$$;
-notify pgrst,'reload schema';
+
 -- =============== SUPABASE FREE-TIER KEEP-ALIVE (auto-installed) ===============
 -- SUPABASE FREE-TIER KEEP-ALIVE (idempotent — safe to re-run)
 -- Supabase pauses free-tier projects after ~7 days without
@@ -3607,7 +3607,7 @@ exception when others then
   raise notice 'Proctor bucket setup skipped (%). Create a private bucket named "proctor" from Dashboard -> Storage instead.', sqlerrm;
 end
 $proctor$;
-notify pgrst,'reload schema';
+
 -- (v6.3 role-access fixes installed)
 
 -- =============== V6.4 HARD-SCOPE FIXES (auto-installed) ===============
@@ -3693,7 +3693,7 @@ begin
 end $$;
 revoke execute on function public.sc_push_punctuality_to_report(uuid,text,text,text,date,date,text) from public, anon;
 grant  execute on function public.sc_push_punctuality_to_report(uuid,text,text,text,date,date,text) to authenticated;
-notify pgrst,'reload schema';
+
 -- (v6.4 hard-scope fixes installed)
 
 -- =============== BRANDING BUCKET (auto-installed) ===============
@@ -3854,7 +3854,7 @@ begin
 end $$;
 revoke execute on function public.sc_save_report_score(jsonb) from public, anon;
 grant  execute on function public.sc_save_report_score(jsonb) to authenticated;
-notify pgrst,'reload schema';
+
 -- (v6.9 score saving installed)
 
 -- =============== V7.0 CLEAN DATA LIFECYCLE (auto-installed) ===============
@@ -3961,7 +3961,7 @@ begin
 end $$;
 revoke execute on function public.sc_sweep_report_ghosts(text,text,text) from public, anon;
 grant  execute on function public.sc_sweep_report_ghosts(text,text,text) to authenticated;
-notify pgrst,'reload schema';
+
 -- (v7.0 lifecycle installed)
 
 -- =============== V7.3 MISSING POLICIES + PROMOTION FINALISER (auto-installed) ===============
@@ -3997,7 +3997,6 @@ using (public.is_admin(auth.uid())) with check (public.is_admin(auth.uid()));
 --  graduate-to-alumni pipeline included; the older body was removed so the
 --  schema keeps one authoritative definition per function.)
 
-notify pgrst,'reload schema';
 -- (v7.3 installed)
 
 -- EMBEDDED: database/v7.5-rls-gap-and-self-service.sql (last wins)
@@ -4211,7 +4210,7 @@ do $$ declare p record; begin
     execute format('drop policy if exists %I on public.assignments', p.policyname);
   end loop;
 end $$;
-notify pgrst,'reload schema';
+
 -- EMBEDDED: database/v8.2-voting-scope-and-dl.sql (last wins)
 -- School Connect V8.2 — Class-scoped voting + audience enforcement + DL types
 -- 1. polls.class_scope — a poll can belong to ONE class (class captain election
@@ -4233,7 +4232,7 @@ drop policy if exists "polls_write" on polls;
 create policy "polls_write" on public.polls for insert with check (public.is_staff(auth.uid()));
 drop policy if exists "polls_update" on polls;
 drop policy if exists "polls_delete" on polls;
-notify pgrst,'reload schema';
+
 -- EMBEDDED: database/v8.4-assignment-dl-points.sql (last wins)
 -- School Connect V8.4 — Assignment & Digital-Library points → report card
 -- 1. assignment_scores — every assignment a subject teacher gives can now be
@@ -4268,7 +4267,7 @@ alter table public.reading_scores add column if not exists term text;
 alter table public.reading_scores add column if not exists session text;
 alter table public.reading_scores add column if not exists student_id_ref text;
 create index if not exists idx_reading_scores_ctx on public.reading_scores (class, subject, term, session);
-notify pgrst,'reload schema';
+
 -- EMBEDDED: database/v8.5-payroll-net-fix.sql (last wins)
 -- School Connect V8.5 — Payroll net-pay: unconditional trigger + backfill
 -- Symptom on older installs: net pay = basic+allowances only (deductions
@@ -4285,7 +4284,6 @@ drop trigger if exists trg_compute_payroll_net on public.payroll;
 update public.payroll set basic = basic;
    -- touches each row; trigger recomputes net_pay
 
-notify pgrst,'reload schema';
 alter table public.payroll add column if not exists deductions numeric default 0;
 do $$
 declare v record; view_defs jsonb := '[]'::jsonb;
@@ -4366,7 +4364,7 @@ update public.payroll set basic = basic;
   -- trigger recomputes every row
 -- V8.7 also: digital-library attempt limit (1 = once, N = teacher's choice, 0 = unlimited)
 alter table public.digital_library add column if not exists attempts_allowed int default 1;
-notify pgrst,'reload schema';
+
 -- 1. Retarget every blocking FK that references public.profiles.
 --    Walks the catalog, so it also fixes columns added by older installs.
 --    nullable column + NO ACTION/RESTRICT  → ON DELETE SET NULL
@@ -4492,7 +4490,7 @@ begin
 exception when undefined_table then
   raise notice 'auth.users not reachable in this environment — orphan adoption skipped.';
 end $$;
-notify pgrst,'reload schema';
+
 -- 1b. Duplicate timetable rows are the root cause of "master says Maths,
 --     class grid says CRS": older generations with a different term/session
 --     spelling, or repeated manual adds, left several rows claiming the same
@@ -4706,7 +4704,7 @@ create policy "ai_read"  on public.sc_ai_settings for select using (public.is_st
 drop policy if exists "ai_write" on public.sc_ai_settings;
 create policy "ai_write" on public.sc_ai_settings for all
   using (public.is_admin(auth.uid())) with check (public.is_admin(auth.uid()));
-notify pgrst,'reload schema';
+
 -- 1a. Authorized editors registry
 create table if not exists public.sc_module_editors (
   id uuid primary key default gen_random_uuid(),
@@ -4821,7 +4819,6 @@ end $$;
 -- (generate_timetable V9.2 is defined ONCE in Section 5 above; the standalone
 --  v9.2 file carries it for existing databases.)
 
-notify pgrst,'reload schema';
 -- 1. Auto-computed class fee total
 create or replace function public.compute_class_fee_total()
 returns trigger language plpgsql as $$
@@ -4848,11 +4845,9 @@ alter table public.exam_timetable add column if not exists paper_kind text defau
 -- 3. One-call student fee state
 -- (sc_student_fee_state superseded by the V9.9 definition embedded below — single authoritative copy)
 
-notify pgrst,'reload schema';
 -- (is_school_leader is defined ONCE in the section above with bursar included;
 --  the standalone v9.7 file carries it for existing databases.)
 
-notify pgrst,'reload schema';
 -- 1. subject → classes mapping
 alter table public.subjects add column if not exists classes text[];
 -- 3. per-module leadership access switch
@@ -4864,7 +4859,6 @@ alter table public.subjects add column if not exists classes text[];
 -- 2. fee state with financial aid (full V9.9 definition)
 -- (sc_student_fee_state superseded by the V10.0 definition embedded below)
 
-notify pgrst,'reload schema';
 -- 2. staff_bonus: keep staff-wide read (feature-preserving) — it already lets
 --    each staff member see their own row; nothing to change, but ensure the
 --    self-read exists even on DBs where sbn_staff_read was dropped.
@@ -4879,7 +4873,6 @@ end $$;
 -- (sc_student_fee_state superseded by the V10.3 override-aware definition embedded below)
 -- (sc_student_fee_state grants issued with the V10.3 definition embedded below)
 
-notify pgrst,'reload schema';
 -- 2a. Loan balance engine
 alter table public.staff_loans add column if not exists repaid_from_payroll numeric default 0;
 create or replace function public.sc_payroll_posts_loan()
@@ -5102,12 +5095,11 @@ exception when undefined_table then null; end $$;
 -- (sc_can_edit unchanged — defined ONCE earlier in this schema; the standalone
 --  v10.1 file re-asserts it for existing databases.)
 
-notify pgrst,'reload schema';
 insert into public.sc_module_access(module, leadership)
 values ('status_manager','none')
 on conflict (module) do nothing;
    -- an owner's later choice is never overwritten
-notify pgrst,'reload schema';
+
 -- 0. Schema: deliberate per-student fee override marker
 alter table public.fee_payments add column if not exists total_overridden boolean default false;
 -- 1. sc_cbt_items — canonical Items/Pairs reader (array or JSON-in-text)
@@ -5443,7 +5435,6 @@ grant execute on function public.cbt_submit_v2(jsonb)to anon,authenticated;
 -- (cbt_regrade_exam_results_v5 grants issued with the V10.6 definition embedded below)
 -- (sc_student_fee_state grants issued with the V10.7 definition embedded below)
 
-notify pgrst,'reload schema';
 -- (Section 1 of the standalone pack — the case-insensitive teacher_can_manage_subject_class —
 --  is already applied at the function's single authoritative definition earlier in this file.)
 
@@ -5517,10 +5508,10 @@ for each row execute function public.sc_cbt_duration_sync();
 -- duration carries the teacher's real figure.
 update public.cbt_exams set duration_min=duration
  where coalesce(duration,0)>0 and duration<>45 and coalesce(duration_min,45)=45;
-notify pgrst,'reload schema';
+
 alter table public.digital_library add column if not exists cbt_code text default '';
 create index if not exists idx_digital_library_cbt_code on public.digital_library (cbt_code) where cbt_code <> '';
-notify pgrst,'reload schema';
+
 -- 0. Schema
 alter table public.cbt_results add column if not exists manual_awards jsonb not null default '{}'::jsonb;
 alter table public.cbt_results add column if not exists reviewed_by uuid references public.profiles(id) on delete set null;
@@ -5646,7 +5637,7 @@ revoke execute on function public.cbt_review_result(uuid,jsonb)from public,anon;
 grant execute on function public.cbt_review_result(uuid,jsonb)to authenticated;
 revoke execute on function public.cbt_regrade_exam_results_v5(uuid)from public,anon;
 grant execute on function public.cbt_regrade_exam_results_v5(uuid)to authenticated;
-notify pgrst,'reload schema';
+
 -- 0. Schema
 alter table public.students add column if not exists portal_locked boolean not null default false;
 alter table public.students add column if not exists portal_lock_message text not null default '';
@@ -5909,7 +5900,7 @@ end $$;
 drop trigger if exists trg_community_audience on public.module_records;
 create trigger trg_community_audience before insert or update on public.module_records
 for each row execute function public.sc_community_audience();
-notify pgrst,'reload schema';
+
 create or replace function public.sc_recompute_fee_rows(p_student uuid, p_term text default '', p_session text default '')
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare grand numeric := null; r record; paid_before numeric := 0; n int := 0; cand numeric;
@@ -6008,7 +5999,7 @@ create policy results_scope_select on public.results for select using(
         and(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))
         and not public.sc_report_hidden_for(auth.uid(), s.id)));
 drop policy if exists cbt_result_scope_select on public.cbt_results;
-notify pgrst,'reload schema';
+
 drop policy if exists "affective_traits_read" on public.affective_traits;
 create policy "affective_traits_read" on public.affective_traits for select using (
   public.is_staff(auth.uid())
@@ -6036,7 +6027,7 @@ create policy metrics_family_read on public.student_term_metrics for select usin
      and (s.user_id=auth.uid() or public.is_parent_of(auth.uid(),s.id))
      and not public.sc_report_hidden_for(auth.uid(), s.id))
 );
-notify pgrst,'reload schema';
+
 create or replace function public.sc_fee_ledger_doctor(p_heal boolean default false)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare issues jsonb := '[]'::jsonb; r record; healed int := 0; cur record;
@@ -6149,7 +6140,7 @@ begin
 end $$;
 revoke execute on function public.sc_fee_ledger_doctor(boolean) from public, anon;
 grant execute on function public.sc_fee_ledger_doctor(boolean) to authenticated;
-notify pgrst,'reload schema';
+
 -- 1+2. ENGINE 11 (single authoritative definition; supersedes engine 9.5)
 create or replace function public.generate_timetable(
   p_class text, p_session text default '', p_term text default '',
@@ -6556,7 +6547,7 @@ begin
 end $$;
 revoke execute on function public.sc_timetable_capacity(text[],integer,jsonb) from public, anon;
 grant execute on function public.sc_timetable_capacity(text[],integer,jsonb) to authenticated;
-notify pgrst,'reload schema';
+
 alter table public.students add column if not exists admission_year int;
 comment on column public.students.admission_year is
   'The year the student ACTUALLY joined the school (may be years before the platform was deployed). Printed on the lifetime ID card. NULL = unknown → the card omits the Admitted row.';
@@ -6698,7 +6689,7 @@ create policy "pv_delete" on public.poll_votes for delete using (
   or public.is_admin(auth.uid())
   or exists (select 1 from public.polls p where p.id = poll_id and p.created_by = auth.uid())
 );
-notify pgrst,'reload schema';
+
 alter table public.staff add column if not exists date_of_birth date;
 comment on column public.staff.date_of_birth is
   'V12.0: staff birthday (used by the Birthdays importer and dashboard widget). Optional.';
@@ -6794,7 +6785,7 @@ end $doctor$;
 -- 3. This pack's own marker (the template every future pack copies):
 insert into public.sc_install_state(key,details)
   values ('v12.5-schema-doctor.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 0. Auth hook must carry the linking fields (V12.6 fix: the old hook dropped admission_no/staff_no)
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer as $$
@@ -6908,7 +6899,7 @@ revoke execute on function public.sc_relink_all() from public, anon;
 grant execute on function public.sc_relink_all() to authenticated;
 -- marker
 insert into public.sc_install_state(key,details) values ('v12.6-relink.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 1. Restore ALL archived CBT exams (one-click fix)
 create or replace function public.sc_restore_all_archived_exams()
 returns jsonb language plpgsql security definer set search_path=public as $$
@@ -7064,7 +7055,7 @@ revoke all on function public.sc_restore_all_student_archives() from public, ano
 grant execute on function public.sc_restore_all_student_archives() to authenticated;
 -- Marker for schema doctor
 insert into public.sc_install_state(key,details) values ('v12.7-archive-restore.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Ensure assignment column exists for all classes (if admin hasn't created, create default Assignment column for each class)
 -- This ensures cumulative assignment push has destination
 do $$
@@ -7100,16 +7091,16 @@ from public.cbt_exams e
 where a.cbt_exam_id = e.id and e.code is not null and (a.drive_link is null or a.drive_link = '')
 and lower(coalesce(e.assessment_type,''))='assignment';
 insert into public.sc_install_state(key,details) values ('v12.12-report-student-fix.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 4. Update totals to return per-subject breakdown as well
 
 -- REMOVED early -- REMOVED early -- REMOVED early grant for sc_assignment_totals kept after last def (v12.25 fix 42883 final)
 -- REMOVED early grant for sc_assignment_totals kept after last def (v12.25 fix 42883 final)
 insert into public.sc_install_state(key,details) values ('v12.13-multi-assignment.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Marker for schema doctor
 insert into public.sc_install_state(key,details) values ('v12.14-robust-fixes.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Ensure assignments RLS write policy enforces owner (teacher can only edit own)
 drop policy if exists assignments_scope_write on public.assignments;
 create policy assignments_scope_write on public.assignments for all using(public.is_admin(auth.uid())or((posted_by=auth.uid()or posted_by is null)and public.teacher_can_manage_subject_class(auth.uid(),subject,class)))with check(public.is_admin(auth.uid())or(posted_by=auth.uid()and public.teacher_can_manage_subject_class(auth.uid(),subject,class)));
@@ -7118,7 +7109,7 @@ drop policy if exists assignments_scope_select on public.assignments;
 create policy assignments_scope_select on public.assignments for select using(public.is_admin(auth.uid())or public.teacher_can_manage_subject_class(auth.uid(),subject,class)or exists(select 1 from public.students s where(s.user_id=auth.uid()or public.is_parent_of(auth.uid(),s.id))and s.class=assignments.class));
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.15-term-sheet-and-permissions.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 1. Add column to academic_periods
 alter table public.academic_periods add column if not exists allow_student_report boolean not null default false;
 alter table public.academic_periods add column if not exists allow_parent_report boolean not null default false;
@@ -7285,7 +7276,7 @@ grant all on public.notifications to authenticated;
 -- Ensure sc_install_state markers
 insert into public.sc_install_state(key,details) values ('v12.23-fix-notif-mark-read-and-theme.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.22-theme-messages-notifications-drive-progress.sql','{"self":true,"retro":"v12.23"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 comment on column public.assignments.cbt_exam_id is 'V12.8: when this assignment is a mirror of a CBT exam (assessment_type=assignment), stores the cbt_exams.id';
 comment on column public.assignments.is_cbt is 'V12.8: true if this assignment is auto-mirrored from a CBT assignment exam';
 comment on column public.assignments.source is 'V12.8: manual | cbt_assignment | cbt_mirror';
@@ -7310,7 +7301,7 @@ comment on column public.assignment_scores.cbt_exam_id is 'V12.8: when this scor
 -- REMOVED early -- REMOVED early -- REMOVED early -- REMOVED early -- REMOVED early grant for sc_assignment_totals kept after last def (v12.28 final fix)
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.8-assignment-cbt-bridge.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 2. Rebuild mirror trigger with drive_link auto-fill (robust, all-inclusive)
 
 -- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
@@ -7326,7 +7317,7 @@ where a.cbt_exam_id = e.id and e.code is not null and (a.drive_link is null or a
 and lower(coalesce(e.assessment_type,''))='assignment';
 -- 5. Marker
 insert into public.sc_install_state(key,details) values ('v12.9-assignment-fixes.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Mirror trigger with drive_link (V12.9 improved, V12.10 final)
 
 -- REMOVED early cbt assignment mirror/cleanup trigger kept last (v12.25 fix 42883)
@@ -7344,7 +7335,7 @@ and lower(coalesce(e.assessment_type,''))='assignment';
 
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.10-final-fixes.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 create index if not exists assignments_cbt_exam_id_idx on public.assignments(cbt_exam_id) where cbt_exam_id is not null;
 create index if not exists assignment_scores_cbt_exam_id_idx on public.assignment_scores(cbt_exam_id) where cbt_exam_id is not null;
 drop index if exists assignment_scores_assignment_unique;
@@ -7358,7 +7349,7 @@ from public.cbt_exams e
 where a.cbt_exam_id = e.id and e.code is not null and (a.drive_link is null or a.drive_link = '')
 and lower(coalesce(e.assessment_type,''))='assignment';
 insert into public.sc_install_state(key,details) values ('v12.11-assignment-final.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 3. RPC to set allowed per term/session (admin-only, one-click)
 -- REMOVED duplicate sc_set_report_generation_allowed kept last (v12.24 final rebuild)
 
@@ -7380,7 +7371,7 @@ create unique index if not exists assignment_scores_cbt_subject_unique on public
 drop index if exists assignment_scores_cbt_unique;
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.16-report-allow-and-multicombine.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.sc_keepalive_sources enable row level security;
 drop policy if exists "ka_sources_read" on public.sc_keepalive_sources;
 revoke all on table public.sc_keepalive_sources from anon, authenticated;
@@ -7422,7 +7413,7 @@ create policy "spaced_rw" on public.cbt_spaced_practice for all using (user_id=a
 -- REMOVED early grant for storage_table_top kept after last def (v12.24 final)
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.17-advanced-cbt-and-layers.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.sc_keepalive_sources enable row level security;
 drop policy if exists "ka_sources_read" on public.sc_keepalive_sources;
 revoke all on table public.sc_keepalive_sources from anon, authenticated;
@@ -7435,7 +7426,7 @@ grant select on public.sc_heartbeat to anon, authenticated;
 insert into public.sc_heartbeat(id) values (1) on conflict (id) do nothing;
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.18-heartbeat-updated-at-fix.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.sc_keepalive_sources enable row level security;
 drop policy if exists "ka_sources_read" on public.sc_keepalive_sources;
 create policy "ka_sources_read" on public.sc_keepalive_sources for select using (true);
@@ -7542,7 +7533,7 @@ drop policy if exists "install_state_read" on public.sc_install_state;
 grant select on public.sc_install_state to anon, authenticated;
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.19-platform-health-robust.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Ensure photo sync triggers exist (from v12.2)
 -- REMOVED duplicate sc_sync_photo_to_profile kept last (v12.24 final rebuild)
 
@@ -7583,7 +7574,7 @@ insert into public.sc_install_state(key,details) values ('v12.2-photo-sync.sql',
 
 -- Marker for v12.20
 insert into public.sc_install_state(key,details) values ('v12.20-cbt-full-edit-and-proctor.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.sc_install_state enable row level security;
 drop policy if exists "sis_admin_read" on public.sc_install_state;
 drop policy if exists "install_state_read" on public.sc_install_state;
@@ -7777,7 +7768,7 @@ insert into public.sc_install_state(key,details) values ('v12.18-heartbeat-updat
 insert into public.sc_install_state(key,details) values ('v12.19-platform-health-robust.sql','{"self":true,"pack":"v12.21 unconditional"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.20-cbt-full-edit-and-proctor.sql','{"self":true,"pack":"v12.21 unconditional"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.21-schema-doctor-v12.2-fix.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.messages add column if not exists sender uuid;
 alter table public.messages add column if not exists recipient uuid;
 alter table public.messages add column if not exists subject text default '';
@@ -7954,19 +7945,19 @@ grant all on public.messages to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.25-fix-messages-sender-42703.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.24-fix-notif-clear-42883.sql','{"self":true,"retro":"v12.25"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.23-fix-notif-mark-read-and-theme.sql','{"self":true,"retro":"v12.25"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- No function return type changes in this pack — just ensure existing functions still exist
 -- (they are already in complete-schema from V12.25, but we ensure markers)
 
 insert into public.sc_install_state(key,details) values ('v12.26-theme-legibility-final.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.25-fix-messages-sender-42703.sql','{"self":true,"retro":"v12.26"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.24-fix-notif-clear-42883.sql','{"self":true,"retro":"v12.26"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Markers
 insert into public.sc_install_state(key,details) values ('v12.27-notification-legibility-fix.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.26-theme-legibility-final.sql','{"self":true,"retro":"v12.27"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.25-fix-messages-sender-42703.sql','{"self":true,"retro":"v12.27"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 0. Ensure cbt_exams table has all columns
 alter table public.cbt_exams add column if not exists teacher_id uuid references public.profiles(id) on delete set null;
 alter table public.cbt_exams add column if not exists code text;
@@ -8010,7 +8001,7 @@ create policy cbt_exams_public_select on public.cbt_exams for select using (true
 insert into public.sc_install_state(key,details) values ('v12.28-fix-cbt-teacher-create.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.27-notification-legibility-fix.sql','{"self":true,"retro":"v12.28"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.25-fix-messages-sender-42703.sql','{"self":true,"retro":"v12.28"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- V12.28 ensure assignment CBT bridge funcs exist (fix 42883)
 create or replace function public.sc_mirror_cbt_assignment()
 returns trigger language plpgsql security definer set search_path=public as $$
@@ -8166,14 +8157,14 @@ create trigger trg_cbt_assignment_cleanup after delete on public.cbt_exams for e
 insert into public.sc_install_state(key,details) values ('v12.29-idcard-dropdown-fix.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.28-fix-cbt-teacher-create.sql','{"self":true,"retro":"v12.29"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.27-notification-legibility-fix.sql','{"self":true,"retro":"v12.29"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.notifications add column if not exists priority text default 'normal';
 alter table public.notifications add column if not exists channels text default '[]';
 -- No function changes in this pack — legibility is client-side, but ensure markers
 insert into public.sc_install_state(key,details) values ('v12.30-notification-bell-legibility-fix.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.29-idcard-dropdown-fix.sql','{"self":true,"retro":"v12.30"}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.27-notification-legibility-fix.sql','{"self":true,"retro":"v12.30"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 0. Ensure needed columns/tables exist
 alter table public.cbt_results add column if not exists attempt_number int default 1;
 alter table public.cbt_results add column if not exists retake_allowed_by uuid references public.profiles(id) on delete set null;
@@ -8248,7 +8239,7 @@ create index if not exists messages_pair_idx on public.messages (sender, recipie
 create index if not exists messages_recipient_idx on public.messages (recipient, read_at);
 insert into public.sc_install_state(key,details) values ('v12.31-cbt-retake-robust.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.30-notification-bell-legibility-fix.sql','{"self":true,"retro":"v12.31"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 1. Broaden CBT update policy: admin/owner OR subject/class teacher can edit
 drop policy if exists cbt_exam_scope_update on public.cbt_exams;
 -- 2. Helper: class match (used by both v6 functions) — kept inline for self-containment,
@@ -8316,7 +8307,7 @@ grant execute on function public.cbt_set_question_bank(uuid, jsonb) to anon;
 -- Markers
 insert into public.sc_install_state(key,details) values ('v12.32-cbt-edit-and-class-fix.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.31-cbt-retake-robust.sql','{"self":true,"retro":"v12.32"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.cbt_exams add column if not exists select_count int not null default 0;
 -- Add check for attempt_limit >=0 (idempotent)
 do $$ begin
@@ -8333,7 +8324,7 @@ create index if not exists cbt_results_exam_id_idx on public.cbt_results(exam_id
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.33-cbt-comprehensive-fix.sql','{"self":true}') on conflict (key) do nothing;
 insert into public.sc_install_state(key,details) values ('v12.32-cbt-edit-and-class-fix.sql','{"self":true,"retro":"v12.33"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 do $$ begin
   if not exists (select 1 from pg_constraint where conname='cbt_exams_attempt_limit_check') then
     alter table public.cbt_exams add constraint cbt_exams_attempt_limit_check check (attempt_limit >= 0);
@@ -8376,7 +8367,7 @@ grant execute on function public.cbt_append_questions(uuid,jsonb) to authenticat
 -- 6. Index for attempt check
 create index if not exists cbt_results_exam_student_ref_idx on public.cbt_results(exam_id, student_id_ref);
 insert into public.sc_install_state(key,details) values ('v12.34-cbt-attempt-and-robust-fixes.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 1. Fix cbt_set_question_bank to be even more permissive — any authenticated teacher who can select the exam can edit
 -- 2. Fix cbt_append_questions similarly
 -- 3. Add RPC for single-exam push with detailed status (for progress report)
@@ -8404,7 +8395,7 @@ end$$;
 revoke execute on function public.cbt_push_exam_to_reports(uuid,text) from public, anon;
 grant execute on function public.cbt_push_exam_to_reports(uuid,text) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.35-cbt-edit-push-categorisation-fix.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 0. Ensure cbt_results table and helper functions exist
 create table if not exists public.cbt_results_recovery_log (
   id uuid primary key default gen_random_uuid(),
@@ -8480,7 +8471,7 @@ select r.*, e.code as exam_code, e.title as exam_title, e.subject as exam_subjec
 from public.cbt_results r join public.cbt_exams e on e.id=r.exam_id;
 grant select on public.cbt_results_with_exam to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.36-cbt-missing-results-and-robust-fixes.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 drop function if exists public.cbt_update_exam_bank_verified(uuid, jsonb) cascade;
 create or replace function public.cbt_update_exam_bank_verified(p_exam_id uuid, p_bank jsonb)
 returns jsonb language plpgsql security definer set search_path=public as $$
@@ -8676,7 +8667,7 @@ end$$;
 revoke execute on function public.cbt_recover_pending(jsonb) from public, anon;
 grant execute on function public.cbt_recover_pending(jsonb) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.38-cbt-total-view-and-all-cbt-audit.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- 0. Ensure bank_version for optimistic lock (detects concurrent edits)
 alter table public.cbt_exams add column if not exists bank_version int not null default 1;
 -- 1. Server pending table (device-independent)
@@ -8844,9 +8835,9 @@ end$$;
 revoke execute on function public.cbt_audit_all_missing() from public, anon;
 grant execute on function public.cbt_audit_all_missing() to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.39-edit-bulletproof-and-server-pending.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 insert into public.sc_install_state(key,details) values ('v12.40-pwa-seamless-update.sql','{"self":true,"feature":"pwa-update"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Helper: coerce any jsonb/text/null to jsonb array '[]'
 create or replace function public.cbt_coerce_to_jsonb_array(p_val jsonb)
 returns jsonb language plpgsql immutable as $$
@@ -8991,7 +8982,7 @@ end$$;
 revoke execute on function public.cbt_get_results_with_pending(uuid) from public, anon;
 grant execute on function public.cbt_get_results_with_pending(uuid) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.41-force-edit-and-pending-wal.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- New per-exam toggles (default true to keep existing exams working — no feature dropped)
 alter table public.cbt_exams add column if not exists enable_math_keyboard boolean not null default true;
 alter table public.cbt_exams add column if not exists enable_calculator boolean not null default true;
@@ -9001,7 +8992,7 @@ update public.cbt_exams set enable_math_keyboard = coalesce((anti_cheat_config->
 update public.cbt_exams set enable_calculator = coalesce((anti_cheat_config->>'calculator')::boolean, coalesce((anti_cheat_config->>'scientific_calculator')::boolean, true)) where enable_calculator is null;
 grant execute on function public.cbt_get_public_exam_v6(text,text) to anon, authenticated;
 insert into public.sc_install_state(key,details) values ('v12.42-math-keyboard-toggle-and-public-link.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.cbt_exams add column if not exists show_score_on_submit boolean not null default true;
 alter table public.cbt_exams add column if not exists clear_previous_on_next boolean not null default true;
 update public.cbt_exams set show_score_on_submit = coalesce((anti_cheat_config->>'show_score_on_submit')::boolean, (anti_cheat_config->>'show_score')::boolean, true) where show_score_on_submit is null;
@@ -9055,7 +9046,7 @@ begin
  return base||jsonb_build_object('identity_mode','open','candidate',candidate,'identity_engine_version','v5.6.2-class','enable_math_keyboard', coalesce(exam_row.enable_math_keyboard, true), 'enable_calculator', coalesce(exam_row.enable_calculator, true), 'show_score_on_submit', coalesce(exam_row.show_score_on_submit, true), 'public_link', coalesce(exam_row.public_link, ''));
 end$$;
 insert into public.sc_install_state(key,details) values ('v12.43-score-display-and-privacy.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Draft table for shadow edit
 create table if not exists public.cbt_exams_drafts(
   id uuid primary key default gen_random_uuid(),
@@ -9089,7 +9080,7 @@ begin
 end$$;
 grant execute on function public.cbt_publish_draft(uuid) to authenticated, anon;
 insert into public.sc_install_state(key,details) values ('v12.44-comprehensive-7-issues.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.cbt_exams_drafts enable row level security;
 drop policy if exists cbt_drafts_any_auth on public.cbt_exams_drafts;
 create policy cbt_drafts_any_auth on public.cbt_exams_drafts for all using (auth.uid() is not null) with check (auth.uid() is not null);
@@ -9122,7 +9113,7 @@ grant execute on function public.cbt_save_draft(uuid,jsonb) to authenticated, an
 -- Add a new wrapper that does JSON.stringify compare on client side is enough, but we keep cbt_publish_draft as is
 
 insert into public.sc_install_state(key,details) values ('v12.45-edit-draft-publish-privacy.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.cbt_exams add column if not exists bank_hash text not null default '';
 alter table public.cbt_exams add column if not exists proctor_required boolean generated always as (coalesce((anti_cheat_config->>'camera')::boolean,false)) stored;
 create index if not exists cbt_exams_proctor_required_idx on public.cbt_exams(proctor_required) where proctor_required=true;
@@ -9151,7 +9142,7 @@ begin
 end$$;
 grant execute on function public.cbt_force_replace_bank_v2(uuid,jsonb,text) to authenticated, anon;
 insert into public.sc_install_state(key,details) values ('v12.46-proctor-enforce-and-cache-bust.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 create table if not exists public.midterm_report_cards(
   id uuid primary key default gen_random_uuid(),
   student_id uuid references public.students(id) on delete set null,
@@ -9247,7 +9238,7 @@ begin
 end$$;
 grant execute on function public.publish_midterm_reports(text,text,text,boolean) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.47-midterm-reports.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Canonical DB-side verifier. Hash is computed from coerced JSONB, so object key
 -- ordering and TEXT-vs-JSONB transport never cause a false negative.
 create or replace function public.cbt_verify_exam_bank(p_exam_id uuid, p_expected_hash text default null)
@@ -9321,7 +9312,7 @@ begin
 end$$;
 drop trigger if exists trg_midterm_report_sync on public.report_scores;
 insert into public.sc_install_state(key,details) values ('v12.48-cbt-integrity-network-and-midterm-sync.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 -- Canonical force replace: row-lock, optimistic version, coerce JSONB, hash computed by postgres.
 create or replace function public.cbt_force_replace_bank_v3(p_exam_id uuid,p_bank jsonb,p_expected_version int default null)
 returns jsonb language plpgsql security definer set search_path=public as $$
@@ -9368,7 +9359,7 @@ grant execute on function public.cbt_force_append_bank_v2(uuid,jsonb) to authent
 revoke execute on function public.cbt_verify_exam_bank(uuid,text) from public,anon;
 grant execute on function public.cbt_verify_exam_bank(uuid,text) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.49-canonical-edit-append-verify.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 create table if not exists public.cbt_proctor_sessions(
  id uuid primary key default gen_random_uuid(),
  exam_id uuid not null references public.cbt_exams(id) on delete cascade,
@@ -9415,9 +9406,9 @@ end$$;
 drop trigger if exists trg_cbt_proctor_required_before_result on public.cbt_results;
 create trigger trg_cbt_proctor_required_before_result before insert on public.cbt_results for each row execute function public.sc_cbt_require_proctor_before_result();
 insert into public.sc_install_state(key,details) values ('v12.50-server-proctor-session-gate.sql','{"self":true}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 insert into public.sc_install_state(key,details) values ('v12.51-runtime-cache-bust.sql','{"self":true,"runtime_cache":"v12.51"}') on conflict (key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.midterm_report_cards add column if not exists has_scores boolean not null default true;
 -- Internal helper: recalculate one student/context from Midterm columns only.
 create or replace function public.sc_midterm_rebuild_one(p_sid uuid,p_sid_ref text,p_name text,p_class text,p_term text,p_session text)
@@ -9440,7 +9431,7 @@ grant execute on function public.sc_midterm_rebuild_one(uuid,text,text,text,text
 grant execute on function public.generate_midterm_reports(text,text,text) to authenticated;
 drop trigger if exists trg_midterm_report_sync on public.report_scores;
 insert into public.sc_install_state(key,details) values ('v12.52-midterm-roster-complete-and-context-sync.sql','{"self":true}') on conflict(key) do nothing;
-notify pgrst,'reload schema';
+
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
 -- Final cbt_exam_scope policies AFTER sc_cbt_subject_allowed (fix 42883 + allow any teacher to create)
 drop policy if exists cbt_exam_scope_insert on public.cbt_exams;
@@ -9523,7 +9514,7 @@ end$$;
 drop trigger if exists trg_midterm_report_sync on public.report_scores;
 create trigger trg_midterm_report_sync after insert or update or delete on public.report_scores for each row execute function public.sc_refresh_midterm_report_for_score();
 insert into public.sc_install_state(key,details) values ('v12.55-unify-midterm-assessment-and-report-mapping.sql','{"self":true}') on conflict(key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.cbt_exams drop constraint if exists cbt_exams_assessment_type_check;
 update public.cbt_exams
    set assessment_type='midterm',updated_at=now()
@@ -9533,7 +9524,7 @@ update public.cbt_exams
 insert into public.sc_install_state(key,details)
 values ('v12.56-cbt-assessment-check-constraint-safe.sql','{"self":true}')
 on conflict(key) do nothing;
-notify pgrst,'reload schema';
+
 alter table public.midterm_report_cards add column if not exists max_total numeric not null default 0;
 alter table public.midterm_report_cards add column if not exists score_details jsonb not null default '[]'::jsonb;
 revoke execute on function public.sc_midterm_rebuild_one(uuid,text,text,text,text,text) from public,anon;
@@ -9811,7 +9802,7 @@ end$$;
 revoke execute on function public.sc_cbt_bulk_push_batch_v1(uuid[],text,boolean,numeric,boolean,text,text,boolean) from public,anon;
 grant execute on function public.sc_cbt_bulk_push_batch_v1(uuid[],text,boolean,numeric,boolean,text,text,boolean) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.57-report-details-and-atomic-cbt-bulk-push.sql',jsonb_build_object('self',true)) on conflict(key) do nothing;
-notify pgrst,'reload schema';
+
 create or replace function public.cbt_force_replace_bank_v3(p_exam_id uuid,p_bank jsonb,p_expected_version int default null)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare e record; bank jsonb; old_bank jsonb; old_questions jsonb; old_hash text; old_qhash text; new_hash text; ver int;
@@ -9884,7 +9875,7 @@ end$$;
 revoke execute on function public.cbt_verify_exam_bank(uuid,text) from public,anon;
 grant execute on function public.cbt_verify_exam_bank(uuid,text) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.58-cbt-bank-alias-repair-and-verified-readback.sql',jsonb_build_object('self',true)) on conflict(key) do nothing;
-notify pgrst,'reload schema';
+
 -- 1. CBT CODE BRIDGE
 --    Root cause: assignments.cbt_exam_id stores the cbt_exams UUID and the
 --    mirror trigger never copied cbt_exams.code into assignments.drive_link,
@@ -10588,8 +10579,7 @@ begin
 end $$;
 revoke all on function public.sc_fee_roster(text,text,text,text) from public, anon;
 grant execute on function public.sc_fee_roster(text,text,text,text) to authenticated;
-notify pgrst,'reload schema';
- select pg_notify('pgrst','reload schema');
+
 -- V12.62 — ONE FEE ENGINE (items 1, 2, 4, 5)
 -- WHY THIS EXISTS
 --   The dashboard card read sc_student_fee_state; the Fees page and every
@@ -14572,3 +14562,12 @@ begin
 end $$;
 revoke all on function public.sc_fee_truth_sheet(uuid) from public, anon;
 grant execute on function public.sc_fee_truth_sheet(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- V12.68: LAST STATEMENT IN THE FILE, DELIBERATELY.
+-- PostgREST answers RPCs from a cached catalogue. This notification is
+-- what makes it reload. Any object declared after it is invisible to the
+-- API until the cache expires — which is exactly how a perfectly good
+-- database came to report "run database/v9.4-fees-and-exams.sql".
+-- ---------------------------------------------------------------------
+select pg_notify('pgrst', 'reload schema');
