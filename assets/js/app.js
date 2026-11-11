@@ -119,7 +119,28 @@ const App = {
   async loadSchoolSettings() {
     try {
       const supabase = window.sb || this.sb || null; if (!supabase) return;
-      const { data } = await supabase.from('school_settings').select('*').eq('id', 1).maybeSingle();
+      // V12.68 — `select('*')` is all-or-nothing: ONE missing column and the
+      // whole settings row fails, so branding, terms, sessions, geofence and the
+      // currency symbol all vanish at once. Ask for the columns we actually use;
+      // if the API still refuses, drop to an empty select so the id row is still
+      // readable, and finally surface the reason instead of swallowing it.
+      let data = null;
+      {
+        const COLS = ['id','school_name','short_name','motto','address','phone','email','logo_url',
+          'currency','terms','sessions','principal_name','signature_url','principal_signature_bg_removed',
+          'proprietor_name','proprietor_signature_url','proprietor_signature_bg_removed',
+          'examination_officer_name','examination_officer_signature_url','examination_officer_signature_bg_removed',
+          'latitude','longitude','geo_radius_m','enforce_geofence','stamp_text','stamp_color',
+          'stamp_enabled','signature_enabled','class_teacher_signature_url','hmg_link'].join(',');
+        const r = await supabase.from('school_settings').select(COLS).eq('id', 1).maybeSingle();
+        if (!r.error) data = r.data;
+        else {
+          console.warn('[settings] named columns refused, retrying with id only:', r.error.message);
+          const r2 = await supabase.from('school_settings').select('id').eq('id', 1).maybeSingle();
+          if (r2.error) throw r2.error;
+          data = r2.data;                 // the row exists; other fields use defaults
+        }
+      }
       if (data) {
         window.SC_SETTINGS = data;
         try {
@@ -135,7 +156,9 @@ const App = {
           window.SCHOOL.enforceGeofence = data.enforce_geofence !== false;
         } catch (_) {}
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn('[settings] school_settings could not be read:', e && e.message ? e.message : e);
+    }
   },
 
   hydrateBrandAssets() {
