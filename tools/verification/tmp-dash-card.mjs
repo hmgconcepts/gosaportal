@@ -22,7 +22,8 @@ function findChrome() {
   for (const r of [process.env.HOME + '/.cache/ms-playwright', '/root/.cache/ms-playwright']) {
     let dirs = [];
     try { dirs = fs.readdirSync(r).sort().reverse(); } catch { continue; }
-    for (const d of dirs) for (const rel of ['chrome-linux/chrome', 'chrome-linux64/chrome',
+    for (const d of dirs) for (const rel of ['chrome-linux/headless_shell', 'chrome-linux/chrome',
+                                             'chrome-linux64/chrome',
                                              'chrome-headless-shell-linux64/chrome-headless-shell']) {
       const p = r + '/' + d + '/' + rel;
       if (fs.existsSync(p)) return p;

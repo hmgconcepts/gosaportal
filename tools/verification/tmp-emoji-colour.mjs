@@ -12,10 +12,19 @@
 /* playwright-core lives in the authoring tree, not in the shipped repo */
 import { createRequire } from 'module';
 const require_ = createRequire(import.meta.url);
-const WORK = process.env.SC_WORK || '/home/user/work/node_modules/playwright-core';
-let chromium;
-try { ({ chromium } = require_('playwright-core')); }
-catch { ({ chromium } = require_(WORK)); }
+/* The authoring tree at /home/user/work is NOT part of the saved workspace, so
+   never depend on it: resolve playwright-core from wherever it actually is
+   (the repo's own node_modules, an env override, or a global install). */
+let chromium = null, resolveErr = null;
+for (const cand of [process.env.SC_WORK, 'playwright-core', 'playwright',
+                    '/usr/lib/node_modules/playwright-core'].filter(Boolean)) {
+  try { ({ chromium } = require_(cand)); break; } catch (e) { resolveErr = e; }
+}
+if (!chromium) {
+  console.error('  playwright-core not resolvable — run: npm i --no-save playwright-core');
+  console.error('  ' + (resolveErr && resolveErr.message));
+  process.exit(1);
+}
 import fs from 'fs';
 const HERE = new URL('.', import.meta.url).pathname;
 /* find a usable Chromium: the container image changes between sessions, so
@@ -27,8 +36,8 @@ function findChrome() {
   const glob = (dir) => { try { return fs.readdirSync(dir); } catch { return []; } };
   for (const r of roots) {
     for (const d of glob(r).sort().reverse()) {
-      for (const rel of ['chrome-linux/chrome', 'chrome-linux64/chrome',
-                         'chrome-headless-shell-linux64/chrome-headless-shell']) {
+      for (const rel of ['chrome-linux/headless_shell', 'chrome-linux/chrome',
+                         'chrome-linux64/chrome', 'chrome-headless-shell-linux64/chrome-headless-shell']) {
         const p = r + '/' + d + '/' + rel;
         if (fs.existsSync(p)) return p;
       }
