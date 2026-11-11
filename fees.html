@@ -1156,13 +1156,19 @@ const FeeTruth={
         +(pv.fix?'<div style="margin-top:3px;color:#78350f">'+this.esc(pv.fix)+'</div>':'')+'</div>';
     }
     /* the five numbers, in the order every screen shows them */
+    /* V12.69 — build the tile list BEFORE mapping it. The opening-balance tile
+       is conditional, so the array must be assembled first: appending the map
+       straight onto a ternary only maps the final array literal and leaves the
+       opening tile as raw "label,value,colour" text. */
+    const tiles=[];
+    if(Number(h.opening_arrears||0)>0) tiles.push(['Opening balance (before School Connect)',m(h.opening_arrears),'#b45309']);
+    tiles.push(['Total fees this term',(h.bill_known===false?'not published':m(h.net_bill)),(h.bill_known===false?'#b45309':'#0f172a')]);
+    tiles.push(['Paid (all receipts)',m(h.paid_this_term),'#15803d']);
+    tiles.push(['Balance this term',m(h.balance_this_term),Number(h.balance_this_term)>0?'#b91c1c':'#15803d']);
+    tiles.push(['Previous terms owing',Number(h.arrears||0)>0?m(h.arrears):'—',Number(h.arrears)>0?'#b91c1c':'#64748b']);
+    tiles.push(['TOTAL OUTSTANDING',m(h.total_outstanding),out?'#b91c1c':'#15803d']);
     html+='<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">'
-      +[['Total fees this term',(h.bill_known===false?'not published':m(h.net_bill)),(h.bill_known===false?'#b45309':'#0f172a')],
-        ['Paid',m(h.paid_this_term),'#15803d'],
-        ['Balance this term',m(h.balance_this_term),Number(h.balance_this_term)>0?'#b91c1c':'#15803d'],
-        ['Previous terms owing',m(h.arrears),Number(h.arrears)>0?'#b91c1c':'#64748b'],
-        ['TOTAL OUTSTANDING',m(h.total_outstanding),out?'#b91c1c':'#15803d']]
-      .map(([l,v,c])=>'<div><div style="font-size:1.35rem;font-weight:900;color:'+c+'">'+v+'</div>'
+      +tiles.map(([l,v,c])=>'<div><div style="font-size:1.35rem;font-weight:900;color:'+c+'">'+v+'</div>'
         +'<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--gray-500)">'+l+'</div></div>').join('')
       +'</div>';
 

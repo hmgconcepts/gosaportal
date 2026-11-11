@@ -729,6 +729,13 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     if(document.getElementById('ic-dept')) document.getElementById('ic-dept').value=(s.department||s.role||'');
     document.getElementById('ic-photo').value=s.photo_url||''; this.render(); },
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
+  /* the finished card size, read from the same fields the PDF uses */
+  faceOpts(){
+    const n=id=>Number((document.getElementById(id)||{}).value)||0;
+    const w=n('ic-card-width-mm'), h=n('ic-card-height-mm');
+    return { widthMm:w, heightMm:h, template:(this.tplOpts()||{}).template,
+             widthPx:w?Math.round(w*96/25.4):0, heightPx:h?Math.round(h*96/25.4):0 };
+  },
   person(){ var to=this.tplOpts(); const typedName=(document.getElementById('ic-name').value||'').trim(); const sample=this.sample(); const base={ full_name:typedName||this.cur.full_name||sample.full_name, created_at:(this.cur&&this.cur.created_at)||'', date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:document.getElementById('ic-photo').value||this.cur.photo_url||'', gender:document.getElementById('ic-gender').value||this.cur.gender||'', phone:document.getElementById('ic-phone').value||this.cur.phone||'', blood_group:document.getElementById('ic-blood').value||'', type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
     if(this.kind==='staff'){ base.staff_no=document.getElementById('ic-id').value||this.cur.staff_no||sample.staff_no; base.staff_type=document.getElementById('ic-class').value||this.cur.staff_type||sample.staff_type; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role||sample.role; base.department=this.cur.department||sample.department; }
     else { base.admission_no=document.getElementById('ic-id').value||this.cur.admission_no||sample.admission_no; base.admission_year=this.cur.admission_year||''; base.class=document.getElementById('ic-class').value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
@@ -736,7 +743,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   fallbackHtml(p){ return '<div class="sc-idcard" style="width:340px;border:1px solid #e2e8f0;border-radius:16px;padding:18px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.12);font-family:system-ui"><h3 style="margin:0;color:#0506ae">'+(window.SCHOOL&&SCHOOL.name||'School')+'</h3><p style="font-size:.75rem;color:#64748b">'+(p.type==='staff'?'STAFF IDENTITY CARD':'STUDENT IDENTITY CARD')+'</p><div style="display:flex;gap:12px;align-items:center"><div style="width:76px;height:76px;border-radius:12px;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900">'+(p.full_name||'S').charAt(0).toUpperCase()+'</div><div><b>'+esc(p.full_name||'')+'</b><br><span>'+esc(p.admission_no||p.staff_no||'')+'</span><br><span>'+esc(p.class||p.role||'')+'</span></div></div><p style="font-size:.65rem;color:#94a3b8;margin-bottom:0">If found, please return to the school office.</p></div>'; },
   cardHtml(p){ try{ if(window.Super&&Super.idcard&&Super.idcard.html) return Super.idcard.html(p); }catch(e){ console.error('ID-card render failed:',e); } return this.fallbackHtml(p); },
   render(){ const box=document.getElementById('ic-preview'); if(!box)return; const p=this.person();
-    let html=''; try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) html=Super.idcard.pairHtml(p); }catch(e){ console.error('pair render failed:',e); }
+    let html=''; try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) html=Super.idcard.pairHtml(p,this.faceOpts()); }catch(e){ console.error('pair render failed:',e); }
     box.innerHTML=html||this.cardHtml(p)||this.fallbackHtml(p); },
   applyCardSize(){
     const preset=document.getElementById('ic-size-preset'),orient=document.getElementById('ic-card-orientation'),wrapW=document.getElementById('ic-custom-size-wrap'),wrapH=document.getElementById('ic-custom-height-wrap'),paper=document.getElementById('ic-paper-size'),paperW=document.getElementById('ic-custom-paper-width-wrap'),paperH=document.getElementById('ic-custom-paper-height-wrap');
@@ -1080,8 +1087,12 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     if(!people||!people.length){toast('No ID-card records to print.','warning');return false;}
     const w=window.open('','_blank');if(!w){toast('Popup blocked. Allow pop-ups to print ID cards.','warning',7000);return false;}
     const base=document.baseURI.replace(/[^/]*$/,''),paperRule=cfg.paperCss;
+    /* V12.70 — the SAME physical box is handed to both faces, so the back can
+       never come out in a different orientation from the front. */
+    const faceOpts={widthMm:cfg.width,heightMm:cfg.height,template:(this.tplOpts()||{}).template,
+                    widthPx:Math.round(cfg.width*96/25.4),heightPx:Math.round(cfg.height*96/25.4)};
     const makeSide=(person,side)=>{
-      let html='';try{html=side==='front'?(window.Super&&Super.idcard&&Super.idcard.html?Super.idcard.html(person):this.cardHtml(person)):(window.Super&&Super.idcard&&Super.idcard.backHtml?Super.idcard.backHtml(person):this.fallbackBackHtml(person));}catch(e){console.error('ID-card '+side+' render failed',e);html=side==='front'?this.fallbackHtml(person):this.fallbackBackHtml(person);}
+      let html='';try{html=side==='front'?(window.Super&&Super.idcard&&Super.idcard.html?Super.idcard.html(person):this.cardHtml(person)):(window.Super&&Super.idcard&&Super.idcard.backHtml?Super.idcard.backHtml(person,faceOpts):this.fallbackBackHtml(person));}catch(e){console.error('ID-card '+side+' render failed',e);html=side==='front'?this.fallbackHtml(person):this.fallbackBackHtml(person);}
       return '<div class="idcard-face '+(cfg.trim?'with-trim':'')+'" data-side="'+side+'" style="width:'+cfg.width+'mm;height:'+cfg.height+'mm"><div class="idcard-scale">'+html+'</div></div>';
     };
     const sheets=people.map(person=>{
@@ -1094,25 +1105,99 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const closeScript='</'+'script>';w.document.open();w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="'+esc(base)+'"><title>'+esc(title||'Student ID Cards')+'</title><style>'+css+'</style></head><body>'+sheets+'<script>'+js+closeScript+'</body></html>');w.document.close();return true;
   },
   fallbackBackHtml(p){const s=window.SCHOOL||{};return '<div class="sc-idcard" style="width:340px;height:220px;border:1px solid #cbd5e1;border-radius:16px;padding:18px;background:#fff;font-family:system-ui"><h3 style="margin:0 0 8px">If found, return to '+esc(s.name||'the school')+'</h3><p>'+esc(s.address||'')+'</p><p>'+esc(s.phone||'')+' · '+esc(s.email||'')+'</p><b>'+esc(p.admission_no||p.staff_no||'')+'</b><p>Powered by HMG Concepts</p></div>';},
+  /* ==================================================================
+     V12.70 — ISSUE 2: "DOWNLOAD PDF" AND "PRINT" MUST AGREE.
+     ------------------------------------------------------------------
+     They were two different programs. Download built the PDF with
+     IDCardPDF (vector, exact millimetres, embedded font); Print opened a
+     pop-up and rendered the HTML cards, then handed them to the browser's
+     own print-to-PDF. Same data, two engines: different font metrics,
+     different scaling, a different back layout, and different margins.
+     The school was right to say the two results do not match.
+
+     Print now builds the SAME PDF and sends it to the print dialog, so the
+     sheet you print is byte-identical to the file you download. If the
+     browser cannot print a blob directly (older Safari), it opens the PDF
+     in a new tab, where the print dialog is one keypress away.
+     ================================================================== */
   print(){
-    const src=this.exportSource();
-    if(!src.length){ toast('Nothing selected — pick a record or type a name first. The sample preview is never printed.','warning',7000); return false; }
-    return this.printCards(src.slice(0,1).map(x=>this.recordPerson(x,this.tplOpts())),'ID Card');
+    return this.printViaPdf(false);
+  },
+  printAll(){
+    return this.printViaPdf(true);
+  },
+  /* Build the PDF for the current selection and hand it to the printer.
+     `allRecords` false → the single selected/typed record (the old print());
+     true → everything the class/search filter covers (the old printAll()). */
+  async printViaPdf(allRecords){
+    let cfg; try{ cfg=this.printConfig(); }catch(e){ toast(e.message||e,'warning',8000); return false; }
+    if(!window.IDCardPDF || !IDCardPDF.available()){
+      toast('The PDF/print engine did not load. Reload the page and try again.','warning',8000);
+      return false;
+    }
+    let source=this.exportSource();
+    if(!source.length){
+      toast('Nothing selected. Pick a record from the list, or type a name to print a single card. The on-screen sample is never printed.','warning',8000);
+      return false;
+    }
+    if(allRecords){
+      const f=this.currentFilter();
+      source=this.applyFilter(source,f,true);
+      if(!source.length) return false;
+    } else {
+      source=source.slice(0,1);
+    }
+    const btn=document.querySelector(allRecords?'[onclick="ICUI.printAll()"]':'[onclick="ICUI.print()"]');
+    const restore=btn?btn.innerHTML:'';
+    if(btn){ btn.disabled=true; btn.innerHTML='⏳ Preparing print…'; }
+    try{
+      const to=this.tplOpts();
+      const people=source.map(x=>this.recordPerson(x,to));
+      const cards=await this.pdfCards(people);
+      const bytes=IDCardPDF.build(cards,{
+        widthMm:cfg.width, heightMm:cfg.height,
+        pageWidthMm:(cfg.paperOrientation==='landscape'?this.paperDims(cfg.paper)[1]:this.paperDims(cfg.paper)[0]),
+        pageHeightMm:(cfg.paperOrientation==='landscape'?this.paperDims(cfg.paper)[0]:this.paperDims(cfg.paper)[1]),
+        marginMm:cfg.margin, gapMm:cfg.gap, layout:this.pdfLayout(cfg), trim:cfg.trim,
+        brand:this.brand(), title:'ID Cards', creator:(window.SCHOOL&&SCHOOL.name)||'School Connect'
+      });
+      const blob=new Blob([bytes],{type:'application/pdf'});
+      const url=URL.createObjectURL(blob);
+      /* Preferred path: print the PDF itself in a hidden frame, so the paper
+         output is exactly the downloaded file. */
+      const frame=document.createElement('iframe');
+      frame.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+      frame.src=url;
+      let printed=false;
+      frame.onload=()=>{
+        try{ frame.contentWindow.focus(); frame.contentWindow.print(); printed=true; }
+        catch(e){ printed=false; }
+      };
+      document.body.appendChild(frame);
+      await new Promise(r=>setTimeout(r,1200));
+      if(!printed){
+        /* Fallback — open the very same PDF in a tab. Nothing is re-rendered,
+           so there is still only one appearance. */
+        const w=window.open(url,'_blank');
+        if(!w) toast('Your browser blocked the print window. Allow pop-ups, or use Download PDF and print the file.','warning',9000);
+        else toast('The PDF is open in a new tab — press Ctrl/Cmd+P to send it to the printer.','info',9000);
+      }
+      setTimeout(()=>{ try{ frame.remove(); }catch(_){} }, 60000);
+      setTimeout(()=>URL.revokeObjectURL(url),120000);
+      if(window.CRUD&&CRUD.audit) try{ CRUD.audit('idcards','print-pdf',allRecords?'bulk':'single','',{count:cards.length}); }catch(_){}
+      return true;
+    }catch(e){
+      console.error('ID-card print failed',e);
+      toast('Print failed: '+(e.message||e)+' — use Download PDF instead; it is the same file.','error',10000);
+      return false;
+    }finally{ if(btn){ btn.disabled=false; btn.innerHTML=restore; } }
   },
   printHtml(cards,title){const w=window.open('','_blank');if(!w){toast('Popup blocked. Please allow popups.','warning');return;}const base=document.baseURI.replace(/[^/]*$/,'');w.document.open();w.document.write('<!doctype html><html><head><title>'+esc(title||'ID Cards')+'</title><base href="'+base+'"><style>@page{size:A4;margin:10mm}body{margin:0}</style></head><body>'+cards+'</body></html>');w.document.close();},
-  /* Bulk print — same single source of truth as the PDF (exportSource +
-     applyFilter), so class filters, searches and the preview can never disagree,
-     and an empty match prints nothing instead of the whole school. */
-  printAll(){
-    const to=this.tplOpts();
-    let source=this.exportSource();
-    if(!source.length){ toast('Nothing selected — pick a record or type a name first. The sample preview is never printed.','warning',7000); return false; }
-    const f=this.currentFilter();
-    source=this.applyFilter(source,f,true);
-    if(!source.length) return false;
-    const people=source.map(x=>this.recordPerson(x,to));
-    return this.printCards(people,'ID Cards — '+this.filterLabel(f));
-  }
+  /* V12.70 — the old bulk print lived here and silently OVERRODE the
+     printViaPdf() definition above it, because a later duplicate key wins in an
+     object literal. That is why fixing the print path had no visible effect:
+     the replacement was dead code from the moment it was written. Removed — the
+     single definition of printAll() is the PDF path at the top of this object. */
 
 };
 window.ICUI=ICUI;

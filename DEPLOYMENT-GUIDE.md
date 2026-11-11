@@ -70,13 +70,17 @@ live data on the builder site itself:
 ## B2. Install the tables (run ONE SQL file)
 1. Supabase → **SQL Editor → + New query**.
 2. Open **`database/complete-schema.sql`** from the ZIP, copy **all** of it, paste, **Run**.
-3. Confirm the final success row: **`V12.65 applied: public.diary + diary_ack, sc_diary_ack, sc_diary_acks, sc_diary_feed`**.
-   - ✅ This one file installs everything: **127 tables, 1,541 columns, 195 functions,
-     4 views, 292 RLS policies, 242 indexes, 354 constraints**, every trigger, grant
-     and seed row, plus every RPC the app calls.
+3. Wait for the run to finish. On success the last statements return without error
+   and the file ends by reloading the API cache (`pg_notify('pgrst','reload schema')`).
+   - ✅ This one file installs everything: **130 tables, 1,586 columns, 236 functions,
+     5 views, 309 RLS policies, 252 indexes, 365 constraints**, every trigger, grant
+     and seed row, plus every RPC the app calls. (Counts verified V12.70 against a
+     freshly booted PostgreSQL.)
    - ✅ It is **idempotent** — safe to run again, and safe on an existing project.
-   - ✅ It is **782 KB**, comfortably inside Supabase's 1 MB SQL Editor limit, so it
-     pastes and runs from the dashboard in one go.
+   - ✅ It is **976,856 bytes** (954 KiB), inside Supabase's 1 MB SQL Editor limit,
+     so it pastes and runs from the dashboard in one go. Headroom at V12.70 is
+     **23,144 bytes** — `tools/build-complete-schema.py` fails the build rather than
+     let the file cross the cap.
    - ✅ Apart from the optional demo packs (`demo-users.sql`, `demo-seed.sql`),
      this is the **only** SQL your deployment ever needs.
    - ❌ You do **not** need to run any smaller feature SQL separately (each of those
@@ -186,3 +190,39 @@ This build implements the blueprint you requested for assignments:
 
 **SW:** `sc-builder-v12.10-20260925-17` / `sc-client-v12.10-20260925-17` — includes `assignment-cbt.js` for offline.
 
+
+---
+
+## Verifying a deployment (V12.70)
+
+Run these from the repository root **before** you hand a build to a school.
+Every one of them exits non-zero on failure, so they can go straight into CI.
+
+```bash
+python3 tools/audit-every-page.py     # 398 pages, 45,047 links, 3 deployments
+python3 tools/audit-42703.py          # 178 files, 130 tables — no phantom columns
+python3 tools/audit-v5.py             # 513 platform checks (V5 → V12)
+python3 tools/audit-repo-parity.py    # client deployments match the generator
+python3 tools/audit-duplicate-methods.py --self-test
+python3 tools/audit-single-sql.py     # "one SQL file only" is still true
+python3 tools/test-inline-scripts.py  # every inline script parses
+node    tools/verify-complete-schema.mjs   # schema is object-identical & idempotent
+```
+
+The whole gate at once:
+
+```bash
+bash work/run-all-tests.sh    # 38 suites, 1,122 checks
+```
+
+**If an audit fails, do not ship.** Two of these audits had been broken and
+unreported for several releases precisely because nobody ran them; that is why
+they are all inside the gate now.
+
+### Two checks worth running on your own real data after install
+
+1. **Report Cards → 🔎 Audit / Clear Unwanted Scores** — the top banner checks
+   every mark against its maximum. Green means no impossible score exists.
+2. **Report Cards → 🏅 Repair percentages & positions** — re-measures and
+   re-ranks. Run it after importing historical marks from another system, then
+   compare one report card against its broadsheet row.
