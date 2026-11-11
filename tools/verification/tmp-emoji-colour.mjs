@@ -18,14 +18,37 @@ try { ({ chromium } = require_('playwright-core')); }
 catch { ({ chromium } = require_(WORK)); }
 import fs from 'fs';
 const HERE = new URL('.', import.meta.url).pathname;
-const EXE = process.env.SC_CHROME || '/home/user/.cache/ms-playwright/chromium-1140/chrome-linux/chrome';
+/* find a usable Chromium: the container image changes between sessions, so
+   never hard-code one revision. Chrome needs its shared libraries; the
+   headless shell is what CI has. */
+function findChrome() {
+  if (process.env.SC_CHROME) return process.env.SC_CHROME;
+  const roots = [process.env.HOME + '/.cache/ms-playwright', '/root/.cache/ms-playwright'];
+  const glob = (dir) => { try { return fs.readdirSync(dir); } catch { return []; } };
+  for (const r of roots) {
+    for (const d of glob(r).sort().reverse()) {
+      for (const rel of ['chrome-linux/chrome', 'chrome-linux64/chrome',
+                         'chrome-headless-shell-linux64/chrome-headless-shell']) {
+        const p = r + '/' + d + '/' + rel;
+        if (fs.existsSync(p)) return p;
+      }
+    }
+  }
+  return '';
+}
+const EXE = findChrome();
 const FONT = HERE + 'fonts/color-emoji-subset.woff2';
 let pass = 0, fail = 0;
 const ok = (c, m, x) => { c ? (pass++, console.log('  PASS', m)) : (fail++, console.log('  FAIL', m, x ?? '')); };
 
 const b64 = fs.readFileSync(FONT).toString('base64');
 const GLYPHS = '💰 🧾 ✅ ⚠️ 📞 ✉️ 📍 🔎 🎓 🧮';
-const browser = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox'] });
+if (!EXE) { console.log('  SKIP  no Chromium found (set SC_CHROME)'); process.exit(0); }
+const browser = await chromium.launch({
+  executablePath: EXE,
+  args: ['--no-sandbox'],
+  env: { ...process.env, LD_LIBRARY_PATH: '/home/user/.local/lib:' + (process.env.LD_LIBRARY_PATH || '') },
+});
 const page = await browser.newPage({ viewport: { width: 900, height: 260 }, deviceScaleFactor: 2 });
 await page.setContent(`<meta charset="utf-8"><style>
   @font-face{font-family:"SCEmoji";src:url(data:font/woff2;base64,${b64}) format("woff2");font-display:block;}

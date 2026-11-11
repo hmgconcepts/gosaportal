@@ -148,9 +148,23 @@ def build(raw: str) -> tuple[str, dict]:
             stats[why] += 1
 
     # ---- 1. noise -----------------------------------------------------------
+    # V12.68 — KEEP THE **LAST** NOTIFY, NOT THE FIRST.
+    #
+    # `pg_notify('pgrst','reload schema')` is what makes PostgREST re-read the
+    # catalogue. Its effect is positional: it announces everything created
+    # BEFORE it. The packs after V12.61 (V12.62 … V12.68) are appended at the
+    # end of the file, so keeping the FIRST notify means the reload happens
+    # roughly 2,300 statements early and every later object — 53 functions
+    # including sc_fee_ledger_for, sc_fee_bill_v2 and sc_student_fee_state, plus
+    # the sc_fee_invoice table — is created AFTER the announcement. PostgREST
+    # then answers `rpc('sc_student_fee_state')` with 404 "function not found",
+    # and the dashboard reported that as "run database/v9.4-fees-and-exams.sql".
+    # Keep the LAST one, and move it to the very end of the file so it really is
+    # the last statement the server executes.
     notifies = [s for s in st if noise_kind(s) == 'notify']
     for s in notifies[:-1]:
         kill(s, 'redundant-notify')
+    final_notify = notifies[-1] if notifies else None
     for s in st:
         if noise_kind(s) == 'progress-select':
             kill(s, 'progress-select')
@@ -316,6 +330,22 @@ def build(raw: str) -> tuple[str, dict]:
     out = re.sub(r'\A(?:\s*--[^\n]*\n)+?\s*(?=create|comment|do|alter|grant|--   )', '', out, count=1)
     out = re.sub(r'\n{3,}', '\n\n', out)
     out = out.rstrip() + '\n'
+
+    # ---- 11. the schema-cache signal must be the LAST statement -------------
+    if final_notify is not None:
+        out = re.sub(r'^\s*notify\s+pgrst\s*,\s*\'reload schema\'\s*;\s*$', '', out, flags=re.I | re.M)
+        out = re.sub(r"^\s*select\s+pg_notify\s*\(\s*'pgrst'\s*,\s*'reload schema'\s*\)\s*;\s*$",
+                     '', out, flags=re.I | re.M)
+        out = re.sub(r'\n{3,}', '\n\n', out).rstrip() + '\n'
+        out += ("\n-- ---------------------------------------------------------------------\n"
+                "-- V12.68: LAST STATEMENT IN THE FILE, DELIBERATELY.\n"
+                "-- PostgREST answers RPCs from a cached catalogue. This notification is\n"
+                "-- what makes it reload. Any object declared after it is invisible to the\n"
+                "-- API until the cache expires — which is exactly how a perfectly good\n"
+                "-- database came to report \"run database/v9.4-fees-and-exams.sql\".\n"
+                "-- ---------------------------------------------------------------------\n"
+                "select pg_notify('pgrst', 'reload schema');\n")
+        stats['notify-moved-last'] += 1
     return out, stats, drop, st
 
 

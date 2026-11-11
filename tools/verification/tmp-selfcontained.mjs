@@ -65,5 +65,41 @@ if (applied) {
   ok(twice, 'the second run succeeds (idempotent)', e2);
 }
 
+/* ------------------------------------------------------------------
+   The schema-cache signal must come LAST.
+   PostgREST answers RPCs from a cached catalogue and reloads it when it sees
+   `pgrst`/`reload schema`. Anything declared AFTER that notification is
+   invisible to the API until the cache expires — which is precisely how a
+   correct database reported "run database/v9.4-fees-and-exams.sql" on the
+   dashboard. This is the guard against it coming back.
+   ------------------------------------------------------------------ */
+console.log('\n=== schema-cache signal (PostgREST) ===');
+const builtPath = HERE + '../../database/complete-schema.sql';
+const builtTxt = fs.readFileSync(builtPath, 'utf8');
+/* capture the WHOLE statement, so the tail can be sliced from its start */
+const NOTIFY_STMT = /select\s+pg_notify\s*\(\s*'pgrst'\s*,\s*'reload schema'\s*\)\s*;/gi;
+const notifyLines = [...builtTxt.matchAll(NOTIFY_STMT)].map(m => m.index);
+ok(notifyLines.length === 1, `exactly one reload notification (found ${notifyLines.length})`, notifyLines.length);
+const lastNotifyAt = notifyLines[notifyLines.length - 1];
+/* nothing executable may follow it */
+const tailAfter = builtTxt.slice(lastNotifyAt);
+const afterStatements = tailAfter
+  .replace(/^[ \t]*select[ \t]+pg_notify\([^)]*\)[ \t]*;[ \t]*$/m, '')
+  .split('\n')
+  .filter(l => l.trim() && !l.trim().startsWith('--'));
+ok(afterStatements.length === 0, 'and nothing executes after it (it is the last statement)', afterStatements.slice(0, 3));
+
+/* the functions the dashboard calls are all created BEFORE it */
+for (const fn of ['sc_fee_ledger_for', 'sc_fee_bill_v2', 'sc_student_fee_state', 'sc_fee_explain']) {
+  const at = builtTxt.search(new RegExp('create or replace function public\\.' + fn + '\\b'));
+  ok(at >= 0 && at < lastNotifyAt, `${fn} is created before the reload notification`);
+}
+/* and a live database really exposes them */
+const live = (await db.query(`select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+                       where n.nspname='public' and p.proname in
+                         ('sc_student_fee_state','sc_fee_bill_v2','sc_fee_explain','sc_fee_bill_audit')
+                       order by 1`)).rows;
+ok(live.length === 4, 'the live catalogue exposes all four dashboard entry points', live.map(r => r.proname));
+
 console.log(`\n  ${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);
