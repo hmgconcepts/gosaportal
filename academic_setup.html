@@ -560,11 +560,33 @@ const AS={
    const {data,error}=await sb.rpc('sc_term_rollover',{p_new_term:term,p_new_session:session,p_dry_run:true});
    if(error||!data||data.ok===false){box.innerHTML='<div class="pill pill-danger">'+esc((data&&data.error)||error.message)+'</div>';go.style.display='none';return;}
    this._roll=data;
+   /* V12.71 (round-15 item 6) — the roll used to move money and stop. The new
+      term then had no assessment columns, so Results was empty and every
+      teacher rebuilt the whole report sheet by hand. Ask the server what the
+      SECOND half of opening a term would do, and show both halves together. */
+   let open=null;
+   try{ const o=await sb.rpc('sc_term_open',{p_new_term:term,p_new_session:session,p_from_term:data.from.term,p_from_session:data.from.session,p_dry_run:true});
+        if(!o.error&&o.data&&o.data.ok!==false) open=o.data;
+        else if(o.error) open={error:o.error.message};
+        else open={error:(o.data&&o.data.error)||'preview failed'}; }
+   catch(e){ open={error:e.message}; }
+   this._open=open;
    const warn=(data.without_structure_students||[]).slice(0,12).join(', ');
    box.innerHTML='<div class="pill pill-info"><b>From '+esc(data.from.term+' '+data.from.session)+' → '+esc(data.to.term+' '+data.to.session)+'</b><br>'
      +'• '+data.invoices_to_raise+' learner(s) would be billed for the new term<br>'
      +'• '+esc((window.SC_SETTINGS&&SC_SETTINGS.currency)||'₦')+(Number(data.carried_owing_total)||0).toLocaleString()+' of unpaid balance follows learners as <i>earlier terms owing</i> — not re-charged<br>'
      +(data.without_structure>0?'<br><b class="pill pill-warning">'+data.without_structure+' learner(s) have no published fee structure for '+esc(term)+' and would be skipped:</b> '+esc(warn):'<br>Every active learner has a published structure for the new term.')
+     +'<hr style="border:none;border-top:1px solid #dbeafe;margin:8px 0">'
+     +'<b>📋 Report sheet for the new term</b><br>'
+     +(open&&open.error
+        ? '<span style="color:#b45309">Could not preview the report sheet: '+esc(open.error)+'. The term will still roll; build its columns on the Results page afterwards.</span>'
+        : open
+          ? '• '+Number(open.columns_created||0)+' assessment column(s) will be created for '+((open.classes_opened||[]).length)+' class(es), with the <b>same names, maxima and weights</b> as '+esc(open.from.term)+'<br>'
+            +'• <b>No marks move.</b> Every mark stays in '+esc(open.from.term)+' where it was earned — this only prepares an empty sheet to fill.<br>'
+            +( (open.classes_without_structure||[]).length
+                ? '<b class="pill pill-warning">'+esc((open.classes_without_structure||[]).join(', '))+'</b> have no structure to copy — check them before results are entered.'
+                : '<span style="color:#166534">Every class has structure to carry.</span>')
+          : '')
      +'</div>';
    go.style.display='inline-block';
  },
@@ -574,9 +596,25 @@ const AS={
    if(!confirm('Roll the school from '+d.from.term+' '+d.from.session+' into '+d.to.term+' '+d.to.session+'?\n\n'+d.invoices_to_raise+' bill(s) will be raised. Nothing else changes, and no debt is duplicated.'))return;
    const {data,error}=await sb.rpc('sc_term_rollover',{p_new_term:d.to.term,p_new_session:d.to.session,p_dry_run:false});
    if(error||!data||data.ok===false){toast((data&&data.error)||error.message,'danger',12000);return;}
+   /* second half of "one click": carry the report sheet's structure (never its
+      marks) so Results is ready the moment the term opens */
+   let opened=null, openErr=null;
+   try{
+     const o=await sb.rpc('sc_term_open',{p_new_term:d.to.term,p_new_session:d.to.session,
+       p_from_term:d.from.term,p_from_session:d.from.session,p_dry_run:false});
+     if(o.error) openErr=o.error.message;
+     else if(!o.data||o.data.ok===false) openErr=(o.data&&o.data.error)||'The report sheet could not be prepared.';
+     else opened=o.data;
+   }catch(e){ openErr=e.message; }
    toast('✅ '+data.message,'success',14000);
    document.getElementById('as-roll-go').style.display='none';
-   document.getElementById('as-roll-preview').innerHTML='<div class="pill pill-success">'+esc(data.message)+'</div>';
+   document.getElementById('as-roll-preview').innerHTML='<div class="pill pill-success">'+esc(data.message)
+     +'<hr style="border:none;border-top:1px solid #bbf7d0;margin:8px 0">'
+     +(opened
+        ? '<b>📋 Report sheet ready:</b> '+Number(opened.columns_created||0)+' column(s) created. '+esc(opened.message||'')
+          +(opened.next_step?'<br><span style="font-size:.86rem">'+esc(opened.next_step)+'</span>':'')
+        : '<b>📋 Report sheet:</b> <span style="color:#b45309">'+esc(openErr||'not prepared')+'</span> — build it on the Results page.')
+     +'</div>';
    this.load();
  },
  async addPeriod(){ if(!sb)return; const row={session:document.getElementById('as-p-session').value.trim(),term:document.getElementById('as-p-term').value.trim(),starts_on:document.getElementById('as-start').value||null,ends_on:document.getElementById('as-end').value||null,is_current:document.getElementById('as-current').checked}; if(!row.session||!row.term){toast('Select a registered session and term (add them in the Terms / Sessions / Arms card above first)','warning');return;} if(row.is_current) await sb.from('academic_periods').update({is_current:false}).neq('id','00000000-0000-0000-0000-000000000000'); const {error}=await sb.from('academic_periods').upsert(row,{onConflict:'session,term'}); if(error){toast(error.message,'danger');return;} toast('Academic period saved','success'); this.load(); }

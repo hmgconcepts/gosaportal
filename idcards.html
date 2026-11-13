@@ -740,8 +740,11 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     if(this.kind==='staff'){ base.staff_no=document.getElementById('ic-id').value||this.cur.staff_no||sample.staff_no; base.staff_type=document.getElementById('ic-class').value||this.cur.staff_type||sample.staff_type; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role||sample.role; base.department=this.cur.department||sample.department; }
     else { base.admission_no=document.getElementById('ic-id').value||this.cur.admission_no||sample.admission_no; base.admission_year=this.cur.admission_year||''; base.class=document.getElementById('ic-class').value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
     return base; },
-  fallbackHtml(p){ return '<div class="sc-idcard" style="width:340px;border:1px solid #e2e8f0;border-radius:16px;padding:18px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.12);font-family:system-ui"><h3 style="margin:0;color:#0506ae">'+(window.SCHOOL&&SCHOOL.name||'School')+'</h3><p style="font-size:.75rem;color:#64748b">'+(p.type==='staff'?'STAFF IDENTITY CARD':'STUDENT IDENTITY CARD')+'</p><div style="display:flex;gap:12px;align-items:center"><div style="width:76px;height:76px;border-radius:12px;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900">'+(p.full_name||'S').charAt(0).toUpperCase()+'</div><div><b>'+esc(p.full_name||'')+'</b><br><span>'+esc(p.admission_no||p.staff_no||'')+'</span><br><span>'+esc(p.class||p.role||'')+'</span></div></div><p style="font-size:.65rem;color:#94a3b8;margin-bottom:0">If found, please return to the school office.</p></div>'; },
-  cardHtml(p){ try{ if(window.Super&&Super.idcard&&Super.idcard.html) return Super.idcard.html(p); }catch(e){ console.error('ID-card render failed:',e); } return this.fallbackHtml(p); },
+  /* V12.71 — the front fallback takes the same box as the back, so even the
+     no-template path cannot produce two different shapes for one card. */
+  fallbackHtml(p,opts){ const _w=Number(opts&&opts.widthPx)||340,_h=Number(opts&&opts.heightPx)||0;
+    return '<div class="sc-idcard" style="width:'+_w+'px;'+(_h?('height:'+_h+'px;overflow:hidden;'):'')+'border:1px solid #e2e8f0;border-radius:16px;padding:18px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.12);font-family:system-ui"><h3 style="margin:0;color:#0506ae">'+(window.SCHOOL&&SCHOOL.name||'School')+'</h3><p style="font-size:.75rem;color:#64748b">'+(p.type==='staff'?'STAFF IDENTITY CARD':'STUDENT IDENTITY CARD')+'</p><div style="display:flex;gap:12px;align-items:center"><div style="width:76px;height:76px;border-radius:12px;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900">'+(p.full_name||'S').charAt(0).toUpperCase()+'</div><div><b>'+esc(p.full_name||'')+'</b><br><span>'+esc(p.admission_no||p.staff_no||'')+'</span><br><span>'+esc(p.class||p.role||'')+'</span></div></div><p style="font-size:.65rem;color:#94a3b8;margin-bottom:0">If found, please return to the school office.</p></div>'; },
+  cardHtml(p,opts){ try{ if(window.Super&&Super.idcard&&Super.idcard.html) return Super.idcard.html(p,opts); }catch(e){ console.error('ID-card render failed:',e); } return this.fallbackHtml(p,opts); },
   render(){ const box=document.getElementById('ic-preview'); if(!box)return; const p=this.person();
     let html=''; try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) html=Super.idcard.pairHtml(p,this.faceOpts()); }catch(e){ console.error('pair render failed:',e); }
     box.innerHTML=html||this.cardHtml(p)||this.fallbackHtml(p); },
@@ -1028,8 +1031,13 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     source=this.applyFilter(source,this.currentFilter(),true);
     if(!source.length) return false;
     const people=source.map(x=>this.recordPerson(x,to));
+    /* the proof sheet shows front and back side by side, so it must use the
+       same physical box as the printed card or the proof misrepresents it */
+    let _cfg={}; try{_cfg=this.printConfig();}catch(e){_cfg={width:85.6,height:53.98};}
+    const _face={widthMm:_cfg.width,heightMm:_cfg.height,
+                 widthPx:Math.round((_cfg.width||85.6)*96/25.4),heightPx:Math.round((_cfg.height||53.98)*96/25.4)};
     const html=people.map(p=>'<div style="page-break-inside:avoid;margin:0 0 8mm">'+
-      this.cardHtml(p)+this.fallbackBackHtml(p)+'</div>').join('');
+      (this.tplOpts&&this.tplOpts().template?'':'')+this.cardHtml(p)+this.fallbackBackHtml(p,_face)+'</div>').join('');
     this.printHtml('<h1 style="font-family:system-ui;font-size:12pt">ID cards — proof sheet</h1>'+
       '<p style="font-family:system-ui;font-size:9pt;color:#475569">Visual proof only. Use “Download PDF” for print production.</p>'+html,
       'ID Cards — proof sheet');
@@ -1092,7 +1100,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const faceOpts={widthMm:cfg.width,heightMm:cfg.height,template:(this.tplOpts()||{}).template,
                     widthPx:Math.round(cfg.width*96/25.4),heightPx:Math.round(cfg.height*96/25.4)};
     const makeSide=(person,side)=>{
-      let html='';try{html=side==='front'?(window.Super&&Super.idcard&&Super.idcard.html?Super.idcard.html(person):this.cardHtml(person)):(window.Super&&Super.idcard&&Super.idcard.backHtml?Super.idcard.backHtml(person,faceOpts):this.fallbackBackHtml(person));}catch(e){console.error('ID-card '+side+' render failed',e);html=side==='front'?this.fallbackHtml(person):this.fallbackBackHtml(person);}
+      let html='';try{html=side==='front'?(window.Super&&Super.idcard&&Super.idcard.html?Super.idcard.html(person,faceOpts):this.cardHtml(person,faceOpts)):(window.Super&&Super.idcard&&Super.idcard.backHtml?Super.idcard.backHtml(person,faceOpts):this.fallbackBackHtml(person,faceOpts));}catch(e){console.error('ID-card '+side+' render failed',e);html=side==='front'?this.fallbackHtml(person,faceOpts):this.fallbackBackHtml(person,faceOpts);}
       return '<div class="idcard-face '+(cfg.trim?'with-trim':'')+'" data-side="'+side+'" style="width:'+cfg.width+'mm;height:'+cfg.height+'mm"><div class="idcard-scale">'+html+'</div></div>';
     };
     const sheets=people.map(person=>{
@@ -1104,7 +1112,28 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const js='window.addEventListener("load",function(){var imgs=[].slice.call(document.images),wait=Promise.all(imgs.map(function(i){return i.complete?Promise.resolve():new Promise(function(r){i.onload=r;i.onerror=r})}));Promise.resolve(document.fonts&&document.fonts.ready).then(function(){return wait}).then(function(){document.querySelectorAll(".idcard-face").forEach(function(frame){var box=frame.querySelector(".idcard-scale"),card=box&&box.querySelector(".sc-idcard");if(!box||!card)return;card.style.setProperty("max-width","none","important");card.style.setProperty("margin","0","important");var r=card.getBoundingClientRect(),w=r.width||card.offsetWidth,h=r.height||card.offsetHeight;if(!w||!h)return;var scale=Math.min(frame.clientWidth/w,frame.clientHeight/h);box.style.width=w+"px";box.style.height=h+"px";box.style.left=Math.max(0,(frame.clientWidth-w*scale)/2)+"px";box.style.top=Math.max(0,(frame.clientHeight-h*scale)/2)+"px";box.style.transform="scale("+scale+")"});setTimeout(function(){window.focus();window.print()},350)});setTimeout(function(){window.focus();window.print()},5000)});';
     const closeScript='</'+'script>';w.document.open();w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="'+esc(base)+'"><title>'+esc(title||'Student ID Cards')+'</title><style>'+css+'</style></head><body>'+sheets+'<script>'+js+closeScript+'</body></html>');w.document.close();return true;
   },
-  fallbackBackHtml(p){const s=window.SCHOOL||{};return '<div class="sc-idcard" style="width:340px;height:220px;border:1px solid #cbd5e1;border-radius:16px;padding:18px;background:#fff;font-family:system-ui"><h3 style="margin:0 0 8px">If found, return to '+esc(s.name||'the school')+'</h3><p>'+esc(s.address||'')+'</p><p>'+esc(s.phone||'')+' · '+esc(s.email||'')+'</p><b>'+esc(p.admission_no||p.staff_no||'')+'</b><p>Powered by HMG Concepts</p></div>';},
+  /* V12.71 (item 2) — THE BACK DID NOT FOLLOW THE FRONT.
+     This fallback was hard-coded to 340x220px (landscape, 1.545:1) and took no
+     size, so when a school chose PORTRAIT the front rendered tall and the back
+     rendered wide — two different shapes for one card, and the pair no longer
+     aligned on the sheet. It now accepts the same faceOpts the front receives
+     and takes its size from them, so both faces are always one physical box.
+     340x220 remains the default only when no size is supplied. */
+  fallbackBackHtml(p,opts){
+    const s=window.SCHOOL||{};
+    const w=Number(opts&&opts.widthPx)||340, h=Number(opts&&opts.heightPx)||220;
+    const portrait=h>w;
+    /* the whole block scales with the card so text never overflows a small card */
+    const k=Math.min(w/340,h/220)||1;
+    const pad=Math.max(6,Math.round(18*k));
+    return '<div class="sc-idcard" style="width:'+w+'px;height:'+h+'px;border:1px solid #cbd5e1;border-radius:16px;padding:'+pad+'px;background:#fff;font-family:system-ui;display:flex;flex-direction:column;justify-content:center;gap:'+Math.round(6*k)+'px;overflow:hidden;text-align:center">'
+      +'<h3 style="margin:0;font-size:'+Math.round(16*k)+'px">If found, return to '+esc(s.name||'the school')+'</h3>'
+      +'<p style="margin:0;font-size:'+Math.round(12*k)+'px">'+esc(s.address||'')+'</p>'
+      +'<p style="margin:0;font-size:'+Math.round(12*k)+'px">'+esc(s.phone||'')+' · '+esc(s.email||'')+'</p>'
+      +'<b style="font-size:'+Math.round(13*k)+'px">'+esc(p.admission_no||p.staff_no||'')+'</b>'
+      +'<p style="margin:0;font-size:'+Math.round(10*k)+'px;color:#64748b">Powered by HMG Concepts</p>'
+      +'</div>';
+  },
   /* ==================================================================
      V12.70 — ISSUE 2: "DOWNLOAD PDF" AND "PRINT" MUST AGREE.
      ------------------------------------------------------------------

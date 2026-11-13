@@ -191,6 +191,42 @@ textarea.form-input{min-height:80px;resize:vertical}
 
   /* ---------- State ---------- */
   const Exam = {
+  /* V12.72 (item 4) — an honest countdown. It is derived from the server's
+     own start time, so a learner who changes their device clock gains nothing. */
+  countdownText(ms){
+    if(!(ms>0)) return 'Opening now…';
+    const s=Math.floor(ms/1000), d=Math.floor(s/86400), h=Math.floor((s%86400)/3600),
+          m=Math.floor((s%3600)/60), sec=s%60;
+    if(d>0) return d+'d '+h+'h '+m+'m';
+    if(h>0) return h+'h '+m+'m '+sec+'s';
+    if(m>0) return m+'m '+sec+'s';
+    return sec+'s';
+  },
+  startCountdown(ms){
+    if(this._cdTimer) clearInterval(this._cdTimer);
+    const started=Date.now();
+    this._cdTimer=setInterval(()=>{
+      const left=ms-(Date.now()-started);
+      const el=document.getElementById('cbt-countdown');
+      if(!el){ clearInterval(this._cdTimer); this._cdTimer=null; return; }
+      if(left<=0){
+        clearInterval(this._cdTimer); this._cdTimer=null;
+        el.textContent='Opening now…';
+        /* unlock by itself — the learner does not have to know to reload */
+        this.reload();
+        return;
+      }
+      el.textContent=this.countdownText(left);
+    },1000);
+  },
+  reload(){
+    if(this._cdTimer){ clearInterval(this._cdTimer); this._cdTimer=null; }
+    try{
+      const code=new URLSearchParams(location.search).get('code')||'';
+      if(code) location.href='./cbt-exam.html?code='+encodeURIComponent(code);
+      else location.reload();
+    }catch(_){ location.reload(); }
+  },
     data: null,
     answers: [],
     idx: 0,
@@ -666,7 +702,17 @@ textarea.form-input{min-height:80px;resize:vertical}
       return;
     }
     if (data.wait) {
-      this.root().innerHTML = '<div class="card"><h2>⏳ Please wait</h2><p>'+esc(data.message||'This exam has not started yet.')+'</p><p>Opens at <strong>' + (window.fmtDMYT ? fmtDMYT(data.start_at) : new Date(data.start_at).toLocaleString()) + '</strong>.</p></div>';
+      /* V12.72 (item 4) — a learner should not have to guess when to come back.
+         Show the exact opening moment AND a live countdown to it. */
+      const _opens = window.fmtDMYT ? fmtDMYT(data.start_at) : new Date(data.start_at).toLocaleString();
+      const _ms = data.start_at ? (new Date(data.start_at).getTime() - Date.now()) : 0;
+      this.root().innerHTML = '<div class="card"><h2>⏳ Not open yet</h2>'
+        + '<p>'+esc(data.message||'This exam has not started yet.')+'</p>'
+        + '<p>Opens at <strong>'+esc(_opens)+'</strong>.</p>'
+        + '<div id="cbt-countdown" style="font-size:1.5rem;font-weight:700;color:#1e3a8a;margin:10px 0">'+this.countdownText(_ms)+'</div>'
+        + '<p style="font-size:.88rem;color:#475569">Keep this page open — it will unlock by itself the moment the test opens. Do not reload.</p>'
+        + '<button class="btn btn-outline" onclick="Exam.reload()">🔄 Check again now</button></div>';
+      this.startCountdown(_ms);
       return;
     }
     if (data.closed) {

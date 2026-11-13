@@ -641,6 +641,26 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         
         <p style="margin:10px 0 0;font-size:.85rem;color:var(--gray-500)">Tip: click the <strong>ℹ️ Help</strong> button in the top bar, or the 💬 assistant, for the full explanation of any page.</p>
       </div></div>
+      <div class="card" style="margin-bottom:16px;border:2px solid #f59e0b;background:#fffbeb" data-admin-only id="fee-reports-card">
+        <h2 style="margin-top:0">📊 Financial Reports — what a board actually asks for</h2>
+        <p style="color:var(--gray-700);font-size:.9rem;margin-top:0">
+          A single “total outstanding” figure is the least useful number a school holds, because it merges three
+          different situations: money <b>not yet due</b>, money <b>just overdue</b>, and money that is
+          <b>never coming</b>. This panel ages the debt into 30-day bands so you can act on it, shows the
+          collection rate per class, and keeps a permanent register of every credit, waiver and write-off with the
+          reason and the person who approved it.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <button class="btn btn-primary" id="fr-load">🔄 Build the reports</button>
+          <button class="btn" id="fr-csv" disabled>⬇️ Download arrears CSV</button>
+          <button class="btn" id="fr-recon">🏦 Month-end cash &amp; bank reconciliation</button>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.88rem">
+            <input type="checkbox" id="fr-only-overdue" checked> Show only money already overdue
+          </label>
+          <span id="fr-status" style="font-size:.85rem;color:var(--gray-500)"></span>
+        </div>
+        <div id="fr-out"><div class="notice">Press <b>Build the reports</b> to age the debt and total the collections.</div></div>
+      </div>
       <div class="card" style="margin-bottom:16px;border:2px solid #a7f3d0" data-admin-only id="fee-segment-card">
         <h2 style="margin-top:0">🎯 Paid vs Debtors — one-click segmentation</h2>
         <p style="color:var(--gray-600);font-size:.9rem;margin-top:0">Every figure below comes from the same engine as the dashboard's <b>💰 School Fees — Current Term</b> widget (<code>sc_student_fee_state</code>), so the two pages can never disagree. Pick a class and filter; then lock portal access for the debtors in one click.</p>
@@ -1687,4 +1707,227 @@ window.FeeTruth = FeeTruth;
 
 /* V12.62: inline handlers resolve through window — expose the controller. */
 window.FeeSegment = FeeSegment;
+
+/* V12.71 (item 5): the reports a board asks for — aged arrears, collection
+   summary, and the adjustments register. Every figure comes from
+   sc_fee_aged_arrears / sc_fee_collection_summary / sc_fee_adjustments, which
+   re-read the invoice and payment ledgers on every call. Nothing is cached, so
+   this panel cannot disagree with the Fees table above it. */
+const FeeReports = {
+  _data: null,
+  esc: s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'),
+  money(n){ return ((window.SCHOOL && SCHOOL.currency) || '₦') + Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2}); },
+
+  async load(){
+    const out = document.getElementById('fr-out');
+    const st  = document.getElementById('fr-status');
+    if(!window.sb){ out.innerHTML = '<div class="notice notice-error">Not signed in.</div>'; return; }
+    out.innerHTML = '<div class="notice"><span class="pulse">Reading the invoice and payment ledgers…</span></div>';
+    try{
+      const [ag, cs, ad, cr] = await Promise.all([
+        sb.rpc('sc_fee_aged_arrears', { p_as_of: null, p_class: null, p_term: null, p_session: null }),
+        sb.rpc('sc_fee_collection_summary', { p_term: null, p_session: null }),
+        sb.rpc('sc_fee_adjustments', { p_term: null, p_session: null }),
+        sb.rpc('sc_fee_cash_reconciliation', { p_from: null, p_to: null })
+      ]);
+      for(const r of [ag, cs, ad, cr]){
+        if(r.error) throw r.error;
+        if(r.data && r.data.ok === false) throw new Error(r.data.error || 'Refused.');
+      }
+      this._data = { aged: ag.data, coll: cs.data, adj: ad.data, recon: cr.data };
+      if(st) st.textContent = 'Built ' + new Date().toLocaleTimeString() + ' · engine ' + ((ag.data && ag.data.engine) || 'v12.71');
+      document.getElementById('fr-csv').disabled = false;
+      this.render();
+    }catch(e){
+      const msg = String(e.message || e);
+      out.innerHTML = '<div class="notice notice-error"><b>The reports could not be built.</b><br>' + this.esc(msg)
+        + (/function|schema cache|does not exist/i.test(msg)
+            ? '<br>Run the latest <b>complete-schema.sql</b> — the financial report functions arrive with it.'
+            : '') + '</div>';
+    }
+  },
+
+  render(){
+    const d = this._data; if(!d) return;
+    const t = (d.aged && d.aged.totals) || {};
+    const g = (d.coll && d.coll.totals) || {};
+    const onlyOverdue = document.getElementById('fr-only-overdue');
+    const overdue = Number(t['0_30']||0) + Number(t['31_60']||0) + Number(t['61_90']||0) + Number(t['over_90']||0);
+
+    /* --- the four bands, each with the action it implies --- */
+    const band = (label, amount, meaning, colour) =>
+      '<div class="stat-card" style="border-left:4px solid ' + colour + '">'
+      + '<div class="stat-value">' + this.money(amount) + '</div>'
+      + '<div class="stat-label"><b>' + label + '</b><br><span style="font-size:.78rem;color:var(--gray-500)">' + meaning + '</span></div></div>';
+
+    let h = '<div class="stats-grid">'
+      + band('Not yet due', t.not_due, 'billed, but the family is not late', '#94a3b8')
+      + band('0–30 days overdue', t['0_30'], 'send the reminder now', '#fbbf24')
+      + band('31–60 days', t['31_60'], 'phone the family', '#f97316')
+      + band('61–90 days', t['61_90'], 'book a meeting', '#ef4444')
+      + band('Over 90 days', t['over_90'], 'written plan, or write it off', '#7f1d1d')
+      + '</div>';
+
+    h += '<div class="notice" style="font-size:.88rem">'
+      + '<b>' + this.money(overdue) + '</b> is money the school can already chase across <b>'
+      + (t.learners || 0) + ' learner(s)</b>. ' + this.esc((d.aged && d.aged.meaning) || '') + '</div>';
+
+    /* --- collection summary per class --- */
+    const coll = (d.coll && d.coll.rows) || [];
+    h += '<h4 style="margin:16px 0 6px">Collection by class</h4>';
+    if(!coll.length){
+      h += '<div class="notice">No invoices or payments are recorded yet, so there is nothing to summarise.</div>';
+    } else {
+      h += '<div class="table-wrap"><table style="font-size:.88rem"><thead><tr>'
+        + '<th style="text-align:left">Class</th><th>Invoices</th><th>Billed</th><th>Collected</th>'
+        + '<th>Outstanding</th><th>Collection rate</th></tr></thead><tbody>'
+        + coll.map(r => {
+            const rate = (r.rate == null) ? '—' : r.rate + '%';
+            const col = (r.rate != null && Number(r.rate) < 70) ? '#b91c1c' : (r.rate != null ? '#166534' : 'inherit');
+            return '<tr><td style="text-align:left"><b>' + this.esc(r.class || '(no class)') + '</b></td>'
+              + '<td>' + (r.invoices || 0) + '</td>'
+              + '<td>' + this.money(r.billed) + '</td>'
+              + '<td>' + this.money(r.collected) + '</td>'
+              + '<td>' + this.money(r.outstanding) + '</td>'
+              + '<td style="color:' + col + ';font-weight:600">' + rate + '</td></tr>';
+          }).join('')
+        + '<tr style="background:var(--gray-50,#f8fafc);font-weight:700"><td style="text-align:left">Whole school</td>'
+        + '<td></td><td>' + this.money(g.billed) + '</td><td>' + this.money(g.collected) + '</td>'
+        + '<td>' + this.money(g.outstanding) + '</td>'
+        + '<td>' + (g.rate == null ? '—' : g.rate + '%') + '</td></tr>'
+        + '</tbody></table></div>';
+      if(g.rate != null && Number(g.rate) < 70){
+        h += '<div class="notice" style="border-left:3px solid #f97316;font-size:.86rem;margin-top:8px">'
+          + 'A collection rate below 70% at this point in the term usually means invoices went out late, '
+          + 'or a class has no fee structure published. Check <b>Fee Doctor</b> above before chasing families.</div>';
+      }
+    }
+
+    /* --- the aged list itself --- */
+    let rows = (d.aged && d.aged.rows) || [];
+    if(onlyOverdue && onlyOverdue.checked) rows = rows.filter(r => r.band !== 'not_due');
+    h += '<h4 style="margin:16px 0 6px">Learners who owe money'
+       + (onlyOverdue && onlyOverdue.checked ? ' — overdue only' : ' — including money not yet due') + '</h4>';
+    if(!rows.length){
+      h += '<div class="notice notice-success" style="border-left:3px solid #16a34a">'
+         + (onlyOverdue && onlyOverdue.checked
+              ? 'Nothing is overdue. Every invoice is either paid or not yet payable.'
+              : 'No learner owes anything. Every invoice is fully paid.')
+         + '</div>';
+    } else {
+      const pill = b => ({
+        not_due:'background:#e2e8f0;color:#334155', '0_30':'background:#fef3c7;color:#92400e',
+        '31_60':'background:#ffedd5;color:#9a3412', '61_90':'background:#fee2e2;color:#991b1b',
+        over_90:'background:#7f1d1d;color:#fff'
+      }[b] || '');
+      const label = b => ({not_due:'not due','0_30':'0–30 days','31_60':'31–60 days',
+        '61_90':'61–90 days', over_90:'over 90 days'}[b] || b);
+      h += '<div class="table-wrap"><table style="font-size:.86rem"><thead><tr>'
+        + '<th style="text-align:left">Learner</th><th style="text-align:left">Class</th>'
+        + '<th>Outstanding</th><th>Days overdue</th><th>Age band</th></tr></thead><tbody>'
+        + rows.map(r => '<tr><td style="text-align:left"><b>' + this.esc(r.student || '')
+          + '</b><br><small>' + this.esc(r.admission_no || '') + '</small></td>'
+          + '<td style="text-align:left">' + this.esc(r.class || '') + '</td>'
+          + '<td><b>' + this.money(r.outstanding) + '</b></td>'
+          + '<td>' + (Number(r.days_overdue) || 0) + '</td>'
+          + '<td><span style="padding:2px 8px;border-radius:10px;font-size:.78rem;font-weight:600;' + pill(r.band) + '">'
+          + this.esc(label(r.band)) + '</span></td></tr>').join('')
+        + '</tbody></table></div>';
+    }
+
+    /* --- adjustments register --- */
+    const adj = (d.adj && d.adj.rows) || [];
+    h += '<h4 style="margin:16px 0 6px">Adjustments register — every credit, waiver and write-off</h4>';
+    if(!adj.length){
+      h += '<div class="notice" style="font-size:.86rem">No credit, waiver or write-off has been recorded. '
+         + 'When one is granted it appears here permanently, with the reason and the person who approved it — '
+         + 'this is the page a board reads when it questions a total.</div>';
+    } else {
+      h += '<div class="table-wrap"><table style="font-size:.84rem"><thead><tr>'
+        + '<th style="text-align:left">Learner</th><th style="text-align:left">Kind</th><th>Amount</th>'
+        + '<th style="text-align:left">Reason</th><th style="text-align:left">Approved by</th><th>When</th></tr></thead><tbody>'
+        + adj.map(a => '<tr><td style="text-align:left">' + this.esc(a.student || '')
+          + '<br><small>' + this.esc(a.admission_no || '') + '</small></td>'
+          + '<td style="text-align:left">' + this.esc(String(a.kind || '').replace('_',' ')) + '</td>'
+          + '<td>' + this.money(a.amount) + '</td>'
+          + '<td style="text-align:left">' + this.esc(a.reason || '') + '</td>'
+          + '<td style="text-align:left">' + this.esc(a.by || '') + '</td>'
+          + '<td>' + this.esc(a.at || '') + '</td></tr>').join('')
+        + '</tbody></table></div>';
+    }
+    /* --- month-end cash & bank reconciliation --- */
+    const rc = d.recon;
+    if(rc && rc.ok){
+      const rt = rc.totals || {};
+      h += '<h4 style="margin:16px 0 6px">🏦 Cash &amp; bank reconciliation — ' +
+           this.esc(rc.from || '') + ' to ' + this.esc(rc.to || '') + '</h4>';
+      const methods = rc.by_method || [];
+      if(!methods.length){
+        h += '<div class="notice" style="font-size:.86rem">No money was received in this period, so there is nothing to reconcile.</div>';
+      } else {
+        h += '<div class="table-wrap"><table style="font-size:.88rem"><thead><tr>'
+          + '<th style="text-align:left">Method</th><th>Receipts</th><th>Amount</th></tr></thead><tbody>'
+          + methods.map(m => '<tr><td style="text-align:left"><b>' + this.esc(m.method || 'unspecified') + '</b></td>'
+              + '<td>' + (m.receipts || 0) + '</td><td>' + this.money(m.amount) + '</td></tr>').join('')
+          + '<tr style="background:var(--gray-50,#f8fafc);font-weight:700"><td style="text-align:left">Cash</td><td></td>'
+          + '<td>' + this.money(rt.cash) + '</td></tr>'
+          + '<tr style="background:var(--gray-50,#f8fafc);font-weight:700"><td style="text-align:left">Bank</td><td></td>'
+          + '<td>' + this.money(rt.bank) + '</td></tr>'
+          + '<tr style="background:#ecfdf5;font-weight:700"><td style="text-align:left">Total received</td>'
+          + '<td>' + (rt.receipts || 0) + '</td><td>' + this.money(rt.total) + '</td></tr>'
+          + '</tbody></table></div>';
+
+        /* the three things that make money indefensible in an audit */
+        const flags = [];
+        if(Number(rt.no_reference) > 0) flags.push('<b>' + rt.no_reference + '</b> receipt(s) carry no reference number — you cannot trace them to a parent.');
+        if(Number(rt.unallocated) > 0)  flags.push('<b>' + rt.unallocated + '</b> receipt(s) are attached to no learner at all.');
+        if(Number(rt.zero_or_negative) > 0) flags.push('<b>' + rt.zero_or_negative + '</b> receipt(s) are zero or negative.');
+        h += '<div class="notice" style="font-size:.85rem;' + (flags.length ? 'border-left:3px solid #f97316' : 'border-left:3px solid #16a34a') + '">'
+          + (flags.length
+              ? 'Fix these before you sign the month off:<br>• ' + flags.join('<br>• ')
+              : 'Every receipt in this period has a reference, belongs to a learner, and carries a real amount.')
+          + '<br><span style="color:var(--gray-500)">' + this.esc(rc.how_to_use || '') + '</span></div>';
+      }
+    }
+
+    document.getElementById('fr-out').innerHTML = h;
+  },
+
+  scrollRecon(){
+    const out = document.getElementById('fr-out');
+    if(!out) return;
+    const h4 = [...out.querySelectorAll('h4')].find(e => /Cash & bank reconciliation|Cash &amp; bank reconciliation/.test(e.textContent));
+    if(h4) h4.scrollIntoView({behavior:'smooth', block:'center'});
+    else toast('Build the reports first — the reconciliation is part of the same sheet.','warning');
+  },
+
+  csv(){
+    const d = this._data; if(!d || !d.aged){ toast('Build the reports first.','warning'); return; }
+    let rows = d.aged.rows || [];
+    const only = document.getElementById('fr-only-overdue');
+    if(only && only.checked) rows = rows.filter(r => r.band !== 'not_due');
+    if(!rows.length){ toast('Nothing to export.','warning'); return; }
+    const keys = ['student','admission_no','class','outstanding','days_overdue','band'];
+    const body = [['Learner','Admission no','Class','Outstanding','Days overdue','Age band'].join(',')]
+      .concat(rows.map(r => keys.map(k => '"' + String(r[k] ?? '').replace(/"/g,'""') + '"').join(',')))
+      .join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([body], {type:'text/csv'}));
+    a.download = 'aged-arrears-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+  }
+};
+window.FeeReports = FeeReports;
+const _frLoad = document.getElementById('fr-load');
+if(_frLoad) _frLoad.addEventListener('click', () => FeeReports.load());
+const _frCsv = document.getElementById('fr-csv');
+if(_frCsv) _frCsv.addEventListener('click', () => FeeReports.csv());
+const _frOnly = document.getElementById('fr-only-overdue');
+if(_frOnly) _frOnly.addEventListener('change', () => { if(FeeReports._data) FeeReports.render(); });
+/* the reconciliation is part of the same build; this button takes you to it */
+const _frRecon = document.getElementById('fr-recon');
+if(_frRecon) _frRecon.addEventListener('click', () => {
+  if(!FeeReports._data){ FeeReports.load().then(()=>FeeReports.scrollRecon()); return; }
+  FeeReports.scrollRecon();
+});
 </script></body></html>

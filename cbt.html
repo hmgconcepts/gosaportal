@@ -602,9 +602,9 @@ window.CBTUI = {
   _filters: { q:'', class:'', subject:'', teacher:'', mode:'all', group:'all', archive:'active', term:'', session:'', sort:'newest', purpose:'all' },
   _isMidtermType(t){return ['ca','test','midterm','midtermtest','midtermca','midtermassessment','midtermcolumn'].includes(String(t||'').toLowerCase().replace(/[^a-z0-9]/g,''));},
   _canonicalType(t){const v=String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');return this._isMidtermType(t)?'midterm':(v||'exam');},
-  _purposeLabel(t){ const v=this._canonicalType(t);const m={assignment:'🟢 Assignment',midterm:'🔵 Mid-term Assessment',exam:'🔴 Exam',project:'🟣 Project',quiz:'🟡 Quiz',practical:'🟠 Practical'}; return m[v]||'⚪ '+(t||'Other'); },
+  _purposeLabel(t){ const v=this._canonicalType(t);const m={assignment:'🟢 Assignment',midterm:'🔵 Mid-term Assessment',exam:'🔴 Exam',project:'🟣 Project',quiz:'🟡 Quiz',practical:'🟠 Practical',prep:'🧪 Prep Exam (rehearsal)'}; return m[v]||'⚪ '+(t||'Other'); },
   _purposeBadge(t){
-    const key=this._canonicalType(t);const c={assignment:'background:#dcfce7;color:#166534;border:1px solid #86efac', midterm:'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd', exam:'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5', project:'background:#f3e8ff;color:#6b21a8;border:1px solid #c4b5fd', quiz:'background:#fef3c7;color:#92400e;border:1px solid #fcd34d'};
+    const key=this._canonicalType(t);const c={assignment:'background:#dcfce7;color:#166534;border:1px solid #86efac', midterm:'background:#dbeafe;color:#1e40af;border:1px solid #93c5fd', exam:'background:#fee2e2;color:#991b1b;border:1px solid #fca5a5', project:'background:#f3e8ff;color:#6b21a8;border:1px solid #c4b5fd', quiz:'background:#fef3c7;color:#92400e;border:1px solid #fcd34d', prep:'background:#ffedd5;color:#9a3412;border:2px dashed #fb923c'};
     const s=c[key]||'background:#f1f5f9;color:#475569;border:1px solid #e2e8f0';
     return '<span class="badge" style="'+s+'">'+this._purposeLabel(t)+'</span>';
   },
@@ -615,6 +615,7 @@ window.CBTUI = {
     if(t==='assignment') help.innerHTML='<b>🟢 Assignment / Homework:</b> Multiple per term, cumulatively collated. When you create this, it auto-appears in <b>Assignments page</b> for every student of that class with auto-filled link — students click to take it. Score class auto-fills kind/max/scores from CBT results → accumulates → push to Assignment column.';
     else if(this._isMidtermType(t)) help.innerHTML='<b>🔵 Mid-term Assessment:</b> Use this single purpose for a mid-term test or CA. Choose the separate <b>Report-card destination</b> (for example CA1, CA2, or Midterm); legacy CA/Test exams remain supported.';
     else if(t==='exam') help.innerHTML='<b>🔴 Terminal Exam:</b> Once per term. Scores pushed to Exam column.';
+    else if(t==='prep') help.innerHTML='<b>🧪 Prep Exam (rehearsal):</b> A prototype of the school examination, sat to test readiness. It generates its <b>own prep report</b> with a readiness verdict (ready / nearly / needs work / at risk). <b>Its scores can never be pushed to a report card</b> — the platform blocks it in the database, not just on this screen. Leave the report-card column empty for a rehearsal.';
     else help.innerHTML='<b>'+this._purposeLabel(val)+':</b> Other purpose — project/quiz/practical. Can be mapped to any report column.';
     // V12.9: auto-select Assignment column when assignment type chosen
     try{
@@ -626,6 +627,62 @@ window.CBTUI = {
         }
       }
     }catch(_){}
+  },
+  /* V12.72 (item 2): a teacher invents a purpose without a developer. The
+     server is the authority — this only speaks to it and reports back. */
+  async addPurpose(){
+    const box=document.getElementById('ex-new-purpose');
+    const msg=document.getElementById('ex-purpose-msg');
+    const prep=document.getElementById('ex-new-preplike');
+    const label=(box&&box.value||'').trim();
+    if(!label){ if(msg) msg.textContent='Type a name first, for example "Mock UTME".'; return; }
+    if(!window.sb){ if(msg) msg.textContent='Not signed in.'; return; }
+    if(msg) msg.textContent='Saving…';
+    try{
+      const r=await sb.rpc('sc_purpose_create',{p_label:label,p_emoji:'🎯',
+        p_report_eligible:!(prep&&prep.checked),p_feeds_report:(prep&&prep.checked)?'prep':'none'});
+      if(r.error) throw r.error;
+      const d=r.data||{};
+      if(d.ok===false){
+        if(msg) msg.textContent='❌ '+(d.error||'Could not add that purpose.');
+        if(d.existing && d.slug){ this.selectPurpose(d.slug); }
+        return;
+      }
+      if(msg) msg.innerHTML='✅ '+(d.note||'Added.');
+      await this.loadPurposes(d.slug);
+      if(box) box.value='';
+    }catch(e){
+      const m=String(e.message||e);
+      if(msg) msg.textContent=/function|schema cache|does not exist/i.test(m)
+        ? '❌ '+m+' — run the latest database/complete-schema.sql.'
+        : '❌ '+m;
+    }
+  },
+  /* the dropdown the teacher sees is the registry, so a purpose added on one
+     screen is instantly available on every screen and every device */
+  async loadPurposes(select){
+    const sel=document.getElementById('ex-type');
+    if(!sel||!window.sb) return;
+    try{
+      const r=await sb.rpc('sc_purposes',{});
+      if(r.error||!Array.isArray(r.data)) return;
+      const cur=select||sel.value||'exam';
+      sel.innerHTML=r.data.map(p=>'<option value="'+this.esc(p.slug)+'">'+
+        this.esc((p.emoji||'⚪')+' '+p.label)+(p.report_eligible?'':' — rehearsal')+'</option>').join('');
+      if(r.data.some(p=>p.slug===cur)) sel.value=cur;
+      this._purposes=r.data;
+    }catch(_){}
+  },
+  /* live plain-English preview of the date window, so a teacher never has to
+     guess what the student will be told */
+  previewWindow(){
+    const box=document.getElementById('ex-window-preview'); if(!box) return;
+    const s=document.getElementById('ex-start'), c=document.getElementById('ex-close');
+    const sv=s&&s.value, cv=c&&c.value;
+    if(!sv&&!cv){ box.textContent='No window — the link works whenever the test is open.'; return; }
+    if(sv&&cv&&new Date(cv)<=new Date(sv)){ box.innerHTML='<span style="color:#b91c1c">The closing time must be AFTER the opening time.</span>'; return; }
+    const f=v=>new Date(v).toLocaleString(undefined,{weekday:'short',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    box.textContent = (sv?'Opens '+f(sv)+'. ':'Opens immediately. ')+(cv?'Closes '+f(cv)+'.':'Stays open until you close it.');
   },
   onEditTypeChange(val){
     const help=document.getElementById('ed-type-help');
@@ -738,7 +795,28 @@ window.CBTUI = {
         <div class="form-group"><label>Class</label><select class="form-select" id="ex-class"><option value="">— select class —</option></select></div>
         <div class="form-group"><label>Term</label><select class="form-select" id="ex-term"><option value="">— select term —</option></select></div>
         <div class="form-group"><label>Session</label><select class="form-select" id="ex-session"><option value="">— select session —</option></select></div>
-        <div class="form-group"><label>UTME / multi-subject package (optional)</label><input class="form-input" id="ex-package" placeholder="e.g. UTME 2026: English, Maths, Physics, Chemistry"></div><div class="form-group"><label>Assessment purpose</label><select class="form-select" id="ex-type" onchange="if(window.CBTUI) CBTUI.onTypeChange(this.value)"><option value="exam">🔴 Terminal Exam</option><option value="midterm">🔵 Mid-term Assessment (single test/CA)</option><option value="assignment">🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)</option><option value="project">🟣 Project (other purpose)</option><option value="quiz">🟡 Quiz (other purpose)</option><option value="practical">🟠 Practical (other purpose)</option></select><div id="ex-type-help" style="font-size:.82rem;color:#475569;margin-top:6px"></div></div>
+        <div class="form-group"><label>UTME / multi-subject package (optional)</label><input class="form-input" id="ex-package" placeholder="e.g. UTME 2026: English, Maths, Physics, Chemistry"></div><div class="form-group"><label>Assessment purpose</label><select class="form-select" id="ex-type" onchange="if(window.CBTUI) CBTUI.onTypeChange(this.value)"><option value="exam">🔴 Terminal Exam</option><option value="midterm">🔵 Mid-term Assessment (single test/CA)</option><option value="assignment">🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)</option><option value="project">🟣 Project (other purpose)</option><option value="quiz">🟡 Quiz (other purpose)</option><option value="practical">🟠 Practical (other purpose)</option><option value="prep">🧪 Prep Exam (rehearsal)</option></select><div id="ex-type-help" style="font-size:.82rem;color:#475569;margin-top:6px"></div>
+          <div style="margin-top:8px;padding:10px;border:1px dashed var(--gray-300);border-radius:8px;background:var(--gray-50)">
+            <div style="font-size:.86rem;font-weight:600;margin-bottom:6px">Need a purpose that is not on this list?</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <input class="form-input" id="ex-new-purpose" placeholder="e.g. Mock UTME, Prep Exam, Christmas Test" style="flex:1;min-width:180px">
+              <label style="display:flex;align-items:center;gap:5px;font-size:.82rem"><input type="checkbox" id="ex-new-preplike"> Rehearsal — never reaches the report card</label>
+              <button type="button" class="btn btn-sm btn-outline" onclick="CBTUI.addPurpose()">➕ Add purpose</button>
+            </div>
+            <div id="ex-purpose-msg" style="font-size:.8rem;color:var(--gray-600);margin-top:6px"></div>
+          </div></div>
+
+        <div class="form-group">
+          <label>When may students sit this test?</label>
+          <div class="grid grid-2">
+            <div><label style="font-size:.82rem;color:var(--gray-600)">Opens</label>
+              <input class="form-input" type="datetime-local" id="ex-start"></div>
+            <div><label style="font-size:.82rem;color:var(--gray-600)">Closes</label>
+              <input class="form-input" type="datetime-local" id="ex-close"></div>
+          </div>
+          <small>Leave both empty to let students sit it any time the test is open. Set them and the link refuses entry before the start and after the close, telling the student the exact date and time. Times are school time (Africa/Lagos).</small>
+          <div id="ex-window-preview" style="font-size:.82rem;color:var(--gray-600);margin-top:4px"></div>
+        </div>
         <div class="form-group"><label>Report-card column (auto-maps results)</label><select class="form-select" id="ex-col"><option value="">— select a report-card column —</option></select><small>Only columns configured in Report Cards for the selected class, subject, term and session are shown.</small></div>
         <div class="form-group"><label>Exam access mode</label><select class="form-select" id="ex-mode"><option value="registered">Registered students only — identity required</option><option value="open">Open / anonymous candidates — public code access</option></select><small>Use Registered for school tests; Open for entrance or anonymous assessments.</small></div>
         <div class="form-group"><label>Max score in report card</label><input class="form-input" type="number" id="ex-max" value="100"></div>
@@ -864,6 +942,8 @@ window.CBTUI = {
       select_count: parseInt(document.getElementById('ex-sel').value)||0,
       instructions: document.getElementById('ex-instr').value,
       is_open: true,
+      start_at: (function(){ const v=document.getElementById('ex-start'); return v&&v.value?new Date(v.value).toISOString():null; })(),
+      close_at: (function(){ const v=document.getElementById('ex-close'); return v&&v.value?new Date(v.value).toISOString():null; })(),
       anti_cheat_config: {tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5')},
       csv_data: questions
     };
@@ -1004,7 +1084,7 @@ window.CBTUI = {
         <div class="form-group"><label>Class *</label><select class="form-select" id="ed-class" onchange="CBTUI.refreshEditReportColumns()">${opts(this._classes,e.class,'select class')}</select></div>
         <div class="form-group"><label>Term *</label><select class="form-select" id="ed-term" onchange="CBTUI.refreshEditReportColumns()">${opts(this._terms,e.term,'select term')}</select></div>
         <div class="form-group"><label>Session *</label><select class="form-select" id="ed-session" onchange="CBTUI.refreshEditReportColumns()">${opts(this._sessions,e.session,'select session')}</select></div>
-        <div class="form-group"><label>Assessment type — purpose (clear differentiation)</label><select class="form-select" id="ed-type" onchange="if(window.CBTUI) CBTUI.onEditTypeChange(this.value)">${['exam','midterm','assignment','project','quiz','practical'].map(x=>{const labels={exam:'🔴 Terminal Exam',midterm:'🔵 Mid-term Assessment (single test/CA)',assignment:'🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)',project:'🟣 Project (other)',quiz:'🟡 Quiz (other)',practical:'🟠 Practical (other)'};const selected=x==='midterm'?CBTUI._isMidtermType(e.assessment_type):String(e.assessment_type||'exam').toLowerCase()===x;return '<option value="'+x+'" '+(selected?'selected':'')+'>'+labels[x]+'</option>';}).join('')}</select><div id="ed-type-help" style="font-size:.82rem;color:#475569;margin-top:6px"></div></div>
+        <div class="form-group"><label>Assessment type — purpose (clear differentiation)</label><select class="form-select" id="ed-type" onchange="if(window.CBTUI) CBTUI.onEditTypeChange(this.value)">${(['exam','midterm','assignment','project','quiz','practical','prep']+(CBTUI._purposes||[]).map(p=>p.slug).filter(s=>!['exam','midterm','assignment','project','quiz','practical','prep'].includes(s))).map(x=>{const labels={exam:'🔴 Terminal Exam',midterm:'🔵 Mid-term Assessment (single test/CA)',assignment:'🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)',project:'🟣 Project (other)',quiz:'🟡 Quiz (other)',practical:'🟠 Practical (other)',prep:'🧪 Prep Exam (rehearsal — never on the report card)'};const selected=x==='midterm'?CBTUI._isMidtermType(e.assessment_type):String(e.assessment_type||'exam').toLowerCase()===x;return '<option value="'+x+'" '+(selected?'selected':'')+'>'+labels[x]+'</option>';}).join('')}</select><div id="ed-type-help" style="font-size:.82rem;color:#475569;margin-top:6px"></div></div>
         <div class="form-group"><label>Candidate mode</label><select class="form-select" id="ed-mode"><option value="registered" ${e.exam_mode!=='open'?'selected':''}>Registered students</option><option value="open" ${e.exam_mode==='open'?'selected':''}>Open / anonymous</option></select></div>
         <div class="form-group"><label>Report-card destination</label><select class="form-select" id="ed-col" onchange="CBTUI.syncEditMax()"></select><small>Loaded from Report Card columns for the selected class/term/session.</small></div>
         <div class="form-group"><label>Maximum report contribution</label><input class="form-input" type="number" id="ed-max" value="${Number(e.max_score||0)}" min="0" step="0.5" readonly><small>Automatically follows the selected report column.</small></div>
@@ -1645,8 +1725,39 @@ window.CBTUI = {
     if(!confirm('Flush ALL server pending submissions for '+code+'? This will attempt to grade and insert each stranded payload.')) return;
     const r=await sb.rpc('cbt_flush_pending_server',{p_exam_id: examId});
     if(r.error||!r.data||r.data.ok===false){ toast((r.data&&r.data.error)||r.error?.message||'Flush failed','danger',10000); return; }
-    toast('✅ Server flush: '+Number(r.data.saved||0)+' saved, '+Number(r.data.failed||0)+' failed.','success',8000);
-    if(r.data.errors && r.data.errors.length) console.warn('Flush errors', r.data.errors);
+    /* V12.71 (round-15 item 10) — "0 saved, 1 failed" was a dead end.
+       The reasons were written to console.warn, which a bursar or head teacher
+       never opens, so the school saw a failure with no name and no cause and
+       could do nothing about it. Every failed row is now shown on screen with
+       the code, the pupil, and the server's own words. */
+    const saved=Number(r.data.saved||0), failed=Number(r.data.failed||0);
+    const errs=Array.isArray(r.data.errors)?r.data.errors:[];
+    if(failed>0){
+      /* The RPC returns errors as plain strings of the form
+         "<client_ref>: <server words>" (see cbt_flush_pending_server in
+         database/complete-schema.sql), so parse that shape rather than
+         assuming an object — assuming an object is what produced a table of
+         three blank cells. */
+      const rows=errs.map(e=>{
+        let ref='', why='';
+        if(typeof e==='string'){ const i=e.indexOf(':'); if(i>0){ref=e.slice(0,i).trim(); why=e.slice(i+1).trim();} else why=e; }
+        else { ref=(e&&(e.client_ref||e.admission_no||e.student_name||e.student_id))||''; why=(e&&(e.error||e.message||e.reason))||''; }
+        let hint='';
+        if(/no exam|not found|does not exist|deleted|invalid exam/i.test(why)) hint=' <b>Unrecoverable</b> — the exam this belongs to no longer exists. Enter these marks by hand.';
+        else if(/duplicate|already/i.test(why)) hint=' <b>Already saved</b> — this pupil\u2019s paper is in the results; nothing to do.';
+        else if(/permission|policy|rls|denied/i.test(why)) hint=' <b>Permissions</b> — run the schema and sign in as staff.';
+        return '<tr><td><b>'+esc(ref||'(no reference)')+'</b></td><td>'+esc(why||'no reason returned by the server')+hint+'</td></tr>';
+      }).join('');
+      openModal('☁️ Server flush — '+saved+' saved, '+failed+' could not be saved',
+        '<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>'+saved+' submission(s) were attached to their exam and graded.</b><br>'+failed+' could not be, and here is exactly why — each row is one pupil\u2019s paper.</div>'
+        + (rows?'<div class="table-wrap" style="max-height:320px;overflow:auto;margin-top:10px"><table><thead><tr><th>Submission</th><th>Why it could not be saved</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+              :'<p style="font-size:.85rem;color:#64748b">The server did not return a reason. Copy this and send it to support: <code>'+esc(JSON.stringify(r.data).slice(0,500))+'</code></p>')
+        + '<p style="font-size:.82rem;color:#475569;margin-top:10px"><b>What to do:</b> a row naming an exam that no longer exists cannot be recovered — the exam was deleted or its code changed while pupils were sitting it. Enter those marks by hand on the exam\u2019s Results screen. Any other reason is a permissions or column problem: send the line above to support.</p>',
+        '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+      toast('☁️ Server flush: '+saved+' saved, '+failed+' failed — see the table for which and why.','warning',12000);
+    } else {
+      toast('✅ Server flush: '+saved+' saved, 0 failed.','success',8000);
+    }
     this.recoverMissing(examId, code);
   },
   // V12.38: Global audit for ANY CBT's missing/uncompleted (not just civic SSS1-3) — robust, all-inclusive
@@ -1668,8 +1779,43 @@ window.CBTUI = {
       const serverPendingTotal=Number(d.pending_server_total||0);
       const missingExams=exams.filter(e=> Number(e.total_results||0)===0 || Number(e.has_missing) || Number(e.pending_server||0)>0);
       const pendingReviewExams=exams.filter(e=> Number(e.pending_review||0)>0);
-      let html='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+d.total_exams+'</div><div class="stat-label">Total CBTs</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>!e.is_archived).length+'</div><div class="stat-label">Active</div></div><div class="stat-card"><div class="stat-value">'+exams.filter(e=>e.is_archived).length+'</div><div class="stat-label">Archived</div></div><div class="stat-card"><div class="stat-value">'+missingExams.length+'</div><div class="stat-label" style="color:'+(missingExams.length?'#b91c1c':'#16a34a')+'">'+(missingExams.length?'⚠️ Potential missing':'No missing')+'</div></div><div class="stat-card"><div class="stat-value">'+pendingCnt+'</div><div class="stat-label">Pending in THIS browser</div></div><div class="stat-card"><div class="stat-value">'+serverPendingTotal+'</div><div class="stat-label" style="color:'+(serverPendingTotal?'#b91c1c':'#16a34a')+'">Pending on SERVER</div></div></div>';
-      html+='<div class="table-wrap" style="max-height:400px;overflow:auto;margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject / Class</th><th>Status</th><th>Results (total/graded/pending/server)</th><th>Roster</th><th>Alert</th><th>Action</th></tr></thead><tbody>'+exams.slice(0,100).map(e=>{
+      /* ================================================================
+         V12.71 (round-15 item 10) — "33 ⚠️ Potential missing" and
+         "10 Pending on SERVER" told a head teacher NOTHING. Two bare
+         numbers, no explanation of what they counted, why they mattered,
+         or what to press. The school was right: a number without a meaning
+         and an action is noise, and noise in a results screen is dangerous,
+         because the one figure that DID matter was hidden among it.
+         Every tile now says what it counts, what it means, and carries the
+         button that deals with it. A tile that needs nothing says so.
+         ================================================================ */
+      const emptyExams=exams.filter(e=>Number(e.total_results||0)===0 && !e.is_archived);
+      const shortExams=exams.filter(e=>{const t2=Number(e.total_results||0),r2=Number(e.roster_count||0);return r2>0&&t2<r2;});
+      const tile=(value,label,meaning,colour,action)=>'<div class="stat-card"><div class="stat-value" style="color:'+colour+'">'+value+'</div><div class="stat-label">'+label+'</div><div style="font-size:.72rem;color:#64748b;margin-top:4px;line-height:1.35">'+meaning+'</div>'+(action?'<div style="margin-top:6px">'+action+'</div>':'')+'</div>';
+      let html='<div class="stats-grid">'
+        + tile(d.total_exams,'Total CBTs','Every CBT on this portal, archived included.','#0f172a','')
+        + tile(exams.filter(e=>!e.is_archived).length,'Active','Open for sitting. Their results appear in the report-card columns you mapped.','#0f172a','')
+        + tile(exams.filter(e=>e.is_archived).length,'Archived','Hidden from pupils but their marks are KEPT and still count.','#0f172a','')
+        + tile(missingExams.length,'⚠️ Needs attention',
+               missingExams.length
+                 ? 'Exams where pupils sat but marks are not fully in the system (roster not matched, or submissions stranded on the server). Open an exam and press <b>Recover/Repair</b>.'
+                 : 'Every exam\u2019s roster matches its results. Nothing to do.',
+               missingExams.length?'#b91c1c':'#16a34a',
+               missingExams.length?'<button class="btn btn-sm btn-outline" onclick="document.getElementById(\'cbt-audit-table\')&&document.getElementById(\'cbt-audit-table\').scrollIntoView({behavior:\'smooth\'})">↓ Show which</button>':'')
+        + tile(pendingCnt,'📦 Waiting in THIS browser',
+               pendingCnt
+                 ? 'Submissions saved on this device only (the pupil\u2019s phone lost signal). They are safe but NOT in the database yet. Press <b>Recover</b> below to upload them.'
+                 : 'Nothing unsent on this device.',
+               pendingCnt?'#b45309':'#16a34a',
+               pendingCnt?'<button class="btn btn-sm btn-primary" onclick="CBTUI.recoverPending&&CBTUI.recoverPending()">📦 Recover now</button>':'')
+        + tile(serverPendingTotal,'☁️ Stranded on SERVER',
+               serverPendingTotal
+                 ? 'Submissions reached the server but were never attached to an exam \u2014 usually because the exam was deleted or its code changed mid-sitting. <b>Flush</b> attaches them; if a flush reports "1 failed" that one row names an exam that no longer exists and can only be discarded.'
+                 : 'No orphans on the server.',
+               serverPendingTotal?'#b91c1c':'#16a34a',
+               serverPendingTotal?'<button class="btn btn-sm btn-primary" onclick="CBTUI.flushServer&&CBTUI.flushServer()">☁️ Flush now</button>':'')
+        + '</div>';
+      html+='<div id="cbt-audit-table" class="table-wrap" style="max-height:400px;overflow:auto;margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject / Class</th><th>Status</th><th>Results (total/graded/pending/server)</th><th>Roster</th><th>Alert</th><th>Action</th></tr></thead><tbody>'+exams.slice(0,100).map(e=>{
         const total=Number(e.total_results||0), graded=Number(e.graded||0), rev=Number(e.pending_review||0), roster=Number(e.roster_count||0), pendSrv=Number(e.pending_server||0);
         const hasMissing = e.has_missing || (roster>0 && total<roster) || (total===0 && !e.is_archived) || pendSrv>0;
         const alert = hasMissing ? (pendSrv?'<span style="color:#dc2626;font-weight:800">☁️ '+pendSrv+' stranded on server</span>':(total===0 ? '<span style="color:#dc2626;font-weight:800">Empty — no results</span>' : '<span style="color:#d97706;font-weight:700">Roster '+roster+' → Results '+total+'</span>')) : (rev>0?'<span style="color:#92400e">✍️ '+rev+' pending review</span>':'<span style="color:#16a34a">✅ OK</span>');
@@ -1779,7 +1925,15 @@ window.CBTUI = {
     toast('Template downloaded — it demonstrates all 17+ question types including matching, ordering, grids, gap-fills, hot-text and multi-part numeric with worked JSON shapes.','success',9000);
   }
 };
-document.addEventListener('DOMContentLoaded', CBTUI.refresh); CBTUI.refresh();
+document.addEventListener('DOMContentLoaded', function(){
+  CBTUI.refresh();
+  if(CBTUI.loadPurposes) CBTUI.loadPurposes();
+  ['ex-start','ex-close'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('change', function(){ CBTUI.previewWindow(); });
+  });
+});
+CBTUI.refresh();
 </script><script>
 // School Connect v5: real UTME-style multi-subject CBT package builder.
 (function(){

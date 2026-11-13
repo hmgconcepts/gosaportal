@@ -161,6 +161,39 @@ const MR = {
      defaults to "show", which is the old behaviour for schools that never
      touch the setting. */
   _pol:{show_position:true,show_grade:true,show_subject_position:true,show_remarks:true,position_label:'Position in class'},
+  /* V12.71 (round-15 item 7) — A LEARNER WHOSE POSITION IS HELD MUST BE HELD
+     ON EVERY SHEET THE SCHOOL PRINTS.
+     The terminal report card already honoured sc_report_position_hold, but this
+     page never read it: a child whose position the school deliberately
+     withheld was printed WITH a position on the midterm report. Same learner,
+     two documents, contradictory content. The page now loads the holds for the
+     term it is showing and applies them exactly as the card does. */
+  _holds:null,
+  async loadHolds(term,session){
+    if(!sb) return {};
+    const key=[term||'',session||''].join('|');
+    if(this._holds && this._holdsKey===key) return this._holds;
+    const set={};
+    try{
+      let q=sb.from('sc_report_position_hold').select('student_id_ref,student_id,term,session');
+      const r=await q;
+      (r.data||[]).forEach(h=>{
+        /* a hold recorded for a different term must not leak into this one */
+        if(term && h.term && String(h.term).trim().toLowerCase()!==String(term).trim().toLowerCase()) return;
+        if(session && h.session && String(h.session).trim().toLowerCase()!==String(session).trim().toLowerCase()) return;
+        if(h.student_id_ref) set[String(h.student_id_ref).toLowerCase()]=true;
+        if(h.student_id) set['id:'+h.student_id]=true;
+      });
+    }catch(_){ /* no table / no permission: treat as "nobody held" */ }
+    this._holds=set; this._holdsKey=key;
+    return set;
+  },
+  isHeld(row){
+    if(!row||!this._holds) return false;
+    const a=String(row.admission_no||row.student_id_ref||'').toLowerCase();
+    const b=row.student_id?'id:'+row.student_id:'';
+    return !!((a&&this._holds[a])||(b&&this._holds[b]));
+  },
   async loadPolicy(term,session){
     try{
       const r=await sb.rpc('sc_report_policy',{p_kind:'midterm',p_term:term||null,p_session:session||null});
@@ -253,6 +286,7 @@ const MR = {
     if(r.error||!r.data||!r.data.ok){host.innerHTML='<div class="notice">'+MR.esc((r.data&&r.data.message)|| (r.data&&r.data.error)||r.error?.message||'No report available')+'</div>';return;}
     const row=r.data.report;this._familyRow=row;
     await this.loadPolicy(row.term||term, row.session||session);  /* V12.70 item 11 */
+    await this.loadHolds(row.term||term, row.session||session);  /* V12.71 item 7 */
     host.innerHTML=(row.has_scores===false?'<div class="notice">No midterm marks are recorded yet. This is still your student’s standalone report record; contact the tutor if marks should be present.</div>':'')+'<div class="mr-card"><h3>Midterm report sheet — '+MR.esc(row.student_name)+' · '+MR.esc(row.class)+'</h3><p>'+MR.esc(row.term)+' · '+MR.esc(row.session)+(MR._pol.show_position!==false?' · '+MR.esc(MR._pol.position_label||'Position')+' '+MR.esc(row.position||'—'):'')+'</p><button class="btn btn-primary no-print" onclick="MR.printStudent(MR._familyRow)">🖨️ Open standalone sheet / Save PDF</button><div style="margin-top:10px">'+MR.scoreTable(row)+'</div></div>';
   },
   async generate(){
@@ -326,18 +360,19 @@ const MR = {
     const school=window.SCHOOL||{},logoExt=String(school.logoExt||'svg').replace(/[^a-z0-9]/gi,''),logo='assets/img/logo.'+logoExt;
     const detail=this.scoreItems(row),scoreRows=detail.length?detail.map(x=>'<tr><td>'+this.esc(x.subject||'—')+'</td><td>'+this.esc(x.assessment||'Midterm')+'</td><td>'+Number(x.score||0).toFixed(2)+'</td><td>'+(Number(x.max_mark)>0?Number(x.max_mark).toFixed(2):'—')+'</td></tr>').join(''):'<tr><td colspan="4" class="no-score">No midterm score has been recorded for this student.</td></tr>';
     return '<section class="report-page"><header class="school-head">'+(school.logoExt?'<img class="school-logo" src="'+this.esc(logo)+'" alt="">':'')+'<div><h1>'+this.esc(school.name||school.shortName||'School')+'</h1><p>'+this.esc(school.motto||'')+'</p></div></header><div class="sheet-title"><div>MIDTERM ASSESSMENT REPORT</div><small>Student report sheet · '+(row.has_scores===false?'No score recorded':'Official scores')+'</small></div><div class="student-meta"><div><b>Student</b><span>'+this.esc(row.student_name||'—')+'</span></div><div><b>Admission / student ID</b><span>'+this.esc(row.student_id_ref||'—')+'</span></div><div><b>Class</b><span>'+this.esc(row.class||'—')+'</span></div><div><b>Term</b><span>'+this.esc(row.term||'—')+'</span></div><div><b>Session</b><span>'+this.esc(row.session||'—')+'</span></div>'+((this._pol&&this._pol.show_position!==false)
-        ? '<div><b>'+this.esc((this._pol&&this._pol.position_label)||'Position')+'</b><span>'+(row.has_scores===false?'—':this.esc(row.position||'—'))+'</span></div>'
+        ? '<div><b>'+this.esc((this._pol&&this._pol.position_label)||'Position')+'</b><span>'+(row.has_scores===false||this.isHeld(row)?'—':this.esc(row.position||'—'))+'</span></div>'
         : '')+'</div>'+(row.has_scores===false?'<div class="no-score-banner">No midterm marks are recorded for this student for this term. This sheet does not treat missing marks as zero.</div>':'')+'<table class="scores"><thead><tr><th>Subject</th><th>Assessment / report column</th><th>Mark</th><th>Maximum</th></tr></thead><tbody>'+scoreRows+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+Number(row.total||0).toFixed(2)+'</th><th>'+Number(row.max_total||0).toFixed(2)+'</th></tr></tfoot></table><div class="summary">'+
       '<div><b>Overall percentage</b><span>'+(row.has_scores===false?'—':Number(row.percentage!=null?row.percentage:row.average||0).toFixed(2)+'%')+'</span>'+
         '<small style="display:block;font-size:9px;color:#64748b">of the full expected load'+(Number(row.expected_total)>0?' ('+Number(row.total||0).toFixed(2)+' of '+Number(row.expected_total).toFixed(2)+')':'')+'</small></div>'+
       ((this._pol&&this._pol.show_position!==false)
-        ? '<div><b>'+this.esc((this._pol&&this._pol.position_label)||'Position')+'</b><span>'+(row.has_scores===false||row.position==null?'—':this.esc(row.position))+'</span>'+
+        ? '<div><b>'+this.esc((this._pol&&this._pol.position_label)||'Position')+'</b><span>'+(row.has_scores===false||row.position==null||this.isHeld(row)?'—':this.esc(row.position))+'</span>'+
         (Number(row.rank_cohort_size)>0?'<small style="display:block;font-size:9px;color:#64748b">of '+Number(row.rank_cohort_size)+' ranked</small>':'')+'</div>'
         : '')+
       '<div><b>Subjects sat</b><span>'+Number(row.subjects_sat||0)+' / '+Number(row.subjects_expected||0)+'</span></div>'+
       '<div><b>Grade</b><span>'+(this.esc(row.grade||'')||'—')+'</span></div>'+
       '</div>'+
-      ((row.rank_basis)?'<div class="notice" style="text-align:center">'+this.esc(row.rank_basis)+'</div>':'')+
+      ((this.isHeld(row))?'<div class="notice" style="text-align:center">Position withheld for this learner by the school. The marks above are complete and unaffected.</div>'
+        :(row.rank_basis)?'<div class="notice" style="text-align:center">'+this.esc(row.rank_basis)+'</div>':'')+
       '<div class="signatures"><div>Class Teacher</div><div>Head Teacher / Principal</div></div><footer>Generated '+this.esc(new Date().toLocaleDateString())+' · Midterm report is separate from the terminal report card.</footer></section>';
   },
   printRows(rows,title,existingWindow){
@@ -351,7 +386,7 @@ const MR = {
     const {c,t,s}=this.vals();if(!c||!t||!s){toast('Select class, term and session first.','warning');return;}
     const w=window.open('','_blank');if(!w){toast('Allow pop-ups to open printable student reports.','warning',7000);return;}
     w.document.write('<!doctype html><title>Preparing reports…</title><p style="font-family:system-ui;padding:24px">Preparing Midterm student report sheets…</p>');
-    try{await this.loadPolicy(t,s);const rows=await this.fetchContextRows(c,t,s);if(!rows.length){w.close();toast('No generated reports found for this class/term/session.','warning');return;}const html=this.printRows(rows,'Midterm reports — '+c,w);if(!html)w.close();}
+    try{await this.loadPolicy(t,s);await this.loadHolds(t,s);const rows=await this.fetchContextRows(c,t,s);if(!rows.length){w.close();toast('No generated reports found for this class/term/session.','warning');return;}const html=this.printRows(rows,'Midterm reports — '+c,w);if(!html)w.close();}
     catch(e){w.close();toast('Could not prepare reports: '+e.message,'danger',9000);}
   },
   async preview(){
@@ -360,7 +395,7 @@ const MR = {
     const box=document.getElementById('mr-list');box.innerHTML='<span class="pulse">Loading all generated reports…</span>';
     try{
       const rows=await this.fetchContextRows(c,t,s);this._lastRows=rows;
-      await this.loadPolicy(t,s);  /* V12.70 — preview obeys the positions switch */
+      await this.loadPolicy(t,s);await this.loadHolds(t,s);  /* V12.70 — preview obeys the positions switch */
       if(!rows.length){box.innerHTML='<p>No midterm reports yet. Generate first.</p>';return;}
       const body=rows.map((row,i)=>'<tr><td>'+(i+1)+'</td><td>'+this.esc(row.student_name||'')+'</td><td>'+this.esc(row.student_id_ref||'')+'</td><td>'+Number(row.total||0).toFixed(2)+' / '+Number(row.max_total||0).toFixed(2)+'</td><td>'+Number(row.average||0).toFixed(2)+'%</td>'+((this._pol.show_position!==false)?'<td>'+(row.position||'—')+'</td>':'')+'<td>'+(row.has_scores?'Has score':'No score')+'</td><td>'+(row.published?'✅':'—')+'</td><td><button class="btn btn-sm btn-outline" onclick="MR.printStudent(MR._lastRows['+i+'])">View / print sheet</button></td></tr>').join('');
       box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>'+rows.length+' student sheet(s) generated · '+rows.filter(x=>x.has_scores).length+' scored · '+rows.filter(x=>!x.has_scores).length+' no score</b><button class="btn btn-sm btn-primary" onclick="MR.printAll()">🖨️ Print all '+rows.length+' sheets</button></div><div class="table-wrap"><table class="mr-table"><thead><tr><th>#</th><th>Student</th><th>ID</th><th>Total / Maximum</th><th>Average</th>'+(this._pol.show_position!==false?'<th>'+this.esc(this._pol.position_label||'Position')+'</th>':'')+'<th>Status</th><th>Published</th><th>Standalone sheet</th></tr></thead><tbody>'+body+'</tbody></table></div><p style="font-size:.82rem;color:#64748b">Each button opens an independent, print-ready sheet. Use the browser print dialog to print or save as PDF.</p>';
@@ -418,7 +453,7 @@ const MR = {
     if(!this.ready()) return;
     const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
     let rows;try{rows=await this.fetchContextRows(c,t,s);}catch(e){toast(e.message||'Could not load Midterm rows','danger');return;}if(!rows.length){ toast('No data','warning'); return; }
-    await this.loadPolicy(t,s);  /* V12.70 item 11 — CSV obeys the same switch */
+    await this.loadPolicy(t,s);await this.loadHolds(t,s);  /* V12.70 item 11 — CSV obeys the same switch */
     const showPos=this._pol.show_position!==false;
     const header=['Student','ID','Class','Term','Session','Total','Maximum','AveragePercent'].concat(showPos?[(this._pol.position_label||'Position')]:[]).concat(['HasScores','Published','Scores_JSON','Score_Details_JSON']);
     const csv=[header.join(',')].concat(rows.map(row=> [row.student_name,row.student_id_ref,row.class,row.term,row.session,row.total,row.max_total,row.average].concat(showPos?[row.position]:[]).concat([row.has_scores,row.published,JSON.stringify(row.scores||{}),JSON.stringify(row.score_details||[])]).map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','))).join('\n');
@@ -430,5 +465,15 @@ document.addEventListener('DOMContentLoaded', ()=>{ if(window.App) App.init('mid
 /* V12.62: inline handlers resolve through window — expose the controller. */
 window.MR = MR;
 </script>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
 </body>
 </html>
