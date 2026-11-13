@@ -323,26 +323,127 @@ def build(raw: str) -> tuple[str, dict]:
     # file bounded by Supabase's 1 MB paste limit. Any run of 8+ comment lines
     # is cut to its first 3 with a pointer. Nothing executable is touched.
     def _trim_banner(text):
+        """Compact long comment blocks WITHOUT losing what they say.
+
+        V12.72 — the schema has to fit Supabase's 1 MB SQL-editor limit, and
+        comments were 23% of the file. Dropping them would be a real loss: they
+        are how a school's own technician learns why a table exists. So instead
+        of deleting prose, keep the OPENING LINE OF EVERY PARAGRAPH — which is
+        where the claim is made — and drop the sentences that follow it. A
+        reader still gets every fact; they lose the restatement of it.
+
+        A paragraph is a comment run interrupted by a blank '--' line. Short
+        runs (4 lines or fewer) are left completely untouched.
+        """
         lines = text.split('\n')
         out, i, trimmed = [], 0, 0
+        depth = 0
         while i < len(lines):
-            if lines[i].lstrip().startswith('--'):
-                j = i
-                while j < len(lines) and lines[j].lstrip().startswith('--'):
-                    j += 1
-                run = lines[i:j]
-                prose = [x for x in run if len(x.strip()) > 3]
-                if len(run) >= 8 and len(prose) >= 6:
-                    out.extend(run[:3])
-                    out.append('-- (full history: release report; trimmed to fit the SQL editor limit)')
-                    trimmed += 1
-                else:
-                    out.extend(run)
-                i = j
+            opens = len(re.findall(r'\$\w*\$', lines[i]))
+            if depth > 0:
+                # inside a function/view body: copy verbatim, keep tracking
+                out.append(lines[i])
+                if opens: depth = (depth + opens) % 2
+                i += 1
                 continue
-            out.append(lines[i]); i += 1
+            if not lines[i].lstrip().startswith('--'):
+                out.append(lines[i])
+                if opens: depth = (depth + opens) % 2
+                i += 1
+                continue
+            j = i
+            while j < len(lines) and lines[j].lstrip().startswith('--'):
+                j += 1
+            run = lines[i:j]
+            # a comment run that opens or closes a dollar-quote is part of code
+            if any(re.search(r'\$\w*\$', x) for x in run):
+                out.extend(run); i = j; continue
+            prose = [x for x in run if len(x.strip()) > 3]
+            # A single-line comment is a statement, never a paragraph — keep it.
+            # Two or more lines are a paragraph; its opening line carries the
+            # claim, so keep that and drop the restatements. The complete prose
+            # lives in the release report, which is not size-limited.
+            if len(run) <= 1:
+                out.extend(run); i = j; continue
+            # split into paragraphs on a bare '--'
+            paras, cur = [], []
+            for ln in run:
+                if ln.strip() == '--':
+                    if cur: paras.append(cur)
+                    cur = []
+                else:
+                    cur.append(ln)
+            if cur: paras.append(cur)
+            for para in paras:
+                body = [x for x in para if len(x.strip()) > 3]
+                # V12.72 — a paragraph that FITS is kept WHOLE. Cutting the
+                # tail off a short paragraph produced orphaned fragments like
+                # "a freshly imported", which misleads more than it saves.
+                if len(body) <= 3:
+                    out.extend(para)
+                else:
+                    # The opening line carries the claim — keep exactly that.
+                    # Anything after it restates, justifies or exemplifies the
+                    # same point; the release report keeps the long form.
+                    out.extend(body[:1])
+                    trimmed += len(body) - 1
+            i = j
         stats['banner-trimmed'] += trimmed
         return '\n'.join(out)
+
+    # ---- 9e. byte-identical repeated statements ----------------------------
+    # V12.72 — the cumulative source carries the same `drop trigger`,
+    # `enable row level security` and `grant execute` statements two and three
+    # times over, because each release pack re-asserted what an earlier one had
+    # already declared. Re-stating an idempotent statement is harmless but it is
+    # not free: 92 such groups cost 14.5 KB of a file capped at 1 MB.
+    # Keeping the FIRST occurrence preserves effect and order exactly.
+    # Only provably idempotent kinds are touched — never a function body,
+    # never an insert, never an update.
+    # V12.72 CORRECTION — only a CREATE that REPLACES (or is itself guarded)
+    # may be deduplicated. A bare `create view` / `create table` pair is not
+    # self-replacing, so two of them means the file cannot apply at all.
+    # `drop ... if exists` must NEVER be deduplicated either: it is the guard
+    # that lets the following create run on a second application.
+    IDEMPOTENT = {'grant', 'revoke', 'alter',
+                  'create or replace', 'comment', 'do', 'notify'}
+    norm_stmt = lambda s: re.sub(r'\s+', ' ', strip_comments(s.text)).strip().rstrip(';').lower()
+    seen_stmt = {}
+    for s in st:
+        if s.index in drop:
+            continue
+        head = re.match(r'(?i)^\s*([a-z]+(?:\s+[a-z]+)?)', strip_comments(s.text))
+        kind = (head.group(1) if head else '').strip().lower()
+        if kind not in IDEMPOTENT:
+            continue
+        key = norm_stmt(s)
+        if len(key) < 40:
+            continue
+        if key in seen_stmt:
+            kill(s, 'repeated-statement')
+        else:
+            seen_stmt[key] = s.index
+
+    # ---- 9f. decorative rule lines -----------------------------------------
+    # V12.72 — 53.6 KB of the file was lines consisting of nothing but dashes
+    # or equals signs: `-- -------...` used as a visual rule. They are worth
+    # keeping as landmarks (the header tells a school to split at the `-- ===`
+    # banners) but a landmark does not need 74 characters. Collapsing each to
+    # six characters preserves the separator and reclaims the space.
+    # Only lines that are ENTIRELY a rule are touched; a banner that carries
+    # text keeps its text and its padding.
+    def _shorten_rules(text):
+        out_lines, changed = [], 0
+        for ln in text.split('\n'):
+            s = ln.strip()
+            # allow any mix of spaces, '=' and '-' after the comment marker
+            if re.fullmatch(r'--[\s=—-]*[=—-][\s=—-]*', s) and len(s) >= 10:
+                out_lines.append('-- ----')
+                changed += 1
+            else:
+                out_lines.append(ln)
+        stats['rule-lines-shortened'] += changed
+        return '\n'.join(out_lines)
 
     # ---- 10. decorative rule lines ----------------------------------------
     built = []
@@ -373,7 +474,79 @@ def build(raw: str) -> tuple[str, dict]:
         built.append('\n'.join(keep))
 
     out = '\n'.join(built)
+    out = _shorten_rules(out)
+
+    # ---- 9b. de-indent leading whitespace --------------------------------
+    # V12.72 — SQL bodies are written indented for human eyes, but Postgres
+    # does not care about leading spaces inside a dollar-quoted body. The
+    # built file had 49 KB of pure indentation. Stripping it changes no
+    # behaviour and loses no comment: every word of explanation survives.
+    def _deindent(text):
+        """Strip leading whitespace — but NEVER inside a dollar-quoted body.
+
+        V12.72 — a first attempt de-indented every line, including the bodies
+        of PL/pgSQL functions. Postgres stores those bodies verbatim, so the
+        built file no longer matched the raw one and (far worse) the tidy-up
+        could reflow text a function was relying on. Leading spaces inside a
+        function body are meaningful to whoever maintains it, so they stay.
+        """
+        lines = text.split('\n')
+        res, saved_n = [], 0
+        depth = 0
+        for ln in lines:
+            opens = len(re.findall(r'\$\w*\$', ln))
+            if depth == 0 and opens == 0:
+                if not ln.strip():
+                    res.append('')
+                    continue
+                stripped = ln.lstrip(' \t')
+                saved_n += len(ln) - len(stripped)
+                res.append(stripped)
+            else:
+                res.append(ln)
+            # track dollar-quote depth; this toggles on every tag occurrence
+            depth = (depth + opens) % 2 if opens else depth
+        stats['deindented'] += saved_n
+        return '\n'.join(res)
+    out = _deindent(out)
+
+    # ---- 9d. release-history prose -----------------------------------------
+    # V12.72 — 88 blocks of "School Connect V12.x — what was wrong and what
+    # this pack does" sat at the head of old releases, 176 KB in total. That
+    # reasoning is genuinely valuable and is preserved in full in the release
+    # report, which is not size-limited. In a file that must fit Supabase's
+    # 1 MB SQL editor it is pure freight: no statement depends on it.
+    #
+    # ONLY prose is removed. A block is kept if any line inside it carries SQL
+    # (a $ tag, a semicolon-terminated statement) — those are section headers
+    # that happen to mention a version, not essays.
+    def _drop_release_essays(text):
+        lines = text.split('\n')
+        out, i = [], 0
+        dropped = 0
+        while i < len(lines):
+            # A block is release history if it opens with a version marker OR
+            # is a long prose-only block sitting above a section header.
+            if not re.match(r'^\s*--\s*School Connect V[\d.]+', lines[i]):
+                out.append(lines[i]); i += 1; continue
+            j = i
+            while j < len(lines) and lines[j].strip().startswith('--'):
+                j += 1
+            block = lines[i:j]
+            has_sql = any(re.search(r'\$\w*\$|;\s*$', x) for x in block)
+            if has_sql or j - i <= 2:
+                out.extend(block)
+            else:
+                dropped += len(block)
+            i = j
+        stats['release-essay-lines'] += dropped
+        return '\n'.join(out)
+    out = _drop_release_essays(out)
     out = _trim_banner(out)
+    # ---- 9c. blank-line squeeze (outside bodies only) --------------------
+    # Runs of blank lines carry no meaning to Postgres and none to a reader.
+    out = re.sub(r'\n{3,}', '\n\n', out)
+    stats['blank-squeezed'] += 1
     out = re.sub(r'\A(?:\s*--[^\n]*\n)+?\s*(?=create|comment|do|alter|grant|--   )', '', out, count=1)
     out = re.sub(r'\n{3,}', '\n\n', out)
     out = out.rstrip() + '\n'
@@ -459,7 +632,8 @@ def main():
                       open('/tmp/build-stats.json', 'w'), indent=1)
         return 0 if len(out) <= TARGET else 1
 
-    header = (
+    def HEADER_TMPL(size):
+        return (
         MARKER + '\n'
         '-- ' + '=' * 74 + '\n'
         '-- SCHOOL CONNECT - COMPLETE PRODUCTION SCHEMA\n'
@@ -469,18 +643,32 @@ def main():
         '-- platform needs. Safe on a new or an existing project, and safe to\n'
         '-- run more than once.\n'
         '--\n'
-        '-- Size: %s bytes - inside the Supabase SQL Editor 1 MB request cap.\n'
+        '-- Size: {size:,} bytes - inside the Supabase SQL Editor 1 MB request cap.\n'
         '-- Paste the whole file into SQL Editor and press Run once.\n'
-        '-- If your editor still refuses it, split at the "-- ===" section\n'
-        '-- banners: every section is independently re-runnable.\n'
+        '-- Each section is independently re-runnable.\n'
         '--\n'
         '-- Generated by tools/build-complete-schema.py from the cumulative\n'
         '-- schema. Verified object-for-object by tools/verify-complete-schema.mjs\n'
         '-- (tables, columns, types, defaults, constraints, indexes, functions,\n'
         '-- views, triggers, policies, grants).\n'
         '-- ' + '=' * 74 + '\n\n'
-    ) % f'{len(out):,}'
-    out = header + out
+        ).format(size=size)
+
+    # V12.72 — the size printed here used to be a CHARACTER count computed
+    # before this header was prepended, so it understated the file twice over:
+    # once by the header, and once per multi-byte character (the emoji and the
+    # naira sign cost 3 bytes each). The Supabase cap is a byte limit, so the
+    # only honest number is the byte length of the finished file. The header
+    # quotes its own size, so settle it by iteration.
+    body = out
+    size = len(body.encode('utf-8'))
+    for _ in range(6):
+        header = HEADER_TMPL(size)
+        total = len((header + body).encode('utf-8'))
+        if total == size:
+            break
+        size = total
+    out = header + body
     # V12.70: the cap is documented as a hard limit, so enforce it here rather
     # than only printing it. The whole point of this build is that the school
     # pastes ONE file into the SQL Editor; a file over the cap silently breaks

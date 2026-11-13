@@ -242,7 +242,17 @@ ok('V9.4 timetable engine: two-phase double placement','PHASE 1: every subject' 
 ok('V9.4 wizard: explicit multi-class targeting (no silent copies)','mcBanner' in (ROOT/'timetable-generator.html').read_text() and 'conscious decision' in (ROOT/'timetable-generator.html').read_text())
 ok('V9.4 generator: social handles + sameAs SEO',all(x in (ROOT/'builder.html').read_text() for x in ['socialFacebook','socialWhatsApp','socialLinkedIn']) and 'sameAs' in (ROOT/'assets/js/generator.js').read_text() and 'socialBar' in (ROOT/'assets/js/generator.js').read_text())
 ok('V9.4 drive-sync: urgency retries + one-tap heal + overdue banner',all(x in (ROOT/'assets/js/drive-sync.js').read_text() for x in ['overdueBanner','interactiveAskDay','visibilitychange']))
-ok('V9.5 dashboard widgets fill ALL duplicate-id containers','querySelectorAll(\'[id="dash-fees"]\')' in (ROOT/'assets/js/app.js').read_text() and 'querySelectorAll(\'[id="dash-exam-tt"]\')' in (ROOT/'assets/js/app.js').read_text())
+# V12.71: the dashboard's parent and student sections used to share ids, so the
+# old assertion demanded a querySelectorAll workaround. They now carry DISTINCT
+# ids and every selector covers both — a stronger guarantee: no duplicate id in
+# the document, and every section still filled.
+_dash_app=(ROOT/'assets/js/app.js').read_text()
+_dash_html=(ROOT/'dashboard.html').read_text()
+ok('V9.5 dashboard widgets fill ALL containers, no duplicate ids',
+   all(s in _dash_app for s in ['[id="dash-fees"]','[id="dash-fees-student"]',
+                                '[id="dash-exam-tt"]','[id="dash-exam-tt-student"]'])
+   and all(s in _dash_html for s in ['id="dash-fees"','id="dash-fees-student"',
+                                     'id="dash-exam-tt"','id="dash-exam-tt-student"']))
 ok('V9.5 exam auto-spread: interleaved divisions + day pins + saturdays + shift + CSV',all(x in (ROOT/'exam-timetable.html').read_text() for x in ['exa-pins','exa-sat','shiftModal','exportCSV','INTERMIXED','todaySubjects']))
 ok('V9.5 option group: own class tick-list + receipt popup',all(x in (ROOT/'timetable-generator.html').read_text() for x in ['tt-group-classes','tt-gc','gcBanner','Option group saved']))
 ok('V9.5 wizard: engine-version check + post-generation audit + provenance badges',all(x in (ROOT/'timetable-generator.html').read_text() for x in ['engineStale','reconcile','removeGhosts','tt-audit','_addedIds','📦']) and "'engine','11'" in schema)
@@ -269,7 +279,9 @@ ok('V10.1 SOW admin affirmation + lesson-plan vetting','admin_affirmed' in schem
 ok('V10.1 master financial export (PDF+CSV)','sc_class_fee_master' in schema and 'fm-print-area' in (ROOT/'fees.html').read_text() and 'Master Financial Records' in (ROOT/'fees.html').read_text())
 ok('V10.1 school shop on family dashboards','dash-products' in (ROOT/'dashboard.html').read_text() and 'loadDashProducts' in (ROOT/'assets/js/app.js').read_text())
 ok('V10.1 module access: No-access level end-to-end',"'none'" in schema[schema.rindex('sc_module_access_leadership_check')-2000:schema.rindex('sc_module_access_leadership_check')+500] and 'No access (hidden)' in (ROOT/'settings.html').read_text() and "[id]==='none'" in (ROOT/'assets/js/app.js').read_text())
-ok('V10.2 dash-products fills all duplicate-id containers','querySelectorAll(\'[id="dash-products"]\')' in (ROOT/'assets/js/app.js').read_text())
+ok('V10.2 dash-products fills all containers, no duplicate ids',
+   '[id="dash-products"]' in _dash_app and '[id="dash-products-student"]' in _dash_app
+   and 'id="dash-products"' in _dash_html and 'id="dash-products-student"' in _dash_html)
 ok('V10.2 password visibility toggle (global + standalone pages)','scEye' in (ROOT/'assets/js/app.js').read_text() and 'scEye' in (ROOT/'change-password.html').read_text() and 'scEye' in (ROOT/'forgot-password.html').read_text())
 ok('V10.2 group auto-tick + hard block + self-heal + multi-class summary',all(x in (ROOT/'timetable-generator.html').read_text() for x in ['groupSubjectsChanged','Class–subject mismatch','SELF-HEAL','all ticked classes','🎓 group']))
 ok('V10.2 status_manager ACL-governed (seeded none)',"'status_manager','none'" in schema and 'status_manager' in (ROOT/'settings.html').read_text() and "LEADERSHIP_OWNER_ONLY:new Set(['site_license','license'])" in (ROOT/'assets/js/app.js').read_text())
