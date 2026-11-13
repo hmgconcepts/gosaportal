@@ -1,17 +1,22 @@
 {
  "_meta": {
-  "built_bytes": 976057,
-  "built_from_bytes": 1345636,
+  "built_bytes": 998918,
+  "built_from_bytes": 1404982,
   "removed": {
-   "banner-rule": 416,
-   "banner-trimmed": 36,
+   "banner-rule": 434,
+   "banner-trimmed": 485,
+   "blank-squeezed": 1,
+   "deindented": 7173,
    "duplicate-grant": 12,
    "notify-moved-last": 1,
    "progress-select": 159,
-   "redundant-add-column": 147,
+   "redundant-add-column": 148,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
-   "superseded-function": 20,
+   "release-essay-lines": 281,
+   "repeated-statement": 16,
+   "rule-lines-shortened": 1,
+   "superseded-function": 21,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
@@ -244,6 +249,8 @@
   "column public.profiles.dob_day",
   "column public.profiles.dob_month",
   "column public.profiles.role",
+  "column public.profiles.signature_name",
+  "column public.profiles.signature_updated_at",
   "column public.profiles.signature_url",
   "column public.profiles.staff_no",
   "column public.profiles.status",
@@ -309,6 +316,7 @@
   "column public.role_status_log.previous_role",
   "column public.role_status_log.previous_status",
   "column public.role_status_log.school_id",
+  "column public.sc_fee_invoice.due_on",
   "column public.sc_heartbeat.last_ping_at",
   "column public.sc_heartbeat.sources",
   "column public.sc_heartbeat.updated_at",
@@ -618,6 +626,9 @@
    "p_student_id_ref text, p_class text, p_term text, p_session text",
    "p_student_id_ref text,p_class text,p_term text,p_session text"
   ],
+  "get_prep_report": [
+   "p_student uuid"
+  ],
   "handle_new_user": [
    ""
   ],
@@ -756,12 +767,18 @@
   "sc_cbt_save_flags": [
    "p_exam_id uuid, p_client_ref text, p_flagged jsonb default '[]'::jsonb, p_notes jsonb default '{}'::jsonb, p_admission_no text default ''"
   ],
+  "sc_cbt_set_window": [
+   "p_exam_id uuid, p_start_at timestamptz default null, p_close_at timestamptz default null, p_open boolean default null"
+  ],
   "sc_cbt_subject_allowed": [
    "p_uid uuid, p_subject text default '', p_class text default ''",
    "p_uid uuid,p_subject text default '',p_class text default ''"
   ],
   "sc_cbt_take_link": [
    "p_ref text"
+  ],
+  "sc_cbt_window_state": [
+   "p_exam_id uuid"
   ],
   "sc_checkin_marks_attendance": [
    ""
@@ -808,6 +825,15 @@
   "sc_fee_account_for": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
+  "sc_fee_adjust": [
+   "p_student uuid, p_kind text, p_amount numeric, p_reason text, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_adjustments": [
+   "p_term text default null, p_session text default null"
+  ],
+  "sc_fee_aged_arrears": [
+   "p_as_of date default current_date, p_class text default null, p_term text default null, p_session text default null"
+  ],
   "sc_fee_allocate": [
    "p_student uuid, p_amount numeric, p_term text default null, p_session text default null"
   ],
@@ -826,14 +852,26 @@
   "sc_fee_bill_v2_structure": [
    "p_student uuid, p_term text default null, p_session text default null"
   ],
+  "sc_fee_cash_reconciliation": [
+   "p_from date default null, p_to date default null"
+  ],
+  "sc_fee_collection_summary": [
+   "p_term text default null, p_session text default null"
+  ],
   "sc_fee_doctor_v2": [
    "p_class text default null, p_student uuid default null, p_dry_run boolean default false"
   ],
   "sc_fee_doctor_v3": [
    "p_class text default null, p_dry_run boolean default true"
   ],
+  "sc_fee_due_date": [
+   "p_term text, p_session text"
+  ],
   "sc_fee_explain": [
    "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_invoice_set_due": [
+   ""
   ],
   "sc_fee_invoice_sync": [
    "p_student uuid, p_term text default null, p_session text default null, p_force boolean default false"
@@ -928,6 +966,9 @@
   "sc_is_midterm_column": [
    "p_name text,p_assessment_type text default ''"
   ],
+  "sc_is_prep_assessment": [
+   "p_type text"
+  ],
   "sc_is_report_generation_allowed": [
    "p_term text, p_session text default null"
   ],
@@ -983,6 +1024,9 @@
   "sc_my_access_state": [
    ""
   ],
+  "sc_my_signature": [
+   ""
+  ],
   "sc_normalize_name": [
    "p_text text"
   ],
@@ -998,11 +1042,41 @@
   "sc_poll_results": [
    "p_poll uuid"
   ],
+  "sc_prep_generate": [
+   "p_class text, p_term text, p_session text"
+  ],
+  "sc_prep_list": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_prep_publish": [
+   "p_class text, p_term text, p_session text, p_on boolean default true"
+  ],
+  "sc_prep_publish_all": [
+   "p_on boolean default true"
+  ],
+  "sc_prep_push_exam": [
+   "p_exam_id uuid, p_verified_only boolean default true"
+  ],
+  "sc_prep_rebuild_one": [
+   "p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text"
+  ],
   "sc_prevent_embedded_media": [
    ""
   ],
   "sc_publish_all_midterm_reports": [
    "p_term text, p_session text, p_publish boolean default true, p_generate boolean default true"
+  ],
+  "sc_purpose_create": [
+   "p_label text, p_emoji text default '\u26aa', p_report_eligible boolean default true, p_feeds_report text default 'none'"
+  ],
+  "sc_purpose_of": [
+   "p_type text"
+  ],
+  "sc_purpose_report_eligible": [
+   "p_type text"
+  ],
+  "sc_purposes": [
+   ""
   ],
   "sc_push_attendance_to_reports": [
    "p_class text, p_term text, p_session text, p_start date, p_end date"
@@ -1030,6 +1104,9 @@
   ],
   "sc_report_grade": [
    "p_pct numeric"
+  ],
+  "sc_report_guard_prep": [
+   ""
   ],
   "sc_report_hidden_for": [
    "p_uid uuid, p_student uuid"
@@ -1076,6 +1153,9 @@
   "sc_restore_student_archive": [
    "p_archive_id uuid"
   ],
+  "sc_results_guard_prep": [
+   ""
+  ],
   "sc_save_report_score": [
    "p_rows jsonb"
   ],
@@ -1093,6 +1173,12 @@
   ],
   "sc_set_updated_at": [
    ""
+  ],
+  "sc_signature_for_class": [
+   "p_class text"
+  ],
+  "sc_signature_save": [
+   "p_url text, p_name text default ''"
   ],
   "sc_staff_pay_state": [
    "p_user uuid default null"
@@ -1114,6 +1200,9 @@
   ],
   "sc_term_current": [
    ""
+  ],
+  "sc_term_open": [
+   "p_new_term text, p_new_session text, p_from_term text default null, p_from_session text default null, p_dry_run boolean default true"
   ],
   "sc_term_ordinal": [
    "p_term text, p_session text"
@@ -1213,6 +1302,9 @@
   "public.module_records_module_idx",
   "public.poll_votes_poll_voter_idx",
   "public.polls_status_created_idx",
+  "public.prep_report_class",
+  "public.prep_scores_cohort",
+  "public.prep_scores_student",
   "public.promotions_name_lookup_idx",
   "public.promotions_report_lookup_idx",
   "public.punctuality_awards_class_idx",
@@ -1224,6 +1316,8 @@
   "public.results_assessment_uidx",
   "public.role_status_log_person_idx_v7",
   "public.role_status_log_school_idx",
+  "public.sc_assessment_purpose_sort",
+  "public.sc_fee_adjustment_student",
   "public.sc_fee_invoice_student",
   "public.sc_fee_invoice_term",
   "public.sc_fee_invoice_unique",
@@ -1413,6 +1507,10 @@
   "public.polls.polls_update",
   "public.polls.polls_update_v11",
   "public.polls.polls_write",
+  "public.prep_report_cards.prep_report_read",
+  "public.prep_report_cards.prep_report_write",
+  "public.prep_scores.prep_scores_read",
+  "public.prep_scores.prep_scores_write",
   "public.profiles.profiles_admin_all",
   "public.profiles.profiles_self_read",
   "public.profiles.profiles_self_update",
@@ -1477,6 +1575,10 @@
   "public.role_status_log.v7_role_log_write",
   "public.sc_ai_settings.ai_read",
   "public.sc_ai_settings.ai_write",
+  "public.sc_assessment_purpose.sc_assessment_purpose_read",
+  "public.sc_assessment_purpose.sc_assessment_purpose_write",
+  "public.sc_fee_adjustment.sc_fee_adjustment_admin",
+  "public.sc_fee_adjustment.sc_fee_adjustment_read",
   "public.sc_fee_invoice.sc_fee_invoice_read",
   "public.sc_fee_invoice.sc_fee_invoice_write",
   "public.sc_heartbeat.hb_read",
@@ -1634,6 +1736,8 @@
   "payroll": [],
   "poll_votes": [],
   "polls": [],
+  "prep_report_cards": [],
+  "prep_scores": [],
   "profiles": [],
   "promotions": [],
   "psychomotor_traits": [],
@@ -1649,6 +1753,8 @@
   "results": [],
   "role_status_log": [],
   "sc_ai_settings": [],
+  "sc_assessment_purpose": [],
+  "sc_fee_adjustment": [],
   "sc_fee_invoice": [],
   "sc_heartbeat": [],
   "sc_install_state": [],
@@ -1689,6 +1795,7 @@
  },
  "triggers": [
   "trigger on_auth_user_created",
+  "trigger sc_fee_invoice_due",
   "trigger trg_cbt_assignment_cleanup",
   "trigger trg_cbt_assignment_mirror",
   "trigger trg_cbt_duration_sync",
@@ -1709,6 +1816,8 @@
   "trigger trg_payroll_posts_loan",
   "trigger trg_profiles_auto_link",
   "trigger trg_profiles_photo_sync",
+  "trigger trg_report_scores_no_prep",
+  "trigger trg_results_no_prep",
   "trigger trg_sc_fee_opening_touch",
   "trigger trg_sc_generate_admission_no",
   "trigger trg_sc_generate_staff_no",
