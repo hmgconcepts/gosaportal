@@ -98,6 +98,21 @@
   <div class="card-profile" id="teacher-signature-card" style="display:none">
     <h2 class="section-title">✍️ My teacher signature</h2>
     <p class="help">If you are assigned as a class teacher, this signature and your profile name will appear on your class students’ report cards. Paste a transparent PNG/JPG or Google Drive share link. Only your own profile signature can be changed here.</p>
+    <!-- V12.72 (item 3): sign with your hand, exactly as the principal does.
+         No Google Drive, no scanning, no phone photo of a piece of paper. -->
+    <div style="margin:14px 0;padding:12px;border:1px dashed var(--gray-300);border-radius:10px;background:var(--gray-50)">
+      <label style="font-weight:700;display:block;margin-bottom:6px">✍️ Sign here with your hand</label>
+      <canvas id="sig-pad" width="420" height="160"
+        style="border:1px solid var(--gray-300);background:#fff;border-radius:6px;cursor:crosshair;touch-action:none;display:block;max-width:100%"></canvas>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-outline btn-sm" id="btn-sig-clear">Clear pad</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-sig-save">☁️ Save this signature (one click)</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-sig-download">⬇ Download PNG</button>
+      </div>
+      <p class="help" style="margin:8px 0 0">Use a finger on a phone or a mouse on a computer. The drawing is saved to School Storage and becomes your signature on every document you sign — subject broadsheets, CBT certificates and the report cards of your class. Nothing is sent to Google Drive.</p>
+      <div id="sig-msg" style="font-size:.85rem;color:var(--gray-600);margin-top:6px"></div>
+    </div>
+    <p class="help" style="margin-top:0"><b>Or</b> paste an image link if you already have a scanned signature.</p>
     <div class="form-group">
       <label>Signature image link</label>
       <input class="form-input" id="teacher-signature-url" placeholder="https://drive.google.com/file/d/FILE_ID/view?usp=sharing" autocomplete="off">
@@ -268,6 +283,102 @@
     }
   }
 
+  /* ===================================================================
+     V12.72 (item 3) — SIGN WITH YOUR HAND.
+     A teacher is no longer limited to pasting a Google Drive link. The pad
+     below works with a finger or a mouse, saves straight into the school's
+     own storage bucket, and writes the same profiles.signature_url column
+     the report engine already reads — so nothing downstream changes.
+     =================================================================== */
+  var _sigPad = { canvas:null, ctx:null, drawing:false, dirty:false };
+  function initSignaturePad(){
+    var c = $('sig-pad'); if(!c || c.dataset.ready==='1') return;
+    c.dataset.ready='1';
+    var ctx = c.getContext('2d');
+    /* HiDPI: draw at device resolution so the line is not fuzzy */
+    var ratio = (window.devicePixelRatio||1);
+    var w = c.width, h = c.height;
+    c.width = w*ratio; c.height = h*ratio;
+    c.style.width = w+'px'; c.style.height = h+'px';
+    ctx.scale(ratio, ratio);
+    ctx.strokeStyle='#1e2a5e'; ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round';
+    _sigPad.canvas=c; _sigPad.ctx=ctx;
+    function pos(e){
+      var r=c.getBoundingClientRect();
+      var cx=(e.touches&&e.touches[0]?e.touches[0].clientX:e.clientX);
+      var cy=(e.touches&&e.touches[0]?e.touches[0].clientY:e.clientY);
+      return { x:(cx-r.left)*(w/r.width), y:(cy-r.top)*(h/r.height) };
+    }
+    function start(e){ _sigPad.drawing=true; _sigPad.dirty=true; var p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); if(e.touches)e.preventDefault(); }
+    function move(e){ if(!_sigPad.drawing)return; var p=pos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); if(e.touches)e.preventDefault(); }
+    function end(){ _sigPad.drawing=false; }
+    c.addEventListener('mousedown',start); c.addEventListener('mousemove',move);
+    window.addEventListener('mouseup',end);
+    c.addEventListener('touchstart',start,{passive:false});
+    c.addEventListener('touchmove',move,{passive:false});
+    c.addEventListener('touchend',end);
+  }
+  function clearSignaturePad(){
+    if(!_sigPad.ctx||!_sigPad.canvas) return;
+    var c=_sigPad.canvas;
+    _sigPad.ctx.clearRect(0,0,c.width,c.height);
+    _sigPad.dirty=false;
+    var m=$('sig-msg'); if(m) m.textContent='';
+  }
+  function signaturePadBlob(){
+    return new Promise(function(res){
+      if(!_sigPad.canvas) return res(null);
+      _sigPad.canvas.toBlob(res,'image/png');
+    });
+  }
+  async function saveSignaturePad(){
+    var msg=$('sig-msg');
+    if(!_sigPad.dirty){ if(msg) msg.textContent='Draw your signature on the pad first.'; return; }
+    var sb=window.sb;
+    if(!sb||!_currentUser){ if(msg) msg.textContent='Not signed in.'; return; }
+    if(msg) msg.textContent='Saving…';
+    try{
+      var blob=await signaturePadBlob();
+      if(!blob){ if(msg) msg.textContent='Could not read the pad. Draw again.'; return; }
+      if(blob.size>190000){
+        if(msg) msg.textContent='That drawing is too large ('+Math.round(blob.size/1024)+' KB). Clear it and sign again with fewer strokes.';
+        return;
+      }
+      var path='signatures/teacher-'+_currentUser.id+'-'+Date.now()+'.png';
+      var up=await sb.storage.from('branding').upload(path,blob,{contentType:'image/png',upsert:false});
+      if(up.error){
+        if(msg) msg.innerHTML='Upload failed: '+esc(up.error.message)+' — if the storage bucket is missing, ask the administrator to run <b>database/complete-schema.sql</b> once.';
+        return;
+      }
+      var pub=sb.storage.from('branding').getPublicUrl(path);
+      var url=(pub.data&&pub.data.publicUrl)||'';
+      if(!url){ if(msg) msg.textContent='Uploaded, but the public link could not be read. Check the bucket is public.'; return; }
+      /* the authoritative write: the server stamps who and when */
+      var saved=null;
+      try{
+        var r=await sb.rpc('sc_signature_save',{p_url:url,p_name:(_currentProfile&&_currentProfile.full_name)||''});
+        if(r.error) throw r.error;
+        saved=r.data;
+      }catch(_){ /* older database: fall back to the direct profile write */ }
+      if(!saved||saved.ok!==true){
+        var w=await sb.from('profiles').update({signature_url:url}).eq('id',_currentUser.id);
+        if(w.error) throw w.error;
+      }
+      var inp=$('teacher-signature-url'); if(inp) inp.value=url;
+      _currentProfile.signature_url=url;
+      if(window.SC_PROFILE) SC_PROFILE.signature_url=url;
+      try{ localStorage.setItem('sc-class-teacher-signature-url',url); }catch(_){}
+      updateSignaturePreview();
+      clearSignaturePad();
+      if(msg) msg.innerHTML='✅ Signature saved ('+Math.round(blob.size/1024)+' KB). It now prints on every document you sign.';
+    }catch(e){
+      var m2=String(e.message||e);
+      if(msg) msg.innerHTML=/function|schema cache|does not exist/i.test(m2)
+        ? 'Saved the image but could not link it: '+esc(m2)+' — ask the administrator to run the latest <b>complete-schema.sql</b>.'
+        : 'Could not save: '+esc(m2);
+    }
+  }
+
   function updateSignaturePreview(){
     const input=$('teacher-signature-url'),prev=$('teacher-signature-preview');if(!input||!prev)return;const url=driveDirect(input.value);
     prev.innerHTML=url?'<img src="'+esc(url)+'" referrerpolicy="no-referrer" alt="Teacher signature preview" style="width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'Signature preview unavailable\',style:\'color:#94a3b8;font-size:.78rem\'}))">':'<span style="color:#94a3b8">No signature</span>';
@@ -394,6 +505,16 @@
     if(btnSaveSignature)btnSaveSignature.addEventListener('click',()=>saveTeacherSignature(false));
     if(btnClearSignature)btnClearSignature.addEventListener('click',()=>{if(confirm('Remove your teacher signature?'))saveTeacherSignature(true);});
     if(signatureInput)signatureInput.addEventListener('input',updateSignaturePreview);
+    /* V12.72 (item 3) — the hand-drawing pad */
+    initSignaturePad();
+    var _bSigClear=$('btn-sig-clear'), _bSigSave=$('btn-sig-save'), _bSigDl=$('btn-sig-download');
+    if(_bSigClear) _bSigClear.addEventListener('click', clearSignaturePad);
+    if(_bSigSave)  _bSigSave.addEventListener('click', saveSignaturePad);
+    if(_bSigDl)    _bSigDl.addEventListener('click', function(){
+      if(!_sigPad.dirty){ var m=$('sig-msg'); if(m) m.textContent='Draw your signature first.'; return; }
+      var a=document.createElement('a'); a.href=_sigPad.canvas.toDataURL('image/png');
+      a.download='my-signature.png'; a.click();
+    });
     const photoInput = $('photo-url');
     if (photoInput) photoInput.addEventListener('input', updatePhotoPreview);
     // Initial load
@@ -412,11 +533,31 @@
     if(btnSaveSignature)btnSaveSignature.addEventListener('click',()=>saveTeacherSignature(false));
     if(btnClearSignature)btnClearSignature.addEventListener('click',()=>{if(confirm('Remove your teacher signature?'))saveTeacherSignature(true);});
     if(signatureInput)signatureInput.addEventListener('input',updateSignaturePreview);
+    /* V12.72 (item 3) — the hand-drawing pad */
+    initSignaturePad();
+    var _bSigClear=$('btn-sig-clear'), _bSigSave=$('btn-sig-save'), _bSigDl=$('btn-sig-download');
+    if(_bSigClear) _bSigClear.addEventListener('click', clearSignaturePad);
+    if(_bSigSave)  _bSigSave.addEventListener('click', saveSignaturePad);
+    if(_bSigDl)    _bSigDl.addEventListener('click', function(){
+      if(!_sigPad.dirty){ var m=$('sig-msg'); if(m) m.textContent='Draw your signature first.'; return; }
+      var a=document.createElement('a'); a.href=_sigPad.canvas.toDataURL('image/png');
+      a.download='my-signature.png'; a.click();
+    });
     const photoInput = $('photo-url');
     if (photoInput) photoInput.addEventListener('input', updatePhotoPreview);
     load();
   }
 })();
 </script>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
 </body>
 </html>

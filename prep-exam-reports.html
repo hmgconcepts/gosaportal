@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>/* School Connect V12.23 pre-paint theme */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Prep Exam Reports • School Portal</title>
+<meta name="description" content="Generate prep test report sheets per student — only prep test scores, separate from terminal reports.">
+<link rel="icon" type="image/png" href="assets/img/logo-512.jpg">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.mr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.mr-card{border:1px solid #e2e8f0;border-radius:12px;padding:16px;background:white}
+.mr-card h3{margin:0 0 8px;font-size:1rem}
+.mr-table{width:100%;border-collapse:collapse;margin-top:12px}
+.mr-table th,.mr-table td{border:1px solid #e2e8f0;padding:8px 10px;text-align:left;font-size:.88rem}
+.mr-table th{background:#f8fafc;font-weight:800}
+@media print{.no-print{display:none} .mr-card{break-inside:avoid}}
+/* Standalone page shell: match the portal layout and prevent mobile drawer/content overlap. */
+.pr-sidebar-scrim{display:none}
+.mr-brand-caption,.mr-brand-foot{font-size:.76rem;color:var(--gray-500,#64748b)}
+.mr-brand-foot{margin-top:auto;padding:16px;border-top:1px solid var(--gray-200,#e2e8f0)}
+#pr-app-shell{width:100%;min-width:0}
+#pr-app-shell .app-main{min-width:0;width:calc(100% - 250px)}
+#pr-app-shell .app-content{width:100%;max-width:1280px;margin:0 auto;min-width:0}
+#pr-app-shell .mr-table{min-width:0}
+#pr-app-shell .grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+#pr-app-shell .app-topbar{min-width:0}
+@media(max-width:900px){
+  #pr-app-shell .app-main{width:100%;max-width:100%}
+  #pr-app-shell .app-content{padding:14px;width:100%;max-width:100%}
+  #pr-app-shell .grid-3{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+  #pr-app-shell .app-sidebar{transform:translateX(-105%);visibility:hidden;transition:transform .22s ease,visibility .22s ease}
+  #pr-app-shell .app-sidebar.open{transform:translateX(0);visibility:visible}
+  #pr-app-shell .pr-sidebar-scrim.open{display:block;position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:90}
+  #pr-app-shell .app-sidebar{z-index:100}
+  #pr-app-shell .app-topbar{position:sticky;top:0;padding:10px 12px;gap:10px}
+  #pr-app-shell .app-page-title{font-size:1.05rem;min-width:0}
+  #pr-app-shell .app-content .card{min-width:0;overflow-wrap:anywhere}
+  #pr-app-shell .mr-table{display:block;overflow-x:auto}
+}
+</style>
+</head>
+<body>
+<div class="app-layout sidebar" id="pr-app-shell">
+  <div class="pr-sidebar-scrim" id="pr-sidebar-scrim" onclick="PR.closeSidebar()" aria-hidden="true"></div>
+  <aside class="app-sidebar" id="app-sidebar" aria-label="School navigation">
+    <div class="app-brand"><img src="assets/img/logo.png" alt="School logo" onerror="this.style.display='none'"><div><strong id="mr-school-name">School Connect</strong><div class="mr-brand-caption">School Portal</div></div></div>
+    <nav class="app-nav" aria-label="Main navigation">
+      <a href="dashboard.html" data-module-id="dashboard" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student"><span class="app-nav-icon">🏠</span><span>Dashboard</span></a>
+      <a href="report-cards.html" data-module-id="report-cards" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student"><span class="app-nav-icon">📋</span><span>Terminal Report Cards</span></a>
+      <a href="prep-exam-reports.html" data-module-id="prep-exam-reports" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student" class="active"><span class="app-nav-icon">🧪</span><span>Prep Exam Reports</span></a>
+      <a href="cbt.html" data-module-id="cbt" data-role-allow="super_admin admin principal proprietor head_teacher staff teacher"><span class="app-nav-icon">🖥️</span><span>CBT Manager</span></a>
+      <a href="attendance.html" data-module-id="attendance" data-role-allow="super_admin admin principal proprietor head_teacher staff teacher parent student"><span class="app-nav-icon">📅</span><span>Attendance</span></a>
+      <a href="students.html" data-module-id="students" data-role-allow="super_admin admin principal proprietor head_teacher staff teacher"><span class="app-nav-icon">👨‍🎓</span><span>Students</span></a>
+      <a href="profile.html" data-module-id="profile" data-role-allow="super_admin admin principal proprietor head_teacher bursar staff teacher parent student"><span class="app-nav-icon">👤</span><span>My Profile</span></a>
+    </nav>
+    <div class="mr-brand-foot">Powered by HMG Concepts</div>
+  </aside>
+  <main class="app-main">
+    <header class="app-topbar"><button class="mobile-toggle" type="button" aria-label="Open navigation" aria-controls="app-sidebar" aria-expanded="false" onclick="PR.toggleSidebar(this)">☰</button><h1 class="app-page-title">Prep Exam Reports</h1><div style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-sm btn-outline" onclick="App.toggleDarkMode()">🌙</button><button class="btn btn-sm btn-outline" onclick="App.signOut()" data-signout style="display:none">Sign out</button></div></header>
+    <div class="app-content">
+      <!-- V12.72: a rehearsal must never be mistaken for the real thing -->
+      <div class="card" style="background:#fff7ed;border:2px solid #fb923c;margin-bottom:14px">
+        <h2 style="margin:0 0 6px;font-size:1.05rem">🧪 Prep Exam Reports — a rehearsal, not the report card</h2>
+        <p style="margin:0;font-size:.9rem;color:#7c2d12">
+          A prep exam is a <b>prototype of the school examination</b>, sat to test how ready your students are.
+          Everything on this page comes from the <b>prep ledger</b>, which is separate from the report card.
+          <b>No score on this page can be pushed to, or printed on, a report card</b> — the database refuses it, not just this screen.
+        </p>
+      </div>
+
+      <div class="card" style="background:#eff6ff;border-color:#93c5fd">
+        <h3 style="margin-top:0">📝 Prep Test Reports — Once per term</h3>
+        <p style="color:#1e3a8a">Generate a <b>standalone Prep Exam sheet for every student</b>, separately from the terminal report. Use the single CBT purpose <b>Prep Assessment</b>; its report destination is chosen separately and may be <b>CA1, CA2, Prep, or a legacy mid-term CA/Test column</b>. Every generated student row has an individual print-ready sheet, with a class-wide print option.</p>
+        <p style="font-size:.85rem;color:#334155">Workflow: create a CBT with the purpose <b>Prep Exam (rehearsal)</b>, then push its verified results to the PREP reportlts from CBT → Bulk Push to Report Cards, then generate here. You do not need a column literally named “Prep”. Generation still creates a roster sheet if scores have not been pushed; those entries are clearly marked “No score” rather than treated as zero marks.</p>
+      </div>
+
+      <div class="card" id="pr-staff-tools">
+        <div class="grid grid-3" style="gap:10px">
+          <div class="form-group"><label>Class *</label><select id="pr-class" class="form-select"><option value="">— select class —</option></select></div>
+          <div class="form-group"><label>Term *</label><select id="pr-term" class="form-select"><option value="">— select term —</option></select></div>
+          <div class="form-group"><label>Session *</label><select id="pr-session" class="form-select"><option value="">— select session —</option></select></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="PR.generate()">📊 Generate Prep Exam Reports</button>
+          <button class="btn btn-outline" style="border-color:#b45309;color:#b45309" onclick="PR.repairRanking()" title="Re-measure every card against the class's full expected subject load and re-rank the class fairly. Use this on any class generated before V12.64, where a student who sat fewer subjects could take 1st place.">🔧 Repair percentages &amp; positions</button>
+          <button class="btn btn-outline" onclick="PR.preview()">👁️ Preview generated sheets</button>
+          <button class="btn btn-outline" onclick="PR.printAll()">🖨️ Print all student sheets</button>
+          <button class="btn btn-outline" onclick="PR.publish(true)">✅ Publish (student/parent can view)</button>
+          <button class="btn btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="PR.publish(false)">🚫 Unpublish</button>
+          <button class="btn btn-primary" style="background:#059669;border-color:#047857" onclick="PR.publishAllClasses(true)" title="Generate AND publish prep reports for every class in one click — no class-by-class repetition">✅ Publish ALL classes (one click)</button>
+          <button class="btn btn-outline" onclick="PR.publishAllClasses(false)" title="Unpublish prep reports for every class at once">🚫 Unpublish all classes</button>
+          <button class="btn btn-outline" onclick="PR.exportCSV()">⬇ Export CSV</button>
+        </div>
+        <div id="pr-status" style="margin-top:12px;font-size:.9rem;color:#475569"></div>
+      </div>
+
+      <!-- V12.72: readiness summary — what a rehearsal is actually for -->
+      <div class="card" id="pr-readiness-card" style="margin-top:16px;border:2px solid #0d9488;background:#f0fdfa">
+        <h3 style="margin-top:0">🎯 Readiness summary</h3>
+        <p style="color:var(--gray-700);font-size:.88rem;margin-top:0">
+          A rehearsal is only useful if it tells you who to help. This summary groups the class by readiness
+          and names the learners in each group, so a teacher can act before the school examination rather than after it.
+        </p>
+        <div id="pr-readiness"><span style="color:var(--gray-500);font-size:.88rem">Generate the prep reports to see readiness.</span></div>
+      </div>
+
+      <!-- V12.66: the school decides what a prep report prints -->
+      <div class="card" style="margin-top:16px;border:2px solid #6366f1;background:#eef2ff" data-admin-only id="pr-policy-card">
+        <h3 style="margin-top:0">⚙️ What the prep report prints — positions</h3>
+        <p style="color:var(--gray-700);font-size:.88rem;margin-top:0">
+          Decide whether prep reports show a position in class. This switch is separate from the terminal
+          report card, so a school can rank at the end of term and not at prep — which is what many primary
+          schools do. <b>Marks are never changed</b>; only what is printed changes.
+        </p>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
+          <div class="form-group" style="margin:0;min-width:170px"><label>Term</label>
+            <select class="form-select" id="ppol--term"><option value="">All terms</option></select></div>
+          <div class="form-group" style="margin:0;min-width:150px"><label>Session</label>
+            <select class="form-select" id="ppol--session"><option value="">All sessions</option></select></div>
+          <button class="btn btn-primary" onclick="ReportPolicy.load('prep')">Load current setting</button>
+        </div>
+        <div id="ppol--body"><span style="color:var(--gray-500);font-size:.88rem">Press <b>Load current setting</b> to see and change it.</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="ReportPolicy.save('prep')">💾 Save for this term</button>
+          <button class="btn btn-outline" onclick="ReportPolicy.saveAll('prep')">💾 Save as the school default</button>
+        </div>
+      </div>
+
+      <div class="card" id="pr-family-view" style="display:none;margin-top:16px">
+        <h3>👨‍👩‍👧 Your Prep Sheet</h3>
+        <p style="color:#475569">Only your own (or your linked child’s) <b>published</b> prep report is shown here. Report cards remain separate.</p>
+        <div class="grid grid-3" style="gap:10px">
+          <div class="form-group"><label>Student</label><select id="pr-family-student" class="form-select"><option value="">Loading linked student…</option></select></div>
+          <div class="form-group"><label>Term</label><select id="mr-family-term" class="form-select"><option value="">Select term</option></select></div>
+          <div class="form-group"><label>Session</label><select id="mr-family-session" class="form-select"><option value="">Select session</option></select></div>
+        </div>
+        <button class="btn btn-primary" onclick="PR.loadFamilyReport()">View Prep Sheet</button>
+        <div id="mr-family-output" style="margin-top:12px"></div>
+        <p><a href="report-cards.html" class="btn btn-outline">View Terminal Report Card</a></p>
+      </div>
+      <div id="pr-list" class="card" style="margin-top:16px"><span class="pulse">Select class/term/session to generate.</span></div>
+
+      <div class="card" style="margin-top:16px;background:#f8fafc">
+        <h4>How it stays in sync with terminal reports</h4>
+        <ul style="font-size:.88rem;color:#334155;line-height:1.6">
+          <li><b>One assessment purpose, flexible destination:</b> Prep CA and Prep Test are normalized as one Prep Assessment purpose. Legacy <code>ca</code>/<code>test</code> exams and rehearsal purposes are recognised. The report-card destination is not another assessment type.</li>
+          <li><b>Same source, no hidden magic label:</b> The Prep sheet reads only the prep ledger (prep_scores) and nothing elseolumns from <code>report_scores</code>. A literal column named <code>Prep</code> is optional. If a score is not pushed, the roster still generates with a clear “No score” state.</li>
+          <li><b>No conflict:</b> <code>prep_report_cards</code> has <code>unique(student_id_ref, class, term, session)</code> separate from <code>report_cards</code> (<code>report_cards</code> is terminal). Same student can have both for same term.</li>
+          <li><b>Published flag:</b> Tutors generate (published=false) first to preview, then publish. Students/parents only see published via <code>get_prep_report</code> + RLS <code>is_parent_of</code>.</li>
+        </ul>
+      </div>
+    </div>
+    <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">© 2026 HMG Concepts · <a href="developer.html">About</a></footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/theme-manager.js"></script>
+<script src="assets/js/legibility.js"></script>
+<script src="assets/js/report-engine.js"></script>
+<script>
+const MR = {
+  toggleSidebar(button){
+    const side=document.getElementById('app-sidebar'),scrim=document.getElementById('pr-sidebar-scrim');
+    if(!side)return;
+    const open=!side.classList.contains('open');side.classList.toggle('open',open);if(scrim)scrim.classList.toggle('open',open);
+    if(button)button.setAttribute('aria-expanded',String(open));
+  },
+  closeSidebar(){
+    const side=document.getElementById('app-sidebar'),scrim=document.getElementById('pr-sidebar-scrim'),button=document.querySelector('#pr-app-shell .mobile-toggle');
+    if(side)side.classList.remove('open');if(scrim)scrim.classList.remove('open');if(button)button.setAttribute('aria-expanded','false');
+  },
+  /* V12.70 (item 11) — the prep sheet now OBEYS the school's positions
+     setting. Before this the switch saved correctly but the printed sheet
+     ignored it entirely: every prep carried a class position whether the
+     school wanted one or not. `_pol` is read once per term/session pair and
+     defaults to "show", which is the old behaviour for schools that never
+     touch the setting. */
+  _pol:{show_position:true,show_grade:true,show_subject_position:true,show_remarks:true,position_label:'Position in class'},
+  /* V12.71 (round-15 item 7) — A LEARNER WHOSE POSITION IS HELD MUST BE HELD
+     ON EVERY SHEET THE SCHOOL PRINTS.
+     The terminal report card already honoured sc_report_position_hold, but this
+     page never read it: a child whose position the school deliberately
+     withheld was printed WITH a position on the prep report. Same learner,
+     two documents, contradictory content. The page now loads the holds for the
+     term it is showing and applies them exactly as the card does. */
+  _holds:null,
+  async loadHolds(term,session){
+    if(!sb) return {};
+    const key=[term||'',session||''].join('|');
+    if(this._holds && this._holdsKey===key) return this._holds;
+    const set={};
+    try{
+      let q=sb.from('sc_report_position_hold').select('student_id_ref,student_id,term,session');
+      const r=await q;
+      (r.data||[]).forEach(h=>{
+        /* a hold recorded for a different term must not leak into this one */
+        if(term && h.term && String(h.term).trim().toLowerCase()!==String(term).trim().toLowerCase()) return;
+        if(session && h.session && String(h.session).trim().toLowerCase()!==String(session).trim().toLowerCase()) return;
+        if(h.student_id_ref) set[String(h.student_id_ref).toLowerCase()]=true;
+        if(h.student_id) set['id:'+h.student_id]=true;
+      });
+    }catch(_){ /* no table / no permission: treat as "nobody held" */ }
+    this._holds=set; this._holdsKey=key;
+    return set;
+  },
+  isHeld(row){
+    if(!row||!this._holds) return false;
+    const a=String(row.admission_no||row.student_id_ref||'').toLowerCase();
+    const b=row.student_id?'id:'+row.student_id:'';
+    return !!((a&&this._holds[a])||(b&&this._holds[b]));
+  },
+  async loadPolicy(term,session){
+    try{
+      const r=await sb.rpc('sc_report_policy',{p_kind:'prep',p_term:term||null,p_session:session||null});
+      if(!r.error&&r.data&&r.data.ok!==false){
+        this._pol={show_position:r.data.show_position!==false,
+                   show_grade:r.data.show_grade!==false,
+                   show_subject_position:r.data.show_subject_position!==false,
+                   show_remarks:r.data.show_remarks!==false,
+                   position_label:r.data.position_label||'Position in class'};
+      }
+    }catch(_){ /* keep the safe default */ }
+    return this._pol;
+  },
+  async init(){
+    const school=window.SCHOOL||{};const brand=document.getElementById('mr-school-name');if(brand)brand.textContent=school.shortName||school.name||'School Connect';
+    const logo=document.querySelector('#app-sidebar .app-brand img');if(logo&&school.logoExt)logo.src='assets/img/logo.'+String(school.logoExt).replace(/[^a-z0-9]/gi,'');
+    document.querySelectorAll('#app-sidebar .app-nav a').forEach(a=>a.addEventListener('click',()=>PR.closeSidebar()));
+    if(!window.sb) { document.getElementById('pr-status').innerHTML='<span style="color:#dc2626">Supabase not configured.</span>'; return; }
+    // Load lookups for class/term/session
+    try{
+      const [cls, terms, sess] = await Promise.all([
+        sb.from('classes').select('name').order('name'),
+        sb.from('lookups').select('value').eq('kind','term').eq('active',true).order('position'),
+        sb.from('lookups').select('value').eq('kind','session').eq('active',true).order('position')
+      ]);
+      // Show actionable feedback instead of silently leaving an empty page when
+      // RLS, a missing lookup table, or an expired session blocks a lookup.
+      const lookupErrors=[['classes',cls.error],['terms',terms.error],['sessions',sess.error]].filter(x=>x[1]);
+      const fill=(id, result, key)=>{ const el=document.getElementById(id); if(!el) return; const vals=result.data||[]; el.innerHTML='<option value="">— select —</option>'+vals.map(r=>'<option value="'+PR.esc(r[key]||'')+'">'+PR.esc(r[key]||'')+'</option>').join(''); };
+      fill('pr-class', cls, 'name');
+      fill('pr-term', terms, 'value');
+      fill('pr-session', sess, 'value');
+      const status=document.getElementById('pr-status');
+      if(lookupErrors.length && status) status.innerHTML='<span style="color:#b91c1c"><b>Could not load report selectors.</b> '+PR.esc(lookupErrors.map(x=>x[0]+': '+x[1].message).join(' · '))+' Please sign in again or contact the school administrator.</span>';
+      else if(status) status.innerHTML='<span style="color:#475569">Report tools ready. Choose a class, term and session; reports appear after a staff member generates them.</span>';
+      // Also try academic_periods for session/term
+      try{
+        const ap=await sb.from('academic_periods').select('session,term').eq('is_current',true).limit(1).maybeSingle();
+        if(ap.data){ if(ap.data.session) document.getElementById('pr-session').value=ap.data.session; if(ap.data.term) document.getElementById('pr-term').value=ap.data.term; }
+      }catch(_){}
+      // Family-safe view: students/parents see only published reports for linked children.
+      for(let i=0;i<25 && !(window.SC_PROFILE&&SC_PROFILE.role);i++) await new Promise(r=>setTimeout(r,200));
+      const role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+      if(['student','parent'].includes(role)){
+        const tools=document.getElementById('pr-staff-tools'); if(tools) tools.style.display='none';
+        const family=document.getElementById('pr-family-view'); if(family) family.style.display='block';
+        const sel=document.getElementById('pr-family-student'); let people=[];
+        try{
+          if(role==='student'){
+            const r=await sb.from('students').select('id,admission_no,full_name,class').eq('user_id',SC_PROFILE.id); people=r.data||[];
+          }else{
+            const links=await sb.from('parent_child').select('student_id').eq('parent_id',SC_PROFILE.id);
+            const ids=(links.data||[]).map(x=>x.student_id).filter(Boolean);
+            if(ids.length){const r=await sb.from('students').select('id,admission_no,full_name,class').in('id',ids);people=r.data||[];}
+          }
+        }catch(e){console.warn('Prep family lookup',e.message);}
+        if(sel) sel.innerHTML=people.length?people.map(x=>{const sid=x.admission_no||x.id;return '<option value="'+PR.esc(sid||'')+'" data-class="'+PR.esc(x.class||'')+'">'+PR.esc(x.admission_no||x.id)+' — '+PR.esc(x.full_name||'')+' ('+PR.esc(x.class||'')+')</option>';}).join(''):'<option value="">No linked student found</option>';
+        const terms=document.getElementById('mr-family-term'), sessions=document.getElementById('mr-family-session');
+        const fill2=(el,rows,key)=>{if(el&&rows&&rows.length)el.innerHTML='<option value="">Select</option>'+rows.map(r=>'<option>'+String(r[key]||'')+'</option>').join('');};
+        fill2(terms,(await sb.from('lookups').select('value').eq('kind','term').eq('active',true).order('position')).data,'value');
+        fill2(sessions,(await sb.from('lookups').select('value').eq('kind','session').eq('active',true).order('position')).data,'value');
+        const currentTerm=document.getElementById('pr-term')?.value||'', currentSession=document.getElementById('pr-session')?.value||''; if(terms) terms.value=currentTerm; if(sessions) sessions.value=currentSession;
+      }
+    }catch(e){
+      console.warn('MR init failed', e.message);
+      const status=document.getElementById('pr-status');
+      if(status) status.innerHTML='<span style="color:#b91c1c"><b>Prep reports could not finish loading.</b> '+PR.esc(e.message||'Unexpected error')+' Refresh the page after signing in. If this continues, send this message to the school administrator.</span>';
+    }
+  },
+  /* V12.70 (item 9) — one guard for every action. `init()` already refused to
+     start without Supabase, but the buttons below it did not: pressing Generate
+     on a site whose config.js had not been filled in threw `sb is not defined`
+     into the console and left the screen frozen with no explanation. Every
+     entry point now says the same plain sentence instead. */
+  ready(){
+    if(window.sb) return true;
+    const status=document.getElementById('pr-status');
+    if(status) status.innerHTML='<span style="color:#b45309"><b>Database not connected.</b> Add the Supabase URL and anon key to assets/js/config.js, then reload this page. No prep data can be shown until then.</span>';
+    if(typeof toast==='function') toast('Database not connected — add your Supabase keys to assets/js/config.js.','warning',9000);
+    return false;
+  },
+  esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');},
+  vals(){ return {c:document.getElementById('pr-class').value.trim(), t:document.getElementById('pr-term').value.trim(), s:document.getElementById('pr-session').value.trim()}; },
+  async loadFamilyReport(){
+    if(!this.ready()) return;
+    const student=document.getElementById('pr-family-student'), sid=student?.value||'', cls=student?.selectedOptions?.[0]?.dataset?.class||'', term=document.getElementById('mr-family-term')?.value||'', session=document.getElementById('mr-family-session')?.value||'', host=document.getElementById('mr-family-output');
+    if(!sid||!cls||!term||!session){if(host)host.innerHTML='<div class="notice">Select student, term and session.</div>';return;}
+    if(host)host.innerHTML='<span class="pulse">Loading published prep sheet…</span>';
+    const r=await sb.rpc('get_prep_report',{p_student_id_ref:sid,p_class:cls,p_term:term,p_session:session});
+    if(r.error||!r.data||!r.data.ok){host.innerHTML='<div class="notice">'+PR.esc((r.data&&r.data.message)|| (r.data&&r.data.error)||r.error?.message||'No report available')+'</div>';return;}
+    const row=r.data.report;this._familyRow=row;
+    await this.loadPolicy(row.term||term, row.session||session);  /* V12.70 item 11 */
+    await this.loadHolds(row.term||term, row.session||session);  /* V12.71 item 7 */
+    host.innerHTML=(row.has_scores===false?'<div class="notice">No prep marks are recorded yet. This is still your student’s standalone report record; contact the tutor if marks should be present.</div>':'')+'<div class="mr-card"><h3>Prep report sheet — '+PR.esc(row.student_name)+' · '+PR.esc(row.class)+'</h3><p>'+PR.esc(row.term)+' · '+PR.esc(row.session)+(PR._pol.show_position!==false?' · '+PR.esc(PR._pol.position_label||'Position')+' '+PR.esc(row.position||'—'):'')+'</p><button class="btn btn-primary no-print" onclick="PR.printStudent(PR._familyRow)">🖨️ Open standalone sheet / Save PDF</button><div style="margin-top:10px">'+PR.scoreTable(row)+'</div></div>';
+  },
+  async generate(){
+    if(!this.ready()) return;
+    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
+    const status=document.getElementById('pr-status'); status.innerHTML='<span class="pulse">Generating prep reports…</span>';
+    const r=await sb.rpc('sc_prep_generate',{p_class:c, p_term:t, p_session:s});
+    if(r.error || !r.data || r.data.ok===false){ status.innerHTML='<span style="color:#dc2626">'+((r.data&&r.data.error)||r.error?.message||'Generate failed')+'</span>'; return; }
+    const warning=r.data.warning?'<br><span style="color:#a16207">ℹ️ '+PR.esc(r.data.warning)+'</span>':'';
+    status.innerHTML='<span style="color:#16a34a">✅ Generated '+Number(r.data.generated||0)+' student report(s): '+Number(r.data.with_scores||0)+' with scores, '+Number(r.data.without_scores||0)+' awaiting scores for '+PR.esc(c)+' · '+PR.esc(t)+' · '+PR.esc(s)+'.</span>'+warning;
+    this.preview();
+  },
+  /* V12.64 — ONE-CLICK REPAIR.
+     Any prep or terminal card generated before V12.64 carries a percentage
+     that was averaged over the marks the learner happened to submit, and a
+     position that a one-subject learner could top. This re-measures every card
+     in the class against the full expected load and re-ranks it. Dry-run first
+     so the damage is shown before anything is written. */
+  async repairRanking(){
+    if(!this.ready()) return;
+    const c=(document.getElementById('pr-class')||{}).value||'', t=(document.getElementById('pr-term')||{}).value||'', s=(document.getElementById('pr-session')||{}).value||'';
+    if(!c||!t||!s){ toast('Choose class, term and session first.','warning',6000); return false; }
+    const status=document.getElementById('pr-status');
+    try{
+      if(status) status.innerHTML='<span style="color:#0369a1">Checking '+this.esc(c)+' …</span>';
+      const dry=await sb.rpc('sc_prep_generate',{p_class:c,p_term:t,p_session:s,p_dry_run:true});
+      if(dry.error) throw new Error(dry.error.message);
+      const n=Number((dry.data&&dry.data.finding_count)||0);
+      let proceed=true;
+      if(n>0){
+        const kinds={};
+        (dry.data.findings||[]).forEach(f=>{kinds[f.kind]=(kinds[f.kind]||0)+1;});
+        const detail=Object.entries(kinds).map(([k,v])=>v+' × '+(k==='percentage_not_of_expected_load'?'percentage not measured against the full subject load':'partial sitting ranked above a complete one')).join('; ');
+        proceed=confirm('Found '+n+' card(s) that do not meet the reporting standard:\n\n'+detail+'\n\nRe-measure and re-rank '+c+' now?');
+      } else {
+        proceed=confirm('No defects found in '+c+' — all cards already meet the standard.\n\nRe-measure and re-rank anyway? (safe, idempotent)');
+      }
+      if(!proceed){ if(status) status.innerHTML='<span style="color:#64748b">Cancelled — nothing was written.</span>'; return false; }
+      const fix=await sb.rpc('sc_prep_generate',{p_class:c,p_term:t,p_session:s,p_dry_run:false});
+      if(fix.error || !fix.data || fix.data.ok===false) throw new Error((fix.data&&fix.data.error)||fix.error?.message||'Repair failed');
+      const d=fix.data;
+      if(status) status.innerHTML='<span style="color:#16a34a">✅ Re-measured and re-ranked '+this.esc(c)+'. '+
+        'Defects found before: '+n+'. Prep cards repaired: '+Number(d.prep_groups_repaired||0)+
+        ', terminal cards repaired: '+Number(d.terminal_groups_repaired||0)+
+        '. Ranking now: '+this.esc(JSON.stringify(d.prep_ranking||{}))+'</span>';
+      this.preview();
+      return true;
+    }catch(e){
+      if(status) status.innerHTML='<span style="color:#dc2626">'+this.esc(e.message||e)+'</span>';
+      return false;
+    }
+  },
+  async fetchContextRows(c,t,s){
+    const all=[];const pageSize=500;
+    for(let from=0;from<10000;from+=pageSize){
+      const r=await sb.from('prep_report_cards').select('*').eq('class',c).eq('term',t).eq('session',s).order('average',{ascending:false}).range(from,from+pageSize-1);
+      if(r.error)throw new Error(r.error.message);const part=r.data||[];all.push(...part);if(part.length<pageSize)break;
+    }
+    return all;
+  },
+  scoreItems(row){
+    if(Array.isArray(row&&row.score_details)&&row.score_details.length)return row.score_details;
+    return Object.entries((row&&row.scores)||{}).map(([label,score])=>({subject:label,assessment:'Prep',score,max_mark:null}));
+  },
+  readinessBanner(row){
+    if(!row||!row.readiness_band) return '';
+    return '<div style="border:1px solid #0d9488;background:#f0fdfa;color:#115e59;padding:6px 10px;margin:6px 0;font-size:11px">'
+      + '<b>Readiness: '+this.esc(String(row.readiness_band||'').replace(/_/g,' ').toUpperCase())+'</b> — '
+      + this.esc(row.readiness_note||'')+'</div>';
+  },
+  scoreTable(row){
+    const _band=this.readinessBanner(row);
+    const items=this.scoreItems(row);
+    if(!items.length)return _band+'<div class="notice">No prep score is recorded for this student yet.</div>';
+    return _band+'<div class="table-wrap"><table class="mr-table"><thead><tr><th>Subject</th><th>Assessment</th><th>Score</th><th>Maximum</th></tr></thead><tbody>'+items.map(x=>'<tr><td>'+this.esc(x.subject||'—')+'</td><td>'+this.esc(x.assessment||'Prep')+'</td><td>'+Number(x.score||0).toFixed(2)+'</td><td>'+(Number(x.max_mark)>0?Number(x.max_mark).toFixed(2):'—')+'</td></tr>').join('')+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+Number(row.total||0).toFixed(2)+'</th><th>'+Number(row.max_total||0).toFixed(2)+'</th></tr></tfoot></table></div>';
+  },
+  sheetBody(row){
+    const school=window.SCHOOL||{},logoExt=String(school.logoExt||'svg').replace(/[^a-z0-9]/gi,''),logo='assets/img/logo.'+logoExt;
+    const detail=this.scoreItems(row),scoreRows=detail.length?detail.map(x=>'<tr><td>'+this.esc(x.subject||'—')+'</td><td>'+this.esc(x.assessment||'Prep')+'</td><td>'+Number(x.score||0).toFixed(2)+'</td><td>'+(Number(x.max_mark)>0?Number(x.max_mark).toFixed(2):'—')+'</td></tr>').join(''):'<tr><td colspan="4" class="no-score">No prep score has been recorded for this student.</td></tr>';
+    const _reh='<div style="border:2px dashed #ea580c;background:#fff7ed;color:#7c2d12;padding:6px 10px;margin:6px 0;font-size:11px;font-weight:700;text-align:center;letter-spacing:.02em">🧪 PREP EXAM REHEARSAL — this is a practice run for the school examination. It is NOT the report card and carries no report-card score.</div>';
+    const _band=this.readinessBanner(row);
+    return '<section class="report-page">'+_reh+'<header class="school-head">'+(school.logoExt?'<img class="school-logo" src="'+this.esc(logo)+'" alt="">':'')+'<div><h1>'+this.esc(school.name||school.shortName||'School')+'</h1><p>'+this.esc(school.motto||'')+'</p></div></header><div class="sheet-title"><div>PREP EXAM — READINESS REPORT</div><small>Student report sheet · '+(row.has_scores===false?'No score recorded':'Official scores')+'</small></div><div class="student-meta"><div><b>Student</b><span>'+this.esc(row.student_name||'—')+'</span></div><div><b>Admission / student ID</b><span>'+this.esc(row.student_id_ref||'—')+'</span></div><div><b>Class</b><span>'+this.esc(row.class||'—')+'</span></div><div><b>Term</b><span>'+this.esc(row.term||'—')+'</span></div><div><b>Session</b><span>'+this.esc(row.session||'—')+'</span></div>'+((this._pol&&this._pol.show_position!==false)
+        ? '<div><b>'+this.esc((this._pol&&this._pol.position_label)||'Position')+'</b><span>'+(row.has_scores===false||this.isHeld(row)?'—':this.esc(row.position||'—'))+'</span></div>'
+        : '')+'</div>'+_band+(row.has_scores===false?'<div class="no-score-banner">No prep marks are recorded for this student for this term. This sheet does not treat missing marks as zero.</div>':'')+'<table class="scores"><thead><tr><th>Subject</th><th>Assessment / report column</th><th>Mark</th><th>Maximum</th></tr></thead><tbody>'+scoreRows+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+Number(row.total||0).toFixed(2)+'</th><th>'+Number(row.max_total||0).toFixed(2)+'</th></tr></tfoot></table><div class="summary">'+
+      '<div><b>Overall percentage</b><span>'+(row.has_scores===false?'—':Number(row.percentage!=null?row.percentage:row.average||0).toFixed(2)+'%')+'</span>'+
+        '<small style="display:block;font-size:9px;color:#64748b">of the full expected load'+(Number(row.expected_total)>0?' ('+Number(row.total||0).toFixed(2)+' of '+Number(row.expected_total).toFixed(2)+')':'')+'</small></div>'+
+      ((this._pol&&this._pol.show_position!==false)
+        ? '<div><b>'+this.esc((this._pol&&this._pol.position_label)||'Position')+'</b><span>'+(row.has_scores===false||row.position==null||this.isHeld(row)?'—':this.esc(row.position))+'</span>'+
+        (Number(row.rank_cohort_size)>0?'<small style="display:block;font-size:9px;color:#64748b">of '+Number(row.rank_cohort_size)+' ranked</small>':'')+'</div>'
+        : '')+
+      '<div><b>Subjects sat</b><span>'+Number(row.subjects_sat||0)+' / '+Number(row.subjects_expected||0)+'</span></div>'+
+      '<div><b>Grade</b><span>'+(this.esc(row.grade||'')||'—')+'</span></div>'+
+      '</div>'+
+      ((this.isHeld(row))?'<div class="notice" style="text-align:center">Position withheld for this learner by the school. The marks above are complete and unaffected.</div>'
+        :(row.rank_basis)?'<div class="notice" style="text-align:center">'+this.esc(row.rank_basis)+'</div>':'')+
+      '<div class="signatures"><div>Class Teacher</div><div>Head Teacher / Principal</div></div><footer>Generated '+this.esc(new Date().toLocaleDateString())+' · Prep report is separate from the terminal report card.</footer></section>';
+  },
+  printRows(rows,title,existingWindow){
+    const school=window.SCHOOL||{},candidate=String(school.primary||school.theme?.primary||'#1d4ed8'),primary=/^#[0-9a-f]{3,8}$/i.test(candidate)?candidate:'#1d4ed8';
+    const css='@page{size:A4;margin:12mm}*{box-sizing:border-box}body{margin:0;color:#0f172a;font-family:Arial,Helvetica,sans-serif}.report-page{min-height:270mm;page-break-after:always;break-after:page;padding:0 2mm 8mm}.report-page:last-child{page-break-after:auto;break-after:auto}.school-head{display:flex;align-items:center;justify-content:center;gap:14px;text-align:center;border-bottom:3px solid '+primary+';padding:8px 0 12px}.school-logo{width:58px;height:58px;object-fit:contain}.school-head h1{font-size:21px;margin:0}.school-head p{font-size:11px;margin:4px 0 0;color:#475569}.sheet-title{text-align:center;margin:18px 0 12px;font-size:18px;font-weight:800;color:'+primary+'}.sheet-title small{display:block;font-size:10px;color:#475569;margin-top:4px}.student-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border:1px solid #cbd5e1;padding:10px;border-radius:6px;margin-bottom:12px}.student-meta div{display:flex;flex-direction:column;gap:3px}.student-meta b{font-size:9px;text-transform:uppercase;color:#475569}.student-meta span{font-size:12px;font-weight:700}.scores{width:100%;border-collapse:collapse;margin-top:12px}.scores th,.scores td{border:1px solid #94a3b8;padding:8px;text-align:left;font-size:11px}.scores th{background:#eff6ff}.scores tfoot th{background:#f1f5f9}.summary{display:flex;gap:12px;margin-top:14px}.summary div{border:1px solid #cbd5e1;border-radius:6px;padding:10px;min-width:130px;display:flex;flex-direction:column;gap:5px}.summary b{font-size:9px;text-transform:uppercase;color:#475569}.summary span{font-size:14px;font-weight:800}.no-score,.no-score-banner{color:#92400e;background:#fffbeb}.no-score-banner{padding:10px;border:1px solid #fcd34d;margin:10px 0;font-size:11px}.signatures{display:flex;justify-content:space-between;gap:40px;margin-top:55px}.signatures div{width:42%;border-top:1px solid #475569;text-align:center;padding-top:6px;font-size:10px}footer{margin-top:18px;border-top:1px solid #cbd5e1;padding-top:6px;color:#64748b;font-size:9px;text-align:center}';
+    const w=existingWindow||window.open('','_blank');if(!w){toast('Allow pop-ups to open printable student reports.','warning',7000);return false;}
+    w.document.open();w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><base href="'+this.esc(location.href.replace(/[^/]*$/,''))+'"><title>'+this.esc(title||'Prep reports')+'</title><style>'+css+'</style></head><body>'+rows.map(r=>this.sheetBody(r)).join('')+'<script>window.addEventListener("load",function(){var imgs=[...document.images];Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{i.onload=r;i.onerror=r}))).then(()=>setTimeout(()=>window.print(),250))});<\/script></body></html>');w.document.close();return true;
+  },
+  printStudent(row){if(!row){toast('Student report data is not available. Refresh the generated list.','warning');return;}return this.printRows([row],'Prep report — '+(row.student_name||''));},
+  async printAll(){
+    const {c,t,s}=this.vals();if(!c||!t||!s){toast('Select class, term and session first.','warning');return;}
+    const w=window.open('','_blank');if(!w){toast('Allow pop-ups to open printable student reports.','warning',7000);return;}
+    w.document.write('<!doctype html><title>Preparing reports…</title><p style="font-family:system-ui;padding:24px">Preparing Prep student report sheets…</p>');
+    try{await this.loadPolicy(t,s);await this.loadHolds(t,s);const rows=await this.fetchContextRows(c,t,s);if(!rows.length){w.close();toast('No generated reports found for this class/term/session.','warning');return;}const html=this.printRows(rows,'Prep reports — '+c,w);if(!html)w.close();}
+    catch(e){w.close();toast('Could not prepare reports: '+e.message,'danger',9000);}
+  },
+  async preview(){
+    if(!this.ready()) return;
+    const {c,t,s}=this.vals();if(!c||!t||!s){toast('Pick class, term, session','warning');return;}
+    const box=document.getElementById('pr-list');box.innerHTML='<span class="pulse">Loading all generated reports…</span>';
+    try{
+      const rows=await this.fetchContextRows(c,t,s);this._lastRows=rows;
+      await this.loadPolicy(t,s);await this.loadHolds(t,s);  /* V12.70 — preview obeys the positions switch */
+      if(!rows.length){box.innerHTML='<p>No prep reports have been generated yet. Press Generate first.</p>';return;}
+      const body=rows.map((row,i)=>'<tr><td>'+(i+1)+'</td><td>'+this.esc(row.student_name||'')+'</td><td>'+this.esc(row.student_id_ref||'')+'</td><td>'+Number(row.total||0).toFixed(2)+' / '+Number(row.max_total||0).toFixed(2)+'</td><td>'+Number(row.average||0).toFixed(2)+'%</td>'+((this._pol.show_position!==false)?'<td>'+(row.position||'—')+'</td>':'')+'<td>'+(row.has_scores?'Has score':'No score')+'</td><td>'+(row.published?'✅':'—')+'</td><td><button class="btn btn-sm btn-outline" onclick="PR.printStudent(PR._lastRows['+i+'])">View / print sheet</button></td></tr>').join('');
+      this.renderReadiness(rows);
+      box.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><b>'+rows.length+' prep sheet(s) generated · '+rows.filter(x=>x.has_scores).length+' scored · '+rows.filter(x=>!x.has_scores).length+' no score</b><button class="btn btn-sm btn-primary" onclick="PR.printAll()">🖨️ Print all '+rows.length+' sheets</button></div><div class="table-wrap"><table class="mr-table"><thead><tr><th>#</th><th>Student</th><th>ID</th><th>Total / Maximum</th><th>Average</th>'+(this._pol.show_position!==false?'<th>'+this.esc(this._pol.position_label||'Position')+'</th>':'')+'<th>Status</th><th>Published</th><th>Standalone sheet</th></tr></thead><tbody>'+body+'</tbody></table></div><p style="font-size:.82rem;color:#64748b">Each button opens an independent, print-ready sheet. Use the browser print dialog to print or save as PDF.</p>';
+    }catch(e){box.innerHTML='<div class="notice notice-error">Unable to load generated student reports: '+this.esc(e.message||e)+'</div>';}
+  },
+
+  /* V12.72 — a rehearsal exists to answer "who do I help before the exam?".
+     This groups the class into the four readiness verdicts the server set. */
+  renderReadiness(rows){
+    const box=document.getElementById('pr-readiness'); if(!box) return;
+    const all=(rows||[]).filter(r=>r.has_scores!==false);
+    if(!all.length){
+      box.innerHTML='<div class="notice">No prep marks have been recorded yet, so readiness cannot be judged. Push a prep CBT or enter prep marks by hand.</div>';
+      return;
+    }
+    const groups={
+      ready:      {label:'✅ Ready',       help:'On current evidence these learners can sit the school examination now.',  bg:'#ecfdf5',bd:'#16a34a'},
+      nearly:     {label:'🟡 Nearly ready', help:'Close. Target the weakest subjects in the remaining time.',           bg:'#fefce8',bd:'#ca8a04'},
+      needs_work: {label:'🟠 Needs work',   help:'A focused revision plan is needed before the examination.',           bg:'#fff7ed',bd:'#f97316'},
+      at_risk:    {label:'🔴 At risk',      help:'Arrange support now — on current evidence this learner is likely to fail.', bg:'#fef2f2',bd:'#dc2626'}
+    };
+    let html='<div class="stats-grid" style="margin-bottom:12px">';
+    Object.keys(groups).forEach(k=>{
+      const n=all.filter(r=>r.readiness_band===k).length;
+      html+='<div class="stat-card" style="border-left:4px solid '+groups[k].bd+'"><div class="stat-value">'+n+'</div>'
+          + '<div class="stat-label"><b>'+groups[k].label+'</b></div></div>';
+    });
+    html+='</div>';
+    Object.keys(groups).forEach(k=>{
+      const list=all.filter(r=>r.readiness_band===k);
+      if(!list.length) return;
+      const g=groups[k];
+      html+='<div style="margin-bottom:10px;padding:10px;border-left:3px solid '+g.bd+';background:'+g.bg+';border-radius:6px">'
+          + '<b>'+g.label+' — '+list.length+' learner(s)</b>'
+          + '<div style="font-size:.84rem;color:#475569;margin:3px 0 6px">'+g.help+'</div>'
+          + '<div style="font-size:.85rem">'+list.map(r=>this.esc(r.student_name||'')+
+              ' <span style="color:#64748b">('+Number(r.percentage||0).toFixed(1)+'%)</span>').join(' &nbsp;·&nbsp; ')+'</div>'
+          + '</div>';
+    });
+    const unsat=(rows||[]).filter(r=>r.has_scores===false);
+    if(unsat.length){
+      html+='<div class="notice" style="border-left:3px solid #94a3b8;font-size:.86rem">'
+          + '<b>'+unsat.length+' learner(s) did not sit the rehearsal</b> and cannot be judged: '
+          + unsat.map(r=>this.esc(r.student_name||'')).join(', ')
+          + '. An absent learner is not an at-risk learner; check why before drawing a conclusion.</div>';
+    }
+    box.innerHTML=html;
+  },
+
+  async publish(flag){
+    if(!this.ready()) return;
+    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
+    const r=await sb.rpc('sc_prep_publish',{p_class:c, p_term:t, p_session:s, p_on:flag});
+    if(r.error || !r.data || r.data.ok===false){ toast((r.data&&r.data.error)||r.error?.message||'Publish failed','danger'); return; }
+    toast((flag?'✅ Published':'🚫 Unpublished')+' prep reports','success'); this.preview();
+  },
+  /* =====================================================================
+     V12.60 — ONE-CLICK PUBLISH FOR EVERY CLASS
+     ---------------------------------------------------------------------
+     Publishing used to be class-scoped: an admin had to re-select each class
+     and press Publish again (and Generate before it). This runs the whole
+     school in one call and reports exactly what happened per class.
+     ===================================================================== */
+  async publishAllClasses(flag){
+    if(!this.ready()) return;
+    const {t,s}=this.vals();
+    if(!t||!s){ toast('Pick a term and session first — the class filter is ignored here.','warning',8000); return; }
+    const verb=flag?'publish':'unpublish';
+    const detail = flag
+      ? 'Students and parents will see their prep sheets immediately. Generate runs first so no class is skipped.'
+      : 'Students and parents will lose access until you publish again.';
+    if(!confirm('This will '+(flag?'GENERATE and PUBLISH':'UNPUBLISH')+' prep reports for EVERY class · '+t+' · '+s+'.\n\n'+detail+'\n\nContinue?')) return;
+
+    const btn=event&&event.target?event.target.closest('button'):null;
+    const restore=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Working…'; }
+    try{
+      const r=await sb.rpc('sc_prep_publish_all',{p_term:t,p_session:s,p_publish:!!flag,p_generate:!!flag});
+      if(r.error) throw r.error;
+      const d=r.data||{};
+      if(d.ok===false) throw new Error(d.error||('Could not '+verb));
+      const details=(d.details||[]);
+      const rows=details.map(x=>'<tr><td><b>'+this.esc(x.class)+'</b></td><td>'+Number(x.with_scores||0)+'</td><td>'+Number(x.without_scores||0)+'</td><td>'+(flag?'✅ published':'🚫 unpublished')+'</td></tr>').join('');
+      openModal((flag?'✅ Published':'🚫 Unpublished')+' — all classes',
+        '<div class="notice" style="background:#f0fdf4;border-color:#86efac;color:#166534"><b>'+Number(d.classes||details.length)+' class(es) processed</b> · '+Number(d.generated||0)+' sheet(s) generated for '+this.esc(t)+' · '+this.esc(s)+'</div>'+
+        '<div class="table-wrap"><table class="mr-table"><thead><tr><th>Class</th><th>With scores</th><th>No scores</th><th>Status</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No classes found.</td></tr>')+'</tbody></table></div>'+
+        '<p style="font-size:.82rem;color:#64748b">Classes listed with 0 / 0 have no students or no scores yet — they are published anyway so late entries appear automatically.</p>',
+        '<button class="btn btn-outline" onclick="closeModal()">Close</button> <button class="btn btn-primary" onclick="closeModal();PR.preview()">👁️ Preview this class</button>');
+      toast('✅ '+verb+' complete for '+Number(d.classes||details.length)+' class(es).','success',8000);
+      try{ this.preview(); }catch(_){}
+    }catch(e){
+      const msg=String(e.message||e);
+      if(/could not find the function|does not exist|schema cache/i.test(msg)){
+        toast('Run database/complete-schema.sql in Supabase to enable one-click publish.','danger',12000);
+      } else { toast('Bulk '+verb+' failed: '+msg,'danger',10000); }
+    }finally{ if(btn){ btn.disabled=false; btn.innerHTML=restore; } }
+  },
+  async exportCSV(){
+    if(!this.ready()) return;
+    const {c,t,s}=this.vals(); if(!c||!t||!s){ toast('Pick class, term, session','warning'); return; }
+    let rows;try{rows=await this.fetchContextRows(c,t,s);}catch(e){toast(e.message||'Could not load Prep rows','danger');return;}if(!rows.length){ toast('No data','warning'); return; }
+    await this.loadPolicy(t,s);await this.loadHolds(t,s);  /* V12.70 item 11 — CSV obeys the same switch */
+    const showPos=this._pol.show_position!==false;
+    const header=['Student','ID','Class','Term','Session','Total','Maximum','AveragePercent'].concat(showPos?[(this._pol.position_label||'Position')]:[]).concat(['HasScores','Published','Scores_JSON','Score_Details_JSON']);
+    const csv=[header.join(',')].concat(rows.map(row=> [row.student_name,row.student_id_ref,row.class,row.term,row.session,row.total,row.max_total,row.average].concat(showPos?[row.position]:[]).concat([row.has_scores,row.published,JSON.stringify(row.scores||{}),JSON.stringify(row.score_details||[])]).map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(','))).join('\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='prep-'+c+'-'+t+'-'+s+'.csv'; a.click();
+  }
+};
+document.addEventListener('DOMContentLoaded', ()=>{ if(window.App) App.init('prep-reports'); PR.init(); });
+
+/* V12.62: inline handlers resolve through window — expose the controller. */
+window.PR = MR;
+</script>
+<div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h2 id="modal-title">Modal</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-footer" class="modal-footer"></div>
+  </div>
+</div>
+</body>
+</html>
