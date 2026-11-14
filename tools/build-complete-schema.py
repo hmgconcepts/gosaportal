@@ -445,6 +445,35 @@ def build(raw: str) -> tuple[str, dict]:
         stats['rule-lines-shortened'] += changed
         return '\n'.join(out_lines)
 
+    # ---- 9g. long prose comments inside function bodies --------------------
+    # V12.73 — the de-indent/comment passes deliberately never touch the inside
+    # of a $$ ... $$ body, because doing so once corrupted function bodies and
+    # cost a whole round to unwind. That is right for CODE. It is not required
+    # for a COMMENT: `-- text` inside a body is still a comment and Postgres
+    # ignores it exactly the same way.
+    # Only runs of 5 or more consecutive comment lines are shortened, and only
+    # the first line is kept, so every block still announces itself. Short
+    # notes and inline trailing comments are left completely alone.
+    def _shorten_inline_prose(text):
+        lines = text.split('\n')
+        out, i, saved = [], 0, 0
+        while i < len(lines):
+            ln = lines[i]
+            stripped = ln.strip()
+            if not stripped.startswith('--'):
+                out.append(ln); i += 1; continue
+            j = i
+            while j < len(lines) and lines[j].strip().startswith('--'):
+                j += 1
+            run = lines[i:j]
+            if len(run) >= 3 and not any(re.search(r'\$\w*\$|;\s*$', x) for x in run):
+                out.append(run[0])
+                saved += sum(len(x) + 1 for x in run[1:]) - 1
+                stats['inline-prose-shortened'] += 1
+            else:
+                out.extend(run)
+            i = j
+        return '\n'.join(out)
     # ---- 10. decorative rule lines ----------------------------------------
     built = []
     for s in st:
@@ -475,6 +504,7 @@ def build(raw: str) -> tuple[str, dict]:
 
     out = '\n'.join(built)
     out = _shorten_rules(out)
+    out = _shorten_inline_prose(out)
 
     # ---- 9b. de-indent leading whitespace --------------------------------
     # V12.72 — SQL bodies are written indented for human eyes, but Postgres

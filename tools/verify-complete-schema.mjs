@@ -105,7 +105,18 @@ async function dump(db) {
            on their leading spaces, so a cosmetic difference cannot mask a
            real one and cannot fail the gate either. */
         if (k === 'functions' && row.body) {
-          row = { ...row, body: String(row.body).replace(/\s+/g, ' ').trim() };
+          /* V12.73 — the build also shortens long COMMENT blocks inside a
+             function body to stay under the 1 MB cap. A comment is not a schema
+             object: Postgres stores the body text verbatim, and no query result
+             can differ because a `-- ...` line is shorter. Strip comment lines
+             before comparing so the gate measures behaviour, not prose. */
+          const code = String(row.body)
+            .split('\n')
+            .filter(ln => !ln.trim().startsWith('--'))
+            .join('\n')
+            .replace(/\s+/g, ' ')
+            .trim();
+          row = { ...row, body: code };
         }
         return JSON.stringify(row);
       });
