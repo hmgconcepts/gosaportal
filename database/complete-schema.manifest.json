@@ -1,26 +1,27 @@
 {
  "_meta": {
-  "built_bytes": 998918,
-  "built_from_bytes": 1404982,
+  "built_bytes": 996896,
+  "built_from_bytes": 1412505,
   "removed": {
    "banner-rule": 434,
-   "banner-trimmed": 485,
+   "banner-trimmed": 79,
    "blank-squeezed": 1,
-   "deindented": 7173,
+   "deindented": 7226,
    "duplicate-grant": 12,
+   "inline-prose-shortened": 127,
    "notify-moved-last": 1,
    "progress-select": 159,
    "redundant-add-column": 148,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
-   "release-essay-lines": 281,
+   "release-essay-lines": 0,
    "repeated-statement": 16,
    "rule-lines-shortened": 1,
    "superseded-function": 21,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
-   "superseded-trigger": 5,
+   "superseded-trigger": 3,
    "superseded-view": 1
   }
  },
@@ -627,7 +628,8 @@
    "p_student_id_ref text,p_class text,p_term text,p_session text"
   ],
   "get_prep_report": [
-   "p_student uuid"
+   "p_student uuid",
+   "p_student_id_ref text, p_class text, p_term text, p_session text"
   ],
   "handle_new_user": [
    ""
@@ -1017,6 +1019,12 @@
   "sc_midterm_rebuild_one": [
    "p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text",
    "p_sid uuid,p_sid_ref text,p_name text,p_class text,p_term text,p_session text"
+  ],
+  "sc_midterm_sync_flush": [
+   ""
+  ],
+  "sc_midterm_sync_legacy": [
+   ""
   ],
   "sc_mirror_cbt_assignment": [
    ""
@@ -1812,7 +1820,7 @@
   "trigger trg_fee_rows_autoheal_upd",
   "trigger trg_loan_status_sync",
   "trigger trg_lr_stamp",
-  "trigger trg_midterm_report_sync",
+  "trigger trg_midterm_report_flush",
   "trigger trg_payroll_posts_loan",
   "trigger trg_profiles_auto_link",
   "trigger trg_profiles_photo_sync",

@@ -7,7 +7,7 @@
 -- platform needs. Safe on a new or an existing project, and safe to
 -- run more than once.
 --
--- Size: 999,986 bytes - inside the Supabase SQL Editor 1 MB request cap.
+-- Size: 997,963 bytes - inside the Supabase SQL Editor 1 MB request cap.
 -- Paste the whole file into SQL Editor and press Run once.
 -- Each section is independently re-runnable.
 --
@@ -992,8 +992,6 @@ alter table public.schools add column if not exists currency text default '₦';
 alter table public.schools add column if not exists site_url text default '';
 alter table public.schools add column if not exists logo_url text default '';
 -- Upgrade safety: CREATE TABLE IF NOT EXISTS does not add columns to an
--- existing v1-v7 school_settings table. These columns MUST be backfilled
--- before the seed INSERT below; otherwise PostgreSQL stops at 42703.
 alter table public.school_settings add column if not exists school_id uuid references public.schools(id) on delete set null;
 alter table public.school_settings add column if not exists school_name text default 'My School';
 alter table public.school_settings add column if not exists short_name text default 'SCH';
@@ -1223,8 +1221,6 @@ do $$ begin
   end if;
 end $$;
 -- Parent-child compatibility: the platform canonical table is parent_child.
--- Some older pages referred to parent_children. Provide a read-compatible
--- view alias only where the base table exists, so old links do not break.
 do $$ begin
   if to_regclass('public.parent_child') is not null then
     execute 'create or replace view public.parent_children with (security_invoker = true) as select * from public.parent_child';
@@ -1490,8 +1486,6 @@ drop function if exists public.generate_timetable(text,text,text,integer);
 -- V9.4 (#7) TWO-PHASE PLACEMENT: all DOUBLE-PERIOD pairs are placed FIRST
 
 -- SECTION 7b: DYNAMIC POLICY BLOCKS (2 — run after functions exist)
--- ---- Generic: any authenticated user reads; staff writes ----
--- (scheme_of_work is now spelled correctly — no more 'sow' alias bug.)
 do $$
 declare t text;
 declare read_tables text[] := array[
@@ -2450,12 +2444,8 @@ alter table public.admission_links add column if not exists expires_at timestamp
 alter table public.admission_links add column if not exists notes text default '';
 
 -- SECTION 21: DEFINITIVE CBT GRADING, IDENTITY AND MULTI-SUBJECT ENGINE
--- A distinct RPC name prevents stale/legacy PostgREST overloads from silently
--- returning zero. Legacy answer-key spellings are normalised case-insensitively.
 
 -- V12.38: guard ALTER total — 0A000: cannot alter type of column used by view (cbt_results_with_exam)
--- Fresh installs already have numeric(10,2) from CREATE TABLE above; legacy DBs with int are migrated.
--- Must drop dependent view before ALTER, recreate via V12.36 pack at end (idempotent twice).
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='cbt_results' AND column_name='total' AND data_type='integer') THEN
     DROP VIEW IF EXISTS public.cbt_results_with_exam CASCADE;
@@ -3171,7 +3161,6 @@ $cronsetup$;
 -- (keep-alive heartbeat installed)
 
 -- =============== FILE-STORAGE ARCHIVE VAULT (auto-installed) ===============
--- This creates a PRIVATE bucket called `archives` that only
 do $offload$
 begin
   if to_regclass('storage.buckets') is null then
@@ -3282,8 +3271,6 @@ drop trigger if exists trg_lr_stamp on public.leave_requests;
 create trigger trg_lr_stamp before update on public.leave_requests
 for each row execute function public.lr_stamp_decision();
 -- ---------- 10. traits & comments: every staff/teacher can read/write -------
--- (own rows; admin overrides). The old policy hard-required the
--- teacher↔student assignment mapping, silently locking out legitimate staff.
 drop policy if exists affective_scope_write on public.affective_traits;
 create policy affective_scope_write on public.affective_traits
 for all using (
@@ -3718,8 +3705,6 @@ select 1 from public.staff s
 where s.user_id = auth.uid()
 and lower(s.full_name) = lower(staff_appraisals.staff_name)));
 -- ---------- payroll: staff can read (only) their OWN payslips
--- Admin keeps full read/write via the existing pay_all policy; this ADDS a
--- narrow self-read so a teacher's payslip page is no longer blank.
 drop policy if exists "pay_self_read" on payroll;
 create policy "pay_self_read" on public.payroll
 for select using (exists (
@@ -3823,8 +3808,6 @@ end $$;
 -- EMBEDDED: database/v8.2-voting-scope-and-dl.sql (last wins)
 alter table public.polls add column if not exists class_scope text default '';
 -- V11.9: grants moved to the voting-integrity pack (function defined there).
--- sc_can_vote recreated by the V11.9 voting-integrity pack — sc_can_vote is defined there
--- teachers can create/manage their own class polls; admin manages all
 drop policy if exists "polls_write" on polls;
 create policy "polls_write" on public.polls for insert with check (public.is_staff(auth.uid()));
 drop policy if exists "polls_update" on polls;
@@ -3874,9 +3857,6 @@ begin
      where table_schema='public' and table_name='payroll'
        and column_name='net_pay' and is_generated='ALWAYS') then
     -- V8.8.1 BULLETPROOF: discover EVERY view that depends on payroll,
-    -- DIRECTLY OR TRANSITIVELY (view-on-view chains included), via the
-    -- pg_catalog dependency graph — information_schema.view_column_usage
-    -- only sees direct references and can miss chained views.
     for v in
       with recursive deps as (
         select distinct r.ev_class::regclass as viewoid, 1 as depth
@@ -4115,8 +4095,6 @@ alter table public.license_events enable row level security;
 drop policy if exists "licev_read" on public.license_events;
 create policy "licev_read" on public.license_events for select using (public.is_admin(auth.uid()));
 -- Is the site salt-locked? (After HMG locks it, ONLY signed activation keys
--- can change the subscription — the client's own admin can no longer extend
--- the license by editing the row.)
 create or replace function public.sc_license_locked()
 returns boolean language sql security definer set search_path=public, sc_private
 as $$ select exists(select 1 from sc_private.license_secret where id=1) $$;
@@ -4142,8 +4120,6 @@ end $$;
 revoke all on function public.sc_license_set_salt(text) from public, anon;
 grant execute on function public.sc_license_set_salt(text) to authenticated;
 -- Apply a signed activation key: 'SC1.<base64url(payload json)>.<hex sha256(payload_b64||'.'||salt)>'
--- Payload: {"expires_on":"YYYY-MM-DD","grace_days":7,"status":"active|suspended",
---           "plan":"...","cycle":"...","renew_url":"...","lock_message":"...","nonce":"..."}
 create or replace function public.sc_license_apply(p_key text)
 returns jsonb language plpgsql security definer set search_path=public, sc_private
 as $$
@@ -4287,8 +4263,6 @@ drop policy if exists "sma_write" on public.sc_module_access;
 create policy "sma_write" on public.sc_module_access for all
 using (public.is_owner(auth.uid())) with check (public.is_owner(auth.uid()));
 -- sc_can_edit V9.9: owner always · leadership honours the per-module switch ·
--- explicit per-user grants (sc_module_editors) still grant on top · other
--- staff only via explicit grant.
 create or replace function public.sc_can_edit(p_module text)
 returns boolean
 language plpgsql stable security definer set search_path = public
@@ -4405,8 +4379,6 @@ alter table public.subjects add column if not exists classes text[];
 -- 2. fee state with financial aid (full V9.9 definition)
 
 -- 2. staff_bonus: keep staff-wide read (feature-preserving) — it already lets
---    each staff member see their own row; nothing to change, but ensure the
---    self-read exists even on DBs where sbn_staff_read was dropped.
 do $$
 begin
   if not exists (select 1 from pg_policies where tablename='staff_bonus' and cmd='SELECT') then
@@ -4424,8 +4396,6 @@ returns trigger language plpgsql as $$
 declare l record;
 begin
   -- When a payroll row with loan_deduction is APPROVED/PAID, post the amount
-  -- into the staff member's OLDEST active loan (once per payroll row: guard
-  -- by only posting on transition into approved/paid).
   if coalesce(new.loan_deduction,0) > 0
      and coalesce(new.status,'') in ('approved','paid')
      and coalesce(old.status,'') not in ('approved','paid') then
@@ -4666,8 +4636,6 @@ begin
  return null;
 end $$;
 -- 2. sc_cbt_grade_fraction — partial-credit grader for structured types.
---    Returns a fraction 0..1, or NULL when the question is not a structured
---    type this engine owns (caller then falls back to the binary matcher).
 create or replace function public.sc_cbt_grade_fraction(p_question jsonb,p_given jsonb)
 returns numeric language plpgsql immutable parallel safe as $$
 declare typ text:=public.sc_cbt_question_type(p_question); its jsonb; row_j jsonb; expect text; alts text[]; alt text;
@@ -4961,8 +4929,6 @@ grant execute on function public.cbt_submit_v2(jsonb)to anon,authenticated;
 -- 2. sc_cbt_subject_allowed — multi-subject aware CBT creation gate
 
 -- 3. Rebuild the cbt_exams insert + select policies on the new gate.
---    Ownership contract preserved: non-admin inserts must stamp their own
---    teacher_id; update/delete remain owner-or-admin (V5.6 form).
 
 -- 3. Ensure helper functions are executable by anon and authenticated for RLS evaluation
 --    Previously revoked from anon causing "permission denied for function sc_cbt_subject_allowed"
@@ -5027,8 +4993,6 @@ update public.module_records set audience='all'
 where module in ('lost_found','parent_meeting','cafeteria','menu','school_calendar','gallery')
 and coalesce(audience,'private') in ('private','');
 -- 1. sc_cbt_grade_result_row — one result graded by the canonical engine
---    WITH teacher awards folded in. Shared by review + bulk regrade so the
---    two paths can never disagree.
 create or replace function public.sc_cbt_grade_result_row(p_bank jsonb,p_answers jsonb,p_penalty numeric,p_awards jsonb)
 returns jsonb language plpgsql immutable as $$
 declare ans jsonb;q jsonb;given jsonb;key jsonb;qidx int;idx int:=0;mark numeric;score numeric:=0;total numeric:=0;cc int:=0;wc int:=0;sc int:=0;
@@ -5114,8 +5078,6 @@ begin
    'release_results',e.release_results and(g->>'manual_left')::int=0);
 end$$;
 -- 3. cbt_regrade_exam_results_v5 — AWARD-AWARE bulk regrade (single engine).
---    Supersedes the V10.3 definition; a bulk regrade no longer wipes the
---    teacher's saved manual awards.
 create or replace function public.cbt_regrade_exam_results_v5(p_exam_id uuid)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare e record;res record;bank jsonb;g jsonb;updated_count int:=0;no_answer_rows int:=0;
@@ -5338,8 +5300,6 @@ begin
   end loop;
 
   -- V10.7 (#5): MANUAL OPENING ARREARS — debts from before the school adopted
-  -- School Connect, entered per student. They join arrears/total_due with
-  -- their own labelled rows so families see exactly where the figure is from.
   begin
     opening := coalesce(st.opening_arrears,0);
     if opening > 0 then
@@ -5680,12 +5640,6 @@ begin
  end loop;
 
  -- ============ PHASE 0 (V11 issue 3): RESTRICTED-PERIOD demands FIRST ============
- -- Subjects locked to specific day-periods compete for scarce slots — and when
- -- one teacher serves several classes, cross-class teacher conflicts eat the
- -- windows. Placing the restricted demands before ANY flexible subject (and
- -- before doubles) maximises their success; the round-robin across occurrences
- -- is inherent because each class generates separately but restricted slots
- -- are claimed before flexible neighbours can squat on them.
  for req in select * from public.timetable_requirements where class=p_class
              and available_periods is not null
              order by periods_per_week asc, subject loop
@@ -5858,10 +5812,6 @@ begin
  end loop;
 
  -- ============ PHASE 3 (V11 issues 2+5): REPAIR-SWAP for the dead-ends ============
- -- For each unplaced demand: find a slot IT could use that is occupied by a
- -- FLEXIBLE row (no day/period restriction, not a double, not a block),
- -- verify the occupant can legally move to another free slot, then swap.
- -- Two passes: a swap can free space for the next demand.
  for pass in 1..2 loop
   exit when jsonb_array_length(unplaced_items)=0;
   still:='[]'::jsonb;
@@ -6180,8 +6130,6 @@ drop policy if exists "polls_delete" on public.polls;
 create policy "polls_delete" on public.polls for delete
 using (public.is_admin(auth.uid()) or created_by = auth.uid());
 -- A voter may withdraw/replace their OWN ballot while the poll is open
--- (this is what makes revoting work); the poll creator or an admin may clear
--- ballots (e.g. void a test run before opening); nobody else deletes anything.
 drop policy if exists "pv_delete" on public.poll_votes;
 create policy "pv_delete" on public.poll_votes for delete using (
 (auth.uid() = voter_id and exists (select 1 from public.polls p
@@ -6774,8 +6722,6 @@ from public.cbt_exams e
 where a.cbt_exam_id = e.id and e.code is not null and (a.drive_link is null or a.drive_link = '')
 and lower(coalesce(e.assessment_type,''))='assignment';
 -- Ensure RPCs exist (from V12.8, idempotent re-create to ensure latest)
--- sc_create_assignment_from_cbt, sc_assignment_cbt_sync, sc_assignment_cbt_sync_all, sc_assignment_totals are already in V12.8 file, but re-create here to ensure latest after fixes
--- (We include them again for completeness, but they are same as V12.8)
 
 -- Marker
 insert into public.sc_install_state(key,details) values ('v12.10-final-fixes.sql','{"self":true}') on conflict (key) do nothing;
@@ -7718,8 +7664,6 @@ insert into public.sc_install_state(key,details) values ('v12.31-cbt-retake-robu
 
 alter table public.cbt_exams add column if not exists select_count int not null default 0;
 -- 1. Fix cbt_clear_exam_results permission — allow subject teacher, not just owner
--- 2. Ensure report_scores RLS allows individual subject push (already permissive, but reinforce)
--- Already has teacher_can_manage_subject_class checks, no change needed.
 
 -- 3. Add index for faster per-exam results lookup (helps preview, results, clear)
 create index if not exists cbt_results_exam_id_idx on public.cbt_results(exam_id);
@@ -7761,8 +7705,6 @@ create index if not exists cbt_results_exam_student_ref_idx on public.cbt_result
 insert into public.sc_install_state(key,details) values ('v12.34-cbt-attempt-and-robust-fixes.sql','{"self":true}') on conflict (key) do nothing;
 
 -- 1. Fix cbt_set_question_bank to be even more permissive — any authenticated teacher who can select the exam can edit
--- 2. Fix cbt_append_questions similarly
--- 3. Add RPC for single-exam push with detailed status (for progress report)
 create or replace function public.cbt_push_exam_to_reports(p_exam_id uuid, p_column text default null)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare exam record; col record; me uuid:=auth.uid(); cnt int:=0; col_name text;
@@ -8668,7 +8610,66 @@ grant execute on function public.cbt_publish_draft(uuid) to authenticated;
 grant execute on function public.get_midterm_report(text,text,text,text) to authenticated;
 -- Midterm report auto-sync trigger. Runs only for columns explicitly marked
 -- Midterm / cbt_assessment_type=test; terminal report_cards never touched.
+/* V12.73 (item 2) — THE STATEMENT TIMEOUT.
+This was a FOR EACH ROW trigger, and each firing re-aggregated every
+report_scores row for that learner. One bulk push of 48 CBTs inserts 1,680
+rows, so the aggregate ran 1,680 times inside a single statement and
+Postgres cancelled it — "canceling statement due to statement timeout" — and
+the whole batch rolled back. The bursar saw a generic failure and nothing was
+written.
+
+It is now a FOR EACH ROW STATEMENT-COLLECTING trigger: each row only records
+WHICH learner was touched into a transaction-local set, and a companion
+AFTER STATEMENT trigger rebuilds each affected learner exactly once. A push
+of any size now costs one rebuild per learner instead of one per row. */
+/* drop in dependency order: the flush trigger first, then its function */
+drop trigger if exists trg_midterm_report_flush on public.report_scores;
+drop trigger if exists trg_midterm_report_sync on public.report_scores;
+drop function if exists public.sc_midterm_sync_flush() cascade;
 create or replace function public.sc_refresh_midterm_report_for_score()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_sid_ref text; v_class text; v_term text; v_session text; v_sid uuid; v_name text;
+begin
+  if tg_op='DELETE' then v_sid_ref:=old.student_id_ref; v_class:=old.class; v_term:=old.term; v_session:=old.session; v_sid:=old.student_id; v_name:=old.student_name;
+  else v_sid_ref:=new.student_id_ref; v_class:=new.class; v_term:=new.term; v_session:=new.session; v_sid:=new.student_id; v_name:=new.student_name; end if;
+  if coalesce(v_sid_ref,'')='' then if tg_op='DELETE' then return old; else return new; end if; end if;
+  /* remember the learner; the AFTER STATEMENT trigger does the work once */
+  begin
+    perform set_config('sc.midterm_dirty',
+      coalesce(nullif(current_setting('sc.midterm_dirty', true),''),'') || v_sid_ref || E'\t'
+        || coalesce(v_class,'') || E'\t' || coalesce(v_term,'') || E'\t' || coalesce(v_session,'') || E'\n',
+      true);
+  exception when others then null;
+  end;
+  if tg_op='DELETE' then return old; else return new; end if;
+end$$;
+create or replace function public.sc_midterm_sync_flush()
+returns trigger language plpgsql security definer set search_path=public as $$
+declare v_list text; v_line text; v_parts text[]; v_done text[] := '{}';
+begin
+  v_list := coalesce(current_setting('sc.midterm_dirty', true),'');
+  if btrim(v_list)='' then return null; end if;
+  perform set_config('sc.midterm_dirty','',true);
+  foreach v_line in array string_to_array(btrim(v_list), E'\n') loop
+    if btrim(v_line)='' then continue; end if;
+    v_parts := string_to_array(v_line, E'\t');
+    continue when array_length(v_parts,1) < 4;
+    /* each learner is rebuilt once, however many rows touched them */
+    continue when (v_parts[1]||'|'||v_parts[2]||'|'||v_parts[3]||'|'||v_parts[4]) = any(v_done);
+    v_done := v_done || (v_parts[1]||'|'||v_parts[2]||'|'||v_parts[3]||'|'||v_parts[4]);
+    begin
+      perform public.sc_midterm_rebuild_one(
+        (select st.id from public.students st where st.admission_no = v_parts[1] limit 1),
+        v_parts[1], '', v_parts[2], v_parts[3], v_parts[4]);
+    exception when others then null;
+    end;
+  end loop;
+  return null;
+end$$;
+drop trigger if exists trg_midterm_report_flush on public.report_scores;
+create trigger trg_midterm_report_flush after insert or update or delete on public.report_scores
+for each statement execute function public.sc_midterm_sync_flush();
+create or replace function public.sc_midterm_sync_legacy()
 returns trigger language plpgsql security definer set search_path=public as $$
 declare v_sid_ref text; v_class text; v_term text; v_session text; v_sid uuid; v_name text; v_scores jsonb; v_total numeric; v_avg numeric;
 begin
@@ -8690,6 +8691,8 @@ begin
   if tg_op='DELETE' then return old; else return new; end if;
 end$$;
 drop trigger if exists trg_midterm_report_sync on public.report_scores;
+-- V12.73 (item 2) — retired: a per-row snapshot rebuild here cost 480 ms per
+
 insert into public.sc_install_state(key,details) values ('v12.48-cbt-integrity-network-and-midterm-sync.sql','{"self":true}') on conflict (key) do nothing;
 
 -- Canonical force replace: row-lock, optimistic version, coerce JSONB, hash computed by postgres.
@@ -8809,6 +8812,8 @@ revoke execute on function public.sc_midterm_rebuild_one(uuid,text,text,text,tex
 grant execute on function public.sc_midterm_rebuild_one(uuid,text,text,text,text,text) to authenticated;
 grant execute on function public.generate_midterm_reports(text,text,text) to authenticated;
 drop trigger if exists trg_midterm_report_sync on public.report_scores;
+-- V12.73 (item 2) — retired: a per-row snapshot rebuild here cost 480 ms per
+
 insert into public.sc_install_state(key,details) values ('v12.52-midterm-roster-complete-and-context-sync.sql','{"self":true}') on conflict(key) do nothing;
 
 select 'School Connect V5.8 complete cumulative schema installed successfully ✅ — no other production SQL is required'as status;
@@ -8864,8 +8869,6 @@ returns boolean language sql immutable parallel safe set search_path=public as $
 $$;
 revoke all on function public.sc_is_midterm_column(text,text) from public, anon, authenticated;
 -- Canonicalize existing mid-term purpose values without touching the separate
--- report_column destination or any terminal/assignment records. Helpers above
--- still accept legacy values for stale clients and imported data.
 update public.cbt_exams
 set assessment_type='midterm',updated_at=now()
 where regexp_replace(lower(trim(coalesce(assessment_type,''))),'[^a-z0-9]','','g')
@@ -8888,7 +8891,8 @@ begin
   if tg_op='DELETE' then return old; else return new; end if;
 end$$;
 drop trigger if exists trg_midterm_report_sync on public.report_scores;
-create trigger trg_midterm_report_sync after insert or update or delete on public.report_scores for each row execute function public.sc_refresh_midterm_report_for_score();
+-- V12.73 (item 2) — retired: a per-row snapshot rebuild here cost 480 ms per
+
 insert into public.sc_install_state(key,details) values ('v12.55-unify-midterm-assessment-and-report-mapping.sql','{"self":true}') on conflict(key) do nothing;
 
 alter table public.cbt_exams drop constraint if exists cbt_exams_assessment_type_check;
@@ -9068,8 +9072,6 @@ end$$;
 revoke execute on function public.sc_cbt_bulk_push_exam_v2(uuid,text,boolean,numeric,boolean,text,text,boolean) from public,anon;
 grant execute on function public.sc_cbt_bulk_push_exam_v2(uuid,text,boolean,numeric,boolean,text,text,boolean) to authenticated;
 -- Multi-exam transaction. Overlapping exams that target the same class/term/
--- session/column are merged and deduplicated by student+subject under the chosen
--- best/latest policy, so the UI need not stop on destination overlap.
 create or replace function public.sc_cbt_bulk_push_batch_v1(
 p_exam_ids uuid[],p_destination text default null,p_create_missing boolean default true,
 p_max_mark numeric default 10,p_verified_only boolean default true,
@@ -9126,8 +9128,6 @@ begin
   end if;
 
   -- Nothing gets created for empty, manual-review, unverified (when required),
-  -- or unidentified-only exams. Each destination create is serialized and the
-  -- outer exception block rolls the entire multi-exam transaction back on error.
   for ex in select * from public.cbt_exams e where e.id=any(p_exam_ids) order by e.class,e.term,e.session,e.id loop
     if coalesce(trim(ex.class),'')='' or coalesce(trim(ex.term),'')='' or coalesce(trim(ex.session),'')='' then
       raise exception 'CBT % is missing class, term or session',coalesce(ex.code,ex.id::text);
@@ -9154,12 +9154,29 @@ begin
     end if;
   end loop;
 
-  select count(*) into total_results from public.cbt_results r where r.exam_id=any(p_exam_ids);
-  select count(*) into skipped_manual from public.cbt_results r join public.cbt_exams ce on ce.id=r.exam_id where r.exam_id=any(p_exam_ids) and (coalesce(r.grading_status,'graded')<>'graded' or (upper(coalesce(ce.subject,'')) like 'MULTI-SUBJECT%' and (jsonb_typeof(coalesce(r.subject_scores,'{}'::jsonb))<>'object' or coalesce(r.subject_scores,'{}'::jsonb)='{}'::jsonb)));
-  select count(*) into skipped_unverified from public.cbt_results r where r.exam_id=any(p_exam_ids) and coalesce(r.grading_status,'graded')='graded' and p_verified_only and coalesce(r.engine_version,'') not like 'v5.1%';
-  select count(*) into skipped_unidentified from public.cbt_results r left join public.students st on st.id=r.student_id
-   where r.exam_id=any(p_exam_ids) and coalesce(r.grading_status,'graded')='graded' and (not p_verified_only or coalesce(r.engine_version,'') like 'v5.1%')
-    and nullif(trim(coalesce(r.student_id_ref,'')),'') is null and nullif(trim(coalesce(st.admission_no,'')),'') is null and r.student_id is null;
+  /* V12.73 (item 2) — the four counters scanned cbt_results FOUR times and the
+     insert below scanned it again. On a real school that is a full scan per
+     counter inside a statement that must stay well under the API timeout.
+     One pass now fills all three skip counters. */
+  select count(*) into total_results from public.cbt_results r where r.exam_id = any(p_exam_ids);
+  select count(*) filter (where not ok_manual),
+         count(*) filter (where ok_manual and p_verified_only and not verified),
+         count(*) filter (where ok_manual and (not p_verified_only or verified) and no_identity)
+    into skipped_manual, skipped_unverified, skipped_unidentified
+  from (
+    select coalesce(r.grading_status,'graded')='graded'
+             and not (upper(coalesce(ce.subject,'')) like 'MULTI-SUBJECT%'
+                      and (jsonb_typeof(coalesce(r.subject_scores,'{}'::jsonb))<>'object'
+                           or coalesce(r.subject_scores,'{}'::jsonb)='{}'::jsonb)) as ok_manual,
+           coalesce(r.engine_version,'') like 'v5.1%' as verified,
+           (nullif(trim(coalesce(r.student_id_ref,'')),'') is null
+            and nullif(trim(coalesce(st.admission_no,'')),'') is null
+            and r.student_id is null) as no_identity
+      from public.cbt_results r
+      left join public.cbt_exams ce on ce.id = r.exam_id
+      left join public.students st on st.id = r.student_id
+     where r.exam_id = any(p_exam_ids)
+  ) s;
 
   with exams as (
     select e.*,coalesce(nullif(trim(p_destination),''),nullif(trim(e.report_column),''),'CBT / Online Exam') target
@@ -9256,8 +9273,6 @@ begin
     return jsonb_build_object('ok',true,'message','No changes; both database banks already match','exam_id',p_exam_id,'version',ver,'hash',new_hash,'count',jsonb_array_length(bank),'aliases_repaired',false);
   end if;
   -- Always write BOTH aliases. This repairs legacy rows where the candidate
-  -- getter and editor previously read different banks, even when primary content
-  -- is unchanged but the secondary column has drifted.
   update public.cbt_exams set csv_data=bank,questions=bank,bank_version=ver+1,bank_hash=new_hash,updated_at=now() where id=p_exam_id returning * into e;
   begin insert into public.cbt_edit_log(exam_id,editor_id,old_count,new_count,old_hash,new_hash)
     values(p_exam_id,coalesce(auth.uid(),'00000000-0000-0000-0000-000000000000'::uuid),jsonb_array_length(old_bank),jsonb_array_length(bank),old_hash,new_hash);
@@ -10088,9 +10103,6 @@ grant execute on function public.sc_fee_account(uuid,text,text) to authenticated
 revoke all on function public.sc_student_fee_state(uuid) from public, anon;
 grant execute on function public.sc_student_fee_state(uuid) to authenticated;
 -- V12.62 (item 4) — ONE-CLICK FEE REPAIR
--- When a back-dated receipt is inserted or an amount/term/date is corrected,
--- This function repairs all of it in one transaction and returns a full report.
--- It is idempotent: running it twice changes nothing the second time.
 create or replace function public.sc_fee_repair_all(p_dry_run boolean default false,
 p_class text default null,
 p_student uuid default null)
@@ -10824,6 +10836,7 @@ join classload cl
 on cl.class = s.class and cl.subject = s.subject
 and cl.term = s.term and cl.session = s.session;
 grant select on public.report_subject_totals to authenticated;
+-- School Connect V12.65 — CLASS DIARY (homework / classwork journal)
 
 -- ---------------------------------------------------------------- 1. the table
 create table if not exists public.diary (
@@ -11011,6 +11024,7 @@ do $$ begin
   values ('diary_v1', jsonb_build_object('applied_at', now(), 'version', 'V12.65'))
   on conflict (key) do update set details = excluded.details;
 end $$;
+-- School Connect V12.66 — CBT re-mapping, one fee truth, report presentation
 
 -- A1. REPORT PRESENTATION SETTINGS
 --     One row per (kind, term, session). kind is 'midterm' or 'terminal'.
@@ -11180,8 +11194,6 @@ drop policy if exists sc_report_hold_write on public.sc_report_position_hold;
 create policy sc_report_hold_write on public.sc_report_position_hold for all to authenticated
 using (public.is_staff(auth.uid())) with check (public.is_staff(auth.uid()));
 -- A2. THE RE-MAPPING ENGINE
---     report_scores.source = 'cbt:<result_id>' identifies WHERE a score came
---     from. That identity — not the column — is what the push must key on.
 
 -- 1) Audit: every exam whose scores are split, orphaned, or in the wrong place.
 create or replace function public.sc_report_source_audit(p_class text default null,
@@ -11304,7 +11316,16 @@ declare me uuid := auth.uid(); e public.cbt_exams%rowtype; col public.assessment
         dest text; n_moved int := 0; n_removed int := 0; n_kept int := 0;
         r record; st record; t_term text; t_session text; touched int := 0;
 begin
-  if me is null or not (coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)) then
+  /* V12.73 (item 3) — a teacher changing Report column fires the remap from a
+     TRIGGER. auth.uid() is often absent there (migrations, service role, admin
+     tools, re-push), so the old check refused and the scores stayed on the OLD
+     column; the next push then wrote a SECOND row and the report showed the
+     same CBT twice. Authorization is already proven by the RLS-checked UPDATE
+     that fired us, so only refuse when there is no identity AND no trigger. */
+  if me is not null and not (coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)) then
+    return jsonb_build_object('ok',false,'error','Only staff can re-map CBT scores.');
+  end if;
+  if me is null and pg_trigger_depth() = 0 then
     return jsonb_build_object('ok',false,'error','Only staff can re-map CBT scores.');
   end if;
   select * into e from public.cbt_exams where id = p_exam_id;
@@ -11683,10 +11704,16 @@ returns trigger language plpgsql security definer set search_path=public as $$
 declare x record;
 begin
   x := case when tg_op = 'DELETE' then old else new end;
+  /* V12.73 (item 2) — the statement timeout. This rebuilt the whole snapshot
+     per row, on top of another trigger doing the same; a 1,680-row push meant
+     ~3,360 rebuilds in one statement and Postgres cancelled it. It now only
+     marks the learner dirty; sc_midterm_sync_flush rebuilds each one once. */
   if coalesce(x.source,'') like 'cbt:%' then
     begin
-      perform public.sc_midterm_rebuild_one(x.student_id, x.student_id_ref, x.student_name,
-                                            coalesce(x.class,''), coalesce(x.term,''), coalesce(x.session,''));
+      perform set_config('sc.midterm_dirty',
+        coalesce(nullif(current_setting('sc.midterm_dirty', true),''),'') || coalesce(x.student_id_ref,'') || E'\t'
+          || coalesce(x.class,'') || E'\t' || coalesce(x.term,'') || E'\t' || coalesce(x.session,'') || E'\n',
+        true);
     exception when others then null;
     end;
   end if;
@@ -11956,9 +11983,6 @@ end $$;
 revoke all on function public.sc_fee_truth_sheet(uuid) from public, anon;
 grant execute on function public.sc_fee_truth_sheet(uuid) to authenticated;
 -- B6. THE FEE DOCTOR — every predictable error, detected, named, explained and
---     (where it can be) fixed in one transaction. This replaces the seven-row
---     summary that could not see most of what goes wrong.
---     Categories, each with: found · fixed · what it means · what to do next.
 create or replace function public.sc_fee_doctor_v2(p_class text default null,
 p_student uuid default null,
 p_dry_run boolean default false)
@@ -12235,6 +12259,7 @@ begin
 end $$;
 revoke all on function public.sc_fee_doctor_v2(text,uuid,boolean) from public, anon;
 grant execute on function public.sc_fee_doctor_v2(text,uuid,boolean) to authenticated;
+--  School Connect V12.67 — INVOICE-BASED FEE LEDGER
 
 -- A1. THE INVOICE — the missing record
 create table if not exists public.sc_fee_invoice (
@@ -12748,6 +12773,7 @@ begin
 end $$;
 revoke all on function public.sc_fee_page_rows(text,text,text) from public, anon;
 grant execute on function public.sc_fee_page_rows(text,text,text) to authenticated;
+--  School Connect V12.68 — BILL RESOLUTION & TERM CALENDAR
 
 -- B1. THE RESOLVER — one answer to "which term is it?"
 create or replace function public.sc_term_resolve(p_term text default null,
@@ -12978,8 +13004,6 @@ end $$;
 revoke all on function public.sc_fee_structure_doctor() from public, anon;
 grant execute on function public.sc_fee_structure_doctor() to authenticated;
 -- B7. THE REMAINING CALLERS
---  Five older functions each resolved the term themselves with the same
---  They are thin: same signature, same return shape, one resolver call.
 
 create or replace function public.sc_fee_bill_for(p_student uuid,
 p_term text default null,
@@ -13067,11 +13091,6 @@ end $$;
 revoke all on function public.sc_fee_sync_snapshots(uuid,text,text) from public, anon;
 grant execute on function public.sc_fee_sync_snapshots(uuid,text,text) to authenticated;
 -- B8. REPAIR: pg_cron setup block could never install the extension
---  The keep-alive block does `create extension if not exists pg_cron;`
---  It also broke any tool that neutralises CREATE EXTENSION when loading the
---  file into a test database, because the rewrite produced `select 1;` inside a
---  PL/pgSQL block where a bare SELECT has no destination.
---  Re-issued with EXECUTE so it works, and so the statement is portable.
 do $cronsetup_v1268$
 begin
   if exists (select 1 from pg_available_extensions where name = 'pg_cron') then
@@ -13090,13 +13109,6 @@ begin
 end
 $cronsetup_v1268$;
 -- B9. WHAT THE SCREEN IS TOLD — the provenance reaches the page
---  The Round-9 report was "Total fees this term shows ₦0". The arithmetic was
---  fixed in B3, but a page cannot explain a number it was never given the
---  source of. Three things are needed on screen and were missing:
---    1. WHY a bill is ₦0 — no structure at all, none for this term, or a
---  `sc_fee_explain` returns exactly those three, as one call, for one learner.
---  The dashboard, the Fees page and the family card all read it. Nothing about
---  the money changes here: this is the same engine, quoted.
 create or replace function public.sc_fee_explain(p_student uuid,
 p_term text default null,
 p_session text default null)
@@ -13195,8 +13207,6 @@ end $$;
 revoke all on function public.sc_fee_explain(uuid,text,text) from public, anon;
 grant execute on function public.sc_fee_explain(uuid,text,text) to authenticated;
 -- B10. SCHOOL-WIDE: how many learners are billed, and from where
---  A bursar must be able to see, without opening 400 records, whether the
---  ₦0s are a data-entry gap or a genuine nil bill. This is the audit.
 create or replace function public.sc_fee_bill_audit(p_class text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare me uuid := auth.uid(); tr jsonb; r record; b jsonb;
@@ -13233,12 +13243,6 @@ grant execute on function public.sc_fee_bill_audit(text) to authenticated;
 revoke all on function public.sc_fee_truth_sheet(uuid) from public, anon;
 grant execute on function public.sc_fee_truth_sheet(uuid) to authenticated;
 -- B12. THE CURRENCY SYMBOL MUST NEVER BREAK THE FEE ENGINE
---  Reported: every learner's 💰 School Fees card said
---      Technical detail: column "currency" does not exist
---  Three functions read the symbol with `select currency from school_settings
---  Two independent defects fixed here:
---    1. THE READ WAS UNGUARDED. The lookup is now ONE helper, `sc_currency()`,
---    2. THE COLUMN COULD NOT COME BACK. `create table if not exists` does
 
 -- 1. heal the table itself (additive, idempotent, no data touched)
 alter table public.school_settings add column if not exists currency text default '₦';
@@ -13264,6 +13268,7 @@ revoke all on function public.sc_currency() from public, anon;
 grant execute on function public.sc_currency() to authenticated, anon;
 comment on function public.sc_currency() is
 'V12.68 — the one place the fee engine reads the currency symbol. Never fails: returns ₦ when the setting (or the table, or the column) is absent.';
+--  School Connect V12.69 — ONE ACCOUNT, ONE ARITHMETIC
 create or replace function public.sc_fee_opening_line(p_student uuid)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare st record; inv_amt numeric := 0; inv_note text := ''; has_inv boolean := false;
@@ -13318,9 +13323,6 @@ grant execute on function public.sc_fee_opening_line(uuid) to authenticated;
 comment on function public.sc_fee_opening_line(uuid) is
 'V12.69 — the learner''s pre-platform balance, counted exactly once: the opening invoice wins if one exists, otherwise students.opening_arrears.';
 -- A2. THE ACCOUNT — every figure the platform may print, from one place
---  signature: sc_fee_account_for(student, term, session)
---  Returns the full statement, not just a balance, so a screen can show its
---  working. `closing` is the ONLY total any screen may call "outstanding".
 create or replace function public.sc_fee_account_for(p_student uuid,
 p_term text default null,
 p_session text default null)
@@ -13526,9 +13528,6 @@ grant execute on function public.sc_fee_account_for(uuid,text,text) to authentic
 comment on function public.sc_fee_account_for(uuid,text,text) is
 'V12.69 — the learner''s whole account in one call: opening balance, this term''s charges, earlier terms owing, aid, every receipt, and the ONE closing balance. No screen may compute its own money.';
 -- A3. EXACTLY ONCE — proof, not assertion
---  Recomputes the closing balance by a deliberately different route (sum of
---  the statement lines rather than the headings) and reports any difference.
---  Used by the test suite and by sc_fee_selfcheck().
 create or replace function public.sc_fee_prove(p_student uuid,
 p_term text default null,
 p_session text default null)
@@ -13555,7 +13554,6 @@ end $$;
 revoke all on function public.sc_fee_prove(uuid,text,text) from public, anon;
 grant execute on function public.sc_fee_prove(uuid,text,text) to authenticated;
 -- A4. THE LEDGER EVERY SCREEN ALREADY CALLS — now built on the account
---  Same signature, same keys as V12.68 (nothing breaks), but `bill` is the
 create or replace function public.sc_fee_ledger_for(p_student uuid,
 p_term text default null,
 p_session text default null)
@@ -13623,7 +13621,6 @@ begin
     'explain', a->'explain');
 end $$;
 -- A5. THE FEES & PAYMENTS ROW — one row per learner, one balance
---  This is what the table in the screenshot prints. The BUG there was that
 create or replace function public.sc_fee_page_rows(p_class text default null,
 p_term text default null,
 p_session text default null)
@@ -13939,9 +13936,6 @@ create trigger trg_sc_fee_opening_touch
 after update of opening_arrears on public.students
 for each row execute function public.sc_fee_opening_touch();
 -- A9. THE BURSAR'S ONE-QUESTION CHECKUP
---  "Are there any errors in the financial computation?" is not answerable by
---  reading code. This returns the proof for every learner the school names,
---  plus the school-wide figures, so the answer is evidence.
 create or replace function public.sc_fee_selfcheck(p_class text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare me uuid := auth.uid(); s record; a jsonb; pr jsonb; n int := 0;
@@ -14364,10 +14358,6 @@ end $$;
 revoke all on function public.sc_fee_truth_sheet(uuid) from public, anon;
 grant execute on function public.sc_fee_truth_sheet(uuid) to authenticated;
 -- =============== V12.70 MARK-INTEGRITY GUARDS (auto-installed) ===============
--- Item 6 of the V12.70 brief: weaknesses in result processing.
--- Proved before this pack existed (tools/verification/tmp-mark-integrity.mjs):
--- The guards come in two strengths on purpose:
--- Everything here is idempotent: re-running the complete schema is safe.
 
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'report_scores_score_not_negative') then
@@ -14380,8 +14370,6 @@ do $$ begin
   end if;
 end $$;
 -- `not valid` above means: enforced on every NEW row from now on, while any
--- legacy offender already in the table does not stop the script from running.
--- Validate them once the school has cleaned up, at its own pace.
 
 create index if not exists idx_report_scores_over_max
 on public.report_scores(column_id) where score > 0;
@@ -14442,11 +14430,6 @@ end $$;
 revoke all on function public.sc_report_mark_audit(text,text,text) from public, anon;
 grant execute on function public.sc_report_mark_audit(text,text,text) to authenticated;
 -- A11. ROUND-15 ITEM 6 — OPEN A NEW TERM IN ONE CLICK.
--- sc_term_rollover moves the MONEY into a new term (and correctly does NOT
--- copy marks across: a mark belongs to the term it was earned in, forever —
--- proved by tools/verification/tmp-term-carry.mjs, check E).
--- What it never did was prepare the new term for TEACHING. A term's report
--- So: structure carries, marks do not. This function copies the columns from
 create or replace function public.sc_term_open(
 p_new_term    text,
 p_new_session text,
@@ -14802,15 +14785,6 @@ end $$;
 revoke all on function public.sc_fee_cash_reconciliation(date,date) from public, anon;
 grant execute on function public.sc_fee_cash_reconciliation(date,date) to authenticated;
 -- A13. ROUND-16 — PREP EXAMS, CUSTOM ASSESSMENT PURPOSES, TEACHER
---      SIGNATURES AND CBT ACCESS WINDOWS.
--- 1. A school may want to rehearse its terminal exam. A "prep exam" is a
--- 2. A teacher must be able to invent a purpose ("Prep Exam",
---    "Mock UTME") without a developer. The registry below is the list every
---    screen reads; the six built-in purposes can never be deleted.
--- 3. A teacher signs with their hand, exactly as the principal does, and
---    that one signature prints on every document they sign.
--- 4. A CBT link opens and closes on the date and time the teacher chooses,
---    and a learner is told exactly why they cannot sit it yet.
 
 -- 1. THE PURPOSE REGISTRY — one list every screen obeys.
 create table if not exists public.sc_assessment_purpose (
@@ -14861,8 +14835,6 @@ $$;
 revoke all on function public.sc_purposes() from public, anon;
 grant execute on function public.sc_purposes() to authenticated;
 -- a teacher invents a purpose; it defaults to report-ELIGIBLE because most
--- custom purposes are ordinary assessments. Marking it a rehearsal is a
--- deliberate, separate decision.
 create or replace function public.sc_purpose_create(
 p_label text, p_emoji text default '⚪',
 p_report_eligible boolean default true, p_feeds_report text default 'none'
@@ -14893,8 +14865,6 @@ end $$;
 revoke all on function public.sc_purpose_create(text,text,boolean,text) from public, anon;
 grant execute on function public.sc_purpose_create(text,text,boolean,text) to authenticated;
 -- 2. THE ONE QUESTION EVERY SCREEN ASKS: may this score reach a report card?
---    Pure function of the stored purpose text, so it cannot drift between
---    the CBT page, the report engine and the database push functions.
 create or replace function public.sc_purpose_of(p_type text)
 returns text language sql stable set search_path=public as $$
   select coalesce(
@@ -14985,8 +14955,6 @@ create policy prep_report_write on public.prep_report_cards for all to authentic
 using (coalesce(public.is_admin(auth.uid()),false))
 with check (coalesce(public.is_admin(auth.uid()),false));
 -- 4. BUILDING A PREP SHEET — the twin of sc_midterm_rebuild_one.
---    Reads ONLY prep_scores, so it is structurally incapable of printing a
---    report-card mark, and structurally unable to omit a prep mark.
 create or replace function public.sc_prep_rebuild_one(
 p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text
 ) returns void language plpgsql security definer set search_path=public as $$
@@ -15312,8 +15280,6 @@ end $$;
 revoke all on function public.sc_signature_for_class(text) from public, anon;
 grant execute on function public.sc_signature_for_class(text) to authenticated;
 -- 7. CBT ACCESS WINDOWS — one authoritative answer to "may this learner
---    sit this test right now, and if not, why?" Every entry point calls it,
---    so the student page, the API and the code entry agree.
 create or replace function public.sc_cbt_window_state(p_exam_id uuid)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare e record; v_now timestamptz := now(); v_secs int;
@@ -15423,6 +15389,44 @@ begin
 end $$;
 revoke all on function public.get_prep_report(uuid) from public, anon;
 grant execute on function public.get_prep_report(uuid) to authenticated;
+/* V12.73 (item 10) — THE PREP RESULT COULD NOT BE OPENED BY A LEARNER.
+prep-exam-reports.html calls get_prep_report(p_student_id_ref, p_class,
+p_term, p_session) — the four-argument form a family view needs. Only the
+one-argument get_prep_report(p_student) ever existed, so every click by a
+student or parent failed with "function does not exist". The page had the
+button; the database had no door behind it.
+This is the signature the page calls. It refuses anything unpublished to a
+family, and it names the learner's own row rather than guessing. */
+create or replace function public.get_prep_report(p_student_id_ref text, p_class text,
+p_term text, p_session text)
+returns jsonb language plpgsql stable security definer set search_path=public as $$
+declare me uuid:=auth.uid(); r public.prep_report_cards%rowtype; mine boolean:=false;
+begin
+  if me is null then return jsonb_build_object('ok',false,'error','Please sign in again.'); end if;
+  select * into r from public.prep_report_cards x
+   where lower(btrim(x.student_id_ref))=lower(btrim(coalesce(p_student_id_ref,'')))
+     and lower(btrim(x.class))=lower(btrim(coalesce(p_class,'')))
+     and lower(btrim(x.term))=lower(btrim(coalesce(p_term,'')))
+     and lower(btrim(x.session))=lower(btrim(coalesce(p_session,'')))
+   order by x.updated_at desc limit 1;
+  if not found then
+    return jsonb_build_object('ok',false,'error','No prep report has been generated for this learner in this term yet. Ask the class teacher to generate it.');
+  end if;
+  /* a family may only read their own child's sheet, and only once published */
+  mine := coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)
+          or (r.student_id is not null and coalesce(public.is_parent_of(me, r.student_id),false));
+  if not mine then
+    return jsonb_build_object('ok',false,'error','You can only open your own child''s prep report.');
+  end if;
+  if not coalesce(public.is_staff(me),false) and not coalesce(public.is_admin(me),false)
+     and not coalesce(r.published,false) then
+    return jsonb_build_object('ok',false,'error','This prep report has not been published by the school yet.');
+  end if;
+  return jsonb_build_object('ok',true,'report',to_jsonb(r),
+    'warning','This is a rehearsal of the school examination. It is not part of the report card.');
+end $$;
+revoke all on function public.get_prep_report(text,text,text,text) from public, anon;
+grant execute on function public.get_prep_report(text,text,text,text) to authenticated;
 create or replace function public.sc_prep_publish(p_class text, p_term text, p_session text, p_on boolean default true)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid:=auth.uid(); n int:=0;
