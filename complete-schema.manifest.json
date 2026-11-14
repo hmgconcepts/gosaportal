@@ -1,0 +1,1844 @@
+{
+ "_meta": {
+  "built_bytes": 996896,
+  "built_from_bytes": 1412505,
+  "removed": {
+   "banner-rule": 434,
+   "banner-trimmed": 79,
+   "blank-squeezed": 1,
+   "deindented": 7226,
+   "duplicate-grant": 12,
+   "inline-prose-shortened": 127,
+   "notify-moved-last": 1,
+   "progress-select": 159,
+   "redundant-add-column": 148,
+   "redundant-drop-index": 15,
+   "redundant-notify": 99,
+   "release-essay-lines": 0,
+   "repeated-statement": 16,
+   "rule-lines-shortened": 1,
+   "superseded-function": 21,
+   "superseded-index": 29,
+   "superseded-policy": 72,
+   "superseded-table": 21,
+   "superseded-trigger": 3,
+   "superseded-view": 1
+  }
+ },
+ "columns": [
+  "column public.academic_periods.allow_parent_report",
+  "column public.academic_periods.allow_student_report",
+  "column public.admission_links.class_applied",
+  "column public.admission_links.exam_code",
+  "column public.admission_links.expires_at",
+  "column public.admission_links.notes",
+  "column public.admission_links.title",
+  "column public.admissions.data",
+  "column public.admissions.photo_url",
+  "column public.affective_traits.data",
+  "column public.affective_traits.student_id",
+  "column public.assessment_columns.cbt_assessment_type",
+  "column public.assessment_columns.class",
+  "column public.assessment_columns.created_by",
+  "column public.assessment_columns.max_mark",
+  "column public.assessment_columns.name",
+  "column public.assessment_columns.position",
+  "column public.assessment_columns.session",
+  "column public.assessment_columns.source",
+  "column public.assessment_columns.subject",
+  "column public.assessment_columns.term",
+  "column public.assessment_columns.weight",
+  "column public.assignment_scores.cbt_exam_id",
+  "column public.assignments.cbt_exam_id",
+  "column public.assignments.is_cbt",
+  "column public.assignments.source",
+  "column public.assignments.teacher_id",
+  "column public.attendance.student_id",
+  "column public.attendance.student_name",
+  "column public.attendance_checkins.status",
+  "column public.behaviour_points.student_name",
+  "column public.birthdays.parent_ref",
+  "column public.birthdays.staff_ref",
+  "column public.birthdays.student_ref",
+  "column public.cbt_exams.anti_cheat_config",
+  "column public.cbt_exams.assessment_type",
+  "column public.cbt_exams.attempt_limit",
+  "column public.cbt_exams.bank_hash",
+  "column public.cbt_exams.bank_version",
+  "column public.cbt_exams.class",
+  "column public.cbt_exams.clear_previous_on_next",
+  "column public.cbt_exams.code",
+  "column public.cbt_exams.csv_data",
+  "column public.cbt_exams.duration",
+  "column public.cbt_exams.duration_min",
+  "column public.cbt_exams.enable_calculator",
+  "column public.cbt_exams.enable_math_keyboard",
+  "column public.cbt_exams.is_archived",
+  "column public.cbt_exams.is_open",
+  "column public.cbt_exams.max_score",
+  "column public.cbt_exams.proctor_required",
+  "column public.cbt_exams.public_link",
+  "column public.cbt_exams.questions",
+  "column public.cbt_exams.report_column",
+  "column public.cbt_exams.select_count",
+  "column public.cbt_exams.session",
+  "column public.cbt_exams.show_score_on_submit",
+  "column public.cbt_exams.subject",
+  "column public.cbt_exams.teacher_id",
+  "column public.cbt_exams.term",
+  "column public.cbt_exams.title",
+  "column public.cbt_pending_submissions.error",
+  "column public.cbt_pending_submissions.exam_code",
+  "column public.cbt_pending_submissions.status",
+  "column public.cbt_results.attempt_number",
+  "column public.cbt_results.client_ref",
+  "column public.cbt_results.engine_version",
+  "column public.cbt_results.flag_resolution",
+  "column public.cbt_results.flagged_questions",
+  "column public.cbt_results.grading_status",
+  "column public.cbt_results.manual_awards",
+  "column public.cbt_results.retake_allowed_at",
+  "column public.cbt_results.retake_allowed_by",
+  "column public.cbt_results.retake_reason",
+  "column public.cbt_results.reviewed_at",
+  "column public.cbt_results.reviewed_by",
+  "column public.cbt_results.student_id",
+  "column public.cbt_results.student_id_ref",
+  "column public.cbt_results.subject_scores",
+  "column public.cbt_results.submitted_at",
+  "column public.cbt_results.ungraded_count",
+  "column public.certificate_designs.signature_url",
+  "column public.certificates.student_id",
+  "column public.class_fee_structure.active",
+  "column public.class_fee_structure.amount",
+  "column public.class_fee_structure.arm",
+  "column public.class_fee_structure.class",
+  "column public.class_fee_structure.department",
+  "column public.class_fee_structure.fee_items",
+  "column public.class_fee_structure.next_term_begins",
+  "column public.class_fee_structure.note",
+  "column public.class_fee_structure.other_fee",
+  "column public.class_fee_structure.school_id",
+  "column public.class_fee_structure.session",
+  "column public.class_fee_structure.term",
+  "column public.class_fee_structure.total",
+  "column public.complaints.assigned_to",
+  "column public.complaints.attachment_link",
+  "column public.complaints.resolution",
+  "column public.conduct.recorded_by_id",
+  "column public.conduct.student_id",
+  "column public.conduct.student_name",
+  "column public.departments.next_term_fees",
+  "column public.departments.next_term_fees_currency",
+  "column public.departments.next_term_fees_note",
+  "column public.diary.acks",
+  "column public.diary.behaviour",
+  "column public.diary.class",
+  "column public.diary.classwork",
+  "column public.diary.created_at",
+  "column public.diary.date",
+  "column public.diary.homework",
+  "column public.diary.note",
+  "column public.diary.period",
+  "column public.diary.subject",
+  "column public.diary.teacher_id",
+  "column public.diary.teacher_name",
+  "column public.diary.updated_at",
+  "column public.diary_ack.acks_name",
+  "column public.diary_ack.created_at",
+  "column public.diary_ack.note",
+  "column public.diary_ack.role",
+  "column public.digital_library.attempts_allowed",
+  "column public.digital_library.cbt_code",
+  "column public.digital_library.teacher_id",
+  "column public.eresources.class",
+  "column public.exam_registrations.candidate_name",
+  "column public.exam_registrations.email",
+  "column public.exam_registrations.phone",
+  "column public.exam_registrations.reg_code",
+  "column public.exam_registrations.registration_link_id",
+  "column public.exam_registrations.updated_at",
+  "column public.exam_timetable.day_no",
+  "column public.exam_timetable.paper_kind",
+  "column public.fee_payments.balance",
+  "column public.fee_payments.fee_total",
+  "column public.fee_payments.payment_date",
+  "column public.fee_payments.received_by_name",
+  "column public.fee_payments.student_id",
+  "column public.fee_payments.student_name",
+  "column public.fee_payments.total_overridden",
+  "column public.health.student_id",
+  "column public.health.student_name",
+  "column public.idcards.full_name",
+  "column public.idcards.person_id",
+  "column public.idcards.person_type",
+  "column public.inventory.asset_tag",
+  "column public.inventory.category",
+  "column public.inventory.condition",
+  "column public.inventory.item_name",
+  "column public.inventory.last_audit",
+  "column public.inventory.location",
+  "column public.inventory.next_audit",
+  "column public.inventory.quantity",
+  "column public.inventory.unit_cost",
+  "column public.leave_requests.decided_at",
+  "column public.leave_requests.decided_by",
+  "column public.leave_requests.requested_by",
+  "column public.lesson_plans.posted_by",
+  "column public.lesson_plans.review_feedback",
+  "column public.lesson_plans.reviewed_at",
+  "column public.lesson_plans.reviewed_by",
+  "column public.lesson_plans.teacher_id",
+  "column public.lms_submissions.student_id",
+  "column public.messages.created_at",
+  "column public.messages.from_id",
+  "column public.messages.read",
+  "column public.messages.read_at",
+  "column public.messages.recipient",
+  "column public.messages.sender",
+  "column public.messages.sender_name",
+  "column public.messages.subject",
+  "column public.messages.thread_id",
+  "column public.messages.to_id",
+  "column public.messages.to_role",
+  "column public.midterm_report_cards.assessments_expected",
+  "column public.midterm_report_cards.assessments_sat",
+  "column public.midterm_report_cards.complete",
+  "column public.midterm_report_cards.expected_total",
+  "column public.midterm_report_cards.grade",
+  "column public.midterm_report_cards.has_scores",
+  "column public.midterm_report_cards.max_total",
+  "column public.midterm_report_cards.percentage",
+  "column public.midterm_report_cards.rank_basis",
+  "column public.midterm_report_cards.rank_cohort_size",
+  "column public.midterm_report_cards.rankable",
+  "column public.midterm_report_cards.score_details",
+  "column public.midterm_report_cards.subjects_expected",
+  "column public.midterm_report_cards.subjects_sat",
+  "column public.midterm_report_cards.tie_group",
+  "column public.module_records.audience",
+  "column public.module_records.created_by",
+  "column public.module_records.recipient_id",
+  "column public.notifications.audience",
+  "column public.notifications.channels",
+  "column public.notifications.cleared_by",
+  "column public.notifications.created_by",
+  "column public.notifications.kind",
+  "column public.notifications.link",
+  "column public.notifications.priority",
+  "column public.notifications.read_by",
+  "column public.notifications.recipient_id",
+  "column public.notifications.url",
+  "column public.notifications.user_id",
+  "column public.parent_child.parent_id",
+  "column public.parent_child.student_id",
+  "column public.parents.date_of_birth",
+  "column public.payment_intents.student_id",
+  "column public.payroll.bonus",
+  "column public.payroll.deductions",
+  "column public.payroll.loan_deduction",
+  "column public.payroll.method",
+  "column public.payroll.other_deductions",
+  "column public.payroll.overtime",
+  "column public.payroll.pension",
+  "column public.payroll.staff_name",
+  "column public.payroll.tax",
+  "column public.poll_votes.candidate_id",
+  "column public.polls.class_scope",
+  "column public.profiles.admission_no",
+  "column public.profiles.date_of_birth",
+  "column public.profiles.dob_day",
+  "column public.profiles.dob_month",
+  "column public.profiles.role",
+  "column public.profiles.signature_name",
+  "column public.profiles.signature_updated_at",
+  "column public.profiles.signature_url",
+  "column public.profiles.staff_no",
+  "column public.profiles.status",
+  "column public.promotions.average",
+  "column public.promotions.department",
+  "column public.promotions.status",
+  "column public.promotions.student_name",
+  "column public.psychomotor_traits.data",
+  "column public.psychomotor_traits.student_id",
+  "column public.push_subscriptions.subscription",
+  "column public.push_subscriptions.updated_at",
+  "column public.push_subscriptions.user_agent",
+  "column public.push_subscriptions.user_id",
+  "column public.reading_scores.session",
+  "column public.reading_scores.student_id_ref",
+  "column public.reading_scores.term",
+  "column public.report_cards.assessments_expected",
+  "column public.report_cards.assessments_sat",
+  "column public.report_cards.complete",
+  "column public.report_cards.expected_total",
+  "column public.report_cards.grade",
+  "column public.report_cards.percentage",
+  "column public.report_cards.rank_basis",
+  "column public.report_cards.rank_cohort_size",
+  "column public.report_cards.rankable",
+  "column public.report_cards.student_id",
+  "column public.report_cards.subjects_expected",
+  "column public.report_cards.subjects_sat",
+  "column public.report_cards.tie_group",
+  "column public.report_cards.total",
+  "column public.report_comments.applied_percent",
+  "column public.report_comments.comment_band_id",
+  "column public.report_comments.comment_locked",
+  "column public.report_comments.comment_source",
+  "column public.report_comments.student_id",
+  "column public.report_comments.teacher_id",
+  "column public.report_comments.updated_at",
+  "column public.report_scores.class",
+  "column public.report_scores.column_id",
+  "column public.report_scores.created_at",
+  "column public.report_scores.score",
+  "column public.report_scores.session",
+  "column public.report_scores.source",
+  "column public.report_scores.student_id",
+  "column public.report_scores.student_id_ref",
+  "column public.report_scores.student_name",
+  "column public.report_scores.subject",
+  "column public.report_scores.term",
+  "column public.report_scores.updated_at",
+  "column public.report_scores.updated_by",
+  "column public.results.assessment_ref",
+  "column public.results.assessment_source",
+  "column public.results.student_id",
+  "column public.results.student_id_ref",
+  "column public.results.student_name",
+  "column public.results.teacher_id",
+  "column public.role_status_log.changed_by",
+  "column public.role_status_log.new_role",
+  "column public.role_status_log.new_status",
+  "column public.role_status_log.person_email",
+  "column public.role_status_log.person_id",
+  "column public.role_status_log.person_name",
+  "column public.role_status_log.previous_role",
+  "column public.role_status_log.previous_status",
+  "column public.role_status_log.school_id",
+  "column public.sc_fee_invoice.due_on",
+  "column public.sc_heartbeat.last_ping_at",
+  "column public.sc_heartbeat.sources",
+  "column public.sc_heartbeat.updated_at",
+  "column public.sc_install_state.applied_at",
+  "column public.sc_install_state.installed_at",
+  "column public.sc_report_position_hold.created_by",
+  "column public.sc_report_position_hold.reason",
+  "column public.sc_report_settings.notes",
+  "column public.sc_report_settings.position_label",
+  "column public.sc_report_settings.show_grade",
+  "column public.sc_report_settings.show_position",
+  "column public.sc_report_settings.show_remarks",
+  "column public.sc_report_settings.show_subject_position",
+  "column public.sc_report_settings.updated_at",
+  "column public.sc_report_settings.updated_by",
+  "column public.scheme_of_work.admin_affirmed",
+  "column public.scheme_of_work.affirmed_at",
+  "column public.scheme_of_work.affirmed_by",
+  "column public.school_products.active",
+  "column public.school_products.description",
+  "column public.school_products.name",
+  "column public.school_products.price",
+  "column public.school_products.school_id",
+  "column public.school_settings.address",
+  "column public.school_settings.admission_acronym",
+  "column public.school_settings.admission_format",
+  "column public.school_settings.admission_include_year",
+  "column public.school_settings.admission_prefix",
+  "column public.school_settings.admission_start_num",
+  "column public.school_settings.allow_parent_report_global",
+  "column public.school_settings.allow_student_report_global",
+  "column public.school_settings.checkin_deadline",
+  "column public.school_settings.checkin_grace_minutes",
+  "column public.school_settings.class_teacher_signature_url",
+  "column public.school_settings.currency",
+  "column public.school_settings.drive_client_id",
+  "column public.school_settings.drive_folder_id",
+  "column public.school_settings.drive_last_backup",
+  "column public.school_settings.drive_sync_days",
+  "column public.school_settings.drive_sync_enabled",
+  "column public.school_settings.email",
+  "column public.school_settings.enforce_geofence",
+  "column public.school_settings.examination_officer_name",
+  "column public.school_settings.examination_officer_signature_bg_removed",
+  "column public.school_settings.examination_officer_signature_url",
+  "column public.school_settings.geo_radius_m",
+  "column public.school_settings.geo_updated_at",
+  "column public.school_settings.hmg_link",
+  "column public.school_settings.idle_lock_minutes",
+  "column public.school_settings.latitude",
+  "column public.school_settings.lockdown_message",
+  "column public.school_settings.lockdown_mode",
+  "column public.school_settings.logo_url",
+  "column public.school_settings.longitude",
+  "column public.school_settings.motto",
+  "column public.school_settings.next_term_begins",
+  "column public.school_settings.next_term_fees",
+  "column public.school_settings.next_term_fees_currency",
+  "column public.school_settings.next_term_fees_note",
+  "column public.school_settings.phone",
+  "column public.school_settings.principal_name",
+  "column public.school_settings.principal_signature_bg_removed",
+  "column public.school_settings.proprietor_name",
+  "column public.school_settings.proprietor_signature_bg_removed",
+  "column public.school_settings.proprietor_signature_url",
+  "column public.school_settings.role_access",
+  "column public.school_settings.role_write",
+  "column public.school_settings.school_id",
+  "column public.school_settings.school_name",
+  "column public.school_settings.short_name",
+  "column public.school_settings.signature_enabled",
+  "column public.school_settings.signature_url",
+  "column public.school_settings.staff_mid_segment",
+  "column public.school_settings.staff_prefix",
+  "column public.school_settings.stamp_color",
+  "column public.school_settings.stamp_enabled",
+  "column public.school_settings.stamp_text",
+  "column public.schools.address",
+  "column public.schools.admission_acronym",
+  "column public.schools.currency",
+  "column public.schools.email",
+  "column public.schools.logo_url",
+  "column public.schools.motto",
+  "column public.schools.name",
+  "column public.schools.phone",
+  "column public.schools.short_name",
+  "column public.schools.site_url",
+  "column public.security_prefs.user_id",
+  "column public.site_license.expires_on",
+  "column public.site_license.grace_days",
+  "column public.site_license.lock_message",
+  "column public.site_license.renew_url",
+  "column public.site_license.signature",
+  "column public.staff.address",
+  "column public.staff.date_of_birth",
+  "column public.staff.dob_day",
+  "column public.staff.dob_month",
+  "column public.staff.gender",
+  "column public.staff.marital_status",
+  "column public.staff.qualification",
+  "column public.staff.religion",
+  "column public.staff.signature_url",
+  "column public.staff.staff_no",
+  "column public.staff.staff_type",
+  "column public.staff.subject_taught",
+  "column public.staff.user_id",
+  "column public.staff_clock.school_id",
+  "column public.staff_clock.staff_id",
+  "column public.staff_loans.repaid_from_payroll",
+  "column public.student_clock.school_id",
+  "column public.student_clock.student_id",
+  "column public.student_diary.student_id",
+  "column public.students.admission_no",
+  "column public.students.admission_year",
+  "column public.students.arm",
+  "column public.students.department",
+  "column public.students.guardian_email",
+  "column public.students.locked_at",
+  "column public.students.locked_by",
+  "column public.students.opening_arrears",
+  "column public.students.opening_arrears_note",
+  "column public.students.portal_lock_message",
+  "column public.students.portal_locked",
+  "column public.students.report_lock_message",
+  "column public.students.report_locked",
+  "column public.students.user_id",
+  "column public.subjects.classes",
+  "column public.subjects.teacher",
+  "column public.subjects.teacher_id",
+  "column public.substitutions.reason",
+  "column public.support_plans.created_by",
+  "column public.support_plans.student_id",
+  "column public.teacher_availability.available_periods",
+  "column public.timetable_requirements.available_periods",
+  "column public.timetable_requirements.double_periods",
+  "column public.timetable_requirements.max_period"
+ ],
+ "functions": {
+  "cbt_allow_retake": [
+   "p_exam_id uuid, p_student_ref text, p_reason text default ''"
+  ],
+  "cbt_append_questions": [
+   "p_exam_id uuid, p_new_questions jsonb"
+  ],
+  "cbt_append_questions_verified": [
+   "p_exam_id uuid, p_new_questions jsonb"
+  ],
+  "cbt_audit_all_missing": [
+   ""
+  ],
+  "cbt_clear_exam_results": [
+   "p_exam_id uuid,p_confirm_code text"
+  ],
+  "cbt_coerce_to_jsonb_array": [
+   "p_val jsonb"
+  ],
+  "cbt_diagnose_exam": [
+   "p_exam_id uuid"
+  ],
+  "cbt_flush_pending_server": [
+   "p_exam_id uuid"
+  ],
+  "cbt_force_append_bank": [
+   "p_exam_id uuid, p_new_questions jsonb"
+  ],
+  "cbt_force_append_bank_v2": [
+   "p_exam_id uuid,p_new_questions jsonb"
+  ],
+  "cbt_force_replace_bank": [
+   "p_exam_id uuid, p_bank jsonb, p_expected_version int default null"
+  ],
+  "cbt_force_replace_bank_v2": [
+   "p_exam_id uuid, p_bank jsonb, p_expected_hash text default null"
+  ],
+  "cbt_force_replace_bank_v3": [
+   "p_exam_id uuid,p_bank jsonb,p_expected_version int default null"
+  ],
+  "cbt_get_public_exam": [
+   "p_code text"
+  ],
+  "cbt_get_public_exam_v2": [
+   "p_code text"
+  ],
+  "cbt_get_public_exam_v5": [
+   "p_code text"
+  ],
+  "cbt_get_public_exam_v6": [
+   "p_code text, p_admission_no text default ''",
+   "p_code text,p_admission_no text default ''"
+  ],
+  "cbt_get_public_exam_v7": [
+   "p_code text, p_admission_no text default ''"
+  ],
+  "cbt_get_results_with_pending": [
+   "p_exam_id uuid"
+  ],
+  "cbt_has_retake_allowance": [
+   "p_exam_id uuid, p_student_ref text"
+  ],
+  "cbt_import_backup": [
+   "p_payload jsonb"
+  ],
+  "cbt_insert_questions_bulletproof": [
+   "p_exam_id uuid, p_new_questions jsonb"
+  ],
+  "cbt_is_class_match": [
+   "p_exam_class text, p_student_class text, p_student_arm text default ''"
+  ],
+  "cbt_list_all_results": [
+   "p_exam_id uuid"
+  ],
+  "cbt_list_pending_server": [
+   "p_exam_id uuid"
+  ],
+  "cbt_list_retakes": [
+   "p_exam_id uuid default null"
+  ],
+  "cbt_proctor_register": [
+   "p_exam_id uuid,p_client_ref text,p_student_id_ref text default ''"
+  ],
+  "cbt_publish_draft": [
+   "p_draft_id uuid"
+  ],
+  "cbt_push_exam_to_reports": [
+   "p_exam_id uuid, p_column text default null"
+  ],
+  "cbt_recover_failed_submissions": [
+   "p_exam_id uuid"
+  ],
+  "cbt_recover_pending": [
+   "p_payloads jsonb"
+  ],
+  "cbt_regrade_exam_results_v5": [
+   "p_exam_id uuid"
+  ],
+  "cbt_repair_exam_scoring": [
+   "p_exam_id uuid"
+  ],
+  "cbt_replace_bank_bulletproof": [
+   "p_exam_id uuid, p_bank jsonb, p_expected_version int default null"
+  ],
+  "cbt_review_result": [
+   "p_result_id uuid,p_awards jsonb default '{}'::jsonb"
+  ],
+  "cbt_save_draft": [
+   "p_exam_id uuid, p_draft jsonb"
+  ],
+  "cbt_set_question_bank": [
+   "p_exam_id uuid, p_bank jsonb"
+  ],
+  "cbt_store_pending": [
+   "p_payload jsonb"
+  ],
+  "cbt_submit": [
+   "p_payload jsonb"
+  ],
+  "cbt_submit_v2": [
+   "p_payload jsonb"
+  ],
+  "cbt_submit_v5": [
+   "p_payload jsonb"
+  ],
+  "cbt_submit_v6": [
+   "p_payload jsonb"
+  ],
+  "cbt_submit_with_wal": [
+   "p_payload jsonb"
+  ],
+  "cbt_update_exam_bank_verified": [
+   "p_exam_id uuid, p_bank jsonb"
+  ],
+  "cbt_verify_exam_bank": [
+   "p_exam_id uuid, p_expected_hash text default null",
+   "p_exam_id uuid,p_expected_hash text default null"
+  ],
+  "compute_class_fee_total": [
+   ""
+  ],
+  "compute_fee_payment_balance": [
+   ""
+  ],
+  "compute_payroll_net": [
+   ""
+  ],
+  "compute_punctuality_awards": [
+   "p_date date default current_date, p_class text default ''"
+  ],
+  "delete_exam_registration_link": [
+   "p_id uuid"
+  ],
+  "extract_admission": [
+   "p_id uuid"
+  ],
+  "generate_midterm_reports": [
+   "p_class text, p_term text, p_session text"
+  ],
+  "generate_timetable": [
+   "p_class text, p_session text default '', p_term text default '', p_periods_per_day integer default 6, p_day_periods jsonb default null"
+  ],
+  "get_class_teacher_identity": [
+   "p_class text"
+  ],
+  "get_exam_registration_link": [
+   "p_token text"
+  ],
+  "get_midterm_report": [
+   "p_student_id_ref text, p_class text, p_term text, p_session text",
+   "p_student_id_ref text,p_class text,p_term text,p_session text"
+  ],
+  "get_prep_report": [
+   "p_student uuid",
+   "p_student_id_ref text, p_class text, p_term text, p_session text"
+  ],
+  "handle_new_user": [
+   ""
+  ],
+  "is_admin": [
+   "uid uuid"
+  ],
+  "is_authenticated": [
+   "uid uuid"
+  ],
+  "is_owner": [
+   "p_uid uuid"
+  ],
+  "is_parent_of": [
+   "uid uuid, child uuid"
+  ],
+  "is_school_leader": [
+   "p_uid uuid"
+  ],
+  "is_staff": [
+   "uid uuid"
+  ],
+  "lookup_login_email": [
+   "p_identifier text"
+  ],
+  "lr_stamp_decision": [
+   ""
+  ],
+  "notif_clear": [
+   "p_ids uuid[] default null"
+  ],
+  "notif_mark_read": [
+   "p_id uuid"
+  ],
+  "publish_midterm_reports": [
+   "p_class text, p_term text, p_session text, p_publish boolean"
+  ],
+  "purge_old": [
+   "p_table text,p_days integer"
+  ],
+  "retention_candidates": [
+   ""
+  ],
+  "sc_adopt_orphan_auth_users": [
+   ""
+  ],
+  "sc_archive_cbt_exams": [
+   "p_ids uuid[]"
+  ],
+  "sc_archive_student_on_delete": [
+   ""
+  ],
+  "sc_assignment_cbt_sync": [
+   "p_cbt_exam_id uuid"
+  ],
+  "sc_assignment_cbt_sync_all": [
+   "p_class text default null, p_subject text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_assignment_totals": [
+   "p_class text, p_subject text, p_term text default null, p_session text default null"
+  ],
+  "sc_auto_link_on_profile": [
+   ""
+  ],
+  "sc_can_edit": [
+   "p_module text"
+  ],
+  "sc_can_vote": [
+   "p_poll uuid"
+  ],
+  "sc_cbt_answer_matches": [
+   "p_question jsonb,p_given jsonb"
+  ],
+  "sc_cbt_answer_value": [
+   "p_question jsonb"
+  ],
+  "sc_cbt_bulk_push_batch_v1": [
+   "p_exam_ids uuid[],p_destination text default null,p_create_missing boolean default true, p_max_mark numeric default 10,p_verified_only boolean default true, p_attempt_policy text default 'best',p_subject_filter text default null, p_require_midterm boolean default false"
+  ],
+  "sc_cbt_bulk_push_exam_v2": [
+   "p_exam_id uuid,p_destination text default null,p_create_missing boolean default true, p_max_mark numeric default 10,p_verified_only boolean default true, p_attempt_policy text default 'best',p_subject_filter text default null, p_require_midterm boolean default false"
+  ],
+  "sc_cbt_bulk_result_counts_v1": [
+   "p_exam_ids uuid[]"
+  ],
+  "sc_cbt_canonical_option": [
+   "p_question jsonb,p_value text"
+  ],
+  "sc_cbt_duration_sync": [
+   ""
+  ],
+  "sc_cbt_flagged_summary": [
+   "p_exam_id uuid"
+  ],
+  "sc_cbt_grade_fraction": [
+   "p_question jsonb,p_given jsonb"
+  ],
+  "sc_cbt_grade_result_row": [
+   "p_bank jsonb,p_answers jsonb,p_penalty numeric,p_awards jsonb"
+  ],
+  "sc_cbt_items": [
+   "p_question jsonb"
+  ],
+  "sc_cbt_json_value": [
+   "p_object jsonb,p_keys text[]"
+  ],
+  "sc_cbt_norm": [
+   "p_value text"
+  ],
+  "sc_cbt_normalize_question": [
+   "p_question jsonb"
+  ],
+  "sc_cbt_options": [
+   "p_question jsonb"
+  ],
+  "sc_cbt_public_question": [
+   "p_question jsonb"
+  ],
+  "sc_cbt_push_clean": [
+   "p_exam_id uuid, p_destination text default null"
+  ],
+  "sc_cbt_question_type": [
+   "p_question jsonb"
+  ],
+  "sc_cbt_report_column_changed": [
+   ""
+  ],
+  "sc_cbt_require_proctor_before_result": [
+   ""
+  ],
+  "sc_cbt_resolve_code": [
+   "p_ref text"
+  ],
+  "sc_cbt_resolve_flag": [
+   "p_exam_id uuid, p_question_index int, p_action text, p_note text default '', p_revoke boolean default false"
+  ],
+  "sc_cbt_save_flags": [
+   "p_exam_id uuid, p_client_ref text, p_flagged jsonb default '[]'::jsonb, p_notes jsonb default '{}'::jsonb, p_admission_no text default ''"
+  ],
+  "sc_cbt_set_window": [
+   "p_exam_id uuid, p_start_at timestamptz default null, p_close_at timestamptz default null, p_open boolean default null"
+  ],
+  "sc_cbt_subject_allowed": [
+   "p_uid uuid, p_subject text default '', p_class text default ''",
+   "p_uid uuid,p_subject text default '',p_class text default ''"
+  ],
+  "sc_cbt_take_link": [
+   "p_ref text"
+  ],
+  "sc_cbt_window_state": [
+   "p_exam_id uuid"
+  ],
+  "sc_checkin_marks_attendance": [
+   ""
+  ],
+  "sc_class_fee_master": [
+   "p_class text default ''"
+  ],
+  "sc_cleanup_cbt_assignment": [
+   ""
+  ],
+  "sc_cleanup_student_leftovers": [
+   ""
+  ],
+  "sc_community_audience": [
+   ""
+  ],
+  "sc_create_assignment_from_cbt": [
+   "p_cbt_exam_id uuid"
+  ],
+  "sc_currency": [
+   ""
+  ],
+  "sc_current_role": [
+   ""
+  ],
+  "sc_delete_user": [
+   "p_user uuid"
+  ],
+  "sc_diary_ack": [
+   "p_diary_id uuid, p_note text default 'seen'"
+  ],
+  "sc_diary_acks": [
+   "p_diary_id uuid"
+  ],
+  "sc_diary_feed": [
+   "p_class text default null, p_limit int default 200"
+  ],
+  "sc_expected_load": [
+   "p_class text, p_term text, p_session text, p_midterm boolean default true"
+  ],
+  "sc_fee_account": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_account_for": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_adjust": [
+   "p_student uuid, p_kind text, p_amount numeric, p_reason text, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_adjustments": [
+   "p_term text default null, p_session text default null"
+  ],
+  "sc_fee_aged_arrears": [
+   "p_as_of date default current_date, p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_allocate": [
+   "p_student uuid, p_amount numeric, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_backfill_invoices": [
+   "p_term text default null, p_session text default null, p_dry_run boolean default true"
+  ],
+  "sc_fee_bill_audit": [
+   "p_class text default null"
+  ],
+  "sc_fee_bill_for": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_bill_v2": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_bill_v2_structure": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_cash_reconciliation": [
+   "p_from date default null, p_to date default null"
+  ],
+  "sc_fee_collection_summary": [
+   "p_term text default null, p_session text default null"
+  ],
+  "sc_fee_doctor_v2": [
+   "p_class text default null, p_student uuid default null, p_dry_run boolean default false"
+  ],
+  "sc_fee_doctor_v3": [
+   "p_class text default null, p_dry_run boolean default true"
+  ],
+  "sc_fee_due_date": [
+   "p_term text, p_session text"
+  ],
+  "sc_fee_explain": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_invoice_set_due": [
+   ""
+  ],
+  "sc_fee_invoice_sync": [
+   "p_student uuid, p_term text default null, p_session text default null, p_force boolean default false"
+  ],
+  "sc_fee_invoice_sync_all": [
+   "p_class text default null, p_term text default null, p_session text default null, p_prior_terms boolean default false"
+  ],
+  "sc_fee_ledger_doctor": [
+   "p_heal boolean default false"
+  ],
+  "sc_fee_ledger_for": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_opening_line": [
+   "p_student uuid"
+  ],
+  "sc_fee_opening_to_invoice": [
+   "p_dry_run boolean default true"
+  ],
+  "sc_fee_opening_touch": [
+   ""
+  ],
+  "sc_fee_overview": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_page_rows": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_prior_terms": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_prove": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_receipt_bill": [
+   "p_payment uuid"
+  ],
+  "sc_fee_reconcile": [
+   "p_student uuid default null"
+  ],
+  "sc_fee_repair_all": [
+   "p_dry_run boolean default false, p_class text default null, p_student uuid default null"
+  ],
+  "sc_fee_roster": [
+   "p_class text default null, p_term text default null, p_session text default null, p_filter text default 'all'"
+  ],
+  "sc_fee_rows_autoheal": [
+   ""
+  ],
+  "sc_fee_selfcheck": [
+   "p_class text default null"
+  ],
+  "sc_fee_structure_doctor": [
+   ""
+  ],
+  "sc_fee_structure_for": [
+   "p_class text, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_sync_snapshots": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_truth_migrate": [
+   "p_dry_run boolean default true"
+  ],
+  "sc_fee_truth_sheet": [
+   "p_student uuid"
+  ],
+  "sc_finalise_promotions": [
+   ""
+  ],
+  "sc_generate_admission_no": [
+   ""
+  ],
+  "sc_generate_staff_no": [
+   ""
+  ],
+  "sc_generate_terminal_reports": [
+   "p_class text, p_term text, p_session text"
+  ],
+  "sc_heartbeat_health": [
+   ""
+  ],
+  "sc_installed_packs": [
+   ""
+  ],
+  "sc_is_locked_out": [
+   "p_uid uuid"
+  ],
+  "sc_is_midterm_assessment": [
+   "p_type text"
+  ],
+  "sc_is_midterm_column": [
+   "p_name text,p_assessment_type text default ''"
+  ],
+  "sc_is_prep_assessment": [
+   "p_type text"
+  ],
+  "sc_is_report_generation_allowed": [
+   "p_term text, p_session text default null"
+  ],
+  "sc_is_tutor": [
+   "uid uuid default null"
+  ],
+  "sc_keep_alive": [
+   "src text default 'unknown'"
+  ],
+  "sc_license_apply": [
+   "p_key text"
+  ],
+  "sc_license_locked": [
+   ""
+  ],
+  "sc_license_set_salt": [
+   "p_salt text"
+  ],
+  "sc_license_status": [
+   ""
+  ],
+  "sc_list_student_archives": [
+   ""
+  ],
+  "sc_loan_status_sync": [
+   ""
+  ],
+  "sc_message_directory": [
+   ""
+  ],
+  "sc_message_send": [
+   "p_to uuid, p_subject text, p_body text"
+  ],
+  "sc_message_thread": [
+   "p_other uuid"
+  ],
+  "sc_message_threads": [
+   ""
+  ],
+  "sc_message_unread": [
+   ""
+  ],
+  "sc_midterm_rank": [
+   "p_class text, p_term text, p_session text"
+  ],
+  "sc_midterm_rebuild_one": [
+   "p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text",
+   "p_sid uuid,p_sid_ref text,p_name text,p_class text,p_term text,p_session text"
+  ],
+  "sc_midterm_sync_flush": [
+   ""
+  ],
+  "sc_midterm_sync_legacy": [
+   ""
+  ],
+  "sc_mirror_cbt_assignment": [
+   ""
+  ],
+  "sc_my_access_state": [
+   ""
+  ],
+  "sc_my_signature": [
+   ""
+  ],
+  "sc_normalize_name": [
+   "p_text text"
+  ],
+  "sc_on_cbt_score_change": [
+   ""
+  ],
+  "sc_payroll_posts_loan": [
+   ""
+  ],
+  "sc_photo_sync_status": [
+   ""
+  ],
+  "sc_poll_results": [
+   "p_poll uuid"
+  ],
+  "sc_prep_generate": [
+   "p_class text, p_term text, p_session text"
+  ],
+  "sc_prep_list": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_prep_publish": [
+   "p_class text, p_term text, p_session text, p_on boolean default true"
+  ],
+  "sc_prep_publish_all": [
+   "p_on boolean default true"
+  ],
+  "sc_prep_push_exam": [
+   "p_exam_id uuid, p_verified_only boolean default true"
+  ],
+  "sc_prep_rebuild_one": [
+   "p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text"
+  ],
+  "sc_prevent_embedded_media": [
+   ""
+  ],
+  "sc_publish_all_midterm_reports": [
+   "p_term text, p_session text, p_publish boolean default true, p_generate boolean default true"
+  ],
+  "sc_purpose_create": [
+   "p_label text, p_emoji text default '\u26aa', p_report_eligible boolean default true, p_feeds_report text default 'none'"
+  ],
+  "sc_purpose_of": [
+   "p_type text"
+  ],
+  "sc_purpose_report_eligible": [
+   "p_type text"
+  ],
+  "sc_purposes": [
+   ""
+  ],
+  "sc_push_attendance_to_reports": [
+   "p_class text, p_term text, p_session text, p_start date, p_end date"
+  ],
+  "sc_push_cbt_to_results": [
+   "p_exam_id uuid, p_column text default 'exam', p_term text default '', p_session text default ''"
+  ],
+  "sc_push_punctuality_to_report": [
+   "p_column_id uuid, p_term text, p_session text, p_class text default '', p_start date default null, p_end date default null, p_subject text default 'PUNCTUALITY'"
+  ],
+  "sc_push_punctuality_to_results": [
+   "p_term text, p_session text, p_column text default 'ca2', p_class text default '', p_start date default null, p_end date default null, p_subject text default 'PUNCTUALITY'"
+  ],
+  "sc_recompute_fee_rows": [
+   "p_student uuid, p_term text default '', p_session text default ''"
+  ],
+  "sc_refresh_midterm_report_for_score": [
+   ""
+  ],
+  "sc_relink_all": [
+   ""
+  ],
+  "sc_report_explain": [
+   "p_student_ref text, p_class text, p_term text, p_session text, p_kind text default 'midterm'"
+  ],
+  "sc_report_grade": [
+   "p_pct numeric"
+  ],
+  "sc_report_guard_prep": [
+   ""
+  ],
+  "sc_report_hidden_for": [
+   "p_uid uuid, p_student uuid"
+  ],
+  "sc_report_hold_position": [
+   "p_student_id_ref text, p_class text, p_term text, p_session text, p_kind text default 'terminal', p_reason text default '', p_hold boolean default true"
+  ],
+  "sc_report_mark_audit": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_report_min_participation": [
+   ""
+  ],
+  "sc_report_policy": [
+   "p_kind text default 'terminal', p_term text default null, p_session text default null"
+  ],
+  "sc_report_policy_save": [
+   "p_kind text, p_term text, p_session text, p_show_position boolean default true, p_show_grade boolean default true, p_show_subject_position boolean default true, p_show_remarks boolean default true, p_position_label text default 'Position in class', p_notes text default ''"
+  ],
+  "sc_report_recolumn": [
+   "p_exam_id uuid, p_new_column text, p_dry_run boolean default false"
+  ],
+  "sc_report_remap_cbt": [
+   "p_exam_id uuid, p_column text default null, p_result_id uuid default null, p_dry_run boolean default false"
+  ],
+  "sc_report_repair_all": [
+   "p_class text default null, p_term text default null, p_session text default null, p_dry_run boolean default false"
+  ],
+  "sc_report_source_audit": [
+   "p_class text default null, p_term text default null, p_session text default null"
+  ],
+  "sc_reports_recompute": [
+   "p_class text default null, p_term text default null, p_session text default null, p_dry_run boolean default false"
+  ],
+  "sc_restore_all_archived_exams": [
+   ""
+  ],
+  "sc_restore_all_student_archives": [
+   ""
+  ],
+  "sc_restore_archived_exams_by_filter": [
+   "p_term text default null, p_session text default null, p_class text default null, p_subject text default null"
+  ],
+  "sc_restore_student_archive": [
+   "p_archive_id uuid"
+  ],
+  "sc_results_guard_prep": [
+   ""
+  ],
+  "sc_save_report_score": [
+   "p_rows jsonb"
+  ],
+  "sc_set_report_generation_allowed": [
+   "p_term text, p_session text, p_allowed boolean, p_allow_parent boolean default null"
+  ],
+  "sc_set_report_generation_global": [
+   "p_allowed boolean, p_allow_parent boolean default null"
+  ],
+  "sc_set_student_locks": [
+   "p_student_ids uuid[], p_kind text, p_locked boolean, p_message text default ''"
+  ],
+  "sc_set_student_locks_by_filter": [
+   "p_kind text, p_locked boolean, p_message text default '', p_class text default null, p_only_debtors boolean default false, p_student_ids uuid[] default null, p_term text default null, p_session text default null"
+  ],
+  "sc_set_updated_at": [
+   ""
+  ],
+  "sc_signature_for_class": [
+   "p_class text"
+  ],
+  "sc_signature_save": [
+   "p_url text, p_name text default ''"
+  ],
+  "sc_staff_pay_state": [
+   "p_user uuid default null"
+  ],
+  "sc_student_fee_state": [
+   "p_student uuid"
+  ],
+  "sc_sweep_report_ghosts": [
+   "p_class text default '', p_term text default '', p_session text default ''"
+  ],
+  "sc_sync_photo_to_profile": [
+   ""
+  ],
+  "sc_sync_photo_to_student": [
+   ""
+  ],
+  "sc_sync_staff_photo_to_profile": [
+   ""
+  ],
+  "sc_term_current": [
+   ""
+  ],
+  "sc_term_open": [
+   "p_new_term text, p_new_session text, p_from_term text default null, p_from_session text default null, p_dry_run boolean default true"
+  ],
+  "sc_term_ordinal": [
+   "p_term text, p_session text"
+  ],
+  "sc_term_resolve": [
+   "p_term text default null, p_session text default null"
+  ],
+  "sc_term_rollover": [
+   "p_new_term text, p_new_session text, p_dry_run boolean default true"
+  ],
+  "sc_term_undated": [
+   ""
+  ],
+  "sc_terminal_rank": [
+   "p_class text, p_term text, p_session text"
+  ],
+  "sc_terminal_rebuild_one": [
+   "p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text"
+  ],
+  "sc_timetable_capacity": [
+   "p_classes text[], p_periods_per_day integer default 6, p_day_periods jsonb default null"
+  ],
+  "storage_health": [
+   ""
+  ],
+  "storage_table_top": [
+   ""
+  ],
+  "submit_admission": [
+   "p_payload jsonb"
+  ],
+  "submit_exam_registration": [
+   "p_token text,p_payload jsonb"
+  ],
+  "table_sizes": [
+   ""
+  ],
+  "teacher_can_manage_student": [
+   "p_uid uuid,p_student uuid"
+  ],
+  "teacher_can_manage_subject_class": [
+   "p_uid uuid,p_subject text default '',p_class text default ''"
+  ],
+  "verify_certificate": [
+   "p_code text"
+  ]
+ },
+ "indexes": [
+  "public.assignment_scores_assignment_unique",
+  "public.assignment_scores_cbt_exam_id_idx",
+  "public.assignment_scores_cbt_subject_unique",
+  "public.assignments_cbt_exam_id_idx",
+  "public.cbt_exams_bank_hash_idx",
+  "public.cbt_exams_normalized_code_idx",
+  "public.cbt_exams_proctor_required_idx",
+  "public.cbt_exams_subject_class_idx",
+  "public.cbt_exams_upper_code_idx",
+  "public.cbt_flag_resolutions_exam_idx",
+  "public.cbt_results_client_ref_uidx",
+  "public.cbt_results_exam_id_idx",
+  "public.cbt_results_exam_idx",
+  "public.cbt_results_exam_student_id_idx",
+  "public.cbt_results_exam_student_ref_idx",
+  "public.cbt_results_exam_time_idx",
+  "public.cbt_results_student_idx_v7",
+  "public.cbt_results_student_ref_idx",
+  "public.cbt_retake_exam_student_idx",
+  "public.class_fee_structure_lookup_idx",
+  "public.class_fee_structure_school_idx",
+  "public.class_fee_structure_school_idx_v7",
+  "public.diary_ack_diary_idx",
+  "public.diary_class_date_idx",
+  "public.diary_date_idx",
+  "public.diary_teacher_idx",
+  "public.exam_registration_links_active_idx",
+  "public.exam_registrations_link_idx",
+  "public.fee_payments_daily_idx",
+  "public.fee_payments_method_daily_idx",
+  "public.idx_asg_scores_ctx",
+  "public.idx_attendance_hist",
+  "public.idx_digital_library_cbt_code",
+  "public.idx_fee_payments_hist",
+  "public.idx_promotions_dept",
+  "public.idx_promotions_hist",
+  "public.idx_reading_scores_ctx",
+  "public.idx_report_scores_hist",
+  "public.idx_report_scores_over_max",
+  "public.idx_results_hist",
+  "public.ix_exam_tt_class",
+  "public.messages_created_idx",
+  "public.messages_from_to_idx",
+  "public.messages_pair_idx",
+  "public.messages_recipient_idx",
+  "public.messages_sender_idx",
+  "public.midterm_rc_lookup_idx",
+  "public.midterm_rc_student_idx",
+  "public.module_records_module_idx",
+  "public.poll_votes_poll_voter_idx",
+  "public.polls_status_created_idx",
+  "public.prep_report_class",
+  "public.prep_scores_cohort",
+  "public.prep_scores_student",
+  "public.promotions_name_lookup_idx",
+  "public.promotions_report_lookup_idx",
+  "public.punctuality_awards_class_idx",
+  "public.punctuality_awards_date_idx",
+  "public.punctuality_awards_student_idx",
+  "public.report_comment_bands_context_idx",
+  "public.report_scores_lookup_idx_v7",
+  "public.report_scores_push_join_idx_v12_70",
+  "public.results_assessment_uidx",
+  "public.role_status_log_person_idx_v7",
+  "public.role_status_log_school_idx",
+  "public.sc_assessment_purpose_sort",
+  "public.sc_fee_adjustment_student",
+  "public.sc_fee_invoice_student",
+  "public.sc_fee_invoice_term",
+  "public.sc_fee_invoice_unique",
+  "public.school_products_school_idx",
+  "public.school_products_school_idx_v7",
+  "public.school_settings_school_idx",
+  "public.security_prefs_user_id_uq",
+  "public.staff_clock_school_idx",
+  "public.staff_clock_staff_idx",
+  "public.staff_staff_no_uq_v7",
+  "public.staff_user_id_idx",
+  "public.staff_user_id_idx_v7",
+  "public.student_clock_school_idx",
+  "public.student_clock_student_idx",
+  "public.student_term_metrics_lookup_idx",
+  "public.students_admission_no_uq_v7",
+  "public.students_user_id_idx",
+  "public.students_user_id_idx_v7"
+ ],
+ "policies": [
+  "public.academic_periods.ap_read",
+  "public.academic_periods.ap_write",
+  "public.academic_print_records.v7_print_read",
+  "public.academic_print_records.v7_print_write",
+  "public.activity_log.al_insert",
+  "public.activity_log.al_read",
+  "public.admission_letters.al_admin_write",
+  "public.admission_letters.al_read",
+  "public.admission_links.adl_admin_write",
+  "public.admission_links.adl_read",
+  "public.affective_traits.affective_scope_select",
+  "public.affective_traits.affective_scope_write",
+  "public.affective_traits.affective_traits_read",
+  "public.affective_traits.affective_traits_write",
+  "public.affective_traits.read_affective",
+  "public.affective_traits.v7_affective_read",
+  "public.affective_traits.v7_affective_write",
+  "public.affective_traits.write_affective",
+  "public.announcements.ann_read",
+  "public.announcements.ann_write",
+  "public.assessment_columns.ac_admin_write",
+  "public.assessment_columns.ac_read_all",
+  "public.assignment_scores.asg_scores_self_read",
+  "public.assignment_scores.asg_scores_staff_all",
+  "public.assignments.assignments_scope_select",
+  "public.assignments.assignments_scope_write",
+  "public.assignments.read_assignments",
+  "public.assignments.write_assignments",
+  "public.attendance.att_read",
+  "public.attendance.att_write",
+  "public.attendance.attendance_parent_read_v16",
+  "public.attendance.attendance_scope_delete",
+  "public.attendance.attendance_scope_insert",
+  "public.attendance.attendance_scope_select",
+  "public.attendance.attendance_scope_update",
+  "public.attendance.v7_attendance_read_family",
+  "public.attendance.v7_attendance_write_staff",
+  "public.attendance_checkins.v7_checkins_insert",
+  "public.attendance_checkins.v7_checkins_read",
+  "public.behaviour_points.behaviour_scope_read",
+  "public.behaviour_points.behaviour_teacher_write",
+  "public.cbt_accommodations.accommodations_read",
+  "public.cbt_accommodations.accommodations_write",
+  "public.cbt_appeals.appeals_read",
+  "public.cbt_appeals.appeals_write",
+  "public.cbt_exams.cbt_exam_scope_delete",
+  "public.cbt_exams.cbt_exam_scope_insert",
+  "public.cbt_exams.cbt_exam_scope_select",
+  "public.cbt_exams.cbt_exam_scope_update",
+  "public.cbt_exams.cbt_exams_public_select",
+  "public.cbt_exams_drafts.cbt_drafts_any_auth",
+  "public.cbt_flag_resolutions.cbt_flag_res_staff",
+  "public.cbt_pending_submissions.cbt_pending_anon_insert",
+  "public.cbt_pending_submissions.cbt_pending_staff_delete",
+  "public.cbt_pending_submissions.cbt_pending_staff_select",
+  "public.cbt_practice_streaks.streaks_read",
+  "public.cbt_practice_streaks.streaks_write",
+  "public.cbt_proctor_sessions.cbt_proctor_staff_read",
+  "public.cbt_results.cbt_result_no_direct_insert",
+  "public.cbt_results.cbt_result_owner_delete",
+  "public.cbt_results.cbt_result_scope_select",
+  "public.cbt_results.cbt_result_staff_delete",
+  "public.cbt_roster.cr_read",
+  "public.cbt_roster.cr_staff_write",
+  "public.cbt_spaced_practice.spaced_rw",
+  "public.certificate_designs.cd_admin_write",
+  "public.certificate_designs.cd_read",
+  "public.certificates.read_certificates",
+  "public.certificates.write_certificates",
+  "public.class_fee_structure.class_fee_structure_read",
+  "public.class_fee_structure.class_fee_structure_write",
+  "public.class_fee_structure.v7_fee_structure_read",
+  "public.class_fee_structure.v7_fee_structure_write",
+  "public.classes.authenticated_read_classes",
+  "public.complaints.comp_all",
+  "public.conduct.cond_read",
+  "public.conduct.cond_write",
+  "public.conduct.conduct_scope_read",
+  "public.conduct.conduct_teacher_write",
+  "public.data_retention_settings.retention_owner_read",
+  "public.data_retention_settings.retention_owner_write",
+  "public.departments.authenticated_read_departments",
+  "public.diary.diary_delete_staff",
+  "public.diary.diary_read_admin",
+  "public.diary.diary_read_family",
+  "public.diary.diary_read_staff",
+  "public.diary.diary_update_staff",
+  "public.diary.diary_write_staff",
+  "public.diary_ack.diary_ack_insert",
+  "public.diary_ack.diary_ack_read",
+  "public.digital_library.dl_scope_read",
+  "public.digital_library.dl_teacher_write",
+  "public.donations.don_admin",
+  "public.eresources.er_scope_read",
+  "public.eresources.er_teacher_write",
+  "public.eresources.read_eresources",
+  "public.eresources.write_eresources",
+  "public.exam_registration_links.exam_links_leader_manage",
+  "public.exam_registration_links.exam_links_staff_read",
+  "public.exam_registrations.exam_regs_leader_delete",
+  "public.exam_registrations.exam_regs_leader_manage",
+  "public.exam_registrations.exam_regs_staff_read",
+  "public.exam_timetable.examtt_read",
+  "public.exam_timetable.examtt_write",
+  "public.fee_payments.fp_read",
+  "public.fee_payments.fp_write",
+  "public.finance_entries.fin_all",
+  "public.health.hlth_delete_v12",
+  "public.health.hlth_insert_v12",
+  "public.health.hlth_read",
+  "public.health.hlth_update_v12",
+  "public.health.hlth_write",
+  "public.helpdesk_tickets.hd_all",
+  "public.helpdesk_tickets.hd_delete_v12",
+  "public.helpdesk_tickets.hd_insert_v12",
+  "public.helpdesk_tickets.hd_select_v12",
+  "public.helpdesk_tickets.hd_update_v12",
+  "public.i18n_strings.v7_i18n_read",
+  "public.i18n_strings.v7_i18n_write",
+  "public.idcards.read_idcards",
+  "public.idcards.write_idcards",
+  "public.learner_portfolios.portfolio_read",
+  "public.learner_portfolios.portfolio_write",
+  "public.leave_requests.lr_admin_all",
+  "public.leave_requests.lr_all",
+  "public.leave_requests.lr_insert",
+  "public.leave_requests.lr_read",
+  "public.leave_requests.lr_update_own_pending",
+  "public.lesson_plans.lesson_scope_select",
+  "public.lesson_plans.lesson_scope_write",
+  "public.license_events.licev_read",
+  "public.lms_submissions.sub_read",
+  "public.lms_submissions.sub_write",
+  "public.login_audit.v7_login_audit_insert",
+  "public.login_audit.v7_login_audit_read",
+  "public.lookups.lookups_read",
+  "public.lookups.lookups_write",
+  "public.menu_planner.v7_menu_read",
+  "public.menu_planner.v7_menu_write",
+  "public.messages.messages_all",
+  "public.messages.msg_all",
+  "public.midterm_report_cards.midterm_rc_select",
+  "public.midterm_report_cards.midterm_rc_write",
+  "public.module_records.mr_delete_v12_owner",
+  "public.module_records.mr_insert_v15",
+  "public.module_records.mr_select_v15",
+  "public.module_records.mr_update_v12_owner",
+  "public.notifications.notif_read",
+  "public.notifications.notif_write",
+  "public.notifications.notifications_all",
+  "public.parent_child.pc_read",
+  "public.parent_child.pc_write",
+  "public.parents.parents_read",
+  "public.parents.parents_write",
+  "public.payment_intents.pi_read",
+  "public.payment_intents.pi_write",
+  "public.payroll.pay_all",
+  "public.payroll.pay_self_read",
+  "public.poll_votes.pv_delete",
+  "public.poll_votes.pv_delete_v11",
+  "public.poll_votes.pv_insert",
+  "public.poll_votes.pv_read",
+  "public.poll_votes.pv_update",
+  "public.polls.polls_delete",
+  "public.polls.polls_delete_v11",
+  "public.polls.polls_read",
+  "public.polls.polls_update",
+  "public.polls.polls_update_v11",
+  "public.polls.polls_write",
+  "public.prep_report_cards.prep_report_read",
+  "public.prep_report_cards.prep_report_write",
+  "public.prep_scores.prep_scores_read",
+  "public.prep_scores.prep_scores_write",
+  "public.profiles.profiles_admin_all",
+  "public.profiles.profiles_self_read",
+  "public.profiles.profiles_self_update",
+  "public.profiles.profiles_staff_read",
+  "public.promotions.prom_all",
+  "public.psychomotor_traits.psychomotor_scope_select",
+  "public.psychomotor_traits.psychomotor_scope_write",
+  "public.psychomotor_traits.psychomotor_traits_read",
+  "public.psychomotor_traits.psychomotor_traits_write",
+  "public.psychomotor_traits.read_psychomotor",
+  "public.psychomotor_traits.v7_psychomotor_read",
+  "public.psychomotor_traits.v7_psychomotor_write",
+  "public.psychomotor_traits.write_psychomotor",
+  "public.punctuality_awards.punctuality_awards_read",
+  "public.punctuality_awards.punctuality_awards_write",
+  "public.punctuality_config.punctuality_config_read",
+  "public.punctuality_config.punctuality_config_write",
+  "public.push_subscriptions.ps_all",
+  "public.reading_scores.uv1_rs_insert",
+  "public.reading_scores.uv1_rs_manage",
+  "public.report_cards.v7_report_cards_family",
+  "public.report_cards.v7_report_cards_staff",
+  "public.report_comment_bands.comment_bands_leader_manage",
+  "public.report_comment_bands.comment_bands_staff_read",
+  "public.report_comments.comments_scope_select",
+  "public.report_comments.comments_scope_write",
+  "public.report_comments.read_comments",
+  "public.report_comments.report_comments_read",
+  "public.report_comments.report_comments_write",
+  "public.report_comments.v7_comments_read",
+  "public.report_comments.v7_comments_write",
+  "public.report_comments.write_comments",
+  "public.report_scores.report_score_scope_delete",
+  "public.report_scores.report_score_scope_insert",
+  "public.report_scores.report_score_scope_select",
+  "public.report_scores.report_score_scope_update",
+  "public.report_scores.rs_delete_v16_owner",
+  "public.report_scores.rs_insert_v16_owner",
+  "public.report_scores.rs_update_v16_owner",
+  "public.report_scores.v7_report_scores_delete",
+  "public.report_scores.v7_report_scores_insert",
+  "public.report_scores.v7_report_scores_read",
+  "public.report_scores.v7_report_scores_update",
+  "public.reports.rep_all",
+  "public.reports.rep_delete_v12",
+  "public.reports.rep_insert_v12",
+  "public.reports.rep_select_v12",
+  "public.reports.rep_update_v12",
+  "public.results.results_delete_teacher",
+  "public.results.results_delete_v5",
+  "public.results.results_insert_v5",
+  "public.results.results_scope_delete",
+  "public.results.results_scope_insert",
+  "public.results.results_scope_select",
+  "public.results.results_scope_update",
+  "public.results.results_select_v5",
+  "public.results.results_update_teacher",
+  "public.results.results_update_v5",
+  "public.role_status_log.role_status_log_read",
+  "public.role_status_log.role_status_log_write",
+  "public.role_status_log.v7_role_log_read",
+  "public.role_status_log.v7_role_log_write",
+  "public.sc_ai_settings.ai_read",
+  "public.sc_ai_settings.ai_write",
+  "public.sc_assessment_purpose.sc_assessment_purpose_read",
+  "public.sc_assessment_purpose.sc_assessment_purpose_write",
+  "public.sc_fee_adjustment.sc_fee_adjustment_admin",
+  "public.sc_fee_adjustment.sc_fee_adjustment_read",
+  "public.sc_fee_invoice.sc_fee_invoice_read",
+  "public.sc_fee_invoice.sc_fee_invoice_write",
+  "public.sc_heartbeat.hb_read",
+  "public.sc_install_state.install_state_read",
+  "public.sc_install_state.sis_admin_read",
+  "public.sc_keepalive_sources.ka_sources_read",
+  "public.sc_module_access.sma_read",
+  "public.sc_module_access.sma_write",
+  "public.sc_module_editors.sme_read",
+  "public.sc_module_editors.sme_write",
+  "public.sc_report_position_hold.sc_report_hold_read",
+  "public.sc_report_position_hold.sc_report_hold_write",
+  "public.sc_report_settings.sc_report_settings_read",
+  "public.sc_report_settings.sc_report_settings_write",
+  "public.scheme_of_work.sow_scope_select",
+  "public.scheme_of_work.sow_scope_write",
+  "public.school_products.school_products_read",
+  "public.school_products.school_products_write",
+  "public.school_products.v7_products_read",
+  "public.school_products.v7_products_write",
+  "public.school_settings.v7_settings_read",
+  "public.school_settings.v7_settings_write",
+  "public.schools.v7_schools_read",
+  "public.schools.v7_schools_write",
+  "public.security_prefs.v7_security_prefs",
+  "public.site_license.site_license_read",
+  "public.site_license.site_license_write",
+  "public.staff_appraisals.sa_admin_all",
+  "public.staff_appraisals.sa_self_read",
+  "public.staff_bonus.sbn_admin_write",
+  "public.staff_bonus.sbn_staff_read",
+  "public.staff_clock.staff_clock_read",
+  "public.staff_clock.staff_clock_write",
+  "public.staff_clock.v7_clock_read",
+  "public.staff_clock.v7_clock_write",
+  "public.staff_loans.sl_admin_all",
+  "public.staff_loans.sl_self_read",
+  "public.student_clock.student_clock_read",
+  "public.student_clock.student_clock_write",
+  "public.student_clock.v7_student_clock_read",
+  "public.student_clock.v7_student_clock_write",
+  "public.student_diary.diary_scope_read",
+  "public.student_diary.diary_teacher_write",
+  "public.student_diary.v7_diary_read",
+  "public.student_diary.v7_diary_write",
+  "public.student_term_metrics.metrics_family_read",
+  "public.student_term_metrics.metrics_staff_all",
+  "public.student_term_metrics.metrics_teacher_write",
+  "public.students.read_students",
+  "public.students.write_students",
+  "public.study_logs.study_logs_rw",
+  "public.subjects.authenticated_read_subjects",
+  "public.substitutions.subs_admin_write",
+  "public.substitutions.subs_staff_read",
+  "public.support_plans.sp_read",
+  "public.support_plans.sp_write",
+  "public.support_plans.support_scope_read",
+  "public.support_plans.support_teacher_write",
+  "public.survey_responses.v7_survey_response",
+  "public.surveys.v7_survey_read",
+  "public.surveys.v7_survey_write",
+  "public.teacher_availability.scoped_read_teacher_availability",
+  "public.teacher_availability.v7_availability_read",
+  "public.teacher_availability.v7_availability_write",
+  "public.timetable_blocks.tb_read",
+  "public.timetable_blocks.tb_staff_write",
+  "public.timetable_config.tc_admin_write",
+  "public.timetable_config.tc_read",
+  "public.timetable_requirements.scoped_read_timetable_requirements",
+  "public.timetable_requirements.v7_enterprise_read",
+  "public.timetable_requirements.v7_enterprise_write",
+  "public.timetable_runs.v7_runs_read",
+  "public.timetable_runs.v7_runs_write",
+  "public.transport.tr_all",
+  "public.visitors.vis_insert",
+  "public.visitors.vis_read"
+ ],
+ "tables": {
+  "academic_periods": [],
+  "academic_print_records": [],
+  "activity_log": [],
+  "admission_letters": [],
+  "admission_links": [],
+  "admissions": [],
+  "affective_traits": [],
+  "alumni": [],
+  "announcements": [],
+  "assessment_columns": [],
+  "assignment_scores": [],
+  "assignments": [],
+  "attendance": [],
+  "attendance_checkins": [],
+  "behaviour_points": [],
+  "birthdays": [],
+  "cbt_accommodations": [],
+  "cbt_appeals": [],
+  "cbt_edit_log": [],
+  "cbt_exams": [],
+  "cbt_exams_drafts": [],
+  "cbt_flag_resolutions": [],
+  "cbt_pending_submissions": [],
+  "cbt_practice_streaks": [],
+  "cbt_proctor_sessions": [],
+  "cbt_results": [],
+  "cbt_results_recovery_log": [],
+  "cbt_retake_allowances": [],
+  "cbt_roster": [],
+  "cbt_spaced_practice": [],
+  "certificate_designs": [],
+  "certificates": [],
+  "class_fee_structure": [],
+  "classes": [],
+  "complaints": [],
+  "conduct": [],
+  "data_retention_settings": [],
+  "departments": [],
+  "diary": [],
+  "diary_ack": [],
+  "digital_library": [],
+  "donations": [],
+  "eresources": [],
+  "events": [],
+  "exam_registration_links": [],
+  "exam_registrations": [],
+  "exam_timetable": [],
+  "fee_payments": [],
+  "fee_structures": [],
+  "finance_entries": [],
+  "gallery": [],
+  "health": [],
+  "helpdesk_tickets": [],
+  "hostel_allocations": [],
+  "i18n_strings": [],
+  "idcards": [],
+  "inventory": [],
+  "learner_portfolios": [],
+  "leave_requests": [],
+  "lesson_plans": [],
+  "library": [],
+  "license_events": [],
+  "license_secret": [],
+  "lms_courses": [],
+  "lms_lessons": [],
+  "lms_submissions": [],
+  "login_audit": [],
+  "lookups": [],
+  "menu_planner": [],
+  "messages": [],
+  "midterm_report_cards": [],
+  "module_records": [],
+  "notifications": [],
+  "parent_child": [],
+  "parents": [],
+  "payment_intents": [],
+  "payroll": [],
+  "poll_votes": [],
+  "polls": [],
+  "prep_report_cards": [],
+  "prep_scores": [],
+  "profiles": [],
+  "promotions": [],
+  "psychomotor_traits": [],
+  "punctuality_awards": [],
+  "punctuality_config": [],
+  "push_subscriptions": [],
+  "reading_scores": [],
+  "report_cards": [],
+  "report_comment_bands": [],
+  "report_comments": [],
+  "report_scores": [],
+  "reports": [],
+  "results": [],
+  "role_status_log": [],
+  "sc_ai_settings": [],
+  "sc_assessment_purpose": [],
+  "sc_fee_adjustment": [],
+  "sc_fee_invoice": [],
+  "sc_heartbeat": [],
+  "sc_install_state": [],
+  "sc_keepalive_sources": [],
+  "sc_module_access": [],
+  "sc_module_editors": [],
+  "sc_report_position_hold": [],
+  "sc_report_settings": [],
+  "scheme_of_work": [],
+  "school_products": [],
+  "school_settings": [],
+  "schools": [],
+  "security_prefs": [],
+  "site_license": [],
+  "staff": [],
+  "staff_appraisals": [],
+  "staff_bonus": [],
+  "staff_clock": [],
+  "staff_loans": [],
+  "student_clock": [],
+  "student_diary": [],
+  "student_term_metrics": [],
+  "students": [],
+  "study_logs": [],
+  "subjects": [],
+  "substitutions": [],
+  "support_plans": [],
+  "survey_responses": [],
+  "surveys": [],
+  "teacher_availability": [],
+  "timetable": [],
+  "timetable_blocks": [],
+  "timetable_config": [],
+  "timetable_requirements": [],
+  "timetable_runs": [],
+  "transport": [],
+  "visitors": []
+ },
+ "triggers": [
+  "trigger on_auth_user_created",
+  "trigger sc_fee_invoice_due",
+  "trigger trg_cbt_assignment_cleanup",
+  "trigger trg_cbt_assignment_mirror",
+  "trigger trg_cbt_duration_sync",
+  "trigger trg_cbt_proctor_required_before_result",
+  "trigger trg_cbt_report_column_moves_scores",
+  "trigger trg_cbt_score_snapshot_sync",
+  "trigger trg_community_audience",
+  "trigger trg_compute_class_fee_total",
+  "trigger trg_compute_fee_payment_balance",
+  "trigger trg_compute_payroll_net",
+  "trigger trg_diary_updated_at",
+  "trigger trg_fee_rows_autoheal_del",
+  "trigger trg_fee_rows_autoheal_ins",
+  "trigger trg_fee_rows_autoheal_upd",
+  "trigger trg_loan_status_sync",
+  "trigger trg_lr_stamp",
+  "trigger trg_midterm_report_flush",
+  "trigger trg_payroll_posts_loan",
+  "trigger trg_profiles_auto_link",
+  "trigger trg_profiles_photo_sync",
+  "trigger trg_report_scores_no_prep",
+  "trigger trg_results_no_prep",
+  "trigger trg_sc_fee_opening_touch",
+  "trigger trg_sc_generate_admission_no",
+  "trigger trg_sc_generate_staff_no",
+  "trigger trg_staff_photo_sync",
+  "trigger trg_student_archive",
+  "trigger trg_student_cleanup",
+  "trigger trg_students_photo_sync"
+ ],
+ "views": [
+  "public.cbt_results_with_exam",
+  "public.parent_children",
+  "public.poll_results",
+  "public.report_subject_totals",
+  "public.sc_report_hold_list"
+ ]
+}
