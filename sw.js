@@ -1,6 +1,6 @@
 // School Connect — Service Worker (V5 cumulative release, generator v8)
 // Bump this literal on every runtime release so previously cached CBT/report code is purged.
-const CACHE = 'sc-client-v12.59-20261101-67';
+const CACHE = 'sc-client-v12.76-20261108-68';
 const CORE = [
   './', './index.html', './builder.html', './voting.html', './notifications.html',
   './install.html', './midterm-reports.html', './ecosystem.html', './about.html', './guide.html', './offline.html',
@@ -9,7 +9,10 @@ const CORE = [
   './assets/js/notifications.js', './assets/js/voting.js', './assets/js/pwa-install.js',
   './assets/js/qrcode-generator.js','./assets/js/super.js', './assets/js/wizard.js', './assets/js/generator.js', './assets/js/templates.js', './assets/js/site-help.js',
   './assets/js/theme-manager.js', './assets/js/messages-center.js', './assets/js/drive-sync.js', './assets/js/proctor.js',
-  './assets/img/logo.svg', './assets/img/favicon.svg', './manifest.json'
+  './assets/img/logo.svg', './assets/img/favicon.svg', './manifest.json',
+  /* V12.76 — the libraries are part of the app now, not a CDN's favour */
+  './assets/vendor/supabase-js-2.58.0.js', './assets/vendor/chart.umd.js',
+  './assets/vendor/jsqr.min.js', './assets/vendor/jszip.min.js'
 ];
 
 self.addEventListener('install', e => {

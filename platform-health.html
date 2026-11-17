@@ -144,6 +144,17 @@
     </div>
   </section>
 
+  <!-- 6b. Security posture (V12.76) -->
+  <section id="sec-posture" class="dc-section">
+    <h2>🔐 Security Posture — prove it now, not at the last audit <span id="posture-pill"></span></h2>
+    <p class="lead">These checks run <em>inside the database</em> (<span class="mono">sc_security_posture()</span>), against the live catalogue — the same guarantees the release audit makes, answerable on any day without a developer. A <b>fail</b> is a configuration that has drifted; a <b>warn</b> is something worth correcting but not dangerous. Nothing here is a score: each row names exactly what to look at.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-primary" onclick="PH.posture()">🔄 Re-run checks</button>
+      <button class="btn btn-outline" onclick="PH.postureJson()">⬇ Copy report</button>
+    </div>
+    <div id="posture-rows" class="muted">Checking…</div>
+  </section>
+
   <!-- 7. Fleet Console -->
   <section id="sec-fleet" class="dc-section">
     <h2>🛰️ HMG Fleet Console — One-Click Monitoring & Wake-up <span id="fleet-pill"></span></h2>
@@ -212,7 +223,7 @@
 <div id="toast-container" class="toast-container" style="position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px"></div>
 <div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;align-items:center;justify-content:center"><div class="modal" onclick="event.stopPropagation()" style="background:#fff;border-radius:16px;max-width:600px;width:90%;max-height:80vh;overflow:auto;padding:20px"><div class="modal-header" style="display:flex;justify-content:space-between;align-items:center"><h2 id="modal-title">Modal</h2><button class="modal-close" onclick="closeModal()" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:32px;height:32px">×</button></div><div id="modal-body" class="modal-body" style="margin-top:12px"></div><div id="modal-footer" class="modal-footer" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"></div></div></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -905,10 +916,61 @@ const PH={
     try{ await this.schemaDoctor(); }catch(e){ console.warn('doctor failed', e); }
     try{ await this.archive(); }catch(e){ console.warn('archive failed', e); }
     try{ await this.fleetChecks(); }catch(e){ console.warn('fleet checks failed', e); }
+    try{ await this.posture(); }catch(e){ console.warn('posture failed', e); }
   }
 };
 
 window.PH = PH;
+
+PH.posture = async function posture(){
+  const box = document.getElementById('posture-rows');
+  const pill = document.getElementById('posture-pill');
+  if (!box) return;
+  const sb = window.sb;
+  if (!sb) { box.innerHTML = '<p class="muted">Database not configured.</p>'; return; }
+  let rows = [];
+  try {
+    const { data, error } = await sb.rpc('sc_security_posture');
+    if (error) throw new Error(error.message || 'the check could not run');
+    rows = Array.isArray(data) ? data : [];
+    if (!rows.length) throw new Error('the check returned nothing — re-run database/complete-schema.sql');
+  } catch (e) {
+    box.innerHTML = '<p style="color:#b91c1c;font-weight:700">Could not verify: ' + String(e.message || e) + '</p>'
+      + '<p class="muted">This page will not pretend the platform is healthy when it cannot check. Run <span class="mono">database/complete-schema.sql</span> and press Re-run.</p>';
+    if (pill) pill.innerHTML = '<span class="badge" style="background:#fee2e2;color:#991b1b">unverified</span>';
+    return;
+  }
+  const fails = rows.filter(r => r.status === 'fail').length;
+  const warns = rows.filter(r => r.status === 'warn').length;
+  if (pill) pill.innerHTML = fails
+    ? '<span class="badge" style="background:#fee2e2;color:#991b1b">' + fails + ' failing</span>'
+    : warns ? '<span class="badge" style="background:#fef3c7;color:#92400e">' + warns + ' to review</span>'
+            : '<span class="badge" style="background:#dcfce7;color:#166534">all ' + rows.length + ' checks pass</span>';
+  const colour = s => s === 'pass' ? '#166534' : s === 'warn' ? '#92400e' : '#991b1b';
+  const bg = s => s === 'pass' ? '#f0fdf4' : s === 'warn' ? '#fffbeb' : '#fef2f2';
+  const word = r => r.check_name.replace(/[<>&]/g, '');
+  const safe = r => String(r == null ? '' : r).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+  box.innerHTML = '<table class="table" style="width:100%"><thead><tr>'
+    + '<th style="text-align:left">Check</th><th style="text-align:left">Result</th><th style="text-align:left">What it found</th></tr></thead><tbody>'
+    + rows.map(r => '<tr style="background:' + bg(r.status) + '">'
+        + '<td style="font-weight:700">' + safe(word(r)) + '</td>'
+        + '<td style="color:' + colour(r.status) + ';font-weight:800;text-transform:uppercase;font-size:.75rem">' + safe(r.status) + '</td>'
+        + '<td class="muted" style="font-size:.85rem">' + safe(r.detail) + '</td></tr>').join('')
+    + '</tbody></table>';
+};
+
+PH.postureJson = async function postureJson(){
+  const sb = window.sb;
+  if (!sb) { alert('Database not configured.'); return; }
+  try {
+    const { data, error } = await sb.rpc('sc_security_posture');
+    if (error) throw new Error(error.message);
+    const txt = JSON.stringify({ generated_at: new Date().toISOString(), checks: data }, null, 2);
+    try { await navigator.clipboard.writeText(txt); alert('Security posture copied — paste it into the school\'s compliance file.'); }
+    catch (e) { window.prompt('Copy the posture report:', txt); }
+  } catch (e) { alert('Could not read the posture: ' + (e.message || e)); }
+};
+
 document.addEventListener('DOMContentLoaded', ()=>{ setTimeout(()=>PH.refresh(), 900); });
 // Bind filter events
 document.addEventListener('DOMContentLoaded', ()=>{
