@@ -1026,6 +1026,10 @@ const App = {
     ['affective_traits','⭐','Affective Domain','affective_traits.html','super_admin admin principal proprietor head_teacher bursar staff teacher'],
     ['psychomotor_traits','🏃','Psychomotor Domain','psychomotor_traits.html','super_admin admin principal proprietor head_teacher bursar staff teacher'],
     ['report_comments','💬','Report Card Comments','report_comments.html','super_admin admin principal proprietor head_teacher bursar staff teacher'],
+    /* V12.74 (item 2): the Prep Exam Results page existed with a full backend but
+       NOTHING linked to it — no sidebar entry on any page — so the feature was
+       unreachable and looked missing. Injected for every page here. */
+    ['prep_exam_reports','🧪','Prep Exam Results','prep-exam-reports.html','super_admin admin principal proprietor head_teacher bursar staff teacher'],
     ['school_fees','💳','School Fee Structure','school-fees.html','super_admin admin principal proprietor head_teacher bursar'],
     ['school_products','🛍️','School Products','school-products.html','super_admin admin principal proprietor head_teacher bursar'],
     ['status_manager','🔐','Role & Status Manager','status-manager.html','super_admin admin principal proprietor head_teacher bursar'],

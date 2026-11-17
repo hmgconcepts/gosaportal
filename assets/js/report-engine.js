@@ -195,14 +195,32 @@ const ReportEngine = {
       });
     };
     const baseRows = (scope.family ? (rows || []).filter(r => familyFilter(r)) : (rows || []));
-    let legacyNormalized=_liveRosterGate(baseRows).map(r=>this.normalizeResult(r,allStudents||[])).filter(r=>!studentText||String(r.student_name||'').toLowerCase().includes(studentText.toLowerCase()));
-    const assessmentPack=await this.loadAssessmentRows({class:klass,subject,term,session,student:studentText},allStudents||[],scope);
+    /* V12.74 FIX (RANK-01) — "every report says First position".
+       This used to filter the returned rows down to the ONE student being
+       printed. rankCohort() then ranked that single learner against a cohort
+       of one, so EVERY learner on EVERY report was 1st of 1. The filtered set
+       also fed the class average, which therefore equalled the learner's own
+       average.
+       The correct shape: `rows` is the whole class cohort (what a position is
+       measured against), and `studentRows` is the learner's own rows. Report
+       sheets print from studentRows; ranking always sees the full class. */
+    const classNormalized = _liveRosterGate(baseRows).map(r=>this.normalizeResult(r,allStudents||[]));
+    const matchStudent = (r) => !studentText || String(r.student_name||'').toLowerCase().includes(studentText.toLowerCase());
+    let legacyNormalized = classNormalized;
+    const assessmentPack=await this.loadAssessmentRows({class:klass,subject,term,session,student:''},allStudents||[],scope);
     const assessmentNormalized=_liveRosterGate(assessmentPack.rows||[]).map(r=>this.normalizeResult(r,allStudents||[]));
     // Once assessment columns exist for this report context, report_scores is the
     // only official source. Legacy results is a fallback solely for old contexts
     // that have never been configured in Report Cards.
     const normalized=assessmentPack.configured?assessmentNormalized:legacyNormalized;
-    return {ctx:{class:klass,subject,term,session,student:studentText},rows:normalized,students:students||[],school:this.school(),sourceMode:assessmentPack.configured?'report_scores':'legacy_results',assessmentColumns:assessmentPack.columns||[],feeBalances:await this.loadFeeBalances(students||[],term,session)};
+    /* the cohort the learner is ranked in — ALWAYS the whole class */
+    const cohortRows = normalized;
+    /* the learner's own rows — what the sheet prints. Selected from the cohort
+       so the two can never come from different sources. */
+    const studentRows = studentText ? cohortRows.filter(matchStudent) : cohortRows;
+    return {ctx:{class:klass,subject,term,session,student:studentText},rows:cohortRows,studentRows,
+            students:students||[],school:this.school(),sourceMode:assessmentPack.configured?'report_scores':'legacy_results',
+            assessmentColumns:assessmentPack.columns||[],feeBalances:await this.loadFeeBalances(students||[],term,session)};
   },
 
 
@@ -611,10 +629,18 @@ const ReportEngine = {
        report cards would not generate. Read the policy once, here, and use it
        throughout. */
     const pol = this.policy();
-    const data = await this.loadContext(ctx); const rows = data.rows;
+    const data = await this.loadContext(ctx);
+    /* V12.74 FIX (RANK-01) — `rows` is now the whole class cohort (used for
+       ranking and the class average); `list` is the learner's own rows (used
+       for the scores table and totals). Before this, `rows` was pre-filtered
+       to a single learner, so the cohort had one member and every sheet read
+       "1st". */
+    const rows = data.rows;
     if (!rows.length) return this.empty('No result records found for this student/filter.');
     const name = ctx.student || rows[0].student_name;
-    const studentRows = rows.filter(r => !ctx.student || this._studentMatch(r, ctx.student));
+    const studentRows = (data.studentRows && data.studentRows.length)
+      ? data.studentRows
+      : rows.filter(r => !ctx.student || this._studentMatch(r, ctx.student));
     const list = studentRows.length ? studentRows : rows;
     const first = list[0] || {}; const sc=data.school;
     const promotion=await this.loadPromotionStatus(first.student_id,first.student_name,ctx.term||first.term,ctx.session||first.session);
@@ -1153,6 +1179,33 @@ const ReportPolicy = {
     await fill('pol-session','academic_periods','session');
     await fill('mpol-term','academic_periods','term');
     await fill('mpol-session','academic_periods','session');
+    /* V12.74 FIX (RANK-02) — "the Class dropdown is unresponsive".
+       #pol-class was written into the page with a single hard-coded
+       "All classes" option and NOTHING ever filled it: initAll() populated the
+       term and session pickers only. The control therefore never offered a
+       real class, could not be changed, and "Show learners" always listed the
+       whole school. Populate it from the classes the school actually has, in
+       the same way — and from acadentic_periods-independent sources so it
+       still works on a project that has no periods configured yet. */
+    try{
+      const el=document.getElementById('pol-class'); if(!el) return;
+      const seen=new Set(['']);
+      const add=(v)=>{ v=String(v==null?'':v).trim(); if(!v||seen.has(v)) return; seen.add(v);
+        const o=document.createElement('option'); o.value=v; o.textContent=v; el.appendChild(o); };
+      /* the widest net: classes from the register, then any configured class */
+      try{ const r=await sb.from('students').select('class').limit(5000); (r.data||[]).forEach(x=>add(x.class)); }catch(_){ }
+      if(seen.size<=1){ try{ const r=await sb.from('classes').select('name').limit(500); (r.data||[]).forEach(x=>add(x.name)); }catch(_){ } }
+      /* NOTE: academic_periods has no `class` column — never select one from it. */
+      const uniq=[...seen].filter(Boolean).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+      /* rebuild in sorted order, keeping the placeholder first */
+      el.innerHTML='<option value="">All classes</option>'+uniq.map(v=>'<option value="'+this.esc(v)+'">'+this.esc(v)+'</option>').join('');
+      /* Once a class is chosen the learner list refreshes immediately, so the
+         control visibly responds instead of looking inert. */
+      if(el.dataset.scHoldBound!=='1'){
+        el.dataset.scHoldBound='1';
+        el.addEventListener('change',()=>{ try{ this.openHolds(); }catch(_){ } });
+      }
+    }catch(_){}
   },
   async load(kind){
     this._kind = kind || (document.getElementById('pol-kind')||{}).value || 'terminal';

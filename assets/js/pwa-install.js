@@ -47,6 +47,9 @@ const PWAInstall = {
     // ---- Update handlers (new in v12.40) ----
     this.injectUpdateBanner();
     this.initUpdateChecker();
+    /* V12.74 (item 8): if this build IS the newest one, there is no update to
+       offer — make sure a stale banner from a previous session cannot linger. */
+    this.alreadyCurrent().then(current => { if (current) this.hideUpdateBanner(); });
   },
 
   bindUI() {
@@ -140,7 +143,59 @@ const PWAInstall = {
     document.body.appendChild(b);
     this._updateBanner = b;
   },
+  /* ==================================================================
+     V12.74 (item 8) — "Update now" must update, and must not come back.
+     Three defects:
+       (a) the banner's version identity was registration.scriptURL, which is
+           the SAME string in every release, so "have I already applied this?"
+           could never be answered — the banner kept returning;
+       (b) applyUpdate() silently reloaded when there was no waiting worker,
+           and the reload could be served from the old cache, so nothing changed;
+       (c) nothing recorded that a version had been applied.
+     The version now comes from the service worker's own cache name, the last
+     applied version is remembered, and the apply path always does something
+     visible.
+     ================================================================== */
+  async latestVersion() {
+    try {
+      const r = await fetch('sw.js', { cache: 'no-store' });
+      if (!r.ok) return null;
+      const t = await r.text();
+      const mm = t.match(/CACHE\s*=\s*['"]([^'"]+)['"]/);
+      return mm ? mm[1] : null;
+    } catch (_) { return null; }
+  },
+  appliedVersion() { try { return localStorage.getItem('sc_pwa_applied_ver') || ''; } catch (_) { return ''; } },
+  /* Ask a specific worker (waiting/installing/active) what version it is. */
+  versionOf(sw) {
+    return new Promise(resolve => {
+      if (!sw || !sw.postMessage) return resolve(null);
+      try {
+        const ch = new MessageChannel();
+        const t = setTimeout(() => resolve(null), 900);
+        ch.port1.onmessage = e => { clearTimeout(t); resolve((e.data && e.data.version) || null); };
+        sw.postMessage({ type: 'GET_VERSION' }, [ch.port2]);
+      } catch (_) { resolve(null); }
+    });
+  },
+  /* True when the running build IS the newest one — then there is nothing to offer. */
+  async alreadyCurrent() {
+    const latest = await this.latestVersion();
+    if (!latest) return false;
+    if (this.appliedVersion() === latest) return true;
+    const active = this._reg && this._reg.active;
+    if (active) {
+      const v = await this.versionOf(active);
+      if (v && v === latest) return true;
+    }
+    return false;
+  },
   showUpdateBanner(version) {
+    /* Never offer an update the platform is already running. */
+    if (version && this.appliedVersion() && version === this.appliedVersion()) {
+      this.hideUpdateBanner();
+      return;
+    }
     if (!this._updateBanner) this.injectUpdateBanner();
     const b = this._updateBanner;
     if (!b) return;
@@ -182,31 +237,63 @@ const PWAInstall = {
     localStorage.setItem('sc_pwa_update_dismissed_ver', ver);
     if (window.toast) toast('Update postponed. App will remind you later.', 'info', 4000);
   },
-  applyUpdate() {
+  async applyUpdate() {
     clearInterval(this._updateCountdown);
-    if (this._waitingSW) {
-      console.log('[PWA] Activating waiting SW');
-      this._waitingSW.postMessage({type: 'SKIP_WAITING'});
-    } else if (this._reg && this._reg.waiting) {
-      this._reg.waiting.postMessage({type: 'SKIP_WAITING'});
-    } else {
-      console.log('[PWA] No waiting SW, reloading');
-      this.forceReload();
+    /* Always answer the click, even if everything is already in place. */
+    if (window.toast) toast('🔄 Updating to the newest version…', 'info', 4000);
+    this.hideUpdateBanner();
+
+    /* Record the version being applied BEFORE reloading, so the banner can never
+       return for a build that is already running. */
+    const latest = await this.latestVersion();
+    try {
+      if (latest) localStorage.setItem('sc_pwa_applied_ver', latest);
+      localStorage.removeItem('sc_pwa_update_dismissed_ver');
+      localStorage.removeItem('sc_pwa_update_dismissed_at');
+    } catch (_) {}
+
+    const waiting = this._waitingSW || (this._reg && this._reg.waiting);
+    if (waiting) {
+      console.log('[PWA] activating waiting SW');
+      try { waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
+      this._reloadSoon();
+      return;
     }
-    // Fallback reload if controllerchange doesn't fire in 2s (e.g., SW already skipWaiting)
-    setTimeout(() => {
-      if (!this._hasReloaded) {
-        console.log('[PWA] Fallback reload after SKIP_WAITING');
-        this.forceReload();
-      }
-    }, 1500);
+
+    /* A worker may still be installing — activate it the moment it is ready. */
+    const installing = this._reg && this._reg.installing;
+    if (installing) {
+      console.log('[PWA] waiting for installing SW to finish');
+      const go = () => {
+        try { installing.postMessage({ type: 'SKIP_WAITING' }); } catch (_) {}
+        this._reloadSoon();
+      };
+      installing.addEventListener('statechange', () => {
+        if (installing.state === 'installed' || installing.state === 'activated') go();
+      });
+      setTimeout(() => { if (!this._hasReloaded) this.forceReload(); }, 5000);
+      return;
+    }
+
+    /* Nothing pending: pull any new worker, then load the shell fresh. */
+    try { if (this._reg) await this._reg.update(); } catch (_) {}
+    this.forceReload();
+  },
+  _reloadSoon() {
+    setTimeout(() => { if (!this._hasReloaded) this.forceReload(); }, 1500);
   },
   forceReload() {
     if (this._hasReloaded) return;
     this._hasReloaded = true;
     // Bust any PWA-install dismissal for new version
     try { sessionStorage.setItem('sc_pwa_reloaded_for_update', Date.now().toString()); } catch (_) {}
-    window.location.reload();
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.set('_u', String(Date.now()));
+      window.location.replace(u.toString());
+    } catch (_) {
+      window.location.reload();
+    }
   },
 
   // ---- Update checker ----
@@ -262,7 +349,11 @@ const PWAInstall = {
     if (reg.waiting) {
       console.log('[PWA] found waiting SW');
       this._waitingSW = reg.waiting;
-      this.showUpdateBanner(reg.waiting.scriptURL);
+      this.versionOf(reg.waiting).then(v => this.latestVersion().then(latest => {
+        const ver = v || latest;
+        if (ver && this.appliedVersion() === ver) { this.hideUpdateBanner(); return; }
+        this.showUpdateBanner(ver);
+      }));
     }
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
@@ -273,8 +364,9 @@ const PWAInstall = {
         if (nw.state === 'installed' && navigator.serviceWorker.controller) {
           // New update ready
           this._waitingSW = reg.waiting || nw;
-          const ver = (reg.waiting && reg.waiting.scriptURL) || nw.scriptURL || 'v';
-          this.showUpdateBanner(ver);
+          this.versionOf(this._waitingSW).then(v => this.latestVersion().then(latest => {
+            this.showUpdateBanner(v || latest || 'v');
+          }));
         }
       });
     });

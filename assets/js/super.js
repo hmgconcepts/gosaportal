@@ -771,7 +771,7 @@ const Super = {
         const photoBig = photo
           ? '<img src="' + Super.esc(photo) + '" referrerpolicy="no-referrer" style="width:132px;height:150px;border-radius:14px;object-fit:cover;background:#e2e8f0" data-alt="' + Super.esc(altPhoto) + '" onerror="if(this.dataset.alt&&this.src!==this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=\'\';}else{this.onerror=null;this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}"><div style="display:none;width:132px;height:150px;border-radius:14px;background:' + navy + ';color:#fff;align-items:center;justify-content:center;font-weight:900;font-size:3rem">' + initial + '</div>'
           : '<div style="width:132px;height:150px;border-radius:14px;background:' + navy + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:3rem">' + initial + '</div>';
-        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'520px')+';'+(_fit?('height:'+_fit.h+';'):'max-width:96vw;')+'border-radius:22px;overflow:hidden;background:#f4f6fb;box-shadow:0 14px 40px rgba(15,23,42,.25);font-family:\'Segoe UI\',Arial,sans-serif;border:1px solid #d8dee9">' +
+        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'520px')+';'+(_fit?('height:'+_fit.h+';box-sizing:border-box;'):'max-width:96vw;')+'border-radius:22px;overflow:hidden;background:#f4f6fb;box-shadow:0 14px 40px rgba(15,23,42,.25);font-family:\'Segoe UI\',Arial,sans-serif;border:1px solid #d8dee9">' +
           '<div style="background:' + navy + ';color:#fff;display:flex;align-items:center;gap:14px;padding:16px 22px">' +
             '<img src="' + logo + '" style="width:52px;height:52px;object-fit:contain;background:#fff;border-radius:12px;padding:4px" onerror="this.style.display=\'none\'">' +
             '<div style="flex:1;min-width:0"><div style="font-weight:900;font-size:1.02rem;letter-spacing:.4px;line-height:1.15">' + Super.esc((s.name || 'SCHOOL').toUpperCase()) + '</div><div style="font-size:.66rem;opacity:.85">' + Super.esc(s.motto || '') + '</div></div>' +
@@ -808,7 +808,7 @@ const Super = {
 
       // 1) EXECUTIVE — gold-trimmed dark green, embassy style
       if (tpl === 'executive') {
-        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'420px')+';'+(_fit?('height:'+_fit.h+';'):'')+'border-radius:16px;overflow:hidden;background:#0b3d2e;color:#f8fafc;font-family:Georgia,serif;box-shadow:0 12px 30px rgba(0,0,0,.3);border:2px solid #c9a227">' +
+        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'420px')+';'+(_fit?('height:'+_fit.h+';box-sizing:border-box;'):'')+'border-radius:16px;overflow:hidden;background:#0b3d2e;color:#f8fafc;font-family:Georgia,serif;box-shadow:0 12px 30px rgba(0,0,0,.3);border:2px solid #c9a227">' +
           '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:2px solid #c9a227"><img src="' + logo + '" style="width:42px;height:42px;border-radius:8px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'"><div><strong style="font-size:.95rem;letter-spacing:.5px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</strong><div style="font-size:.6rem;color:#c9a227;letter-spacing:2px">' + tag + '</div></div></div>' +
           '<div style="display:flex;gap:14px;padding:14px 16px;align-items:center">' + miniPhoto(96,112,10) +
           '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem;color:#fff">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.72rem;margin-top:5px;border-collapse:collapse;color:#d1fae5">' + detailRows.replace(/#64748b/g,'#a7f3d0') + '</table></div>' +
@@ -818,7 +818,7 @@ const Super = {
       }
       // 2) MINIMAL — clean white, thin accent line, Swiss typography
       if (tpl === 'minimal') {
-        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'400px')+';'+(_fit?('height:'+_fit.h+';'):'')+'border-radius:14px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:Helvetica,Arial,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.08)">' +
+        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'400px')+';'+(_fit?('height:'+_fit.h+';box-sizing:border-box;'):'')+'border-radius:14px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:Helvetica,Arial,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.08)">' +
           '<div style="height:6px;background:' + pc + '"></div>' +
           '<div style="padding:16px 18px;display:flex;gap:14px;align-items:flex-start">' + miniPhoto(84,100,8) +
           '<div style="flex:1;min-width:0"><div style="font-size:.6rem;letter-spacing:2.5px;color:' + pc + ';font-weight:700">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + ' · ' + tag + '</div>' +
@@ -829,7 +829,7 @@ const Super = {
       }
       // 3) GRADIENT — vibrant diagonal gradient, modern student card
       if (tpl === 'gradient') {
-        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'400px')+';'+(_fit?('height:'+_fit.h+';'):'')+'border-radius:18px;overflow:hidden;background:linear-gradient(120deg,' + pc + ' 0%,' + ac + ' 100%);color:#fff;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 12px 28px rgba(0,0,0,.25)">' +
+        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'400px')+';'+(_fit?('height:'+_fit.h+';box-sizing:border-box;'):'')+'border-radius:18px;overflow:hidden;background:linear-gradient(120deg,' + pc + ' 0%,' + ac + ' 100%);color:#fff;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 12px 28px rgba(0,0,0,.25)">' +
           '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px"><img src="' + logo + '" style="width:40px;height:40px;border-radius:10px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="flex:1"><strong>' + Super.esc(s.name||'School') + '</strong><div style="font-size:.62rem;opacity:.9;letter-spacing:1.5px">' + tag + '</div></div></div>' +
           '<div style="background:rgba(255,255,255,.94);color:#0f172a;margin:0 12px;border-radius:14px;padding:12px;display:flex;gap:12px;align-items:center">' + miniPhoto(80,96,10) +
           '<div style="flex:1"><div style="font-weight:800;font-size:1.05rem">' + Super.esc(person.full_name||'') + '</div><table style="font-size:.72rem;border-collapse:collapse">' + detailRows + '</table></div>' + qrImg(58) + '</div>' +
@@ -838,7 +838,10 @@ const Super = {
       }
       // 4) BADGE — conference-style portrait badge with big name
       if (tpl === 'badge') {
-        return '<div class="sc-idcard" style="width:280px;border-radius:16px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.16);text-align:center">' +
+        /* V12.74 FIX (ID-03): badge used to hardcode width:280px, so it
+           ignored the finished card size entirely and a badge-style front
+           could never match its back. It now fills the box it is given. */
+        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'280px')+';'+(_fit?('height:'+_fit.h+';box-sizing:border-box;'):'')+'border-radius:16px;overflow:hidden;background:#fff;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 10px 26px rgba(0,0,0,.16);text-align:center">' +
           '<div style="background:' + pc + ';color:#fff;padding:10px"><img src="' + logo + '" style="width:36px;height:36px;border-radius:8px;background:#fff;padding:2px;object-fit:contain" onerror="this.style.display=\'none\'"><div style="font-weight:800;font-size:.8rem;margin-top:3px">' + Super.esc((s.name||'SCHOOL').toUpperCase()) + '</div></div>' +
           '<div style="margin:-1px auto 0;background:' + ac + ';color:#fff;font-size:.58rem;letter-spacing:2px;padding:3px 0;font-weight:700">' + tag + '</div>' +
           '<div style="padding:14px 12px 6px;display:flex;flex-direction:column;align-items:center">' + miniPhoto(110,110,999) +
@@ -850,7 +853,7 @@ const Super = {
       }
       // 5) SMART — fintech-style card with chip + wave pattern
       if (tpl === 'smart') {
-        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'400px')+';'+(_fit?('height:'+_fit.h+';'):'')+'border-radius:20px;overflow:hidden;position:relative;background:#111827;color:#e5e7eb;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 14px 34px rgba(0,0,0,.35)">' +
+        return '<div class="sc-idcard" style="width:'+(_fit?_fit.w:'400px')+';'+(_fit?('height:'+_fit.h+';box-sizing:border-box;'):'')+'border-radius:20px;overflow:hidden;position:relative;background:#111827;color:#e5e7eb;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 14px 34px rgba(0,0,0,.35)">' +
           '<div style="position:absolute;inset:0;background:radial-gradient(circle at 85% 15%,' + ac + '33,transparent 45%),radial-gradient(circle at 10% 90%,' + pc + '44,transparent 50%)"></div>' +
           '<div style="position:relative;padding:16px 18px">' +
           '<div style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;gap:8px;align-items:center"><img src="' + logo + '" style="width:34px;height:34px;border-radius:8px;background:#fff;padding:2px;object-fit:contain" onerror="this.style.display=\'none\'"><strong style="font-size:.85rem">' + Super.esc(s.name||'School') + '</strong></div><span style="font-size:.55rem;letter-spacing:2px;color:' + ac + ';font-weight:800">' + tag + '</span></div>' +
@@ -874,7 +877,9 @@ const Super = {
 
       // VERTICAL (portrait, lanyard-style) professional template (issue 3)
       if (tpl === 'vertical') {
-        return '<div class="sc-idcard" style="position:relative;width:300px;border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.18);background:#fff">' +
+        /* V12.74 FIX (ID-03): vertical used to hardcode width:300px, so it
+           ignored the finished card size and could never match its back. */
+        return '<div class="sc-idcard" style="position:relative;width:'+(_fit?_fit.w:'300px')+';'+(_fit?('height:'+_fit.h+';box-sizing:border-box;'):'')+'border-radius:18px;overflow:hidden;border:1px solid #e2e8f0;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.18);background:#fff">' +
           '<div style="height:14px;background:linear-gradient(90deg,' + pc + ',' + ac + ')"></div>' +
           '<div style="text-align:center;padding:14px 14px 0"><img src="' + logo + '" style="width:46px;height:46px;border-radius:10px;object-fit:contain" onerror="this.style.display=\'none\'">' +
           '<div style="font-weight:800;color:#0f172a;margin-top:4px;line-height:1.15">' + Super.esc(s.name || 'School') + '</div>' +
@@ -1202,22 +1207,61 @@ const Super = {
       }
       return inner;
     },
-    /* Front + back pair, laid side-by-side for printing & cutting (or duplex). */
-    pairHtml(person) {
+    /* Front + back pair, laid side-by-side for printing & cutting (or duplex).
+       V12.74 FIX (ID-01): this used to declare (person) only, so every caller
+       that passed the finished card size — e.g. ICUI.render() calling
+       pairHtml(p, faceOpts()) — had its opts silently discarded by
+       JavaScript. The front then fell back to its historic auto width and
+       the back to its own 340x214 default, so one card printed in two
+       different shapes. opts is now carried into BOTH faces, which is the
+       only way they can be guaranteed identical. */
+    pairHtml(person, opts) {
+      opts = opts || {};
+      /* V12.74 FIX (ID-04): if no size is supplied at all, still produce one
+         box for both faces. Previously a caller that forgot opts got an
+         auto-height front (which grows to fit its content, e.g. 342x327) next
+         to a fixed-ratio back (340x214) — the exact portrait/landscape
+         mismatch this feature is meant to prevent. Default to ID-1 portrait-
+         agnostic: match whatever the front template implies. */
+      if (!this.faceBox(opts)) {
+        const portrait = this.backAspect(opts) === 'portrait';
+        opts = Object.assign({}, opts, {
+          widthMm: portrait ? 53.98 : 85.6,
+          heightMm: portrait ? 85.6 : 53.98
+        });
+      }
+      const box = this.faceBox(opts);
+      /* If the caller supplied a size, force BOTH faces onto that exact box.
+         This is a belt-and-braces guarantee: it does not depend on every
+         template reading opts correctly, so a future template cannot
+         reintroduce a front/back mismatch. box-sizing:border-box also stops
+         padding on one face from making it a couple of pixels wider. */
+      const stamp = (html) => {
+        if (!box) return html;
+        const forced = 'width:' + box.w + ';height:' + box.h + ';min-width:' + box.w +
+          ';min-height:' + box.h + ';max-width:' + box.w + ';max-height:' + box.h +
+          ';box-sizing:border-box!important;overflow:hidden;';
+        return String(html).replace(/class="sc-idcard[^"]*"/, (m) => m + ' style="' + forced + '"');
+      };
       return '<div style="display:flex;gap:14px;align-items:stretch;flex-wrap:wrap;justify-content:center">' +
-        '<div>' + this.html(person) + '</div>' +
-        '<div style="display:flex;align-items:stretch">' + this.backHtml(person) + '</div></div>';
+        '<div>' + stamp(this.html(person, opts)) + '</div>' +
+        '<div style="display:flex;align-items:stretch">' + stamp(this.backHtml(person, opts)) + '</div></div>';
     },
     print(person) {
       // Route direct callers through the fixed-mm one-student pipeline whenever
       // the ID Cards UI exists; retain a standard ID-1 fallback for other pages.
       person=person||{};if(!person.full_name&&!person.name)person.full_name='Sample Student';if(!person.admission_no&&!person.staff_no&&!person.id)person.admission_no='SAMPLE-ID';
       if(window.ICUI&&typeof window.ICUI.printCards==='function')return window.ICUI.printCards([person],'ID Card');
-      const front=this.html(person),back=this.backHtml(person),w=window.open('','_blank');
+      /* V12.74 FIX (ID-01): the print pair must use the SAME finished size as
+         the on-screen pair, otherwise the printed card disagrees with the
+         preview. Prefer the explicit mm the page knows about. */
+      const _po=(window.ICUI&&typeof window.ICUI.faceOpts==='function')?window.ICUI.faceOpts():{};
+      const _pbox=this.faceBox(_po)||{w:'324px',h:'204px'};
+      const front=this.html(person,_po),back=this.backHtml(person,_po),w=window.open('','_blank');
       if(!w){if(typeof toast==='function')toast('Popup blocked. Allow pop-ups to print ID cards.','warning');return;}
       const base=document.baseURI?document.baseURI.replace(/[^/]*$/,''):'';const closeScript='</'+'script>';
       const js='window.addEventListener("load",function(){var imgs=[...document.images],wait=Promise.all(imgs.map(function(i){return i.complete?Promise.resolve():new Promise(function(r){i.onload=r;i.onerror=r})}));wait.then(function(){document.querySelectorAll(".face").forEach(function(f){var c=f.querySelector(".sc-idcard"),b=f.querySelector(".inner");if(!c||!b)return;c.style.maxWidth="none";var r=c.getBoundingClientRect(),scale=Math.min(f.clientWidth/r.width,f.clientHeight/r.height);b.style.width=r.width+"px";b.style.height=r.height+"px";b.style.transform="scale("+scale+")";b.style.left=((f.clientWidth-r.width*scale)/2)+"px";b.style.top=((f.clientHeight-r.height*scale)/2)+"px"});setTimeout(function(){window.print()},300)});setTimeout(function(){window.print()},4500)});';
-      w.document.open();w.document.write('<!doctype html><html><head><title>ID Card</title><base href="'+base+'"><style>@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{margin:0}.sheet{width:190mm;height:277mm;display:flex;align-items:center;justify-content:center;break-after:page}.pair{display:flex;gap:4mm}.face{width:85.6mm;height:53.98mm;position:relative;overflow:hidden;border-radius:3.18mm;background:#fff}.inner{position:absolute;transform-origin:top left}.inner>.sc-idcard{max-width:none!important;margin:0!important;box-shadow:none!important}</style></head><body><section class="sheet"><div class="pair"><div class="face"><div class="inner">'+front+'</div></div><div class="face"><div class="inner">'+back+'</div></div></div></section><script>'+js+closeScript+'</body></html>');w.document.close();
+      w.document.open();w.document.write('<!doctype html><html><head><title>ID Card</title><base href="'+base+'"><style>@page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{margin:0}.sheet{width:190mm;height:277mm;display:flex;align-items:center;justify-content:center;break-after:page}.pair{display:flex;gap:4mm}.face{width:'+_po.widthMm+'mm;height:'+_po.heightMm+'mm;position:relative;overflow:hidden;border-radius:3.18mm;background:#fff}.inner{position:absolute;transform-origin:top left}.inner>.sc-idcard{max-width:none!important;margin:0!important;box-shadow:none!important}</style></head><body><section class="sheet"><div class="pair"><div class="face"><div class="inner">'+front+'</div></div><div class="face"><div class="inner">'+back+'</div></div></div></section><script>'+js+closeScript+'</body></html>');w.document.close();
     }
   },
 
