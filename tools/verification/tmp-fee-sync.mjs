@@ -52,5 +52,51 @@ ok(Number(seen3[0].amount_paid) === 30000, 'an EDITED payment reaches the studen
 const total = (await one(`select coalesce(sum(amount_paid),0) t from fee_payments where student_id='${stu}'`)).t;
 ok(Number(total) === 30000, 'the student\'s running total agrees with the ledger', total);
 
+/* ======================================================================
+   V12.74 item 7 (second half): a teacher EDITS a pre-existing school-fee
+   record. sc_fee_bill_v2_structure treats a raised invoice as the bill and
+   never re-reads class_fee_structure, so the learner kept quoting the old
+   total for ever. The new trigger re-derives structure-sourced invoices and
+   must leave a bursar's personal override alone.
+   ====================================================================== */
+await db.exec(`insert into class_fee_structure(class,term,session,tuition,total,active)
+  values('JSS 1A','First Term','2026/2027',50000,50000,true)`);
+await db.exec(`insert into sc_fee_invoice(student_id,class,term,session,amount,aid,net_amount,source)
+  values('${stu}','JSS 1A','First Term','2026/2027',50000,0,50000,'structure')`);
+const inv0 = await one(`select amount, net_amount from sc_fee_invoice where student_id='${stu}'`);
+ok(Number(inv0.amount) === 50000, 'the invoice starts at the published fee', inv0);
+
+/* the student's own card, before the correction */
+const bill0 = await one(`select public.sc_student_fee_state('${stu}') s`);
+ok(Number(bill0.s.bill) === 50000, 'the student is billed 50,000', bill0.s.bill);
+
+/* the teacher corrects the price list */
+await db.exec(`update class_fee_structure set tuition=60000, total=60000, updated_at=now()
+  where class='JSS 1A' and term='First Term'`);
+const inv1 = await one(`select amount, net_amount, note from sc_fee_invoice where student_id='${stu}'`);
+ok(Number(inv1.amount) === 60000, 'EDITING THE FEE STRUCTURE UPDATES THE INVOICE', inv1);
+ok(Number(inv1.net_amount) === 60000, 'the net amount follows too', inv1);
+
+const bill1 = await one(`select public.sc_student_fee_state('${stu}') s`);
+ok(Number(bill1.s.bill) === 60000, 'THE STUDENT NOW SEES THE CORRECTED TOTAL', bill1.s.bill);
+
+/* a bursar's personal figure must survive the same edit */
+const stu2 = (await one(`insert into students(full_name,admission_no,class) values('Bola Ade','ADM002','JSS 1A') returning id`)).id;
+await db.exec(`insert into sc_fee_invoice(student_id,class,term,session,amount,aid,net_amount,source)
+  values('${stu2}','JSS 1A','First Term','2026/2027',15000,0,15000,'override')`);
+await db.exec(`update class_fee_structure set tuition=70000, total=70000, updated_at=now()
+  where class='JSS 1A' and term='First Term'`);
+const keep = await one(`select amount, source from sc_fee_invoice where student_id='${stu2}'`);
+ok(Number(keep.amount) === 15000 && keep.source === 'override',
+   'a bursar override is NOT overwritten by a price-list edit', keep);
+
+/* and a deleted payment still reaches the learner's balance */
+const before = await one(`select public.sc_student_fee_state('${stu}') s`);
+ok(Number(before.s.paid) === 30000, 'the learner is credited with the edited payment', before.s.paid);
+await db.exec(`delete from fee_payments where student_id='${stu}'`);
+const after = await one(`select public.sc_student_fee_state('${stu}') s`);
+ok(Number(after.s.paid) === 0, 'DELETING A MISTAKEN PAYMENT CLEARS IT ON THE STUDENT SIDE', after.s);
+ok(Number(after.s.balance) === 70000, 'and the outstanding balance returns to the full bill', after.s.balance);
+
 console.log(`fee sync: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -48,7 +48,11 @@ def normalise(text):
     for a, b in BRANDS:
         text = text.replace(a, b)
     text = re.sub(r'\b(?:GOSA|GoSA|GSA|SCD)\b', 'SC', text)
-    text = re.sub(r'logo\.(?:png|jpe?g|webp|svg)', 'logo.E', text)
+    text = re.sub(r'logo(-512)?\.(?:png|jpe?g|webp|svg)', r'logo\1.E', text)
+    # V12.73 (item 17) — the install banner names the SCHOOL's portal, because the
+    # icon lands on a parent's home screen. "Install School Connect" (vendor) and
+    # "Install GoSA" (school) are the same instruction, deliberately different.
+    text = re.sub(r'Install (?:School Connect|[A-Za-z][A-Za-z .\'-]{0,30}?)(?=<)', 'Install BRAND', text)
     return text
 
 
