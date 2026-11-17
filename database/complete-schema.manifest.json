@@ -1,14 +1,14 @@
 {
  "_meta": {
-  "built_bytes": 996896,
-  "built_from_bytes": 1412505,
+  "built_bytes": 997822,
+  "built_from_bytes": 1418207,
   "removed": {
    "banner-rule": 434,
-   "banner-trimmed": 79,
+   "banner-trimmed": 85,
    "blank-squeezed": 1,
    "deindented": 7226,
-   "duplicate-grant": 12,
-   "inline-prose-shortened": 127,
+   "duplicate-grant": 10,
+   "inline-prose-shortened": 140,
    "notify-moved-last": 1,
    "progress-select": 159,
    "redundant-add-column": 148,
@@ -476,6 +476,9 @@
   ],
   "cbt_diagnose_exam": [
    "p_exam_id uuid"
+  ],
+  "cbt_flush_all_pending_server": [
+   "p_discard_orphans boolean default false"
   ],
   "cbt_flush_pending_server": [
    "p_exam_id uuid"
@@ -1051,7 +1054,7 @@
    "p_poll uuid"
   ],
   "sc_prep_generate": [
-   "p_class text, p_term text, p_session text"
+   "p_class text, p_term text, p_session text, p_dry_run boolean default false"
   ],
   "sc_prep_list": [
    "p_class text default null, p_term text default null, p_session text default null"
@@ -1060,7 +1063,7 @@
    "p_class text, p_term text, p_session text, p_on boolean default true"
   ],
   "sc_prep_publish_all": [
-   "p_on boolean default true"
+   "p_on boolean default true, p_term text default null, p_session text default null, p_publish boolean default null, p_generate boolean default false"
   ],
   "sc_prep_push_exam": [
    "p_exam_id uuid, p_verified_only boolean default true"
@@ -1232,6 +1235,9 @@
   ],
   "sc_timetable_capacity": [
    "p_classes text[], p_periods_per_day integer default 6, p_day_periods jsonb default null"
+  ],
+  "sc_trg_fee_structure_sync": [
+   ""
   ],
   "storage_health": [
    ""
@@ -1818,6 +1824,7 @@
   "trigger trg_fee_rows_autoheal_del",
   "trigger trg_fee_rows_autoheal_ins",
   "trigger trg_fee_rows_autoheal_upd",
+  "trigger trg_fee_structure_sync",
   "trigger trg_loan_status_sync",
   "trigger trg_lr_stamp",
   "trigger trg_midterm_report_flush",
