@@ -642,7 +642,7 @@ body{background:#f8fafc;margin:0;font-family:'Plus Jakarta Sans',system-ui,-appl
 <div id="modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:9998;padding:5vh 16px;overflow:auto"><div style="background:#fff;max-width:960px;margin:auto;border-radius:16px;padding:20px"><div style="display:flex;justify-content:space-between"><h2 id="modal-title"></h2><button class="btn btn-outline" onclick="closeModal()">✕</button></div><div id="modal-body"></div><div id="modal-footer" style="margin-top:14px"></div></div></div>
 <script>function toast(m,t){var c=document.getElementById('toast-container'),e=document.createElement('div');e.style.cssText='background:'+(t==='danger'?'#b91c1c':t==='warning'?'#b45309':'#166534')+';color:#fff;padding:10px 14px;border-radius:10px;margin-top:8px;box-shadow:0 6px 18px #0003';e.textContent=m;c.appendChild(e);setTimeout(function(){e.remove()},5000)}function openModal(t,b,f){document.getElementById('modal-title').textContent=t;document.getElementById('modal-body').innerHTML=b;document.getElementById('modal-footer').innerHTML=f||'';document.getElementById('modal-backdrop').style.display='block'}function closeModal(){document.getElementById('modal-backdrop').style.display='none'}</script>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/theme-manager.js"></script>
 <script src="assets/js/legibility.js"></script>

@@ -84,6 +84,7 @@
           <button class="btn btn-outline" onclick="MR.publishAllClasses(false)" title="Unpublish midterm reports for every class at once">🚫 Unpublish all classes</button>
           <button class="btn btn-outline" onclick="MR.exportCSV()">⬇ Export CSV</button>
         </div>
+        <div id="mr-mark-guard" style="margin-top:12px"></div>
         <div id="mr-status" style="margin-top:12px;font-size:.9rem;color:#475569"></div>
       </div>
 
@@ -136,7 +137,7 @@
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">© 2026 HMG Concepts · <a href="developer.html">About</a></footer>
   </main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/theme-manager.js"></script>
@@ -194,6 +195,42 @@ const MR = {
     const b=row.student_id?'id:'+row.student_id:'';
     return !!((a&&this._holds[a])||(b&&this._holds[b]));
   },
+  /* V12.75 (round-19 item 6) — A MIDTERM SHEET MUST NEVER PRINT AN IMPOSSIBLE
+     MARK.
+     A CBT whose score exceeded its own total produced a percentage above 100,
+     and the CBT -> report-column push multiplied it by the column maximum, so
+     a 20-mark midterm column received 21. The sheet then printed "21" beside a
+     maximum of 20. The database now refuses such a mark at write time and the
+     push clamps the percentage, but rows written earlier still exist. This
+     banner names them on the very page that would print them — before the
+     school hands the sheet out — and links to the page that fixes them. */
+  _markGuardKey:'',
+  async checkMarks(){
+    const host=document.getElementById('mr-mark-guard'); if(!host) return;
+    const val=id=>{const el=document.getElementById(id);return el?String(el.value||'').trim():'';};
+    const c={class:val('mr-class'),term:val('mr-term'),session:val('mr-session')};
+    const key=[c.class,c.term,c.session].join('|');
+    if(key===this._markGuardKey) return;
+    this._markGuardKey=key;
+    if(!c.class||!c.term||!c.session){ host.innerHTML=''; return; }
+    if(!sb||!(window.SC_PROFILE&&/admin|staff|teacher|principal|head/i.test(String(SC_PROFILE.role||'')))){ host.innerHTML=''; return; }
+    try{
+      const r=await sb.rpc('sc_report_mark_audit',{p_class:c.class,p_term:c.term,p_session:c.session});
+      if(r.error){ host.innerHTML=''; return; }         /* older database: stay quiet, the sheet still works */
+      const d=r.data||{}, n=Number((d.counts||{}).defects||0);
+      if(!n){ host.innerHTML=''; return; }
+      const rows=(d.above_maximum||[]).slice(0,8).map(x=>'<tr><td>'+this.esc(x.student_name||'')+'</td><td>'+this.esc(x.subject||'')+'</td>'
+        +'<td>'+this.esc(x.column_name||'')+'</td><td><b style="color:#b91c1c">'+this.esc(x.score)+'</b></td><td>'+this.esc(x.max_mark)+'</td></tr>').join('');
+      host.innerHTML='<div class="notice" style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;font-size:.86rem">'
+        +'<b>⚠️ '+n+' mark'+(n===1?'':'s')+' in '+this.esc(c.class)+' · '+this.esc(c.term)+' · '+this.esc(c.session)+' '+(n===1?'is':'are')+' above the maximum its assessment allows.</b> '
+        +'A midterm sheet generated now would print those marks as they are (e.g. 21 out of 20), which inflates the total and the position. '
+        +'Nothing has been changed — correct the marks in <a href="report-cards.html">Report Cards → Results</a>, then generate the midterm sheet again.'
+        +(rows?'<div class="table-wrap" style="margin-top:8px"><table style="width:100%;font-size:.82rem;border-collapse:collapse">'
+          +'<thead><tr><th align="left">Learner</th><th align="left">Subject</th><th align="left">Assessment</th><th align="left">Mark</th><th align="left">Max</th></tr></thead>'
+          +'<tbody>'+rows+'</tbody></table></div>':'')
+        +'</div>';
+    }catch(_){ /* never break the page because a check could not run */ }
+  },
   async loadPolicy(term,session){
     try{
       const r=await sb.rpc('sc_report_policy',{p_kind:'midterm',p_term:term||null,p_session:session||null});
@@ -211,6 +248,9 @@ const MR = {
     const school=window.SCHOOL||{};const brand=document.getElementById('mr-school-name');if(brand)brand.textContent=school.shortName||school.name||'School Connect';
     const logo=document.querySelector('#app-sidebar .app-brand img');if(logo&&school.logoExt)logo.src='assets/img/logo.'+String(school.logoExt).replace(/[^a-z0-9]/gi,'');
     document.querySelectorAll('#app-sidebar .app-nav a').forEach(a=>a.addEventListener('click',()=>MR.closeSidebar()));
+    /* V12.75 — re-check the moment the teacher changes class/term/session */
+    ['mr-class','mr-term','mr-session'].forEach(id=>{const el=document.getElementById(id);
+      if(el&&!el.dataset.guardHooked){el.dataset.guardHooked='1';el.addEventListener('change',()=>{MR._markGuardKey='';MR.checkMarks();});}});
     if(!window.sb) { document.getElementById('mr-status').innerHTML='<span style="color:#dc2626">Supabase not configured.</span>'; return; }
     // Load lookups for class/term/session
     try{
@@ -229,6 +269,7 @@ const MR = {
       const status=document.getElementById('mr-status');
       if(lookupErrors.length && status) status.innerHTML='<span style="color:#b91c1c"><b>Could not load report selectors.</b> '+MR.esc(lookupErrors.map(x=>x[0]+': '+x[1].message).join(' · '))+' Please sign in again or contact the school administrator.</span>';
       else if(status) status.innerHTML='<span style="color:#475569">Report tools ready. Choose a class, term and session; reports appear after a staff member generates them.</span>';
+      setTimeout(()=>MR.checkMarks(),400);
       // Also try academic_periods for session/term
       try{
         const ap=await sb.from('academic_periods').select('session,term').eq('is_current',true).limit(1).maybeSingle();

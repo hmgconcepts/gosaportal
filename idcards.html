@@ -500,7 +500,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
             </select>
           </div>
           <div class="form-group"><label>Professional template</label>
-            <select class="form-select" id="ic-template" onchange="ICUI.render()">
+            <select class="form-select" id="ic-template" onchange="ICUI.pickTemplate()">
               <option value="horizontal">Horizontal (classic)</option>
               <option value="premium">Premium (like sample — navy/QR)</option><option value="executive">Executive (green & gold)</option><option value="minimal">Minimal (Swiss clean)</option><option value="gradient">Gradient (vibrant modern)</option><option value="badge">Badge (portrait conference)</option><option value="smart">Smart Card (fintech chip)</option><option value="heritage">Heritage (classic crest)</option><option value="vertical">Vertical (lanyard / portrait)</option>
               <option value="corporate">Corporate (dark premium)</option>
@@ -547,6 +547,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           <button class="btn btn-outline" onclick="ICUI.downloadHtml()" title="HTML proof sheet — for archiving or emailing, never for print production">⬇ HTML proof</button>
         </div>
       </div>
+      <div id="ic-fit-note" class="notice" style="display:none;margin:10px 0 0;font-size:.82rem"></div>
       <div id="ic-preview" style="display:flex;justify-content:center"></div>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
@@ -554,8 +555,8 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
     </footer>
   </main>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/vendor/supabase-js-2.58.0.js"></script>
+<script src="assets/vendor/chart.umd.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -589,7 +590,17 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   sample(){ return this.kind==='staff'
     ? {full_name:'Sample Staff',staff_no:'STAFF-001',role:'Teacher',department:'Academics',staff_type:'Teaching',gender:'',phone:'',type:'staff'}
     : {full_name:'Sample Student',class:'JSS 1',arm:'A',admission_no:'STD-001',gender:'',phone:'',type:'student'}; },
-  switchType(t){ this.kind=t; this.all=[]; this.cur={}; const sel=document.getElementById('ic-student'); if(sel)sel.innerHTML='<option value="">— choose —</option>';
+  switchType(t){
+    /* V12.75 (round-19 item 2): switching Student <-> Staff used to keep every
+       typed identity field, and person() reads the FIELDS before the record.
+       A staff card therefore printed the student ID that was still in the box
+       ("STF/2026/0013" on a staff card). The identity fields are part of the
+       card type, so switching type clears them all. */
+    ['ic-name','ic-id','ic-gender','ic-phone','ic-dept','ic-photo','ic-blood'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    this.lastFit=null;
+    this.kind=t; this.all=[]; this.cur={}; const sel=document.getElementById('ic-student'); if(sel)sel.innerHTML='<option value="">— choose —</option>';
     document.getElementById('ic-pick-label').textContent=t; document.getElementById('ic-class-label').textContent=(t==='staff'?'Type':'Class');
     document.getElementById('ic-dept-wrap').style.display=(t==='staff'?'block':'none');
     document.getElementById('ic-all-label').textContent=(t==='staff'?'staff':'students');
@@ -728,6 +739,12 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     (document.getElementById('ic-phone')||{}).value=s.phone||'';
     if(document.getElementById('ic-dept')) document.getElementById('ic-dept').value=(s.department||s.role||'');
     (document.getElementById('ic-photo')||{}).value=s.photo_url||''; this.render(); },
+  /* V12.75 (round-19 item 1): a landscape design on a portrait card can only
+     be shrunk to fit, and a card that is 44% full looks broken even when it is
+     not. When the user flips to Portrait we move to a design that is DRAWN for
+     a portrait card - once, visibly, with the dropdown showing what happened -
+     and never again after they have picked a template themselves. */
+  pickTemplate(){ this._tplPinned=true; this.render(); },
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
   /* the finished card size, read from the same fields the PDF uses */
   faceOpts(){
@@ -762,14 +779,57 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     return '<div class="sc-idcard" style="width:'+_w+'px;'+(_h?('height:'+_h+'px;overflow:hidden;'):'')+'border:1px solid #e2e8f0;border-radius:16px;padding:18px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.12);font-family:system-ui"><h3 style="margin:0;color:#0506ae">'+(window.SCHOOL&&SCHOOL.name||'School')+'</h3><p style="font-size:.75rem;color:#64748b">'+(p.type==='staff'?'STAFF IDENTITY CARD':'STUDENT IDENTITY CARD')+'</p><div style="display:flex;gap:12px;align-items:center"><div style="width:76px;height:76px;border-radius:12px;background:#0506ae;color:#fff;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900">'+(p.full_name||'S').charAt(0).toUpperCase()+'</div><div><b>'+esc(p.full_name||'')+'</b><br><span>'+esc(p.admission_no||p.staff_no||'')+'</span><br><span>'+esc(p.class||p.role||'')+'</span></div></div><p style="font-size:.65rem;color:#94a3b8;margin-bottom:0">If found, please return to the school office.</p></div>'; },
   cardHtml(p,opts){ try{ if(window.Super&&Super.idcard&&Super.idcard.html) return Super.idcard.html(p,opts); }catch(e){ console.error('ID-card render failed:',e); } return this.fallbackHtml(p,opts); },
   render(){ const box=document.getElementById('ic-preview'); if(!box)return; const p=this.person();
-    let html=''; try{ if(window.Super&&Super.idcard&&Super.idcard.pairHtml) html=Super.idcard.pairHtml(p,this.faceOpts()); }catch(e){ console.error('pair render failed:',e); }
-    box.innerHTML=html||this.cardHtml(p)||this.fallbackHtml(p); },
+    let html=''; let err=null;
+    try{
+      if(window.Super&&Super.idcard&&Super.idcard.pairHtml){
+        if(window.Super.idcard.lastFit) window.Super.idcard.lastFit=null;
+        html=Super.idcard.pairHtml(p,this.faceOpts());
+      }
+    }catch(e){ err=e; console.error('pair render failed:',e); }
+    const out=html||this.cardHtml(p)||this.fallbackHtml(p);
+    box.innerHTML=out;
+    /* V12.75 — never render an empty-looking card in silence. */
+    const noteEl=document.getElementById('ic-fit-note');
+    if(noteEl){
+      const msg=this.fitMessage(err);
+      noteEl.style.display=msg?'':'none'; noteEl.innerHTML=msg||'';
+    }
+    return out; },
+  /* A design drawn for one card shape cannot fill the other one edge to edge
+     without distorting it. The card is still ONE size, uncropped and
+     undistorted (front and back always match); this explains the margin and
+     gives the one-click cure. */
+  fitMessage(err){
+    if(err) return '⚠ The card preview could not be drawn ('+(err.message||err)+'). The PDF and print buttons still work — reload the page if this persists.';
+    const fit=(window.Super&&Super.idcard&&Super.idcard.lastFit)||null;
+    const orient=((document.getElementById('ic-card-orientation')||{}).value||'landscape');
+    const tpl=((document.getElementById('ic-template')||{}).value||'horizontal');
+    const portraitDesigns=['vertical','badge'];
+    const isPortraitDesign=portraitDesigns.indexOf(tpl)!==-1;
+    if(!fit) return '';
+    const fill=Math.min(fit.fillW||1,fit.fillH||1);
+    if(fill>=0.9) return '';
+    if(orient==='portrait'&&!isPortraitDesign){
+      return 'ℹ <b>'+esc(tpl)+'</b> is a landscape design, so on a portrait card it is scaled to fit and '
+        +Math.round((1-fill)*100)+'% of the card is empty. Nothing is cropped and the back matches exactly. '
+        +'For a full-bleed portrait card choose the <b>Vertical</b> or <b>Badge</b> design — '
+        +'<a href="#" onclick="document.getElementById(\'ic-template\').value=\'vertical\';ICUI.render();return false">use Vertical</a>.';
+    }
+    return 'ℹ This design does not fill a '+esc(orient)+' card: it is scaled to fit (nothing is cropped, '
+      +'and the back is exactly the same size), leaving a '+Math.round((1-fill)*100)+'% margin. '
+      +'Pick a design that matches the card shape, or switch the card orientation.';
+  },
   applyCardSize(){
     const preset=document.getElementById('ic-size-preset'),orient=document.getElementById('ic-card-orientation'),wrapW=document.getElementById('ic-custom-size-wrap'),wrapH=document.getElementById('ic-custom-height-wrap'),paper=document.getElementById('ic-paper-size'),paperW=document.getElementById('ic-custom-paper-width-wrap'),paperH=document.getElementById('ic-custom-paper-height-wrap');
     if(!preset)return;const custom=preset.value==='custom';if(wrapW)wrapW.style.display=custom?'':'none';if(wrapH)wrapH.style.display=custom?'':'none';if(paperW)paperW.style.display=paper&&paper.value==='custom'?'':'none';if(paperH)paperH.style.display=paper&&paper.value==='custom'?'':'none';
     const dims={id1:[85.60,53.98],id2:[105,74],id3:[125,88]};const o=orient?orient.value:'landscape';
     if(custom){if(this._lastCardOrientation&&this._lastCardOrientation!==o){const w=document.getElementById('ic-card-width-mm'),h=document.getElementById('ic-card-height-mm');if(w&&h){const v=w.value;w.value=h.value;h.value=v;}}}
     else{const base=dims[preset.value]||dims.id1,w=document.getElementById('ic-card-width-mm'),h=document.getElementById('ic-card-height-mm');if(w&&h){w.value=(o==='portrait'?base[1]:base[0]);h.value=(o==='portrait'?base[0]:base[1]);}}
+    if(o==='portrait'&&!this._tplPinned){
+      const tpl=document.getElementById('ic-template');
+      const portraitNative=['vertical','badge'];
+      if(tpl&&portraitNative.indexOf(tpl.value)===-1){ tpl.value='vertical'; this.render(); }
+    }
     this._lastCardOrientation=o;this.updateCardSizeLabel();
   },
   updateCardSizeLabel(){
@@ -1053,7 +1113,8 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const _face={widthMm:_cfg.width,heightMm:_cfg.height,
                  widthPx:Math.round((_cfg.width||85.6)*96/25.4),heightPx:Math.round((_cfg.height||53.98)*96/25.4)};
     const html=people.map(p=>'<div style="page-break-inside:avoid;margin:0 0 8mm">'+
-      (this.tplOpts&&this.tplOpts().template?'':'')+this.cardHtml(p)+this.fallbackBackHtml(p,_face)+'</div>').join('');
+      (window.Super&&Super.idcard&&Super.idcard.pairHtml?Super.idcard.pairHtml(p,_face)
+        :(this.cardHtml(p,_face)+this.fallbackBackHtml(p,_face)))+'</div>').join('');
     this.printHtml('<h1 style="font-family:system-ui;font-size:12pt">ID cards — proof sheet</h1>'+
       '<p style="font-family:system-ui;font-size:9pt;color:#475569">Visual proof only. Use “Download PDF” for print production.</p>'+html,
       'ID Cards — proof sheet');
@@ -1121,7 +1182,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     const faceOpts={widthMm:cfg.width,heightMm:cfg.height,template:(this.tplOpts()||{}).template,
                     widthPx:Math.round(cfg.width*96/25.4),heightPx:Math.round(cfg.height*96/25.4)};
     const makeSide=(person,side)=>{
-      let html='';try{html=side==='front'?(window.Super&&Super.idcard&&Super.idcard.html?Super.idcard.html(person,faceOpts):this.cardHtml(person,faceOpts)):(window.Super&&Super.idcard&&Super.idcard.backHtml?Super.idcard.backHtml(person,faceOpts):this.fallbackBackHtml(person,faceOpts));}catch(e){console.error('ID-card '+side+' render failed',e);html=side==='front'?this.fallbackHtml(person,faceOpts):this.fallbackBackHtml(person,faceOpts);}
+      let html='';try{html=side==='front'?(window.Super&&Super.idcard&&Super.idcard.frontFace?Super.idcard.frontFace(person,faceOpts):this.cardHtml(person,faceOpts)):(window.Super&&Super.idcard&&Super.idcard.backHtml?Super.idcard.backHtml(person,faceOpts):this.fallbackBackHtml(person,faceOpts));}catch(e){console.error('ID-card '+side+' render failed',e);html=side==='front'?this.fallbackHtml(person,faceOpts):this.fallbackBackHtml(person,faceOpts);}
       return '<div class="idcard-face '+(cfg.trim?'with-trim':'')+'" data-side="'+side+'" style="width:'+cfg.width+'mm;height:'+cfg.height+'mm"><div class="idcard-scale">'+html+'</div></div>';
     };
     const sheets=people.map(person=>{

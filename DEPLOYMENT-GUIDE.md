@@ -7,12 +7,19 @@ This guide has **two parts**:
 
 Everything uses **free tools only**. No credit card, no monthly fees, no AI APIs.
 
-> **V12.65 SIZE NOTE:** the complete schema is deliberately kept under 1 MB so the
+> **V12.75 SIZE NOTE:** the complete schema is deliberately kept under 1 MB so the
 > Supabase SQL Editor accepts it ("Query is too large to be run via the SQL Editor"
 > appears above 1 MB). It is built by `tools/build-complete-schema.py`, never edited
-> by hand, and `tools/verify-complete-schema.mjs` proves it produces exactly the same
-> 127 tables / 1,541 columns / 195 functions / 292 policies as the raw cumulative
-> file. If a future edit pushes it over the limit, re-run the builder.
+> by hand, and `tools/verify-complete-schema.mjs` proves it is object-identical to the
+> raw cumulative file. As of V12.75 it installs **134 tables** and is **998,862 bytes**
+> — 1,138 bytes below the cap. If a future edit pushes it over the limit the builder
+> refuses to write; re-run the builder and read its `rebuilt …headroom` line.
+>
+> **Where to read next**
+> - `DEPLOYMENT.md` — the step-by-step school deployment (schema → keys → host →
+>   first admin → configuration → verification → updates → backups → troubleshooting).
+> - `FEATURES.md` — every feature in the platform, module by module, with the
+>   guarantee each one makes.
 >
 > **V5.6.1 ONE-SQL RULE:** back up Supabase and run the entire
 > `database/complete-schema.sql` for a fresh install or any upgrade. It includes
