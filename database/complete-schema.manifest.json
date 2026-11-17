@@ -1,16 +1,16 @@
 {
  "_meta": {
-  "built_bytes": 997822,
-  "built_from_bytes": 1418207,
+  "built_bytes": 978555,
+  "built_from_bytes": 1439899,
   "removed": {
-   "banner-rule": 434,
-   "banner-trimmed": 85,
+   "banner-rule": 444,
+   "banner-trimmed": 100,
    "blank-squeezed": 1,
-   "deindented": 7226,
+   "deindented": 40565,
    "duplicate-grant": 10,
-   "inline-prose-shortened": 140,
+   "inline-prose-shortened": 148,
    "notify-moved-last": 1,
-   "progress-select": 159,
+   "progress-select": 162,
    "redundant-add-column": 148,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
@@ -1170,6 +1170,9 @@
   "sc_save_report_score": [
    "p_rows jsonb"
   ],
+  "sc_security_posture": [
+   ""
+  ],
   "sc_set_report_generation_allowed": [
    "p_term text, p_session text, p_allowed boolean, p_allow_parent boolean default null"
   ],
@@ -1237,6 +1240,9 @@
    "p_classes text[], p_periods_per_day integer default 6, p_day_periods jsonb default null"
   ],
   "sc_trg_fee_structure_sync": [
+   ""
+  ],
+  "sc_trg_report_score_max": [
    ""
   ],
   "storage_health": [
@@ -1358,10 +1364,12 @@
   "public.academic_print_records.v7_print_write",
   "public.activity_log.al_insert",
   "public.activity_log.al_read",
+  "public.admission_letters.admission_letters_staff_read",
   "public.admission_letters.al_admin_write",
   "public.admission_letters.al_read",
   "public.admission_links.adl_admin_write",
   "public.admission_links.adl_read",
+  "public.admission_links.admission_links_staff_read",
   "public.affective_traits.affective_scope_select",
   "public.affective_traits.affective_scope_write",
   "public.affective_traits.affective_traits_read",
@@ -1397,11 +1405,13 @@
   "public.cbt_accommodations.accommodations_write",
   "public.cbt_appeals.appeals_read",
   "public.cbt_appeals.appeals_write",
+  "public.cbt_edit_log.cbt_edit_log_admin_read",
   "public.cbt_exams.cbt_exam_scope_delete",
   "public.cbt_exams.cbt_exam_scope_insert",
   "public.cbt_exams.cbt_exam_scope_select",
   "public.cbt_exams.cbt_exam_scope_update",
   "public.cbt_exams.cbt_exams_public_select",
+  "public.cbt_exams.cbt_exams_read_signed_in",
   "public.cbt_exams_drafts.cbt_drafts_any_auth",
   "public.cbt_flag_resolutions.cbt_flag_res_staff",
   "public.cbt_pending_submissions.cbt_pending_anon_insert",
@@ -1414,6 +1424,9 @@
   "public.cbt_results.cbt_result_owner_delete",
   "public.cbt_results.cbt_result_scope_select",
   "public.cbt_results.cbt_result_staff_delete",
+  "public.cbt_results_recovery_log.cbt_recovery_log_admin_read",
+  "public.cbt_retake_allowances.cbt_retake_admin_read",
+  "public.cbt_roster.cbt_roster_staff_read",
   "public.cbt_roster.cr_read",
   "public.cbt_roster.cr_staff_write",
   "public.cbt_spaced_practice.spaced_rw",
@@ -1492,6 +1505,10 @@
   "public.menu_planner.v7_menu_read",
   "public.menu_planner.v7_menu_write",
   "public.messages.messages_all",
+  "public.messages.messages_read",
+  "public.messages.messages_remove",
+  "public.messages.messages_send",
+  "public.messages.messages_touch",
   "public.messages.msg_all",
   "public.midterm_report_cards.midterm_rc_select",
   "public.midterm_report_cards.midterm_rc_write",
@@ -1502,6 +1519,10 @@
   "public.notifications.notif_read",
   "public.notifications.notif_write",
   "public.notifications.notifications_all",
+  "public.notifications.notifications_clear",
+  "public.notifications.notifications_read",
+  "public.notifications.notifications_send",
+  "public.notifications.notifications_touch",
   "public.parent_child.pc_read",
   "public.parent_child.pc_write",
   "public.parents.parents_read",
@@ -1831,6 +1852,7 @@
   "trigger trg_payroll_posts_loan",
   "trigger trg_profiles_auto_link",
   "trigger trg_profiles_photo_sync",
+  "trigger trg_report_score_max",
   "trigger trg_report_scores_no_prep",
   "trigger trg_results_no_prep",
   "trigger trg_sc_fee_opening_touch",
