@@ -547,10 +547,58 @@ const AS={
  _loadSeq:0,
  async init(){ await this.load(); },
  async load(){if(!sb)return;const seq=++this._loadSeq,[d,l,p]=await Promise.all([sb.from('departments').select('*').order('name'),sb.from('lookups').select('*').order('kind').order('position'),sb.from('academic_periods').select('*').order('created_at',{ascending:false}).limit(50)]);if(seq!==this._loadSeq)return;for(const r of[d,l,p])if(r.error){toast('Could not refresh Academic Setup: '+r.error.message,'danger');return;}document.getElementById('as-depts').innerHTML=this.list(d.data||[],['name','head'],'departments');document.getElementById('as-lookups').innerHTML=this.list(l.data||[],['kind','value'],'lookups');document.getElementById('as-periods').innerHTML=this.list(p.data||[],['session','term','starts_on','ends_on','is_current'],'academic_periods');const fill=(id,kind)=>{const e=document.getElementById(id),cur=e.value;e.innerHTML='<option value="">— select registered '+kind+' —</option>'+[...new Set((l.data||[]).filter(x=>x.kind===kind).map(x=>x.value))].map(x=>'<option>'+esc(x)+'</option>').join('');if(cur)e.value=cur};fill('as-p-session','session');fill('as-p-term','term');},
- list(rows,cols,table){ if(!rows.length)return '<p style="color:var(--gray-500)">No records yet.</p>'; return '<div class="table-wrap"><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+(table?'<th>Action</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c]??'')+'</td>').join('')+(table?'<td><button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="AS.del(\''+table+'\',\''+r.id+'\')">🗑 Delete</button></td>':'')+'</tr>').join('')+'</tbody></table></div>'; },
+ list(rows,cols,table){ /* V12.74 (TERM-01): remember the rows so del() knows the kind/value/term/session of the record it is deleting and can clean the linked store too. */ this._lastRows=this._lastRows||{}; if(table)this._lastRows[table]=rows||[]; if(!rows.length)return '<p style="color:var(--gray-500)">No records yet.</p>'; return '<div class="table-wrap"><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+(table?'<th>Action</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c]??'')+'</td>').join('')+(table?'<td><button class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626" onclick="AS.del(\''+table+'\',\''+r.id+'\')">🗑 Delete</button></td>':'')+'</tr>').join('')+'</tbody></table></div>'; },
  async addDepartment(){ if(!sb)return; const name=document.getElementById('as-dept').value.trim(); if(!name){toast('Enter department name','warning');return;} const {error}=await sb.from('departments').insert({name,head:document.getElementById('as-head').value.trim()||null}); if(error){toast(error.message,'danger');return;} toast('Department added','success'); this.load(); },
  async addLookup(){ if(!sb)return; const kind=document.getElementById('as-kind').value, value=document.getElementById('as-value').value.trim(); if(!value){toast('Enter value','warning');return;} const {error}=await sb.from('lookups').insert({kind,value,position:0}); if(error){toast(error.message,'danger');return;} toast('Lookup added','success'); this.load(); },
- async del(table,id){if(!confirm('Delete this setup item permanently? Existing reports keep their text values.'))return;const{data,error}=await sb.from(table).delete().eq('id',id).select('id');if(error){toast(error.message,'danger');return;}if(!data||!data.length){toast('Nothing was deleted. Your role may not have permission, or the record was already removed.','danger',7000);await this.load();return;}try{Object.keys(sessionStorage).filter(k=>k.startsWith('sc-table-cache:')).forEach(k=>sessionStorage.removeItem(k));}catch(_){}const v=await sb.from(table).select('id').eq('id',id).maybeSingle();if(v.data){toast('Delete verification failed; the record still exists.','danger');return;}toast('Deleted permanently and verified.','success');await this.load();},
+ async del(table,id){
+  /* V12.74 FIX (TERM-01) — "deleting a term leaves it in the dropdowns".
+     A term/session exists in TWO places: the `lookups` register (kind='term'
+     or 'session') and the `academic_periods` calendar. The dropdowns on every
+     other page are built from `lookups`, while this page deleted from whichever
+     table the row was rendered from. So deleting an academic period left the
+     lookup behind, and deleting the lookup left the period behind — either way
+     the deleted term kept appearing in the platform's term dropdowns.
+     Delete removes the term/session/arm from BOTH places, verifies both, and
+     says exactly what happened. */
+  if(!confirm('Delete this setup item permanently? Existing reports keep their text values.'))return;
+  const row=(this._lastRows&&this._lastRows[table]||[]).find(r=>String(r.id)===String(id))||{};
+  const kind=String(row.kind||'').trim().toLowerCase();
+  const value=String(row.value||'').trim();
+  const term=String(row.term||'').trim();
+  const session=String(row.session||'').trim();
+  const{data,error}=await sb.from(table).delete().eq('id',id).select('id');
+  if(error){toast(error.message,'danger');return;}
+  if(!data||!data.length){toast('Nothing was deleted. Your role may not have permission, or the record was already removed.','danger',7000);await this.load();return;}
+  /* cascade to the parallel store so the term disappears from the dropdowns */
+  let cascaded=0,cascadeProblem='';
+  try{
+    if(table==='lookups'&&(kind==='term'||kind==='session')){
+      const col=kind; /* 'term' or 'session' */
+      const r=await sb.from('academic_periods').delete().eq(col,value).select('id');
+      if(r.error) cascadeProblem=r.error.message; else cascaded=(r.data||[]).length;
+    }else if(table==='lookups'&&kind==='arm'){
+      /* arms are also stored as a lookup only — nothing else to clean */
+    }else if(table==='academic_periods'&&term&&session){
+      /* remove the matching term/session lookups ONLY when no period still
+         uses them, otherwise deleting one term of a shared session would
+         remove the session for everybody. */
+      for(const [k,v] of [['term',term],['session',session]]){
+        const still=await sb.from('academic_periods').select('id').eq(k,v).limit(1);
+        if(!(still.data&&still.data.length)){
+          const r=await sb.from('lookups').delete().eq('kind',k).eq('value',v).select('id');
+          if(r.error) cascadeProblem=r.error.message; else cascaded+=(r.data||[]).length;
+        }
+      }
+    }
+  }catch(e){ cascadeProblem=e.message||String(e); }
+  try{Object.keys(sessionStorage).filter(k=>k.startsWith('sc-table-cache:')).forEach(k=>sessionStorage.removeItem(k));}catch(_){}
+  const v=await sb.from(table).select('id').eq('id',id).maybeSingle();
+  if(v.data){toast('Delete verification failed; the record still exists.','danger');return;}
+  /* verify the cascade too — otherwise the dropdown would keep showing it */
+  if(cascadeProblem){toast('Deleted, but the linked term/session could not be cleaned: '+cascadeProblem+'. Reload the page and delete it from the other list.','warning',10000);await this.load();return;}
+  toast(cascaded?('Deleted permanently and verified — removed from '+cascaded+' linked record(s), so it no longer appears in any dropdown.'):'Deleted permanently and verified.', cascaded?'success':'success', 7000);
+  await this.load();
+ },
  async rollPreview(){
    if(!sb)return;
    const term=document.getElementById('as-p-term').value.trim(), session=document.getElementById('as-p-session').value.trim();

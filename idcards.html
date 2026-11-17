@@ -722,23 +722,39 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
 
   pick(v){ if(!v){this.cur={}; this.render(); return;} let s={}; try{s=JSON.parse(v);}catch(_){s={};} if(!s.phone&&s.guardian_phone)s.phone=s.guardian_phone; this.cur=s;
     document.getElementById('ic-name').value=s.full_name||'';
-    document.getElementById('ic-class').value=(this.kind==='staff'?(s.staff_type||s.role||''):(s.class||''));
-    document.getElementById('ic-id').value=(this.kind==='staff'?(s.staff_no||s.id||''):(s.admission_no||s.id||''));
-    document.getElementById('ic-gender').value=s.gender||'';
-    document.getElementById('ic-phone').value=s.phone||'';
+    (document.getElementById('ic-class')||{}).value=(this.kind==='staff'?(s.staff_type||s.role||''):(s.class||''));
+    (document.getElementById('ic-id')||{}).value=(this.kind==='staff'?(s.staff_no||s.id||''):(s.admission_no||s.id||''));
+    (document.getElementById('ic-gender')||{}).value=s.gender||'';
+    (document.getElementById('ic-phone')||{}).value=s.phone||'';
     if(document.getElementById('ic-dept')) document.getElementById('ic-dept').value=(s.department||s.role||'');
-    document.getElementById('ic-photo').value=s.photo_url||''; this.render(); },
+    (document.getElementById('ic-photo')||{}).value=s.photo_url||''; this.render(); },
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
   /* the finished card size, read from the same fields the PDF uses */
   faceOpts(){
     const n=id=>Number((document.getElementById(id)||{}).value)||0;
-    const w=n('ic-card-width-mm'), h=n('ic-card-height-mm');
+    let w=n('ic-card-width-mm'), h=n('ic-card-height-mm');
+    /* V12.74 FIX (ID-02): never hand a 0x0 box to the renderer. If the size
+       fields are missing or blank (older markup, a half-saved form, or the
+       controls not yet written), fall back to the ISO/IEC 7810 ID-1 size the
+       preset claims is active, honouring the chosen orientation. A card with
+       a real size always prints; a card with no size prints wrong. */
+    if(!(w>0)||!(h>0)){
+      const base={id1:[85.60,53.98],id2:[105,74],id3:[125,88]};
+      const preset=(document.getElementById('ic-size-preset')||{}).value||'id1';
+      const o=(document.getElementById('ic-card-orientation')||{}).value||'landscape';
+      const d=base[preset]||base.id1;
+      w=(o==='portrait'?d[1]:d[0]); h=(o==='portrait'?d[0]:d[1]);
+    }
+    /* orientation is authoritative: the long edge follows the chosen axis */
+    const o=(document.getElementById('ic-card-orientation')||{}).value||'';
+    if(o==='portrait'&&w>h){ const t=w; w=h; h=t; }
+    if(o==='landscape'&&h>w){ const t=w; w=h; h=t; }
     return { widthMm:w, heightMm:h, template:(this.tplOpts()||{}).template,
-             widthPx:w?Math.round(w*96/25.4):0, heightPx:h?Math.round(h*96/25.4):0 };
+             widthPx:Math.round(w*96/25.4), heightPx:Math.round(h*96/25.4) };
   },
-  person(){ var to=this.tplOpts(); const typedName=(document.getElementById('ic-name').value||'').trim(); const sample=this.sample(); const base={ full_name:typedName||this.cur.full_name||sample.full_name, created_at:(this.cur&&this.cur.created_at)||'', date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:document.getElementById('ic-photo').value||this.cur.photo_url||'', gender:document.getElementById('ic-gender').value||this.cur.gender||'', phone:document.getElementById('ic-phone').value||this.cur.phone||'', blood_group:document.getElementById('ic-blood').value||'', type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
-    if(this.kind==='staff'){ base.staff_no=document.getElementById('ic-id').value||this.cur.staff_no||sample.staff_no; base.staff_type=document.getElementById('ic-class').value||this.cur.staff_type||sample.staff_type; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role||sample.role; base.department=this.cur.department||sample.department; }
-    else { base.admission_no=document.getElementById('ic-id').value||this.cur.admission_no||sample.admission_no; base.admission_year=this.cur.admission_year||''; base.class=document.getElementById('ic-class').value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
+  person(){ var to=this.tplOpts(); const typedName=((document.getElementById('ic-name')||{}).value||'').trim(); const sample=this.sample(); const base={ full_name:typedName||this.cur.full_name||sample.full_name, created_at:(this.cur&&this.cur.created_at)||'', date_of_birth:(this.cur&&this.cur.date_of_birth)||'', photo_url:(document.getElementById('ic-photo')||{}).value||this.cur.photo_url||'', gender:(document.getElementById('ic-gender')||{}).value||this.cur.gender||'', phone:(document.getElementById('ic-phone')||{}).value||this.cur.phone||'', blood_group:(document.getElementById('ic-blood')||{}).value||'', type:this.kind, template:to.template, pc:to.pc, ac:to.ac };
+    if(this.kind==='staff'){ base.staff_no=(document.getElementById('ic-id')||{}).value||this.cur.staff_no||sample.staff_no; base.staff_type=(document.getElementById('ic-class')||{}).value||this.cur.staff_type||sample.staff_type; base.role=(document.getElementById('ic-dept')?document.getElementById('ic-dept').value:'')||this.cur.role||sample.role; base.department=this.cur.department||sample.department; }
+    else { base.admission_no=(document.getElementById('ic-id')||{}).value||this.cur.admission_no||sample.admission_no; base.admission_year=this.cur.admission_year||''; base.class=(document.getElementById('ic-class')||{}).value||this.cur.class||sample.class; base.arm=this.cur.arm||sample.arm; }
     return base; },
   /* V12.71 — the front fallback takes the same box as the back, so even the
      no-template path cannot produce two different shapes for one card. */
@@ -1044,7 +1060,12 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     return true;
   },
   printConfig(){
-    const n=id=>Number(document.getElementById(id)?.value),settings={width:n('ic-card-width-mm'),height:n('ic-card-height-mm'),paper:document.getElementById('ic-paper-size')?.value||'A4',paperOrientation:document.getElementById('ic-paper-orientation')?.value||'portrait',mode:document.getElementById('ic-print-mode')?.value||'paired',layout:document.getElementById('ic-pair-layout')?.value||'auto',trim:!!document.getElementById('ic-trim-guides')?.checked,margin:10,gap:4};
+    const n=id=>Number(document.getElementById(id)?.value);
+    /* V12.74 FIX (ID-05): a blank or missing size field must never block
+       printing. Fall back to the ISO/IEC 7810 ID-1 card so a teacher can
+       always produce a card; orientation is honoured from the form. */
+    const _fo=(this.faceOpts&&this.faceOpts())||{};
+    const settings={width:(Number.isFinite(n('ic-card-width-mm'))&&n('ic-card-width-mm')>0)?n('ic-card-width-mm'):(_fo.widthMm||85.6),height:(Number.isFinite(n('ic-card-height-mm'))&&n('ic-card-height-mm')>0)?n('ic-card-height-mm'):(_fo.heightMm||53.98),paper:document.getElementById('ic-paper-size')?.value||'A4',paperOrientation:document.getElementById('ic-paper-orientation')?.value||'portrait',mode:document.getElementById('ic-print-mode')?.value||'paired',layout:document.getElementById('ic-pair-layout')?.value||'auto',trim:!!document.getElementById('ic-trim-guides')?.checked,margin:10,gap:4};
     if(!Number.isFinite(settings.width)||!Number.isFinite(settings.height)||settings.width<30||settings.height<30||settings.width>250||settings.height>250)throw new Error('Card width and height must each be between 30 mm and 250 mm.');
     const paper=settings.paper==='Letter'?[215.9,279.4]:settings.paper==='custom'?[n('ic-paper-width-mm'),n('ic-paper-height-mm')]:[210,297];
     if(paper.some(x=>!Number.isFinite(x)||x<100||x>500))throw new Error('Paper sheet width/height must each be between 100 mm and 500 mm.');

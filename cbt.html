@@ -1070,8 +1070,27 @@ window.CBTUI = {
      individual questions, append another CSV, or replace the whole
      question bank — at any time after creation.
      ============================================================ */
+  /* V12.74 FIX (CBT-01) — "clicking Edit on an existing CBT does nothing".
+     The Assessment-type dropdown was built with
+         ['exam','midterm',...] + (this._purposes||[]).map(...)
+     Array + Array in JavaScript concatenates to a STRING, so the following
+     .map() threw "is not a function". Because edit() is async, that rejection
+     was never caught and the modal simply never opened — no error, no toast,
+     nothing. The union is now a real array, and edit() reports any failure. */
+  _purposeList(){
+    const builtin=['exam','midterm','assignment','project','quiz','practical','prep'];
+    let extra=[];
+    try{ extra=(this._purposes||[]).map(p=>(p&&p.slug)||p).filter(Boolean); }catch(_){ extra=[]; }
+    const seen=new Set();
+    return builtin.concat(extra).filter(x=>{const k=String(x).toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+  },
   async edit(id){
-    if(!sb)return;if(this.loadPickers)await this.loadPickers();
+    if(!sb){ toast('Database not configured. Add your Supabase keys in assets/js/config.js.','warning',7000); return; }
+    try{ return await this._edit(id); }
+    catch(err){ console.error('Exam edit failed', err); toast('Could not open the exam editor: '+(err&&err.message||err),'danger',8000); }
+  },
+  async _edit(id){
+    if(this.loadPickers)await this.loadPickers();
     const [{data:e,error},{data:cols}]=await Promise.all([sb.from('cbt_exams').select('*').eq('id',id).maybeSingle(),sb.from('assessment_columns').select('id,class,subject,term,session,name,max_mark,position').order('position').limit(2000)]);
     if(error||!e){toast('Exam not found: '+(error&&error.message||''),'warning');return;}this._editExam=e;this._editColumns=cols||[];
     const opts=(arr,current,label)=>{const vals=[...new Set([current].concat(arr||[]).map(x=>String(x||'').trim()).filter(Boolean))];return '<option value="">— '+label+' —</option>'+vals.map(x=>'<option value="'+esc(x)+'" '+(x===String(current||'')?'selected':'')+'>'+esc(x)+'</option>').join('');};
@@ -1084,7 +1103,7 @@ window.CBTUI = {
         <div class="form-group"><label>Class *</label><select class="form-select" id="ed-class" onchange="CBTUI.refreshEditReportColumns()">${opts(this._classes,e.class,'select class')}</select></div>
         <div class="form-group"><label>Term *</label><select class="form-select" id="ed-term" onchange="CBTUI.refreshEditReportColumns()">${opts(this._terms,e.term,'select term')}</select></div>
         <div class="form-group"><label>Session *</label><select class="form-select" id="ed-session" onchange="CBTUI.refreshEditReportColumns()">${opts(this._sessions,e.session,'select session')}</select></div>
-        <div class="form-group"><label>Assessment type — purpose (clear differentiation)</label><select class="form-select" id="ed-type" onchange="if(window.CBTUI) CBTUI.onEditTypeChange(this.value)">${(['exam','midterm','assignment','project','quiz','practical','prep']+(CBTUI._purposes||[]).map(p=>p.slug).filter(s=>!['exam','midterm','assignment','project','quiz','practical','prep'].includes(s))).map(x=>{const labels={exam:'🔴 Terminal Exam',midterm:'🔵 Mid-term Assessment (single test/CA)',assignment:'🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)',project:'🟣 Project (other)',quiz:'🟡 Quiz (other)',practical:'🟠 Practical (other)',prep:'🧪 Prep Exam (rehearsal — never on the report card)'};const selected=x==='midterm'?CBTUI._isMidtermType(e.assessment_type):String(e.assessment_type||'exam').toLowerCase()===x;return '<option value="'+x+'" '+(selected?'selected':'')+'>'+labels[x]+'</option>';}).join('')}</select><div id="ed-type-help" style="font-size:.82rem;color:#475569;margin-top:6px"></div></div>
+        <div class="form-group"><label>Assessment type — purpose (clear differentiation)</label><select class="form-select" id="ed-type" onchange="if(window.CBTUI) CBTUI.onEditTypeChange(this.value)">${(CBTUI._purposeList()).map(x=>{const labels={exam:'🔴 Terminal Exam',midterm:'🔵 Mid-term Assessment (single test/CA)',assignment:'🟢 Assignment / Homework (multiple per term, cumulative → Assignment column)',project:'🟣 Project (other)',quiz:'🟡 Quiz (other)',practical:'🟠 Practical (other)',prep:'🧪 Prep Exam (rehearsal — never on the report card)'};const selected=x==='midterm'?CBTUI._isMidtermType(e.assessment_type):String(e.assessment_type||'exam').toLowerCase()===x;return '<option value="'+x+'" '+(selected?'selected':'')+'>'+labels[x]+'</option>';}).join('')}</select><div id="ed-type-help" style="font-size:.82rem;color:#475569;margin-top:6px"></div></div>
         <div class="form-group"><label>Candidate mode</label><select class="form-select" id="ed-mode"><option value="registered" ${e.exam_mode!=='open'?'selected':''}>Registered students</option><option value="open" ${e.exam_mode==='open'?'selected':''}>Open / anonymous</option></select></div>
         <div class="form-group"><label>Report-card destination</label><select class="form-select" id="ed-col" onchange="CBTUI.syncEditMax()"></select><small>Loaded from Report Card columns for the selected class/term/session.</small></div>
         <div class="form-group"><label>Maximum report contribution</label><input class="form-input" type="number" id="ed-max" value="${Number(e.max_score||0)}" min="0" step="0.5" readonly><small>Automatically follows the selected report column.</small></div>
@@ -1706,6 +1725,12 @@ window.CBTUI = {
       document.getElementById('modal-body').innerHTML='<div class="notice notice-error"><b>Recovery check failed:</b> '+esc(e.message||e)+'</div>';
     }
   },
+  /* V12.74 FIX (CBT-03) — the "📦 Recover now" tile rendered
+     onclick="CBTUI.recoverPending&&CBTUI.recoverPending()" but recoverPending was
+     never written; only replayPending(examId) existed. The guard swallowed the
+     click exactly like the Flush button, so a browser holding unsent papers could
+     not be cleared. This is the same job with no exam filter. */
+  async recoverPending(){ return this.replayPending(); },
   async replayPending(examId){
     let pending=[];
     try{ pending=JSON.parse(localStorage.getItem('cbt-pending-queue')||'[]'); }catch(_){}
@@ -1719,6 +1744,119 @@ window.CBTUI = {
     const remaining=pending.filter(p=> !toReplay.some(q=> String(q.client_ref)===String(p.client_ref)));
     localStorage.setItem('cbt-pending-queue', JSON.stringify(remaining));
     this.results(examId, '');
+  },
+  /* V12.74 FIX (CBT-02, round-18 item 10) — "clicking Flush now did nothing
+     and showed no message".
+     The ☁️ Stranded on SERVER tile rendered
+        onclick="CBTUI.flushServer&&CBTUI.flushServer()"
+     but CBTUI.flushServer had never been written. The && short-circuits on
+     undefined, so the click vanished: no request, no error, no toast. The only
+     flush that existed was flushServerPending(examId, code), which needs one
+     exam and cannot reach a row whose exam was deleted — the exact case the
+     tile exists to fix.
+     flushServer() flushes EVERY stranded row, always says what happened, and
+     offers to discard the ones that can never be saved. */
+  async flushServer(discardOrphans){
+    if(!sb){ toast('Database not configured. Add your Supabase keys in assets/js/config.js.','warning',7000); return; }
+    if(!discardOrphans && !confirm('Flush every stranded server submission now?\n\nEach one is re-graded and attached to its exam. This can take a moment if there are many.')) return;
+    let r;
+    try{
+      r = await sb.rpc('cbt_flush_all_pending_server', { p_discard_orphans: !!discardOrphans });
+    }catch(e){
+      toast('Flush failed before it started: '+(e&&e.message||e),'danger',9000); return;
+    }
+    /* The RPC ships with V12.74. On a database that has not been updated the
+       call answers "function does not exist" — say that plainly instead of
+       failing silently, which is the bug we are here to kill. */
+    if(r.error){
+      const msg=String(r.error.message||'');
+      if(/does not exist|schema cache|PGRST202|Could not find the function/i.test(msg)){
+        await this.flushServerLegacy();
+        return;
+      }
+      toast('Flush failed: '+msg,'danger',10000); return;
+    }
+    const d = r.data||{};
+    if(d.ok===false){
+      toast(d.error||'The server refused the flush.','danger',9000); return;
+    }
+    const saved=Number(d.saved||0), failed=Number(d.failed||0);
+    const discarded=Number(d.discarded||0), orphanCount=Number(d.orphan_count||0);
+    const errs=Array.isArray(d.errors)?d.errors:[];
+    const orphans=Array.isArray(d.orphaned)?d.orphaned:[];
+    const stuck=Number(d.stranded_after!=null?d.stranded_after:(failed+orphanCount-discarded));
+
+    /* nothing to do — still say so, never leave the click unanswered */
+    if(!saved && !failed && !orphanCount && !discarded){
+      toast('✅ Nothing is stranded on the server — there was nothing to flush.','success',7000);
+      this.refreshAfterFlush();
+      return;
+    }
+
+    const rows=errs.map(e=>{
+      let ref='',why='';
+      if(typeof e==='string'){ const i=e.indexOf(':'); if(i>0){ref=e.slice(0,i).trim(); why=e.slice(i+1).trim();} else why=e; }
+      else { ref=(e&&(e.client_ref||e.student_name))||''; why=(e&&(e.error||e.message))||''; }
+      return '<tr><td><b>'+esc(ref||'(no reference)')+'</b></td><td>'+esc(why||'no reason returned by the server')+'</td></tr>';
+    }).join('');
+    const orphanRows=orphans.map(o=>'<tr><td><b>'+esc((o&&o.client_ref)||'(no reference)')+'</b></td><td>'+esc((o&&o.why)||'the exam no longer exists')+'</td></tr>').join('');
+
+    let body='<div class="notice" style="background:'+(failed||orphanCount?'#fffbeb':'#ecfdf5')+';border-color:'+(failed||orphanCount?'#fcd34d':'#6ee7b7')+';color:'+(failed||orphanCount?'#92400e':'#065f46')+'">'
+      +'<b>'+saved+' submission(s) attached and graded.</b>'
+      +(failed?'<br>'+failed+' could not be saved.':'')
+      +(orphanCount?'<br>'+orphanCount+' belong to an exam that no longer exists'+(discarded?(' — '+discarded+' discarded.'):'.'):'')
+      +'</div>';
+    if(rows) body+='<h4 style="margin:14px 0 6px">Could not be saved</h4><div class="table-wrap" style="max-height:260px;overflow:auto"><table><thead><tr><th>Submission</th><th>Why</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    if(orphanRows) body+='<h4 style="margin:14px 0 6px">Exam no longer exists</h4><div class="table-wrap" style="max-height:260px;overflow:auto"><table><thead><tr><th>Submission</th><th>Why</th></tr></thead><tbody>'+orphanRows+'</tbody></table></div>';
+    if(failed||orphanCount) body+='<p style="font-size:.82rem;color:#475569;margin-top:10px"><b>What to do:</b> a submission whose exam was deleted cannot be recovered — enter those marks by hand on the exam\u2019s Results screen, then use <b>Discard unrecoverable</b> to clear them. Anything else is a permissions or column problem: send the reasons above to support.</p>';
+    if(stuck) body+='<p style="font-size:.82rem;color:#475569">'+stuck+' row(s) are still stranded.</p>';
+
+    const footer='<button class="btn btn-outline" onclick="closeModal()">Close</button>'
+      +((orphanCount&&!discardOrphans)?'<button class="btn btn-primary" onclick="CBTUI.flushServer(true)">Discard '+orphanCount+' unrecoverable</button>':'');
+
+    openModal('☁️ Server flush — '+saved+' saved'
+      +(failed?(', '+failed+' failed'):'')
+      +(orphanCount?(', '+orphanCount+' orphaned'):''), body, footer);
+
+    toast(failed||orphanCount
+      ? ('☁️ Server flush: '+saved+' saved, '+failed+' failed, '+orphanCount+' orphaned — see the table.')
+      : ('✅ Server flush: '+saved+' saved, nothing failed.'),
+      (failed||orphanCount)?'warning':'success', 9000);
+
+    this.refreshAfterFlush();
+  },
+  /* Called when the database predates V12.74 and has no
+     cbt_flush_all_pending_server. Falls back to the per-exam flush so the
+     button still does something, and tells the school how to finish the job. */
+  async flushServerLegacy(){
+    let exams=[];
+    try{
+      const r=await sb.rpc('cbt_audit_all_missing');
+      const d=(r&&r.data)||{};
+      exams=(Array.isArray(d.exams)?d.exams:[]).filter(e=>Number(e.pending_server||0)>0);
+    }catch(_){ exams=[]; }
+    if(!exams.length){
+      toast('Nothing is stranded on the server — there was nothing to flush.','warning',7000);
+      return;
+    }
+    let saved=0, failed=0;
+    for(const e of exams){
+      try{ const f=await sb.rpc('cbt_flush_pending_server',{p_exam_id:e.id});
+        if(f&&f.data&&f.data.ok!==false){ saved+=Number(f.data.saved||0); failed+=Number(f.data.failed||0); }
+        else failed+=Number(e.pending_server||0);
+      }catch(_){ failed+=Number(e.pending_server||0); }
+    }
+    openModal('☁️ Server flush — '+saved+' saved, '+failed+' failed',
+      '<div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#92400e"><b>Your database is older than this release.</b><br>'
+      +'The one-click flush needs a database update. Every exam that could be reached was flushed ('+saved+' saved, '+failed+' failed), but submissions whose exam was deleted cannot be reached this way.<br><br>'
+      +'<b>To finish:</b> run <code>database/complete-schema.sql</code> in the Supabase SQL Editor once, then reload this page and press <b>Flush now</b> again.</div>',
+      '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+    toast('☁️ Flushed what it could: '+saved+' saved, '+failed+' failed. Run the schema to enable the full flush.','warning',11000);
+    this.refreshAfterFlush();
+  },
+  refreshAfterFlush(){
+    try{ if(this.auditAllMissing) this.auditAllMissing(true); }catch(_){}
+    try{ if(this.refresh) this.refresh(); }catch(_){}
   },
   async flushServerPending(examId, code){
     if(!sb){ toast('Database not configured','warning'); return; }
@@ -1777,7 +1915,17 @@ window.CBTUI = {
       }
       let pendingCnt=0; try{ pendingCnt=JSON.parse(localStorage.getItem('cbt-pending-queue')||'[]').length; }catch(_){}
       const serverPendingTotal=Number(d.pending_server_total||0);
-      const missingExams=exams.filter(e=> Number(e.total_results||0)===0 || Number(e.has_missing) || Number(e.pending_server||0)>0);
+      /* V12.74 FIX (CBT-04, round-18 item 9) — "Audited 186 CBTs — 34 with
+         potential missing" never changed, even after the results were recovered.
+         This counted EVERY exam with zero results as "potential missing", including
+         exams nobody was ever rostered for and exams that were never sat — nothing
+         could ever clear those, so the figure was permanent. It now counts only a
+         learner who is on the roster and has no result row (missing_count, computed
+         server-side), or a submission still stranded on the server. */
+      const missOf = e => (e && e.missing_count != null)
+        ? Number(e.missing_count)
+        : Math.max(0, Number(e.roster_count||0) - Number(e.total_results||0)); /* older DB */
+      const missingExams=exams.filter(e=> missOf(e) > 0 || Number(e.pending_server||0)>0);
       const pendingReviewExams=exams.filter(e=> Number(e.pending_review||0)>0);
       /* ================================================================
          V12.71 (round-15 item 10) — "33 ⚠️ Potential missing" and
@@ -1813,11 +1961,11 @@ window.CBTUI = {
                  ? 'Submissions reached the server but were never attached to an exam \u2014 usually because the exam was deleted or its code changed mid-sitting. <b>Flush</b> attaches them; if a flush reports "1 failed" that one row names an exam that no longer exists and can only be discarded.'
                  : 'No orphans on the server.',
                serverPendingTotal?'#b91c1c':'#16a34a',
-               serverPendingTotal?'<button class="btn btn-sm btn-primary" onclick="CBTUI.flushServer&&CBTUI.flushServer()">☁️ Flush now</button>':'')
+               serverPendingTotal?'<button class="btn btn-sm btn-primary" onclick="CBTUI.flushServer()">☁️ Flush now</button>':'')
         + '</div>';
       html+='<div id="cbt-audit-table" class="table-wrap" style="max-height:400px;overflow:auto;margin-top:10px"><table><thead><tr><th>Code / Title</th><th>Subject / Class</th><th>Status</th><th>Results (total/graded/pending/server)</th><th>Roster</th><th>Alert</th><th>Action</th></tr></thead><tbody>'+exams.slice(0,100).map(e=>{
         const total=Number(e.total_results||0), graded=Number(e.graded||0), rev=Number(e.pending_review||0), roster=Number(e.roster_count||0), pendSrv=Number(e.pending_server||0);
-        const hasMissing = e.has_missing || (roster>0 && total<roster) || (total===0 && !e.is_archived) || pendSrv>0;
+        const hasMissing = missOf(e) > 0 || pendSrv>0;
         const alert = hasMissing ? (pendSrv?'<span style="color:#dc2626;font-weight:800">☁️ '+pendSrv+' stranded on server</span>':(total===0 ? '<span style="color:#dc2626;font-weight:800">Empty — no results</span>' : '<span style="color:#d97706;font-weight:700">Roster '+roster+' → Results '+total+'</span>')) : (rev>0?'<span style="color:#92400e">✍️ '+rev+' pending review</span>':'<span style="color:#16a34a">✅ OK</span>');
         return `<tr style="`+(hasMissing?'background:#fef2f2':'')+`"><td><b>`+esc(e.code)+`</b><br><small>`+esc(e.title)+`</small></td><td>`+esc(e.subject)+`<br><small>`+esc(e.class)+`</small></td><td>`+(e.is_archived?'<span class="badge">Archived</span>':'<span class="badge badge-success">'+(e.is_open?'Open':'Closed')+'</span>')+`<br><small>`+esc(e.assessment_type)+`</small></td><td>`+total+`/`+graded+`/`+(rev||0)+`/`+pendSrv+`</td><td>`+(roster||"—")+`</td><td>`+alert+`</td><td><button class="btn btn-sm btn-outline" onclick="CBTUI.results('`+e.id+`','`+esc(e.code)+`')">Results</button> <button class="btn btn-sm btn-outline" style="background:#fff7ed" onclick="CBTUI.recoverMissing('`+e.id+`','`+esc(e.code)+`')">Recover</button>`+(pendSrv?` <button class="btn btn-sm btn-primary" onclick="CBTUI.flushServerPending('`+e.id+`','`+esc(e.code)+`')">☁️ Flush ('+pendSrv+')</button>`:'')+`</td></tr>`;
       }).join('')+'</tbody></table></div>';
