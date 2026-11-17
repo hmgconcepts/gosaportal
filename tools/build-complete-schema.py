@@ -508,34 +508,71 @@ def build(raw: str) -> tuple[str, dict]:
 
     # ---- 9b. de-indent leading whitespace --------------------------------
     # V12.72 — SQL bodies are written indented for human eyes, but Postgres
-    # does not care about leading spaces inside a dollar-quoted body. The
-    # built file had 49 KB of pure indentation. Stripping it changes no
-    # behaviour and loses no comment: every word of explanation survives.
+    # does not care about leading spaces: every statement, PL/pgSQL body and DO
+    # block means exactly the same thing de-indented.
+    #
+    # V12.76 — the pass used to stop at the first dollar quote, deliberately:
+    # "leading spaces inside a function body are meaningful to whoever
+    # maintains it". True of the SOURCE, false of the ARTEFACT. This file is
+    # generated — the raw cumulative file keeps every indent for maintainers —
+    # and the 43 KB it was carrying is what kept the shipped schema 124 bytes
+    # from Supabase's 1 MB SQL-Editor cap, blocking every security fix behind
+    # it. So the shipped copy is now de-indented all the way through, with one
+    # inviolable rule: NEVER touch a line that begins inside a string literal,
+    # because there the leading spaces are DATA.
+    #
+    # The scanner understands `--` comments, '' escapes, and E'' backslash
+    # escapes (standard_conforming_strings is on, so a plain '...' treats a
+    # backslash as an ordinary character and only '' closes early). When it
+    # cannot be sure, it leaves the line alone: under-stripping costs bytes,
+    # mis-stripping would corrupt a string.
     def _deindent(text):
-        """Strip leading whitespace — but NEVER inside a dollar-quoted body.
-
-        V12.72 — a first attempt de-indented every line, including the bodies
-        of PL/pgSQL functions. Postgres stores those bodies verbatim, so the
-        built file no longer matched the raw one and (far worse) the tidy-up
-        could reflow text a function was relying on. Leading spaces inside a
-        function body are meaningful to whoever maintains it, so they stay.
-        """
         lines = text.split('\n')
         res, saved_n = [], 0
-        depth = 0
-        for ln in lines:
-            opens = len(re.findall(r'\$\w*\$', ln))
-            if depth == 0 and opens == 0:
-                if not ln.strip():
-                    res.append('')
+        in_str = False
+        e_str = False          # inside an E'' literal: backslash escapes
+
+        def scan(ln):
+            nonlocal in_str, e_str
+            i = 0
+            n = len(ln)
+            while i < n:
+                c = ln[i]
+                if not in_str:
+                    if c == '-' and i + 1 < n and ln[i + 1] == '-':
+                        return                      # comment: rest of line is text
+                    if c == "'":
+                        in_str = True
+                        # E'' or e'' directly before the quote?
+                        k = i - 1
+                        e_str = k >= 0 and ln[k] in 'Ee' and (k == 0 or not (ln[k - 1].isalnum() or ln[k - 1] == '_'))
+                        i += 1
+                        continue
+                    i += 1
                     continue
-                stripped = ln.lstrip(' \t')
-                saved_n += len(ln) - len(stripped)
-                res.append(stripped)
-            else:
-                res.append(ln)
-            # track dollar-quote depth; this toggles on every tag occurrence
-            depth = (depth + opens) % 2 if opens else depth
+                # inside a single-quoted string
+                if e_str and c == '\\':
+                    i += 2
+                    continue
+                if c == "'":
+                    if i + 1 < n and ln[i + 1] == "'":   # '' escape
+                        i += 2
+                        continue
+                    in_str = False
+                i += 1
+
+        for ln in lines:
+            if in_str:
+                res.append(ln)                      # leading spaces are data
+                scan(ln)
+                continue
+            if not ln.strip():
+                res.append('')
+                continue
+            stripped = ln.lstrip(' \t')
+            saved_n += len(ln) - len(stripped)
+            res.append(stripped)
+            scan(stripped)
         stats['deindented'] += saved_n
         return '\n'.join(res)
     out = _deindent(out)
