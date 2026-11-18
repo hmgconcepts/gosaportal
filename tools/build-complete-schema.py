@@ -631,6 +631,13 @@ def build(raw: str) -> tuple[str, dict]:
                 "-- API until the cache expires — which is exactly how a perfectly good\n"
                 "-- database came to report \"run database/v9.4-fees-and-exams.sql\".\n"
                 "-- ---------------------------------------------------------------------\n"
+                # V12.78 — a human-readable row a school can read back to us. The
+                # per-migration progress notices are stripped during the build, so
+                # without this the deployment guide could not tell the user what
+                # success LOOKS like. It sits BEFORE the reload signal, because the
+                # notification must remain the last executable statement in the
+                # file (see tmp-notify-order.mjs and tmp-selfcontained.mjs).
+                "select 'V12.78 installed — a prep exam set for a class is a timetable sitting, and every learner can find it' as status;\n"
                 "select pg_notify('pgrst', 'reload schema');\n")
         stats['notify-moved-last'] += 1
     return out, stats, drop, st
