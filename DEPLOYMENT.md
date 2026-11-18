@@ -1,6 +1,6 @@
 # School Connect — Deployment Guide
 
-**Version 12.77 · 8 November 2026**
+**Version 12.78 · 8 November 2026**
 
 This guide takes a school from "nothing" to "a live, branded school platform with its own data" using **only free tools**. Follow it in order. Every step states exactly what to click or paste, what you should see when it worked, and what to do when it did not.
 
@@ -292,35 +292,53 @@ A single school of 1,000 learners fits comfortably inside the free tiers.
 
 ---
 
-## 15. What is new in V12.77, and the four checks that prove it installed
+## 15. What is new in V12.78, and the four checks that prove it installed
 
-If you are upgrading from V12.76 the procedure is the same four steps as §4 —
+If you are upgrading from V12.77 the procedure is the same four steps as §4 —
 back up, run `database/complete-schema.sql` once, upload the files, hard-reload.
-The database step is **not optional**: without it CBT pages will refuse to run
-(they detect the obsolete engine and stop before a candidate sees a question) and
-marks remain unprotected.
+The database step is **not optional** this time either: the timetable columns
+and the three new functions live there, and the pages degrade politely (they say
+"run database/complete-schema.sql") rather than pretending to work.
 
-After the pack has run, confirm each of these on the live site:
+After the pack has run you should see this line among the results:
 
-1. **CBT per-candidate papers.** Open a CBT exam whose CSV holds more questions
-   than its *Select N questions* value (e.g. 100 questions, 60 selected). Sit it
-   as two different candidates: each gets 60 questions, the sets differ, and each
-   candidate's set is identical after a refresh. The server side records
-   `engine_version = 'v12.77'` and a `selection_seed` you can see in the audit.
-2. **No mark can exceed its maximum.** Enter 21 against a 20-mark column: the
-   save is refused with an explanation. A duplicated push updates the existing
-   row instead of adding a second (Reports → the mark no longer reads 21/20).
-3. **Reports → Mid Term → "Load current setting"** fills the panel and the panel
-   says *Editing: Mid Term · …*. Fees → **Fee Doctor**: the class dropdown opens
-   and lists your classes.
-4. **ID cards**: pick Academic Crest, Clinical Staff, Aurora, Transit Access.
-   Front and back are the same size and the same way up; choosing a portrait
-   design switches the card to portrait and says so.
+```
+V12.78 installed — a prep exam set for a class is a timetable sitting, and every learner can find it
+```
+
+Then confirm each of these on the live site:
+
+1. **A prep exam schedules itself.** CBT → **+ New Exam / Test** → purpose
+   **🧪 Prep Exam (rehearsal)**, class `SSS 1`, opens *today at 18:30*, duration
+   45, venue *Main Hall*. Save. Open **Exam Timetable**: a row exists for SSS 1,
+   *PREP EXAM*, 19:30–20:15, Main Hall — written by the exam, not by you. Edit
+   the exam's start time: the row **moves**; it does not duplicate.
+2. **The learner can find it.** Sign in as an SSS 1 student (or use
+   **Admin Oversight → Student portal**). The dashboard card **🧪 Prep Exams**
+   lists the sitting with its date, time, venue and a **Sit now →** button.
+   An SSS 2 student does not see it. A parent sees their child's, with the
+   child's name on the row.
+3. **Archiving clears it.** Archive the prep exam: the timetable row disappears.
+   Restore it: the row comes back. If a bulk import ever leaves the two out of
+   step, CBT → **🔄 Reschedule prep exams** rebuilds every sitting in one click
+   and reports how many it wrote.
+4. **A student can keep their own ID card.** Sign in as a student and open
+   **ID Cards**: the card renders, and below it the **⬇️ Download & print your
+   card** bar is visible. Press **⬇ Download PDF** — a PDF downloads named
+   `student-id-cards-<their name>-<date>.pdf` containing that learner's card and
+   nobody else's. **🖨 Print ALL** is not offered to a student; the design,
+   type and class controls are still staff-only.
 
 **Rolling back.** Restore the backup taken in step 1 and redeploy the previous
-ZIP. V12.77 only adds objects (two functions, two triggers, one unique index) and
-changes no column type, so a rollback of the files alone is safe for readers; the
-database rollback needs the backup.
+ZIP. V12.78 only *adds* objects (one column on `cbt_exams`, three on
+`exam_timetable`, one unique index, three functions, one trigger) and changes no
+column type, so a file-only rollback is safe for readers; the database rollback
+needs the backup.
+
+> **Note for the next release (schema budget).** The pack is now 999,867 bytes
+> against Supabase's 1,000,000-byte limit for a pasted script. V12.78 fit by
+> trimming its own comments; the next round must reclaim space from older,
+> superseded narrative before adding objects.
 
 ### Free-tier notes (unchanged)
 

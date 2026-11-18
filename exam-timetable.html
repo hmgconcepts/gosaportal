@@ -488,6 +488,18 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
     <div class="app-content">
       
       <div class="card" style="margin-bottom:16px;background:#fef3c7;border-color:#fcd34d"><h3 style="margin-top:0">🗓️ Examination Timetable</h3><p style="color:var(--gray-700);line-height:1.7;margin:0">The official exam schedule for the selected term. Staff/admin build it below (manually or with the ⚡ auto-spread helper); students and parents see their class's papers with dates, times, venues and invigilators. Clashes (same class, same date+time) are detected automatically.</p></div>
+      <!-- V12.78: prep exams are sittings, so they belong on the timetable. A prep
+           exam a teacher creates for a class writes its own row here; this panel
+           adds what the timetable sheet cannot know: the door to sit it. -->
+      <div class="card" id="prep-exams" style="margin-bottom:16px;border:2px solid #7c3aed">
+        <h3 style="margin-top:0">🧪 Prep Exams — date, time, venue, and the way in</h3>
+        <p style="color:var(--gray-700);line-height:1.7;margin:0 0 10px">
+          A prep exam (rehearsal) set for a class appears on the timetable for that class automatically,
+          and is listed here in date-and-time order. <b>Sit now</b> opens the paper itself; the button only
+          works inside the sitting window. Nothing here shows a question — only the door.
+        </p>
+        <div id="prep-exam-list"><span class="pulse">Loading prep exams…</span></div>
+      </div>
       <div class="card" style="margin-bottom:16px"><div id="ex-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
         <div class="form-group"><label>Class</label><select class="form-select" id="ex-class" onchange="EXT.load()"><option value="">All classes</option></select></div>
         <div class="form-group"><label>Term</label><select class="form-select" id="ex-term"><option>First Term</option><option>Second Term</option><option>Third Term</option></select></div>
@@ -554,8 +566,40 @@ const EXT={
     }
     if(!this.canEdit)document.querySelectorAll('#ex-actions [data-staff-only]').forEach(el=>el.style.display='none');
   }catch(_){}},
+  /* V12.78: the learner's own prep sittings — own class (student), children's
+     classes (parent), whole school (staff) — answered by the database so the
+     rule lives in one place. Fails soft: an older database simply hides it. */
+  async loadPrep(){
+    const box=document.getElementById('prep-exam-list');
+    if(!box||!window.sb)return;
+    const badge=st=>st==='open'?'<span class="badge" style="background:#dcfce7;color:#166534">🟢 Open now</span>'
+      :st==='closed'?'<span class="badge" style="background:#f3f4f6;color:#4b5563">🔒 Closed</span>'
+      :'<span class="badge" style="background:#dbeafe;color:#1e40af">🕒 Upcoming</span>';
+    try{
+      for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++)await new Promise(r=>setTimeout(r,200));
+      const {data,error}=await sb.rpc('sc_my_prep_exams');
+      if(error)throw error;
+      const rows=data||[];
+      if(!rows.length){box.innerHTML='<p style="color:var(--gray-500);font-size:.9rem;margin:0">📭 No prep exam is set for your class yet. When a teacher creates one it appears here, and on the dashboards of everyone in that class — nobody has to be given a code.</p>';return;}
+      let h='<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Subject</th><th>Class</th><th>Venue</th><th>Status</th><th></th></tr></thead><tbody>';
+      rows.forEach(x=>{
+        const sit=(x.status==='open'&&x.code)?'<a class="btn btn-sm btn-primary" href="cbt-exam.html?code='+encodeURIComponent(x.code)+'">Sit now →</a>'
+          :(x.status==='upcoming'?'<span style="font-size:.78rem;color:var(--gray-500)">opens '+esc(x.start_local||'')+'</span>':'');
+        h+='<tr><td><b>'+esc(x.start_local||'')+'</b></td>'
+          +'<td>'+esc(x.start_time||'')+'–'+esc(x.end_time||'')+'<br><small>'+Number(x.duration_min||0)+' min</small></td>'
+          +'<td><b>'+esc(x.title||x.subject||'')+'</b><br><small>'+esc(x.subject||'')+'</small></td>'
+          +'<td>'+esc(x.class||'All')+'</td><td>'+esc(x.venue||'—')+'</td><td>'+badge(x.status)+'</td><td>'+sit+'</td></tr>';
+      });
+      h+='</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">'+rows.length+' prep sitting(s) · school time · last score: '+
+        rows.map(x=>esc(x.code||'')+' '+(x.attempts_used?Number(x.last_percent).toFixed(0)+'%':'—')).join(' · ')+'</p>';
+      box.innerHTML=h;
+    }catch(e){
+      box.innerHTML='<p style="color:var(--gray-500);font-size:.9rem;margin:0">💤 Prep sittings appear here after a one-time database update (admin: run database/complete-schema.sql).</p>';
+    }
+  },
   async init(){
     this.resolveEdit();
+    this.loadPrep();
     try{const {data}=await sb.from('classes').select('name').order('name');const sel=document.getElementById('ex-class');(function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();}catch(e){}
     try{const cp=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();if(cp.data){if(cp.data.term)document.getElementById('ex-term').value=cp.data.term;if(cp.data.session)document.getElementById('ex-session').value=cp.data.session;}}catch(e){}
     /* students/parents land on their own class */

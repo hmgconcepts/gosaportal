@@ -1,6 +1,6 @@
 # School Connect — Complete Feature Reference
 
-**Version:** 12.77 · **Date:** 8 November 2026
+**Version:** 12.78 · **Date:** 8 November 2026
 **Applies to:** the generator (`schoolconnect`), and both deployments (`gosaportal`, `schoolconnectdemo`).
 
 This document explains **every feature in the platform**: what it does, how it works, who may use it, and what the system guarantees about it. Nothing here is aspirational — every item listed exists in the shipped code and is exercised by the regression suite.
@@ -14,7 +14,7 @@ A **complete, self-hosted school management SaaS** that runs on two free service
 | Layer | What it is | Cost |
 |---|---|---|
 | Front end | 134 static HTML pages + vanilla JavaScript (no build step, no framework) | free (any static host: Netlify, Vercel, Cloudflare Pages, GitHub Pages) |
-| Database | 134 tables · 269 functions · 315 row-level-security policies in one 974 KB SQL file | free (Supabase free tier) |
+| Database | 135 tables · 278 functions · 332 row-level-security policies in one 1,000 KB SQL file | free (Supabase tier) |
 | Third-party runtime | **none at run time** — supabase-js, Chart.js, jsQR and JSZip are vendored in `assets/vendor/` and precached | free |
 | Data + auth + API | Supabase (PostgreSQL + PostgREST + GoTrue) | free tier |
 | Scheduled work | `pg_cron` inside the same database | free |
@@ -27,7 +27,7 @@ There is **no AI API, no paid service, and no per-seat licence** anywhere in the
 
 1. **The generator** (`schoolconnect/`) — a browser-only wizard that asks for a school's name, colours, logo, and modules, and writes a complete, branded, ready-to-deploy site.
 2. **A deployment** (`gosaportal/`, `schoolconnectdemo/`) — the same site, generated. Same logic, different branding. `tools/audit-repo-parity.py` proves that the two deployments carry the generator's logic and differ only in branding.
-3. **The database** (`database/complete-schema.sql`) — one file, one paste, ~999 KB, idempotent. It creates every table, function, policy, trigger and index the platform uses.
+3. **The database** (`database/complete-schema.sql`) — one file, one paste, 1,000 KB (the Supabase cap), idempotent. It creates every table, function, policy, trigger and index the platform uses.
 
 ---
 
@@ -113,6 +113,58 @@ Fraction-aware marking, partial credit, negative marking, per-subject sub-scores
 
 `sc_cbt_bulk_push_exam_v2` merges overlapping exams, deduplicates by student + subject under a **best** or **latest** attempt policy, and writes into a named report column. It is transaction-safe, uses one lookup per destination column, and stays inside the statement timeout. Each push reports how many results were saved, skipped as unverified, skipped as manually graded, or skipped as unidentified.
 
+### 4.9 Prep exams are sittings — and a sitting has a date, a time, and a door (V12.78)
+
+A **prep exam** (also called a rehearsal or mock) exists to test readiness before the
+real paper. Until V12.78 it lived only in the CBT manager: it had a code, and a
+learner could sit it **only if somebody handed them that code**. Two questions a
+learner actually asks went unanswered — *is there a rehearsal for my class?* and
+*when am I sitting it?* — and the answer lived in the teacher's head.
+
+V12.78 puts that missing fact in the database, where both the school and the
+learner can see it:
+
+| Piece | What it is |
+|---|---|
+| `cbt_exams.venue` | a sitting now has a place as well as a time |
+| `exam_timetable.exam_id` + `source` | a timetable row can remember the exam it came from — one row per exam, enforced by a unique index |
+| `sc_prep_sync_exam(exam, tz)` | writes that row from the exam itself: date, start, end (start + duration), class, subject, term, session, venue |
+| trigger `cbt_exams_prep_schedule` | calls it on every save of the fields that matter (class, subject, term, session, start, close, duration, venue, type, archive) |
+| `sc_prep_sync_all()` | the repair path — one call rebuilds every prep sitting (CBT manager → **🔄 Reschedule prep exams**) |
+| `sc_my_prep_exams(class, tz)` | answers "what do I sit, and when?" for one signed-in person |
+
+**The rules, stated plainly.**
+
+- Only a **prep** exam schedules itself. A terminal exam, test, assignment or
+  project never writes a timetable row — that sheet is the school's to build.
+- The **school's clock** is used: a paper set for 18:30 UTC in Lagos is written as
+  19:30, and the end time is start + duration.
+- Re-saving **moves** the sitting (one row, never two). Changing the class, time
+  or venue moves it with its exam.
+- **Archiving** the exam takes the sitting away; restoring it brings it back.
+- A **whole-school** prep exam (no class) is visible to everyone; a paper for
+  SSS 1 is visible to SSS 1 — and its parents — only.
+- A **draft** (no start, no close, not open, no submissions) stays hidden.
+- A failure in scheduling **never** costs a tutor their question bank: the
+  trigger swallows its own error.
+
+**Where it surfaces.** The student's and parent's dashboard card
+(**🧪 Prep Exams — what you sit, and when**, from `sc_my_prep_exams`), the
+**Exam Timetable → 🧪 Prep Exams** panel, and — because the sitting is a real
+`exam_timetable` row — the existing **🗓️ Upcoming Exams** panel with no extra
+work. Each upcoming/open row offers **Sit now →**, which opens
+`cbt-exam.html?code=…`. Closed rows are shown as closed and offer nothing.
+
+**What it never does:** `sc_my_prep_exams()` returns dates, times, venue, status,
+attempts and the last percentage — **never a question, an option or an answer
+key**. The learner portal is a signpost, not a peep-hole.
+
+**Proved by** `tools/verification/t45-prep-schedule.mjs` (33 checks: one row per
+exam, moves instead of duplicating, archiving removes, another class's paper
+invisible, parent sees their child, staff see the school, a signed-out visitor
+sees nothing, anon holds no EXECUTE grant) and
+`tools/verification/t46-prep-portal.mjs` (39 checks in a real browser).
+
 ---
 
 ## 5. Fees and finance
@@ -156,6 +208,38 @@ Front and back are **one physical box**. Not "usually the same", not "the same u
 - **A staff card never inherits a student's identity.** Switching Student ↔ Staff clears every identity field, so the ID number, name, photo, gender and phone cannot leak across.
 - **A design that cannot fill the chosen shape says so.** Flipping to Portrait moves a landscape design to one drawn for portrait (Vertical/Badge) once, visibly; if a design still leaves a margin, the page names it and offers the one-click cure.
 - **Print = preview = PDF.** There is one vector PDF engine; the Print button builds the same PDF and sends it to the printer, so the paper and the file cannot differ.
+
+### 6.7 Your own card: download and print for the person looking at it (V12.78)
+
+The ID-card page had one design flaw with real consequences: its four
+download/print buttons — **⬇ Download PDF**, **🖨 Print ID Card**,
+**🖨 Print ALL**, **⬇ HTML proof** — sat *inside* the staff-only control card.
+A signed-in student therefore saw their own card rendered on screen (name,
+photo, QR, both faces) and had **no way to keep it or print it**, because every
+path to a file was hidden along with the design controls. The school had to
+print cards for students who could perfectly well print their own.
+
+V12.78 moves the action bar out into its own card and makes it speak to whoever
+is signed in:
+
+| Who | What they get | What they cannot reach |
+|---|---|---|
+| Student | their own card: PDF, print, HTML proof | the bulk button (hidden), the design/type/class controls (still staff-only), anybody else's record |
+| Parent | their linked children, labelled *my children* | unrelated students |
+| Staff / admin | the whole school, with the class filter as before | — |
+
+The safeguard is not the hidden button: every action works on `ICUI.all`, which
+the loader has **already scoped** — a student's list holds exactly one record,
+a parent's holds their children. The button label and the sentence above the bar
+now say which of those a person is looking at (*"This is your own card… You
+cannot see or print anyone else's card."*), and the PDF filename and the
+`filterLabel()` no longer promise "whole school" to somebody who can only ever
+produce one card.
+
+**Proved by** `tools/verification/t47-idcard-self-service.mjs` (36 checks): the
+bar is visible to a student, the bulk button is not, the list holds one record,
+and clicking **Download PDF** really downloads a vector PDF that contains that
+learner's card and **no other name**.
 
 ---
 

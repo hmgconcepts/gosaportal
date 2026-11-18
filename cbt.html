@@ -482,6 +482,7 @@
       
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px" data-staff-only>
         <button class="btn btn-primary" onclick="CBTUI.newExam()">+ New Exam / Test</button>
+        <button class="btn btn-outline" onclick="CBTUI.resyncPrep()" title="Re-write every prep exam's row on the Exam Timetable from the exams themselves">🔄 Reschedule prep exams</button>
         <button class="btn btn-outline" onclick="CBTUI.downloadTemplate()">⬇ CSV Template</button>
         <button class="btn btn-outline" onclick="CBTUI.refresh()">↻ Refresh</button>
         <button class="btn btn-outline" onclick="CBTUI.importBackup()">📥 Import offline backup (JSON)</button>
@@ -609,6 +610,10 @@ window.CBTUI = {
     return '<span class="badge" style="'+s+'">'+this._purposeLabel(t)+'</span>';
   },
   onTypeChange(val){
+    /* V12.78: a prep exam is a SITTING — it writes a timetable row the moment it
+       is saved, so say so on the form the teacher is already using. */
+    const sn=document.getElementById('ex-schedule-note');
+    if(sn) sn.style.display=(String(val||'').toLowerCase()==='prep')?'block':'none';
     const help=document.getElementById('ex-type-help');
     if(!help) return;
     const t=String(val||'').toLowerCase();
@@ -817,6 +822,17 @@ window.CBTUI = {
           <small>Leave both empty to let students sit it any time the test is open. Set them and the link refuses entry before the start and after the close, telling the student the exact date and time. Times are school time (Africa/Lagos).</small>
           <div id="ex-window-preview" style="font-size:.82rem;color:var(--gray-600);margin-top:4px"></div>
         </div>
+        <div class="form-group"><label>Venue / hall (optional)</label>
+          <input class="form-input" id="ex-venue" placeholder="e.g. Main Hall, Block B Lab 1">
+          <small>A prep exam is a sitting, so it carries a place as well as a time.</small>
+        </div>
+        <div id="ex-schedule-note" style="display:none;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px;font-size:.85rem;color:#065f46;margin:0 0 10px">
+          🧪 <b>Prep exam — this writes the timetable for you.</b> The moment you save, this sitting
+          appears on the Exam Timetable and on the dashboard of every student in the class you chose,
+          with its date, start and end time and venue. Change the time or the class later and the
+          timetable row moves with it; archive the exam and the row goes away again. Nobody has to
+          type it twice.
+        </div>
         <div class="form-group"><label>Report-card column (auto-maps results)</label><select class="form-select" id="ex-col"><option value="">— select a report-card column —</option></select><small>Only columns configured in Report Cards for the selected class, subject, term and session are shown.</small></div>
         <div class="form-group"><label>Exam access mode</label><select class="form-select" id="ex-mode"><option value="registered">Registered students only — identity required</option><option value="open">Open / anonymous candidates — public code access</option></select><small>Use Registered for school tests; Open for entrance or anonymous assessments.</small></div>
         <div class="form-group"><label>Max score in report card</label><input class="form-input" type="number" id="ex-max" value="100"></div>
@@ -944,6 +960,7 @@ window.CBTUI = {
       is_open: true,
       start_at: (function(){ const v=document.getElementById('ex-start'); return v&&v.value?new Date(v.value).toISOString():null; })(),
       close_at: (function(){ const v=document.getElementById('ex-close'); return v&&v.value?new Date(v.value).toISOString():null; })(),
+      venue: (function(){ const v=document.getElementById('ex-venue'); return v&&v.value?v.value.trim():''; })(),
       anti_cheat_config: {tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5')},
       csv_data: questions
     };
@@ -951,6 +968,21 @@ window.CBTUI = {
     if(error){ toast('Could not create: '+error.message,'danger'); return; }
     if(typeof App!=='undefined' && App.logActivity) App.logActivity('create','cbt_exam', data && data.code);
     closeModal(); toast('✅ Exam created. Code: '+(data&&data.code),'success',6000); CBTUI.refresh();
+  },
+  /* V12.78: one click rebuilds the prep sittings after a bulk import, a term
+     rollover or any moment when the timetable and the exams drifted apart. The
+     database does the work (sc_prep_sync_all) and reports what it did. */
+  async resyncPrep(){
+    if(!sb){ toast('Database not configured.','warning'); return; }
+    try{
+      const {data,error}=await sb.rpc('sc_prep_sync_all');
+      if(error) throw error;
+      const r=data||{};
+      if(r.ok===false){ toast(r.error||'Could not reschedule.','warning',9000); return; }
+      toast('✅ Prep exams rescheduled — '+(r.scheduled||0)+' sitting(s) written, '+(r.cleared||0)+' cleared'+(r.failed?', '+r.failed+' failed':'')+'. '+(r.note||''),'success',9000);
+      if(typeof App!=='undefined'&&App.logActivity) App.logActivity('sync','cbt_prep_timetable',String(r.scheduled||0));
+      CBTUI.refresh();
+    }catch(e){ toast('Could not reschedule prep exams: '+(e.message||e)+' — run database/complete-schema.sql if this is a new install.','danger',12000); }
   },
   async toggle(id,open){ if(!sb)return; const {data,error}=await sb.from('cbt_exams').update({is_open:open,updated_at:new Date().toISOString()}).eq('id',id).select('id,code,is_open').maybeSingle(); if(error){toast('Could not '+(open?'open':'close')+' exam: '+error.message,'danger',9000);return;} if(!data||data.is_open!==open){toast('Exam status was not confirmed. Check your role/RLS permissions.','danger',9000);return;} try{localStorage.removeItem('cbt-exam-cache-'+String(data.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''));}catch(_){} toast('Exam '+(open?'opened':'closed')+' successfully.','success'); CBTUI.refresh(); },
   async preview(id){
@@ -1115,6 +1147,7 @@ window.CBTUI = {
         <div class="form-group"><label>Topic / package label</label><input class="form-input" id="ed-topic" value="${esc(e.topic||'')}"></div>
         <div class="form-group"><label>Starts at (optional)</label><input class="form-input" type="datetime-local" id="ed-start" value="${e.start_at?String(e.start_at).slice(0,16):''}"></div>
         <div class="form-group"><label>Closes at (optional)</label><input class="form-input" type="datetime-local" id="ed-close" value="${e.close_at?String(e.close_at).slice(0,16):''}"></div>
+        <div class="form-group"><label>Venue / hall (optional)</label><input class="form-input" id="ed-venue" value="${e.venue?String(e.venue).replace(/"/g,'&quot;'):''}" placeholder="e.g. Main Hall"><small>A prep exam's sitting keeps its place and time on the Exam Timetable automatically.</small></div>
       </div>
       <div class="form-group"><label>Candidate instructions</label><textarea class="form-input" id="ed-instr" rows="3">${esc(e.instructions||'')}</textarea></div>
       <div class="card" style="background:#f8fafc"><b>Status & behaviour</b><div class="grid grid-2" style="margin-top:8px">
@@ -1179,7 +1212,7 @@ window.CBTUI = {
     };
     const cMathKb=!!(document.getElementById('ed-mathkb')||{}).checked, cCalc=!!(document.getElementById('ed-calc')||{}).checked, cShowScore=!!(document.getElementById('ed-showscore')||{}).checked;
     acPatch.math_keyboard=cMathKb; acPatch.calculator=cCalc; acPatch.enable_math_keyboard=cMathKb; acPatch.enable_calculator=cCalc; acPatch.show_score_on_submit=cShowScore; acPatch.show_score=cShowScore;
-    const patch={teacher_id:e.teacher_id||((window.SC_PROFILE&&SC_PROFILE.id)||null),title,subject,class:className,term,session,assessment_type:v('ed-type'),exam_mode:v('ed-mode'),report_column:v('ed-col'),max_score:Number(v('ed-max'))||0,duration:Number(v('ed-dur'))||45,duration_min:Number(v('ed-dur'))||45,negative_mark:Number(v('ed-neg'))||0,select_count:Number(v('ed-sel'))||0,attempt_limit:Number(v('ed-att'))||0,pass_mark:Number(v('ed-pass'))||0,topic:v('ed-topic'),instructions:v('ed-instr'),start_at:start||null,close_at:close||null,is_open:c('ed-open'),is_archived:c('ed-arch'),randomise:c('ed-rand'),release_results:c('ed-rel'),certificate_enabled:c('ed-cert'),is_entrance:c('ed-ent'),enable_math_keyboard:cMathKb,enable_calculator:cCalc,show_score_on_submit:cShowScore,public_link:e.public_link||'',anti_cheat_config:acPatch,updated_at:new Date().toISOString()};
+    const patch={teacher_id:e.teacher_id||((window.SC_PROFILE&&SC_PROFILE.id)||null),title,subject,class:className,term,session,assessment_type:v('ed-type'),exam_mode:v('ed-mode'),report_column:v('ed-col'),max_score:Number(v('ed-max'))||0,duration:Number(v('ed-dur'))||45,duration_min:Number(v('ed-dur'))||45,negative_mark:Number(v('ed-neg'))||0,select_count:Number(v('ed-sel'))||0,attempt_limit:Number(v('ed-att'))||0,pass_mark:Number(v('ed-pass'))||0,topic:v('ed-topic'),instructions:v('ed-instr'),start_at:start||null,close_at:close||null,venue:v('ed-venue')||'',is_open:c('ed-open'),is_archived:c('ed-arch'),randomise:c('ed-rand'),release_results:c('ed-rel'),certificate_enabled:c('ed-cert'),is_entrance:c('ed-ent'),enable_math_keyboard:cMathKb,enable_calculator:cCalc,show_score_on_submit:cShowScore,public_link:e.public_link||'',anti_cheat_config:acPatch,updated_at:new Date().toISOString()};
     /* V12.70 (item 10) — if the tutor changed the report column, their existing
        scores must MOVE to the new column. The server does that in a trigger, but
        the tutor has to be told, and has to be warned when the destination column

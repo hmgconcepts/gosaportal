@@ -95,7 +95,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
   <div class="pwa-install-header">
     <img src="assets/img/logo-512.png" alt="" class="pwa-install-icon">
     <div style="flex:1">
-      <div class="pwa-install-title">📲 Install School Connect</div>
+      <div class="pwa-install-title">📲 Install GoSA</div>
       <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
     </div>
     <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
@@ -526,7 +526,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         </div>
         <div class="grid grid-2">
           <div class="form-group"><label>Pick a <span id="ic-pick-label">student</span></label><select class="form-select" id="ic-student" onchange="ICUI.pick(this.value)"><option value="">— choose —</option></select></div>
-          <div class="form-group"><label>Search name / admission no <small style="color:var(--gray-500)">(scopes the PDF)</small></label><input class="form-input" id="ic-search" placeholder="e.g. Ada or GOSA/2024/001" oninput="ICUI.updatePdfLabel()"></div>
+          <div class="form-group"><label>Search name / admission no <small style="color:var(--gray-500)">(scopes the PDF)</small></label><input class="form-input" id="ic-search" placeholder="e.g. Ada or GoSA/2024/001" oninput="ICUI.updatePdfLabel()"></div>
           <div class="form-group"><label>…or enter manually</label><input class="form-input" id="ic-name" placeholder="Full name" oninput="ICUI.render()"></div>
           <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><select class="form-select" id="ic-class" onchange="ICUI.render();ICUI.updatePdfLabel()"><option value="">— All classes — whole school —</option></select><small style="color:var(--gray-500)">Select a class to filter bulk print — NOT printed on card (lifetime card). Choose "All classes" for whole school.</small></div>
           <div class="form-group"><label>ID / Admission / Staff no</label><input class="form-input" id="ic-id" placeholder="(auto)" oninput="ICUI.render()"></div>
@@ -555,12 +555,26 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           <p style="font-size:.8rem;color:#475569;margin:8px 0 0">The output uses fixed physical millimetres and one student per print unit, so pages cannot flow into the next student. ISO/IEC 7810 ID-1 is the common plastic-card format. Card stock thickness/material is a printer/media choice; nominal ID-1 plastic stock is about 0.76 mm. Use paired-sheet mode for paper/cutting, or duplex mode for a two-sided card printer. Print a test on scrap first and confirm the printer's flip edge.</p>
         </div>
         <div class="notice" style="margin-bottom:10px;font-size:.82rem">🪪 <b>Lifetime card:</b> student cards omit class and expiry; staff cards omit expiry. Front and back stay together in the selected paired or duplex output, and every student starts on a fresh sheet.</div>
+      </div>
+      </div>
+      <!-- V12.78 (round 22, item 1) — DOWNLOAD AND PRINT FOR EVERYBODY.
+           These four buttons lived inside the staff-only card above, so a
+           student could see their own card on screen and had no way to keep it:
+           every download and print path was hidden with the design controls.
+           The action bar now stands on its own. Nothing here can widen a
+           person's reach — each button works on ICUI.all, which the loader has
+           already scoped to the signed-in person (a student: themselves and
+           nothing else; a parent: their linked children; staff: the school). -->
+      <div class="card" id="ic-actions" style="margin-bottom:16px">
+        <h3 style="margin-top:0">⬇️ Download &amp; print your card</h3>
+        <p id="ic-actions-note" style="color:var(--gray-600);margin:0 0 10px;font-size:.88rem">Loading…</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="ICUI.pdfAll()" title="Vector PDF at exact millimetres — opens in CorelDRAW, Illustrator, InDesign and Word with editable text">⬇ Download PDF <span id="ic-pdf-label">(all)</span></button>
           <button class="btn btn-outline" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
-          <button class="btn btn-outline" onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
+          <button class="btn btn-outline" data-ic-bulk onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
           <button class="btn btn-outline" onclick="ICUI.downloadHtml()" title="HTML proof sheet — for archiving or emailing, never for print production">⬇ HTML proof</button>
         </div>
+        <p style="font-size:.8rem;color:#475569;margin:10px 0 0">The card is printed at the school's standard size (ISO/IEC 7810 ID-1, 85.60 × 53.98 mm) with the front and back on one sheet; the PDF is the same file the printer receives, so what you download is exactly what comes out of the printer.</p>
       </div>
       <div id="ic-fit-note" class="notice" style="display:none;margin:10px 0 0;font-size:.82rem"></div>
       <div id="ic-preview" style="display:flex;justify-content:center"></div>
@@ -619,7 +633,31 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     document.getElementById('ic-pick-label').textContent=t; document.getElementById('ic-class-label').textContent=(t==='staff'?'Type':'Class');
     document.getElementById('ic-dept-wrap').style.display=(t==='staff'?'block':'none');
     document.getElementById('ic-all-label').textContent=(t==='staff'?'staff':'students');
-    this.load(); this.render(); },
+    this.load(); this.render(); try{this.applyRole();}catch(_){} },
+  /* V12.78 (item 1): who is looking, and what may this bar offer them?
+     Staff/admin print the school; a parent prints their linked children; a
+     student prints their own card. The bulk button is merely hidden — the
+     scoping itself was done by the loader, so hiding it is a courtesy, not the
+     safeguard. */
+  whoami(){
+    const role=String(((window.SC_PROFILE&&SC_PROFILE.role)||(window.SCHOOL_USER&&SCHOOL_USER.role)||'')).toLowerCase();
+    const adminTier=['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher'].includes(role);
+    return { role, adminTier, bulk: adminTier || role==='parent' };
+  },
+  applyRole(){
+    const w=this.whoami();
+    document.querySelectorAll('[data-ic-bulk]').forEach(el=>{ el.style.display = w.bulk ? '' : 'none'; });
+    const what = this.kind==='staff' ? 'staff' : 'students';
+    const bulkLabel = document.getElementById('ic-all-label');
+    if(bulkLabel) bulkLabel.textContent = w.adminTier ? what : 'my children';
+    const note=document.getElementById('ic-actions-note');
+    if(note) note.innerHTML = w.adminTier
+      ? 'You are staff: these buttons cover the list you have selected (or the whole school when nothing is selected and a class filter is empty). Pick a class above to print only that class.'
+      : (w.role==='parent'
+        ? 'These are <b>your linked children</b> only. Download the PDF to keep the card, or print it at home — you never need to ask the school for a file.'
+        : 'This is <b>your own card</b>. Download the PDF to keep it or print it; the front and back are both on the sheet. You cannot see or print anyone else\'s card.');
+    return w;
+  },
   async load(){ const sel=document.getElementById('ic-student'); if(!sel)return;
     while(sel.options.length>1)sel.remove(1);
     if(!window.sb){ this.loaded=true; this.render(); return; }
@@ -667,7 +705,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         }
       }
     }catch(e){ console.warn('ID-card list load failed:', e); if(typeof toast==='function')toast('Could not load list. You can still type details manually and print.', 'warning', 7000); }
-    this.loaded=true; this.render(); try{this.updatePdfLabel();}catch(_){}
+    this.loaded=true; this.render(); try{this.applyRole();}catch(_){} try{this.updatePdfLabel();}catch(_){}
   },
   /* V11.7 (#3): AUTO PHOTO — people set their photo on My Profile
      (profiles.photo_url). Any student/staff row without its own photo_url
@@ -1111,6 +1149,11 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   filterLabel(f){
     if(f&&f.q) return 'search “'+f.q+'”';
     if(f&&f.class) return f.class;
+    /* V12.78 (item 1): the label used to promise "whole school" to everybody,
+       including the student whose list holds one record and the parent whose
+       list holds their children. It now says what the file actually contains. */
+    const w=this.whoami();
+    if(!w.adminTier) return w.role==='parent' ? 'my children' : 'my card';
     return this.kind==='staff'?'all staff':'whole school';
   },
   /* V12.61 — a filter narrows, it never widens.

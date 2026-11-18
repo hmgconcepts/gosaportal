@@ -730,6 +730,10 @@ textarea.form-input{min-height:80px;resize:vertical}
     else {if(!this.student.name&&!anon){this.identityEntry(data,code,'Enter a candidate name or choose Continue anonymously.');return;}this.student.name=this.student.name||('Anonymous-'+Math.random().toString(36).slice(2,7).toUpperCase());}
     this.data = data;
     this.school = applySchoolIdentity(data.school || null);
+    /* V12.77 — the candidate is part of the seed, so that the sixty questions
+       drawn for this student are the SAME sixty on a refresh, on a resume and
+       when the paper is re-marked — while another student gets another sixty. */
+    this.data._student_id = (this.student && (this.student.id || this.student.id_ref || this.student.name)) || '';
     if (window.CBT && typeof window.CBT.prepareForStudent === 'function') window.CBT.prepareForStudent(this.data);
     if (!this.qs().length) {
       this.root().innerHTML = '<div class="card"><h2>No questions</h2><p>This CBT exam has no valid questions. Ask your teacher to re-upload the CSV question bank. Make sure the CSV has a header row and at least one data row.</p></div>';
