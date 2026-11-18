@@ -1917,6 +1917,46 @@ const App = {
       paint(h);
     } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashExamTT()">🔄 Retry</button></p>'); }
   },
+  /* V12.78: WHAT DO I SIT, AND WHEN? A prep exam a teacher sets for a class is
+     a sitting with a date, a time and a venue, so the learner has to be able to
+     find it without being handed a code in class. The database answers this
+     question (sc_my_prep_exams) — a student gets their own class, a parent gets
+     their children's classes, staff get the whole school — and it never returns
+     a question, only the door. Fills every #dash-prep-exams container. */
+  async loadDashPrepExams() {
+    const boxes = [...document.querySelectorAll('[id="dash-prep-exams"],[id="dash-prep-exams-student"]')];
+    const paint = (html) => boxes.forEach(b => { b.innerHTML = html; });
+    if (!boxes.length || !window.sb) return;
+    const badge = (st) => st === 'open'
+      ? '<span class="badge" style="background:#dcfce7;color:#166534">🟢 Open now</span>'
+      : st === 'closed'
+        ? '<span class="badge" style="background:#f3f4f6;color:#4b5563">🔒 Closed</span>'
+        : '<span class="badge" style="background:#dbeafe;color:#1e40af">🕒 Upcoming</span>';
+    try {
+      for (let i = 0; i < 25 && !(window.SC_PROFILE && SC_PROFILE.role); i++) await new Promise(r => setTimeout(r, 200));
+      const r = await sb.rpc('sc_my_prep_exams');
+      if (r.error) { paint('<p style="color:var(--gray-500);font-size:.85rem">💤 Prep exams appear here after a one-time database update (admin: run database/complete-schema.sql).</p>'); return; }
+      const rows = (r.data || []);
+      if (!rows.length) { paint('<p style="color:var(--gray-500);font-size:.85rem">📭 No prep exam has been set for your class yet. When a teacher creates one, it appears here with its date, time and venue — you do not need to be given a code. <a href="exam-timetable.html#prep-exams">Open the Exam Timetable →</a></p>'); return; }
+      let h = '<div class="table-wrap"><table><thead><tr><th>When</th><th>Subject</th><th>Venue</th><th>Status</th><th>My last score</th><th></th></tr></thead><tbody>';
+      rows.forEach(x => {
+        const code = String(x.code || '');
+        const sit = (x.status === 'open' && code)
+          ? '<a class="btn btn-sm btn-primary" href="cbt-exam.html?code=' + encodeURIComponent(code) + '">Sit now →</a>'
+          : (x.status === 'upcoming'
+            ? '<span style="font-size:.78rem;color:var(--gray-500)">opens ' + esc(x.start_local || '') + '</span>'
+            : '');
+        const last = (x.attempts_used ? (Number(x.last_percent).toFixed(0) + '%') : '—') + ' <small>(' + Number(x.attempts_used || 0) + '/' + Number(x.attempt_limit || 1) + ')</small>';
+        h += '<tr><td><b>' + esc(x.start_local || '') + '</b>' + (x.end_time ? '<br><small>' + esc(x.start_time || '') + '–' + esc(x.end_time) + ' · ' + Number(x.duration_min || 0) + ' min</small>' : '')
+          + (x.for_student ? '<br><small>👤 ' + esc(x.for_student) + '</small>' : '') + '</td>'
+          + '<td><b>' + esc(x.title || x.subject || '') + '</b><br><small>' + esc(x.subject || '') + (x.class ? ' · ' + esc(x.class) : '') + '</small></td>'
+          + '<td>' + esc(x.venue || '—') + '</td><td>' + badge(x.status) + '</td><td>' + last + '</td><td>' + sit + '</td></tr>';
+      });
+      h += '</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">'
+        + rows.length + ' prep exam(s) for you · dates and times are school time · <a href="exam-timetable.html#prep-exams">full exam timetable →</a></p>';
+      paint(h);
+    } catch (e) { paint('<p style="color:var(--gray-500);font-size:.85rem">Could not load. <button class="btn btn-sm btn-outline" onclick="App.loadDashPrepExams()">🔄 Retry</button></p>'); }
+  },
   async loadDashboard() {
     const supabase = window.sb || this.sb || null;
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
@@ -2127,6 +2167,7 @@ const App = {
              Fills #dash-exam-tt with the linked child(ren)'s / own class's next
              papers; the container only exists in the parent/student sections. */
           try { App.loadDashExamTT(); } catch (e) {}
+          try { App.loadDashPrepExams(); } catch (e) {}
           try { App.loadDashFees(); } catch (e) {}
           try { App.loadDashMyPay(); } catch (e) {}
           try { App.loadDashProducts(); } catch (e) {}

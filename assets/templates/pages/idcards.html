@@ -501,11 +501,26 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           </div>
           <div class="form-group"><label>Professional template</label>
             <select class="form-select" id="ic-template" onchange="ICUI.pickTemplate()">
-              <option value="horizontal">Horizontal (classic)</option>
-              <option value="premium">Premium (like sample — navy/QR)</option><option value="executive">Executive (green & gold)</option><option value="minimal">Minimal (Swiss clean)</option><option value="gradient">Gradient (vibrant modern)</option><option value="badge">Badge (portrait conference)</option><option value="smart">Smart Card (fintech chip)</option><option value="heritage">Heritage (classic crest)</option><option value="vertical">Vertical (lanyard / portrait)</option>
-              <option value="corporate">Corporate (dark premium)</option>
-            </select>
-          </div>
+              <!-- V12.77 — the options are written here as a fallback and REPLACED at load
+                   from Super.idcard.TEMPLATES, so the list of professional designs has one
+                   source of truth and a new design can never be missing from the menu. -->
+              <option value="premium">Premium (like sample — navy/QR)</option>
+              <option value="executive">Executive (green & gold)</option>
+              <option value="minimal">Minimal (Swiss clean)</option>
+              <option value="gradient">Gradient (vibrant modern)</option>
+              <option value="badge">Badge (portrait conference)</option>
+              <option value="smart">Smart Card (fintech chip)</option>
+              <option value="heritage">Heritage (classic crest)</option>
+              <option value="vertical">Vertical (lanyard / portrait)</option>
+              <option value="corporate">Corporate (dark executive)</option>
+              <option value="crest">Academic Crest (gold seal) — new</option>
+              <option value="clinical">Clinical Staff (teal cross) — new</option>
+              <option value="aurora">Aurora (soft modern) — new</option>
+              <option value="metro">Transit Access (high contrast) — new</option></select>
+            <!-- V12.77 — every design states the card shape it was drawn for, and the
+                 page says so when the two disagree. A portrait design on a landscape
+                 card is not a bug the user should have to discover by printing it. -->
+            <div id="ic-template-note" style="font-size:.78rem;color:#64748b;margin-top:5px;line-height:1.45"></div>
           <div class="form-group"><label>Primary colour</label><input class="form-input" type="color" id="ic-pc" value="#0506ae" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Accent colour</label><input class="form-input" type="color" id="ic-ac" value="#964eec" oninput="ICUI.render()"></div>
         </div>
@@ -540,12 +555,26 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           <p style="font-size:.8rem;color:#475569;margin:8px 0 0">The output uses fixed physical millimetres and one student per print unit, so pages cannot flow into the next student. ISO/IEC 7810 ID-1 is the common plastic-card format. Card stock thickness/material is a printer/media choice; nominal ID-1 plastic stock is about 0.76 mm. Use paired-sheet mode for paper/cutting, or duplex mode for a two-sided card printer. Print a test on scrap first and confirm the printer's flip edge.</p>
         </div>
         <div class="notice" style="margin-bottom:10px;font-size:.82rem">🪪 <b>Lifetime card:</b> student cards omit class and expiry; staff cards omit expiry. Front and back stay together in the selected paired or duplex output, and every student starts on a fresh sheet.</div>
+      </div>
+      </div>
+      <!-- V12.78 (round 22, item 1) — DOWNLOAD AND PRINT FOR EVERYBODY.
+           These four buttons lived inside the staff-only card above, so a
+           student could see their own card on screen and had no way to keep it:
+           every download and print path was hidden with the design controls.
+           The action bar now stands on its own. Nothing here can widen a
+           person's reach — each button works on ICUI.all, which the loader has
+           already scoped to the signed-in person (a student: themselves and
+           nothing else; a parent: their linked children; staff: the school). -->
+      <div class="card" id="ic-actions" style="margin-bottom:16px">
+        <h3 style="margin-top:0">⬇️ Download &amp; print your card</h3>
+        <p id="ic-actions-note" style="color:var(--gray-600);margin:0 0 10px;font-size:.88rem">Loading…</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="ICUI.pdfAll()" title="Vector PDF at exact millimetres — opens in CorelDRAW, Illustrator, InDesign and Word with editable text">⬇ Download PDF <span id="ic-pdf-label">(all)</span></button>
           <button class="btn btn-outline" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
-          <button class="btn btn-outline" onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
+          <button class="btn btn-outline" data-ic-bulk onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
           <button class="btn btn-outline" onclick="ICUI.downloadHtml()" title="HTML proof sheet — for archiving or emailing, never for print production">⬇ HTML proof</button>
         </div>
+        <p style="font-size:.8rem;color:#475569;margin:10px 0 0">The card is printed at the school's standard size (ISO/IEC 7810 ID-1, 85.60 × 53.98 mm) with the front and back on one sheet; the PDF is the same file the printer receives, so what you download is exactly what comes out of the printer.</p>
       </div>
       <div id="ic-fit-note" class="notice" style="display:none;margin:10px 0 0;font-size:.82rem"></div>
       <div id="ic-preview" style="display:flex;justify-content:center"></div>
@@ -604,7 +633,31 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     document.getElementById('ic-pick-label').textContent=t; document.getElementById('ic-class-label').textContent=(t==='staff'?'Type':'Class');
     document.getElementById('ic-dept-wrap').style.display=(t==='staff'?'block':'none');
     document.getElementById('ic-all-label').textContent=(t==='staff'?'staff':'students');
-    this.load(); this.render(); },
+    this.load(); this.render(); try{this.applyRole();}catch(_){} },
+  /* V12.78 (item 1): who is looking, and what may this bar offer them?
+     Staff/admin print the school; a parent prints their linked children; a
+     student prints their own card. The bulk button is merely hidden — the
+     scoping itself was done by the loader, so hiding it is a courtesy, not the
+     safeguard. */
+  whoami(){
+    const role=String(((window.SC_PROFILE&&SC_PROFILE.role)||(window.SCHOOL_USER&&SCHOOL_USER.role)||'')).toLowerCase();
+    const adminTier=['super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher'].includes(role);
+    return { role, adminTier, bulk: adminTier || role==='parent' };
+  },
+  applyRole(){
+    const w=this.whoami();
+    document.querySelectorAll('[data-ic-bulk]').forEach(el=>{ el.style.display = w.bulk ? '' : 'none'; });
+    const what = this.kind==='staff' ? 'staff' : 'students';
+    const bulkLabel = document.getElementById('ic-all-label');
+    if(bulkLabel) bulkLabel.textContent = w.adminTier ? what : 'my children';
+    const note=document.getElementById('ic-actions-note');
+    if(note) note.innerHTML = w.adminTier
+      ? 'You are staff: these buttons cover the list you have selected (or the whole school when nothing is selected and a class filter is empty). Pick a class above to print only that class.'
+      : (w.role==='parent'
+        ? 'These are <b>your linked children</b> only. Download the PDF to keep the card, or print it at home — you never need to ask the school for a file.'
+        : 'This is <b>your own card</b>. Download the PDF to keep it or print it; the front and back are both on the sheet. You cannot see or print anyone else\'s card.');
+    return w;
+  },
   async load(){ const sel=document.getElementById('ic-student'); if(!sel)return;
     while(sel.options.length>1)sel.remove(1);
     if(!window.sb){ this.loaded=true; this.render(); return; }
@@ -652,7 +705,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         }
       }
     }catch(e){ console.warn('ID-card list load failed:', e); if(typeof toast==='function')toast('Could not load list. You can still type details manually and print.', 'warning', 7000); }
-    this.loaded=true; this.render(); try{this.updatePdfLabel();}catch(_){}
+    this.loaded=true; this.render(); try{this.applyRole();}catch(_){} try{this.updatePdfLabel();}catch(_){}
   },
   /* V11.7 (#3): AUTO PHOTO — people set their photo on My Profile
      (profiles.photo_url). Any student/staff row without its own photo_url
@@ -744,7 +797,40 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
      not. When the user flips to Portrait we move to a design that is DRAWN for
      a portrait card - once, visibly, with the dropdown showing what happened -
      and never again after they have picked a template themselves. */
-  pickTemplate(){ this._tplPinned=true; this.render(); },
+  pickTemplate(){ this._tplPinned=true; try{ this.matchDesignShape(); }catch(_){} this.render(); },
+  /* V12.77 — a design's shape is part of the design. Choosing a lanyard badge
+     sets the card to portrait and SAYS SO, instead of printing a tall design
+     into a wide card with two thirds of the card left empty. */
+  matchDesignShape(){
+    const sel=document.getElementById('ic-template'); if(!sel) return;
+    const note=document.getElementById('ic-template-note');
+    const T=(window.Super&&Super.idcard&&Super.idcard.TEMPLATES)||[];
+    const t=T.filter(x=>x.id===sel.value)[0]; if(!t) return;
+    const want=t.native||'landscape';
+    const oSel=document.getElementById('ic-card-orientation');
+    const have=(oSel&&oSel.value)||'landscape';
+    const msg=(html)=>{ if(note) note.innerHTML=html; };
+    if(want!==have && oSel){
+      oSel.value=want;
+      try{ this.applyCardSize(); }catch(_){}
+      msg('<b style="color:#b45309">'+Super.esc(t.label.split('—')[0].trim())+'</b> is drawn for <b>'+want+'</b> cards, so the card has been set to '+want+'. Pick the other orientation again if you need this design on a '+have+' card — it will still print, centred, with margins.');
+      return;
+    }
+    msg('<b style="color:#334155">'+Super.esc(t.label.split('—')[0].trim())+'</b> is drawn for <b>'+want+'</b> cards — this matches the card in use.');
+  },
+  /* V12.77 — one list, generated. If the engine knows a design, the menu offers
+     it; if an older page has a stale hand-written list, this replaces it. */
+  refreshTemplateMenu(){
+    const sel=document.getElementById('ic-template'); if(!sel) return;
+    try{
+      const T=(window.Super&&Super.idcard&&Super.idcard.TEMPLATES)||null;
+      if(!T||!T.length) return;
+      const keep=sel.value;
+      sel.innerHTML=Super.idcard.templateOptions(keep);
+      if(keep) sel.value=keep;
+      sel.title='Professional designs: '+T.length;
+    }catch(e){ console.warn('template menu could not be rebuilt', e); }
+  },
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
   /* the finished card size, read from the same fields the PDF uses */
   faceOpts(){
@@ -1063,6 +1149,11 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   filterLabel(f){
     if(f&&f.q) return 'search “'+f.q+'”';
     if(f&&f.class) return f.class;
+    /* V12.78 (item 1): the label used to promise "whole school" to everybody,
+       including the student whose list holds one record and the parent whose
+       list holds their children. It now says what the file actually contains. */
+    const w=this.whoami();
+    if(!w.adminTier) return w.role==='parent' ? 'my children' : 'my card';
     return this.kind==='staff'?'all staff':'whole school';
   },
   /* V12.61 — a filter narrows, it never widens.
