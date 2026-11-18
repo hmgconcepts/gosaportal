@@ -1,23 +1,23 @@
 {
  "_meta": {
-  "built_bytes": 978555,
-  "built_from_bytes": 1439899,
+  "built_bytes": 989722,
+  "built_from_bytes": 1458309,
   "removed": {
-   "banner-rule": 444,
-   "banner-trimmed": 100,
+   "banner-rule": 452,
+   "banner-trimmed": 128,
    "blank-squeezed": 1,
-   "deindented": 40565,
+   "deindented": 38533,
    "duplicate-grant": 10,
-   "inline-prose-shortened": 148,
+   "inline-prose-shortened": 153,
    "notify-moved-last": 1,
-   "progress-select": 162,
+   "progress-select": 163,
    "redundant-add-column": 148,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
    "release-essay-lines": 0,
    "repeated-statement": 16,
    "rule-lines-shortened": 1,
-   "superseded-function": 21,
+   "superseded-function": 22,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
@@ -514,6 +514,9 @@
   "cbt_get_public_exam_v7": [
    "p_code text, p_admission_no text default ''"
   ],
+  "cbt_get_public_exam_v8": [
+   "p_code text, p_admission_no text default '', p_seed text default ''"
+  ],
   "cbt_get_results_with_pending": [
    "p_exam_id uuid"
   ],
@@ -747,6 +750,9 @@
   ],
   "sc_cbt_options": [
    "p_question jsonb"
+  ],
+  "sc_cbt_pick_questions": [
+   "p_bank jsonb, p_seed text, p_count int default 0, p_shuffle boolean default true"
   ],
   "sc_cbt_public_question": [
    "p_question jsonb"
@@ -1001,6 +1007,9 @@
   "sc_loan_status_sync": [
    ""
   ],
+  "sc_mark_reconcile": [
+   "p_apply boolean default false"
+  ],
   "sc_message_directory": [
    ""
   ],
@@ -1239,10 +1248,16 @@
   "sc_timetable_capacity": [
    "p_classes text[], p_periods_per_day integer default 6, p_day_periods jsonb default null"
   ],
+  "sc_trg_column_max_guard": [
+   ""
+  ],
   "sc_trg_fee_structure_sync": [
    ""
   ],
   "sc_trg_report_score_max": [
+   ""
+  ],
+  "sc_trg_report_score_upsert": [
    ""
   ],
   "storage_health": [
@@ -1332,6 +1347,7 @@
   "public.punctuality_awards_student_idx",
   "public.report_comment_bands_context_idx",
   "public.report_scores_lookup_idx_v7",
+  "public.report_scores_one_row_per_mark",
   "public.report_scores_push_join_idx_v12_70",
   "public.results_assessment_uidx",
   "public.role_status_log_person_idx_v7",
@@ -1837,6 +1853,7 @@
   "trigger trg_cbt_proctor_required_before_result",
   "trigger trg_cbt_report_column_moves_scores",
   "trigger trg_cbt_score_snapshot_sync",
+  "trigger trg_column_max_guard",
   "trigger trg_community_audience",
   "trigger trg_compute_class_fee_total",
   "trigger trg_compute_fee_payment_balance",
@@ -1853,6 +1870,7 @@
   "trigger trg_profiles_auto_link",
   "trigger trg_profiles_photo_sync",
   "trigger trg_report_score_max",
+  "trigger trg_report_score_upsert",
   "trigger trg_report_scores_no_prep",
   "trigger trg_results_no_prep",
   "trigger trg_sc_fee_opening_touch",
