@@ -7,7 +7,7 @@
 -- platform needs. Safe on a new or an existing project, and safe to
 -- run more than once.
 --
--- Size: 990,723 bytes - inside the Supabase SQL Editor 1 MB request cap.
+-- Size: 999,867 bytes - inside the Supabase SQL Editor 1 MB request cap.
 -- Paste the whole file into SQL Editor and press Run once.
 -- Each section is independently re-runnable.
 --
@@ -15479,6 +15479,157 @@ grant execute on function public.sc_mark_reconcile(boolean) to authenticated;
 -- V12.77 — the two new TRIGGER functions are never called by a client: the
 revoke all on function public.sc_trg_report_score_upsert() from public, anon, authenticated;
 revoke all on function public.sc_trg_column_max_guard() from public, anon, authenticated;
+-- V12.78 — A PREP EXAM SET FOR A CLASS REACHES THAT CLASS, WITH ITS DATE AND TIME
+alter table public.cbt_exams add column if not exists venue text not null default '';
+alter table public.exam_timetable add column if not exists exam_id uuid references public.cbt_exams(id) on delete cascade;
+alter table public.exam_timetable add column if not exists source text not null default 'manual';
+create unique index if not exists exam_timetable_one_per_exam on public.exam_timetable(exam_id) where exam_id is not null;
+create or replace function public.sc_prep_sync_exam(p_exam_id uuid, p_tz text default 'Africa/Lagos')
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare e public.cbt_exams; v_date date; v_start text; v_end text; v_dur int; v_row public.exam_timetable;
+begin
+select * into e from public.cbt_exams where id = p_exam_id;
+if not found then return jsonb_build_object('ok', false, 'error', 'That exam does not exist.'); end if;
+if not (public.sc_is_prep_assessment(e.assessment_type) and not coalesce(e.is_archived, false)
+and e.start_at is not null and coalesce(nullif(btrim(e.class), ''), '') <> '') then
+delete from public.exam_timetable where exam_id = p_exam_id and source = 'prep';
+return jsonb_build_object('ok', true, 'scheduled', false, 'reason', case
+when not public.sc_is_prep_assessment(e.assessment_type) then 'not_a_prep_exam'
+when coalesce(e.is_archived, false) then 'archived'
+when e.start_at is null then 'no_start_time' else 'no_class' end);
+end if;
+v_date := (e.start_at at time zone p_tz)::date;
+v_start := to_char(e.start_at at time zone p_tz, 'HH24:MI');
+v_dur := coalesce(nullif(e.duration_min, 0), nullif(e.duration, 0), 45);
+v_end := to_char((e.start_at at time zone p_tz) + make_interval(mins => v_dur), 'HH24:MI');
+insert into public.exam_timetable
+(class, subject, exam_date, start_time, end_time, venue, paper, term, session, notes, exam_id, source, created_by)
+values (btrim(e.class), coalesce(nullif(btrim(e.subject), ''), 'Prep Exam'), v_date, v_start, v_end,
+coalesce(e.venue, ''), 'PREP EXAM', coalesce(e.term, ''), coalesce(e.session, ''),
+'Prep exam · code ' || coalesce(nullif(e.code, ''), '—') || ' · ' || v_dur || ' min' ||
+case when e.close_at is not null then ' · closes ' || to_char(e.close_at at time zone p_tz, 'DD Mon HH24:MI') else '' end ||
+' · created automatically from the CBT manager.', e.id, 'prep', e.teacher_id)
+on conflict (exam_id) where exam_id is not null do update set
+class = excluded.class, subject = excluded.subject, exam_date = excluded.exam_date,
+start_time = excluded.start_time, end_time = excluded.end_time, venue = excluded.venue,
+paper = excluded.paper, term = excluded.term, session = excluded.session, notes = excluded.notes
+returning * into v_row;
+return jsonb_build_object('ok', true, 'scheduled', true, 'exam_date', v_date, 'start_time', v_start,
+'end_time', v_end, 'class', v_row.class, 'venue', v_row.venue, 'row_id', v_row.id);
+end $$;
+revoke all on function public.sc_prep_sync_exam(uuid, text) from public, anon;
+grant execute on function public.sc_prep_sync_exam(uuid, text) to authenticated;
+create or replace function public.sc_trg_cbt_prep_schedule() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+begin perform public.sc_prep_sync_exam(new.id);
+exception when others then null;  -- never cost a tutor their question bank for a timetable row
+end;
+return new;
+end $$;
+revoke all on function public.sc_trg_cbt_prep_schedule() from public, anon, authenticated;
+drop trigger if exists cbt_exams_prep_schedule on public.cbt_exams;
+create trigger cbt_exams_prep_schedule
+after insert or update of class, subject, title, term, session, start_at, close_at, duration,
+duration_min, assessment_type, is_archived, venue, code
+on public.cbt_exams for each row execute function public.sc_trg_cbt_prep_schedule();
+create or replace function public.sc_prep_sync_all() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare r record; v jsonb; n int := 0; c int := 0; f int := 0;
+begin
+if not coalesce(public.is_staff(auth.uid()), false) then
+return jsonb_build_object('ok', false, 'error', 'Only staff can reschedule prep exams.');
+end if;
+for r in select id from public.cbt_exams where public.sc_is_prep_assessment(assessment_type) loop
+begin
+v := public.sc_prep_sync_exam(r.id);
+if (v->>'scheduled')::boolean then n := n + 1; else c := c + 1; end if;
+exception when others then f := f + 1; end;
+end loop;
+return jsonb_build_object('ok', true, 'scheduled', n, 'cleared', c, 'failed', f,
+'note', case when n + c = 0 then 'No prep exams exist yet — create one from the CBT manager and it schedules itself.'
+else 'Every prep exam now matches its timetable row.' end);
+end $$;
+revoke all on function public.sc_prep_sync_all() from public, anon;
+grant execute on function public.sc_prep_sync_all() to authenticated;
+create or replace function public.sc_my_prep_exams(p_class text default null, p_tz text default 'Africa/Lagos')
+returns table (
+exam_id uuid, code text, title text, subject text, class text,
+start_at timestamptz, close_at timestamptz, start_local text, close_local text,
+exam_date date, start_time text, end_time text, duration_min int, venue text,
+term text, session text, status text, public_link text, exam_mode text,
+attempts_used int, attempt_limit int, last_percent numeric, last_at timestamptz,
+scheduled boolean, sort_at timestamptz, for_student text
+) language plpgsql security definer set search_path = public as $$
+declare me uuid := auth.uid(); v_role text := ''; v_staff boolean := false; v_classes text[] := '{}';
+begin
+if me is null then return; end if;
+select coalesce(lower(p.role), '') into v_role from public.profiles p where p.id = me;
+v_staff := v_role in ('super_admin','admin','principal','proprietor','head_teacher','bursar','staff','teacher');
+return query
+with mine as (
+select s.id, s.class, s.full_name
+from public.students s
+where s.user_id = me
+or (v_role = 'student' and s.user_id is null
+and exists (select 1 from public.profiles p where p.id = me
+and lower(btrim(p.full_name)) = lower(btrim(s.full_name))))
+or (v_role = 'parent' and exists (select 1 from public.parent_child pc
+where pc.parent_id = me and pc.student_id = s.id))
+), att as (
+select r.exam_id, count(*)::int as used,
+(array_agg(r.percent order by r.submitted_at desc nulls last))[1] as last_percent,
+max(r.submitted_at) as last_at
+from public.cbt_results r join mine m
+on r.student_id = m.id or r.student_id_ref = m.full_name
+group by r.exam_id
+)
+select e.id, e.code, e.title, coalesce(nullif(btrim(e.subject), ''), 'Prep Exam'), e.class,
+e.start_at, e.close_at,
+coalesce(to_char(e.start_at at time zone p_tz, 'DD Mon YYYY · HH24:MI'), ''),
+coalesce(to_char(e.close_at at time zone p_tz, 'DD Mon YYYY · HH24:MI'), ''),
+(e.start_at at time zone p_tz)::date,
+to_char(e.start_at at time zone p_tz, 'HH24:MI'),
+to_char((e.start_at at time zone p_tz) + make_interval(mins => coalesce(nullif(e.duration_min,0), nullif(e.duration,0), 45)), 'HH24:MI'),
+coalesce(nullif(e.duration_min, 0), nullif(e.duration, 0), 45),
+coalesce(e.venue, ''), coalesce(e.term, ''), coalesce(e.session, ''),
+case when e.close_at is not null and now() > e.close_at then 'closed'
+when e.start_at is not null and now() < e.start_at then 'upcoming'
+when coalesce(e.is_open, false) or e.start_at is not null then 'open'
+else 'draft' end,
+coalesce(e.public_link, ''), coalesce(e.exam_mode, 'open'),
+coalesce(att.used, 0)::int, greatest(coalesce(e.attempt_limit, 0), 1),
+att.last_percent, att.last_at,
+(e.start_at is not null),
+coalesce(e.start_at, e.close_at, now() + interval '100 years'),
+coalesce((select string_agg(m.full_name, ', ') from mine m
+where lower(btrim(m.class)) = lower(btrim(e.class)) and v_role = 'parent'), '')
+from public.cbt_exams e left join att on att.exam_id = e.id
+where public.sc_is_prep_assessment(e.assessment_type)
+and not coalesce(e.is_archived, false)
+and (coalesce(btrim(e.class), '') = '' or v_staff
+or lower(btrim(e.class)) in (select lower(btrim(m.class)) from mine m))
+and (coalesce(btrim(p_class), '') = '' or lower(btrim(e.class)) = lower(btrim(p_class)))
+and (e.start_at is not null or e.close_at is not null or coalesce(e.is_open, false)
+or exists (select 1 from public.cbt_results r2 where r2.exam_id = e.id))
+order by coalesce(e.start_at, e.close_at, now() + interval '100 years'), e.title;
+end $$;
+revoke all on function public.sc_my_prep_exams(text, text) from public, anon;
+grant execute on function public.sc_my_prep_exams(text, text) to authenticated;
+do $$
+declare r record; n int := 0;
+begin
+for r in select id from public.cbt_exams where public.sc_is_prep_assessment(assessment_type)
+and start_at is not null and coalesce(nullif(btrim(class), ''), '') <> ''
+and not coalesce(is_archived, false) loop
+begin perform public.sc_prep_sync_exam(r.id); n := n + 1;
+exception when others then null; end;
+end loop;
+if n > 0 then
+insert into public.sc_install_state(key, details) values ('v12.78-prep-scheduled', jsonb_build_object('scheduled', n))
+on conflict (key) do update set details = excluded.details;
+end if;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- V12.68: LAST STATEMENT IN THE FILE, DELIBERATELY.
@@ -15487,5 +15638,5 @@ revoke all on function public.sc_trg_column_max_guard() from public, anon, authe
 -- API until the cache expires — which is exactly how a perfectly good
 -- database came to report "run database/v9.4-fees-and-exams.sql".
 -- ---------------------------------------------------------------------
-select 'V12.77 installed — per-student CBT papers, no mark can exceed its maximum, one row per mark' as status;
+select 'V12.78 installed — a prep exam set for a class is a timetable sitting, and every learner can find it' as status;
 select pg_notify('pgrst', 'reload schema');

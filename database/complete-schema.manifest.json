@@ -1,17 +1,17 @@
 {
  "_meta": {
-  "built_bytes": 989722,
-  "built_from_bytes": 1458309,
+  "built_bytes": 998854,
+  "built_from_bytes": 1468710,
   "removed": {
-   "banner-rule": 452,
+   "banner-rule": 454,
    "banner-trimmed": 128,
    "blank-squeezed": 1,
-   "deindented": 38533,
+   "deindented": 39076,
    "duplicate-grant": 10,
-   "inline-prose-shortened": 153,
+   "inline-prose-shortened": 154,
    "notify-moved-last": 1,
    "progress-select": 163,
-   "redundant-add-column": 148,
+   "redundant-add-column": 149,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
    "release-essay-lines": 0,
@@ -87,6 +87,7 @@
   "column public.cbt_exams.teacher_id",
   "column public.cbt_exams.term",
   "column public.cbt_exams.title",
+  "column public.cbt_exams.venue",
   "column public.cbt_pending_submissions.error",
   "column public.cbt_pending_submissions.exam_code",
   "column public.cbt_pending_submissions.status",
@@ -159,7 +160,9 @@
   "column public.exam_registrations.registration_link_id",
   "column public.exam_registrations.updated_at",
   "column public.exam_timetable.day_no",
+  "column public.exam_timetable.exam_id",
   "column public.exam_timetable.paper_kind",
+  "column public.exam_timetable.source",
   "column public.fee_payments.balance",
   "column public.fee_payments.fee_total",
   "column public.fee_payments.payment_date",
@@ -1044,6 +1047,9 @@
   "sc_my_access_state": [
    ""
   ],
+  "sc_my_prep_exams": [
+   "p_class text default null, p_tz text default 'Africa/Lagos'"
+  ],
   "sc_my_signature": [
    ""
   ],
@@ -1079,6 +1085,12 @@
   ],
   "sc_prep_rebuild_one": [
    "p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text"
+  ],
+  "sc_prep_sync_all": [
+   ""
+  ],
+  "sc_prep_sync_exam": [
+   "p_exam_id uuid, p_tz text default 'Africa/Lagos'"
   ],
   "sc_prevent_embedded_media": [
    ""
@@ -1248,6 +1260,9 @@
   "sc_timetable_capacity": [
    "p_classes text[], p_periods_per_day integer default 6, p_day_periods jsonb default null"
   ],
+  "sc_trg_cbt_prep_schedule": [
+   ""
+  ],
   "sc_trg_column_max_guard": [
    ""
   ],
@@ -1314,6 +1329,7 @@
   "public.diary_teacher_idx",
   "public.exam_registration_links_active_idx",
   "public.exam_registrations_link_idx",
+  "public.exam_timetable_one_per_exam",
   "public.fee_payments_daily_idx",
   "public.fee_payments_method_daily_idx",
   "public.idx_asg_scores_ctx",
@@ -1845,6 +1861,7 @@
   "visitors": []
  },
  "triggers": [
+  "trigger cbt_exams_prep_schedule",
   "trigger on_auth_user_created",
   "trigger sc_fee_invoice_due",
   "trigger trg_cbt_assignment_cleanup",
