@@ -166,24 +166,89 @@ const CBT = {
     // ENTERPRISE V6 (issue 13): UTME-style multi-subject exams must keep each
     // subject's questions GROUPED — never mixed together randomly. Randomise
     // and select_count now operate WITHIN each subject section.
+    /* =====================================================================
+       V12.77 (round 21, item 3) — 60 OF 100, PER CANDIDATE.
+       The report: "a tutor uploads a 100-question CSV but needs 60 — the
+       platform must randomise 60 per student from the 100".
+       What used to happen: select_count simply SLICED the bank. So candidates
+       one to sixty all received questions 1-60, sixty-one to one hundred never
+       saw a question at all, and answering "did this candidate see question
+       #71" was impossible — a bank of 100 was being used as a bank of 60.
+       What happens now:
+         • every candidate's SELECTION is drawn at random from the whole bank,
+           whether or not option-order randomisation is switched on;
+         • the draw is SEEDED from the exam and the candidate, so a refresh, a
+           resumed attempt and a re-mark all see the same sixty questions, and
+           two candidates sitting the same paper rarely see the same set;
+         • option/order randomisation stays a separate switch, as before;
+         • in a multi-subject paper the draw happens INSIDE each subject, so
+           "40 English + 20 Mathematics" keeps its shape.
+       The server does the same thing in sc_cbt_pick_questions() (V12.77) with
+       the same seed inputs, so the browser and the database cannot disagree
+       about which questions a candidate was given. */
+    const studentKey = exam._student_id || exam.student_id || exam.studentId
+                    || (window.SC_PROFILE && window.SC_PROFILE.id) || '';
+    const baseSeed = this.seedFor(exam, studentKey);
     const sections = [...new Set(qs.map(q => q.section || q.subject || 'General'))];
     if (sections.length > 1) {
       const perSection = Math.max(0, Number(exam.select_count) || 0); // per-subject cap in multi mode
       let grouped = [];
-      sections.forEach(sec => {
+      sections.forEach((sec, si) => {
         let block = qs.filter(q => (q.section || q.subject || 'General') === sec);
-        if (exam.randomise) block = this.shuffle(block);
-        if (perSection > 0) block = block.slice(0, perSection);
+        /* the DRAW is always random and stable for this candidate … */
+        if (perSection > 0 && block.length > perSection) {
+          block = this.shuffleSeeded(block, baseSeed ^ (si * 0x9e3779b1)).slice(0, perSection);
+        }
+        /* … and the ORDER is randomised only when the tutor asked for it */
+        if (exam.randomise) block = this.shuffleSeeded(block, baseSeed ^ 0x5f356495);
         grouped = grouped.concat(block);
       });
       qs = grouped;
     } else {
-      if (exam.randomise) qs = this.shuffle(qs);
-      if (exam.select_count && Number(exam.select_count) > 0) qs = qs.slice(0, Number(exam.select_count));
+      const want = Math.max(0, Number(exam.select_count) || 0);
+      if (want > 0 && qs.length > want) {
+        qs = this.shuffleSeeded(qs, baseSeed).slice(0, want);
+      }
+      if (exam.randomise) qs = this.shuffleSeeded(qs, baseSeed ^ 0x5f356495);
     }
     exam._questions = qs;
     exam.questions = qs;
+    exam._pick = {
+      engine: 'v12.77',
+      seed: baseSeed,
+      candidate: studentKey || '(anonymous)',
+      asked: Math.max(0, Number(exam.select_count) || 0) || qs.length,
+      bank: (exam._questions || []).length,
+      order_randomised: !!exam.randomise
+    };
     return exam;
+  },
+
+  /* a small, fast, SEEDED random source: same seed, same paper, every time */
+  seedFor(exam, studentKey) {
+    const seedStr = [exam && (exam.id || exam.code || exam.exam_code || exam.title || ''),
+                     String(studentKey || '')].join('|');
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < seedStr.length; i++) { h ^= seedStr.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h >>> 0;
+  },
+  _rng(seed) {
+    let a = (seed >>> 0) || 0x9e3779b9;
+    return function () {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  },
+  shuffleSeeded(arr, seed) {
+    const a = arr.slice(), rnd = this._rng(seed);
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
   },
 
   shuffle(arr) { const a = arr.slice(); for (let i=a.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; },

@@ -549,6 +549,56 @@
 
     this.rect(0, 0, W, H, white);
 
+    /* V12.77 (round 21, item 2) — A PORTRAIT CARD IS A LAYOUT, NOT A CROP.
+       Every position below was written for an 85.6 x 54 mm card: a header band
+       14.4 mm deep, a photo 27.5 mm tall, five rows of 3.55 mm, a QR in the
+       bottom-right corner. On a 54 x 86 mm portrait card that geometry runs off
+       the bottom, and on a 60 x 90 mm badge it leaves half the card empty —
+       the PDF, which is what the school actually prints, was the one place the
+       preview could still disagree with the card. Both faces now compose from
+       the card's own W and H: stacked when the card is taller than it is wide,
+       side-by-side when it is wider. */
+    var PORTRAIT = H > W;
+    var pad = Math.max(2.6, Math.min(W, H) * 0.045);
+
+    if (side === 'front' && PORTRAIT) {
+      var bandH = Math.min(H * 0.17, 20);
+      this.rect(0, 0, W, bandH, primary);
+      this.rect(0, bandH, W, Math.max(0.7, H * 0.006), accent);
+      this.text(school.toUpperCase(), pad, bandH * 0.22, { size: Math.min(3.4, W * 0.062), bold: true, colour: white, maxMm: W - pad * 2 });
+      this.text(isStaff ? 'STAFF ID CARD' : 'STUDENT ID CARD', pad, bandH * 0.62,
+                 { size: Math.min(2.3, W * 0.042), colour: '#dbeafe', maxMm: W - pad * 2 });
+
+      var ph = Math.min(H * 0.30, W * 0.62), pwP = ph * 0.82, pxP = (W - pwP) / 2, pyP = bandH + pad * 0.7;
+      this.rect(pxP - 0.4, pyP - 0.4, pwP + 0.8, ph + 0.8, '#e2e8f0');
+      var drawn = false;
+      if (p.photo) { try { this.image(p.photo, pxP, pyP, pwP, ph, { fit: 'cover' }); drawn = true; } catch (e) { diag('photo could not be embedded', (p.full_name || '') + ' — ' + (e && e.message)); } }
+      if (!drawn) {
+        this.rect(pxP, pyP, pwP, ph, '#cbd5e1');
+        this.text((String(p.full_name || 'S').trim().charAt(0) || 'S').toUpperCase(), pxP + pwP / 2, pyP + ph * 0.55,
+                  { size: Math.min(9, ph * 0.4), bold: true, colour: '#94a3b8', align: 'center' });
+      }
+
+      var ny = pyP + ph + pad * 0.9;
+      this.text(p.full_name || '', W / 2, ny, { size: Math.min(4.1, W * 0.075), bold: true, colour: ink, align: 'center', maxMm: W - pad * 2 });
+      ny += Math.max(4.4, W * 0.08);
+      var pRows = isStaff
+        ? [['Designation', p.role], ['Department', p.department], ['Staff ID', idNo], ['Phone', p.phone]]
+        : [['Student ID', idNo], ['Class', [p.class, p.arm].filter(Boolean).join(' ')], ['Date of birth', p.date_of_birth], ['Blood group', p.blood_group]];
+      for (var pj = 0; pj < pRows.length; pj++) {
+        if (!pRows[pj][1] || ny > H - pad * 2 - 20) continue;
+        this.text(pRows[pj][0], pad, ny, { size: 1.9, colour: soft, maxMm: W - pad * 2 });
+        this.text(String(pRows[pj][1]).toUpperCase(), W - pad, ny - 0.15,
+                  { size: 2.4, bold: pj < 2, colour: ink, align: 'right', maxMm: W - pad * 2 - 14 });
+        ny += Math.max(3.4, W * 0.06);
+      }
+      var qs = Math.min(W * 0.34, H * 0.17), qxp = (W - qs) / 2, qyp = H - qs - pad * 1.2;
+      this.frame(qxp, qyp, qs, qs, '#cbd5e1', 0.25);
+      if (p.qr) { try { this.image(p.qr, qxp, qyp, qs, qs, { fit: 'contain' }); } catch (e) { diag('QR could not be embedded', e && e.message); } }
+      this.text('SCAN TO VERIFY', W / 2, H - pad * 0.55, { size: 1.75, bold: true, colour: ink, align: 'center' });
+      return this;
+    }
+
     if (side === 'front') {
       this.rect(0, 0, W, 14.4, primary);
       this.rect(0, 14.4, W, 0.9, accent);
@@ -610,6 +660,48 @@
       this.text(b.address || '', 3.2, H - 6.2, { size: 1.75, colour: soft, maxMm: qx - 6 });
       this.text([b.phone, b.email].filter(Boolean).join('  .  '), 3.2, H - 3.6,
                 { size: 1.75, colour: soft, maxMm: qx - 6 });
+    } else if (PORTRAIT) {
+      /* the reverse of a portrait card, stacked in the same order a reader
+         expects: who issued it, the rules, where to return it, who signed it */
+      this.rect(0, 0, W, 9.5, primary);
+      this.text((short + '  ·  REVERSE').toUpperCase(), pad, 3.0, { size: 2.6, bold: true, colour: white, maxMm: W - pad * 2 });
+      this.rect(0, 9.5, W, 0.9, accent);
+      var pRules = isStaff ? [
+        'This card identifies a bona-fide member of staff and remains school property.',
+        'Wear it visibly on the premises and present it on request.',
+        'It is not transferable; misuse attracts disciplinary action.',
+        'Report loss or damage to the school office immediately.',
+        'Surrender the card to the school office upon exit from service.'
+      ] : [
+        'This card identifies a bona-fide student and remains school property.',
+        'Carry it at school and present it on request; it is not transferable.',
+        'It stays valid for the holder\u2019s entire period of studentship.',
+        'Report loss or damage to the class teacher or school office at once.',
+        'Surrender the card on graduation or withdrawal.'
+      ];
+      var ryP = 12.4;
+      for (var q = 0; q < pRules.length; q++) {
+        if (ryP > H - 34) break;
+        this.text((q + 1) + '.', pad, ryP, { size: 1.85, bold: true, colour: primary });
+        var usedP = this.wrapText(pRules[q], pad + 3.0, ryP,
+          { size: 1.85, colour: '#334155', maxMm: W - pad * 2 - 3.0, maxLines: 3, lineHeight: 2.5 });
+        ryP += 2.85 + Math.max(0, usedP - 1) * 2.5;
+      }
+      var boxTopP = ryP + 1.4, boxHP = Math.min(16, H - ryP - 16);
+      this.rect(pad, boxTopP, W - pad * 2, boxHP, '#f1f5f9');
+      this.frame(pad, boxTopP, W - pad * 2, boxHP, '#cbd5e1', 0.25);
+      this.text('IF FOUND, PLEASE RETURN TO:', pad + 1.2, boxTopP + 1.7, { size: 2.0, bold: true, colour: primary });
+      this.text(school, pad + 1.2, boxTopP + 4.6, { size: 2.2, bold: true, colour: ink, maxMm: W - pad * 2 - 2.4 });
+      this.text(b.address || '', pad + 1.2, boxTopP + 7.6, { size: 1.85, colour: soft, maxMm: W - pad * 2 - 2.4 });
+      this.text([b.phone, b.email].filter(Boolean).join('  .  '), pad + 1.2, boxTopP + 10.5, { size: 1.85, colour: soft, maxMm: W - pad * 2 - 2.4 });
+      var footP = boxTopP + boxHP + 2.0;
+      if (b.signature) { try { this.image(b.signature, pad, footP, W * 0.46, 8.4, { fit: 'contain' }); } catch (e) {} }
+      this.rect(pad, footP + (b.signature ? 7.4 : 3.0), W * 0.5, 0.25, '#64748b');
+      this.text('Authorised signature', pad, footP + (b.signature ? 8.0 : 3.6), { size: 1.75, colour: soft });
+      this.text('Issued ' + new Date().getFullYear(), W - pad, footP, { size: 1.75, colour: soft, align: 'right' });
+      if (idNo) this.text(idNo, pad, H - pad * 0.6, { size: 2.0, bold: true, colour: ink });
+      this.text('Powered by HMG Concepts', W - pad, H - pad * 0.6, { size: 1.6, colour: '#94a3b8', align: 'right' });
+      return this;
     } else {
       this.rect(0, 0, W, 9.5, primary);
       this.text((short + '  ·  ' + (isStaff ? 'STAFF' : 'STUDENT') + ' ID — REVERSE').toUpperCase(),

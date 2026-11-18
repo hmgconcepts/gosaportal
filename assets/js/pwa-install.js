@@ -158,7 +158,11 @@ const PWAInstall = {
      ================================================================== */
   async latestVersion() {
     try {
-      const r = await fetch('sw.js', { cache: 'no-store' });
+      /* V12.77 — a cache-busting query AND no-store. The worker answers sw.js
+         from the network now, but a browser or a corporate proxy can still hold
+         a copy; asking for a URL that has never existed cannot be answered from
+         a cache, so "what is the newest build?" is always answered truthfully. */
+      const r = await fetch('sw.js?_v=' + Date.now(), { cache: 'no-store' });
       if (!r.ok) return null;
       const t = await r.text();
       const mm = t.match(/CACHE\s*=\s*['"]([^'"]+)['"]/);
@@ -195,6 +199,24 @@ const PWAInstall = {
     if (version && this.appliedVersion() && version === this.appliedVersion()) {
       this.hideUpdateBanner();
       return;
+    }
+    /* a version we are in the middle of installing is not "available" either */
+    let pending = ''; try { pending = localStorage.getItem('sc_pwa_pending_ver') || ''; } catch (_) {}
+    if (version && pending && version === pending) { this.hideUpdateBanner(); return; }
+    /* V12.77 — the second way the banner lied: a worker that had just
+       ACTIVATED posted SW_UPDATED about itself, so the page was told "a new
+       version is available" about the version it was already running. The
+       caller cannot know; this function can. Remember the answer briefly so a
+       burst of announcements costs one probe, not four. */
+    if (version) {
+      const now = Date.now();
+      if (!this._activeVer || now - (this._activeVerAt || 0) > 30000) {
+        this._activeVerAt = now;
+        this.versionOf(this._reg && this._reg.active).then(v => { this._activeVer = v; if (v && v === version) this.hideUpdateBanner(); });
+      } else if (this._activeVer && this._activeVer === version) {
+        this.hideUpdateBanner();
+        return;
+      }
     }
     if (!this._updateBanner) this.injectUpdateBanner();
     const b = this._updateBanner;
@@ -247,7 +269,7 @@ const PWAInstall = {
        return for a build that is already running. */
     const latest = await this.latestVersion();
     try {
-      if (latest) localStorage.setItem('sc_pwa_applied_ver', latest);
+      if (latest) localStorage.setItem('sc_pwa_pending_ver', latest);
       localStorage.removeItem('sc_pwa_update_dismissed_ver');
       localStorage.removeItem('sc_pwa_update_dismissed_at');
     } catch (_) {}
@@ -275,8 +297,25 @@ const PWAInstall = {
       return;
     }
 
-    /* Nothing pending: pull any new worker, then load the shell fresh. */
+    /* Nothing pending: pull any new worker, then load the shell fresh.
+       V12.77 — and if that still leaves nothing to activate, the click must
+       STILL do something, because "I pressed Update and nothing happened" is
+       the report that started this. The last resort is a true reset: drop the
+       cached shell, unregister the worker, and let the next load install the
+       deployed build from the network. It costs one page load and it cannot
+       leave a device pinned to an old build. */
     try { if (this._reg) await this._reg.update(); } catch (_) {}
+    await new Promise(r => setTimeout(r, 600));
+    const stillPending = this._reg && (this._reg.waiting || this._reg.installing);
+    if (!stillPending) {
+      console.log('[PWA] nothing to activate — performing a full reset');
+      /* each step on its own: a browser that refuses one of them must not stop
+         the others, or the click is dead again for a different reason */
+      try { if (navigator.serviceWorker.controller && navigator.serviceWorker.controller.postMessage) navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' }); } catch (_) {}
+      try { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); } catch (_) {}
+      try { if (this._reg) await this._reg.unregister(); } catch (_) {}
+      try { if (window.toast) toast('Cache cleared — reloading the newest version…', 'info', 3000); } catch (_) {}
+    }
     this.forceReload();
   },
   _reloadSoon() {
@@ -294,6 +333,25 @@ const PWAInstall = {
     } catch (_) {
       window.location.reload();
     }
+  },
+
+  /* V12.77 — proof, after the fact. A reload can be served by an old worker, so
+     the version we aimed at is written down before the reload and confirmed
+     after it: only when the RUNNING worker reports that exact version is the
+     update recorded as applied and the banner retired for good. */
+  async confirmApplied() {
+    let pending = '';
+    try { pending = localStorage.getItem('sc_pwa_pending_ver') || ''; } catch (_) {}
+    if (!pending) return null;
+    const active = await this.versionOf(this._reg && this._reg.active);
+    if (active && active === pending) {
+      try { localStorage.setItem('sc_pwa_applied_ver', pending); localStorage.removeItem('sc_pwa_pending_ver'); localStorage.removeItem('sc_pwa_update_dismissed_ver'); localStorage.removeItem('sc_pwa_update_dismissed_at'); } catch (_) {}
+      this.hideUpdateBanner();
+      if (window.toast) toast('✅ Updated to the newest version.', 'success', 5000);
+      return active;
+    }
+    /* the reload did not land on the new build — keep the banner honest */
+    return null;
   },
 
   // ---- Update checker ----
@@ -345,6 +403,7 @@ const PWAInstall = {
     if (!reg || this._reg === reg) return;
     this._reg = reg;
     console.log('[PWA] attached to SW registration', reg.scope);
+    this.confirmApplied().catch(() => {});
     // If there's already a waiting SW (update found while page was closed)
     if (reg.waiting) {
       console.log('[PWA] found waiting SW');

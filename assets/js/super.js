@@ -687,6 +687,48 @@ const Super = {
     },
     validityNote(isStaff) { return isStaff ? 'Valid for the duration of employment' : 'Valid throughout studentship'; },
     /* ================================================================
+       V12.77 (round 21, item 1) — THE PROFESSIONAL TEMPLATE FAMILIES.
+       ----------------------------------------------------------------
+       Researched against what the card industry actually prints for schools and
+       institutions (CR80/ISO 7810 ID-1 at 85.6 x 53.98 mm, 1.59 mm bleed each
+       side, 3.2 mm safe margin, 2.4-3.2 mm corner radius, duplex with the backs
+       mirrored for a long-edge flip):
+         • CORPORATE / ACCESS   navy bands, portrait lanyard badges, chip motifs
+         • ACADEMIC             crest, gold trim, house band, serif display
+         • CLINICAL / STAFF     teal, cross motif, role + department prominence
+         • MINIMAL / SWISS      one accent rule, generous white space
+         • TRANSIT / ACCESS     high contrast, big number, barcode strip
+       Every family here is ONE list, and every consumer reads the list: the
+       dropdown on the ID-card page is generated from it, the back-face renderer
+       switches on it, and the gate asserts that each entry has a front AND a
+       back. Adding a family can therefore never leave the UI, the print path or
+       the back a stepner behind.
+       ================================================================ */
+    TEMPLATES: [
+      { id:'premium',   label:'Premium — navy band, photo, QR (lifetime)',       family:'classic', portrait:false , native:'landscape'},
+      { id:'executive', label:'Executive — dark green & gold, embassy',           family:'classic', portrait:false , native:'landscape'},
+      { id:'heritage',  label:'Heritage — classic crest, serif',                  family:'classic', portrait:false , native:'landscape'},
+      { id:'corporate', label:'Corporate — dark executive, accent rule',          family:'classic', portrait:false , native:'landscape'},
+      { id:'minimal',   label:'Minimal — Swiss clean, one accent rule',           family:'classic', portrait:false , native:'landscape'},
+      { id:'crest',     label:'Academic Crest — gold seal, house band (new)',     family:'classic', portrait:false , native:'landscape'},
+      { id:'clinical',  label:'Clinical Staff — teal, cross motif (new)',         family:'clinical',portrait:false , native:'landscape'},
+      { id:'smart',     label:'Smart Card — fintech chip, dark',                  family:'modern',  portrait:false , native:'landscape'},
+      { id:'gradient',  label:'Gradient — vibrant modern',                        family:'modern',  portrait:false , native:'landscape'},
+      { id:'aurora',    label:'Aurora — soft modern gradient (new)',              family:'modern',  portrait:false , native:'landscape'},
+      { id:'badge',     label:'Badge — conference, portrait',                     family:'badge',   portrait:true  , native:'portrait'},
+      { id:'vertical',  label:'Vertical — lanyard, portrait',                     family:'badge',   portrait:true  , native:'portrait'},
+      { id:'metro',     label:'Transit Access — high contrast, barcode (new)',    family:'badge',   portrait:true  , native:'portrait'}
+    ],
+    templateIds(){ return this.TEMPLATES.map(t => t.id); },
+    templateLabel(id){ const t = this.TEMPLATES.filter(x => x.id === id)[0]; return t ? t.label : (id || 'horizontal'); },
+    templateFamily(id){ const t = this.TEMPLATES.filter(x => x.id === id)[0]; return t ? t.family : 'classic'; },
+    /* the dropdown is built from TEMPLATES, so the list can never drift */
+    templateOptions(selected){
+      return this.TEMPLATES.map(t => '<option value="' + t.id + '"' +
+        (t.id === selected ? ' selected' : '') + '>' + Super.esc(t.label) + '</option>').join('');
+    },
+
+    /* ================================================================
        V12.71 (round-15 item 2) — ONE CARD, ONE PHYSICAL BOX.
        ------------------------------------------------------------------
        Every template below used to hard-code its own pixel width (520,
@@ -703,9 +745,12 @@ const Super = {
     faceBox(opts){
       const mmW=Number(opts&&opts.widthMm), mmH=Number(opts&&opts.heightMm),
             pxW=Number(opts&&opts.widthPx), pxH=Number(opts&&opts.heightPx);
-      if(mmW>0&&mmH>0){const w=Math.round(mmW*96/25.4),h=Math.round(mmH*96/25.4);
-        return {w:w+'px',h:h+'px',pxW:w,pxH:h,k:Math.min(w/340,h/220)};}
+      /* V12.77 — an explicit pixel canvas wins: pairHtml() has already measured
+         the design and hands both faces the SAME canvas, and that decision must
+         not be re-derived from the millimetres. */
       if(pxW>0&&pxH>0){const w=Math.round(pxW),h=Math.round(pxH);
+        return {w:w+'px',h:h+'px',pxW:w,pxH:h,k:Math.min(w/340,h/220)};}
+      if(mmW>0&&mmH>0){const w=Math.round(mmW*96/25.4),h=Math.round(mmH*96/25.4);
         return {w:w+'px',h:h+'px',pxW:w,pxH:h,k:Math.min(w/340,h/220)};}
       return null; /* no size supplied: the template keeps its own width */
     },
@@ -774,6 +819,59 @@ const Super = {
         +'.sc-idcard-face .sc-idcard-scale{contain:paint}'
         +'</style>';
     },
+    /* force BOTH dimensions: the card's shape, not just its width */
+    cardAt2(html, w, h){
+      let out=this.cardAt(html, w);
+      const px=Math.max(40,Math.round(Number(h)||0));
+      return out.replace(/(<div class="sc-idcard"[^>]*?style=")([^"]*)(")/, function(all,a,style,b){
+        let st=/height:/.test(style) ? style.replace(/(^|;)\s*height:[^;]*/, '$1height:'+px+'px')
+                                     : style+';height:'+px+'px';
+        if(!/box-sizing/.test(st)) st+=';box-sizing:border-box';
+        return a+st+b;
+      });
+    },
+    /* how much a design overflows a box of exactly w x h */
+    measureBox(html, w, h){
+      const host=this._probeHost(); if(!host) return null;
+      try{
+        host.innerHTML=this.faceCss()
+          +'<div class="sc-idcard-face" style="width:2000px;height:auto;min-width:0;min-height:0;max-width:none;max-height:none;overflow:visible;position:relative">'
+          +this.cardAt2(html,w,h)+'</div>';
+        const c=host.querySelector('.sc-idcard'); if(!c) return null;
+        c.style.setProperty('max-width','none','important');
+        c.style.setProperty('margin','0','important');
+        const r=c.getBoundingClientRect();
+        /* V12.77 — decorations do not count. Every premium design paints soft
+           circles, ribbons or watermarks that deliberately run off the edge and
+           are clipped by the card's own overflow:hidden; counting them as
+           "content that does not fit" made a perfectly good design look 6 %
+           too wide. Overflow is therefore measured over the elements that are
+           actually in the flow. */
+        let maxR=r.left, maxB=r.top;
+        const nodes=c.querySelectorAll('*');
+        for(let i=0;i<nodes.length;i++){
+          const n=nodes[i], cs=getComputedStyle(n);
+          if(cs.position==='absolute'||cs.position==='fixed') continue;
+          const b=n.getBoundingClientRect();
+          if(!b.width&&!b.height) continue;
+          if(b.right>maxR) maxR=b.right;
+          if(b.bottom>maxB) maxB=b.bottom;
+        }
+        return { w:Math.round(r.width), h:Math.round(r.height),
+                 overX:Math.max(0,Math.round(maxR-r.right)),
+                 overY:Math.max(0,Math.round(maxB-r.bottom)) };
+      }finally{ host.innerHTML=''; }
+    },
+
+    /* the design's OWN height at a given width, with any forced height removed */
+    cardNatural(html, w){
+      let out=this.cardAt(html, w);
+      return out.replace(/(<div class="sc-idcard"[^>]*?style=")([^"]*)(")/, function(all,a,style,b){
+        let st=style.replace(/(^|;)\s*height:[^;]*/g,'$1').replace(/(^|;)\s*min-height:[^;]*/g,'$1');
+        return a+st+b;
+      });
+    },
+
     /* natural (unscaled) size of a front template at a given canvas width */
     measureCard(html, w){
       const host=this._probeHost(); if(!host) return null;
@@ -802,51 +900,129 @@ const Super = {
         return (out.w>0&&out.h>0)?out:null;
       }finally{ host.innerHTML=''; }
     },
-    /* the design canvas the template needs so its own proportions match the card */
-    fitCanvas(html, aspect){
+    /* the design canvas the template needs so its own proportions match the card
+       ------------------------------------------------------------------------
+       V12.77 (round 21, item 2) — A SECOND PASS AT "ONE CARD, ONE SHAPE".
+       The previous rule only ever WIDENED a design, on the reasonable theory
+       that widening a flex layout is free while narrowing makes its rows fight.
+       Measured against the portrait-native designs (badge, vertical, transit)
+       that theory fails: their natural canvas is 340x380 — a ratio of 0.89 —
+       while an ID-1 portrait card is 0.63, so the design was never widened,
+       never narrowed, and got letterboxed down to 86 % of the card. A card that
+       is 14 % margin is not a card.
+       The canvas is now chosen by a small search: sample the design at a spread
+       of widths, discard every width that makes content overflow horizontally,
+       and keep the sample whose rendered proportions are closest to the CARD's
+       proportions, preferring a wider canvas when two are equally close. It is
+       measured, not assumed, so any template added later benefits without being
+       touched. */
+    fitCanvas(html, aspect, renderAt){
       const key=this._hash(html)+'@'+aspect.toFixed(4);
       if(this._fitCache[key]) return this._fitCache[key];
-      let m=this.measureCard(html,0);
+      const m=this.measureCard(html,0);
       if(!m) return null;
-      /* V12.75 — A DESIGN IS WIDENED, NEVER SQUEEZED.
-         Widening a flex layout to match a wide card is free: the rows simply
-         have more room. Narrowing one below the width it was drawn for makes
-         its photo, table and QR fight for space, and the result reads as a
-         mangled card even when nothing technically overflows. So the canvas
-         may only grow past its natural width; when the card is the other way
-         round the design keeps its own width and sits centred inside the card,
-         which the page explains in words and offers to fix in one click. */
       const naturalW=m.w;
-      let W=m.w, H=m.h, best={W:W,H:H,pad:m.pad||0,over:m.over||0,err:Math.abs(H*aspect-W)};
-      for(let i=0;i<4;i++){
-        let target=Math.max(naturalW,Math.min(1600,Math.round(H*aspect)));
-        if(Math.abs(target-W)<=1) break;
-        let n=this.measureCard(html,target); if(!n) break;
-        /* a canvas narrower than the design can fold is a canvas that clips:
-           widen until nothing sticks out, or give up on narrowing. */
-        let guard=0;
-        while(n.over>1 && guard++<6){
-          target=Math.round(target*1.15);
-          const wider=this.measureCard(html,target); if(!wider) break;
-          n=wider;
-          if(n.over<=1) break;
-        }
-        W=n.w; H=n.h;
-        const err=Math.abs(H*aspect-W);
-        if(n.over<=1 && err<best.err) best={W:W,H:H,pad:n.pad||0,over:n.over,err:err};
-        if(n.over<=1 && err<=1) break;
+      /* ---------------------------------------------------------------
+         V12.77 — FIRST ANSWER: DRAW THE DESIGN IN THE CARD'S OWN SHAPE.
+         A canvas whose proportions ARE the card's needs no letterboxing at
+         all: the scale is uniform, the artwork covers the whole face and the
+         front and back are identical by construction. So we sample widths,
+         give each one a height of exactly w/aspect, and keep the LARGEST
+         width at which the design still fits inside that height — larger
+         means bigger type on the printed card. Only when no width fits (a
+         design that is simply too dense for the shape) does the older
+         proportion-matching search below take over. */
+      /* V12.77 — MEASURE THE DESIGN AS IT WILL BE DRAWN. Forcing a width onto
+         the *natural* markup and measuring that is one design; drawing the
+         template at that width is another, because the good templates size
+         their photo, QR and type from the canvas they are given. Measuring the
+         first and printing the second clipped the bottom of the card. So when
+         the caller can re-render (pairHtml always can), every candidate is
+         rendered at the exact box it is being tested for. */
+      const drawAt=(w,h)=> (typeof renderAt==='function' ? renderAt(w,h) : this.cardAt2(html,w,h));
+      const tried={};
+      const fits=(w)=>{
+        w=Math.max(120,Math.min(1800,Math.round(w)));
+        if(w in tried) return tried[w];
+        const h=Math.round(w/aspect);
+        const b=this.measureBox(drawAt(w,h),w,h);
+        tried[w]=!!(b && b.overX<=1 && b.overY<=1);
+        return tried[w];
+      };
+      const widths=[0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.15,1.3,1.5].map(f=>Math.round(naturalW*f));
+      let lo=0, hi=0;                       /* lo = largest width that FITS */
+      widths.forEach(w=>{ if(fits(w)){ if(w>lo) lo=w; } else if(!hi||w<hi) hi=w; });
+      /* nothing in the spread fitted: step down, because a narrower canvas needs
+         a shorter height and content shrinks more slowly than the card does */
+      /* V12.77 — a canvas is never shrunk below 75 % of the design's own width.
+         Searching far into the small sizes found "fits" answers that filled a
+         third of the card: a letterboxed card is the failure this round is
+         fixing, so the floor is explicit and the fallback below is preferred. */
+      const FLOOR=Math.max(140, Math.round(naturalW*0.75));
+      for(let step=0;!lo&&step<3;step++){
+        const w=Math.round(naturalW*0.9*Math.pow(0.88,step+1));
+        if(w<FLOOR) break;
+        if(fits(w)) lo=w; else if(!hi||w<hi) hi=w;
       }
-      /* keep the cache small: the preview re-renders on every keystroke */
+      /* then walk back UP towards the largest fitting width: bigger canvas means
+         bigger type on the printed card */
+      if(lo){
+        const ceil=hi||Math.round(lo*1.35);
+        for(let i=0;i<5&&ceil-lo>4;i++){
+          const mid=Math.round((lo+ceil)/2);
+          if(fits(mid)) lo=mid; else hi=mid;
+        }
+      }
+      const exact = lo ? [{W:lo, H:Math.round(lo/aspect), pad:0, over:0, err:0}] : [];
+      if(exact.length){
+        exact.sort((a,b)=>b.W-a.W);
+        const out=exact[0];
+        const keys0=Object.keys(this._fitCache);
+        if(keys0.length>80) delete this._fitCache[keys0[0]];
+        this._fitCache[key]=out;
+        return out;
+      }
+      const natural={W:m.w,H:m.h,pad:m.pad||0,over:m.over||0,err:Math.abs(m.h*aspect-m.w)};
+      /* ---------------------------------------------------------------
+         NOTHING FITS: KEEP THE DESIGN'S OWN SHAPE, ACCEPT THE MARGIN.
+         Some designs are simply drawn for one shape — a lanyard badge is tall,
+         a transit pass is tall — and squeezing one into a landscape card
+         either crops a rule off the bottom or shrinks it into a stamp. In that
+         case the honest result is the design's own canvas, uniformly scaled
+         and centred: nothing is cut, nothing is stretched, and the page says
+         which designs prefer which shape. Only the margin gives. */
+      if(!lo){
+        const drawn = typeof renderAt==='function'
+                    ? renderAt(naturalW, Math.round(naturalW/aspect))
+                    : html;
+        const nat = typeof renderAt==='function'
+                  ? this.measureCard(this.cardNatural(drawn, naturalW), naturalW)
+                  : m;
+        const out = nat ? {W:nat.w, H:nat.h, pad:0, over:0,
+                           err:Math.abs(nat.h*aspect-nat.w), mismatch:true} : natural;
+        const k0=Object.keys(this._fitCache);
+        if(k0.length>80) delete this._fitCache[k0[0]];
+        this._fitCache[key]=out;
+        return out;
+      }
+      const out = {W:lo, H:Math.round(lo/aspect), pad:0, over:0, err:0};
       const keys=Object.keys(this._fitCache);
-      if(keys.length>60) delete this._fitCache[keys[0]];
-      this._fitCache[key]=best;
-      return best;
+      if(keys.length>80) delete this._fitCache[keys[0]];
+      this._fitCache[key]=out;
+      return out;
     },
     /* scale one finished face into exactly `box` without cropping it */
-    fitFace(html, box, faceName){
+    fitFace(html, box, faceName, canvasOverride){
       const FACE=faceName||'front';
       if(!box||!(box.pxW>0)||!(box.pxH>0)) return html;
-      const canvas=this.fitCanvas(html, box.pxW/box.pxH);
+      /* V12.77 (round 21, item 2) — WHEN TWO FACES MUST BE THE SAME SIZE, ONE
+         CANVAS DECIDES IT. fitCanvas() gives each face its own canvas, so a
+         front that could be widened to the card's shape and a back that could
+         not were scaled by different factors and looked like two different
+         cards even though their boxes matched. pairHtml() now measures ONCE and
+         passes that canvas to both faces, so the scale, the centring and
+         therefore the finished size are identical by construction. */
+      const canvas=canvasOverride||this.fitCanvas(html, box.pxW/box.pxH);
       if(!canvas||!canvas.W||!canvas.H){
         /* cannot measure (no DOM yet): still never overflow the box */
         return this.faceCss()+'<div class="sc-idcard-face" data-face="'+FACE+'" style="width:'+box.w+';height:'+box.h+
@@ -875,13 +1051,26 @@ const Super = {
         ';box-sizing:border-box">'
         +'<div class="sc-idcard-scale" style="position:absolute;left:'+left+'px;top:'+top+'px;width:'+canvas.W+
         'px;height:'+canvas.H+'px;transform:scale('+s.toFixed(5)+');transform-origin:top left">'
-        +this.cardAt(html,contentW)+'</div></div>';
+        /* V12.77 — the card inside the scale box is pinned to the canvas on BOTH
+           axes. A template that paints its own natural height (and several do)
+           otherwise ended up shorter than its twin and the pair looked like two
+           different cards even though both wrappers matched. */
+        +this.cardAt2(html, canvas.W, canvas.H)+'</div></div>';
     },
     /* the ONE front-face renderer used by the preview, print and PDF screens */
     frontFace(person, opts){
+      /* V12.77 — the print path, the PDF path and the preview all go through
+         this one function, so all three must agree with pairHtml: measure the
+         design once, draw it on that canvas, then scale it into the card. */
       const box=this.faceBox(opts);
-      const natural=this.html(person||{},{}); /* design canvas, no forced box */
-      return this.fitFace(natural, box);
+      if(!box) return this.html(person||{}, opts||{});
+      const tpl=(opts&&opts.template)||person.template;
+      const natural=this.html(person||{},{template:tpl}); /* design canvas, no forced box */
+      const canvas=this.fitCanvas(natural, box.pxW/box.pxH,
+                     (w,h)=>this.html(person||{},{template:tpl,widthPx:w,heightPx:h}))
+                   || {W:box.pxW,H:box.pxH};
+      return this.fitFace(this.html(person||{},{template:tpl,widthPx:canvas.W,heightPx:canvas.H}),
+                          box, 'front', canvas);
     },
     html(person, opts) {
       const s = Super.school || {};
@@ -902,7 +1091,11 @@ const Super = {
       const tag = isStaff ? 'STAFF IDENTITY CARD' : 'STUDENT IDENTITY CARD';
       // build the detail rows (professional, complete — issue 14)
       const rows = [];
-      const add = (k, v) => { if (v) rows.push('<tr><td style="color:#64748b;padding:1px 8px 1px 0;white-space:nowrap">' + Super.esc(k) + '</td><td style="font-weight:600">' + Super.esc(v) + '</td></tr>'); };
+      /* V12.77 — an ID number is one token. It used to wrap ("GOSA/2026/00" on
+         one line, "05" on the next) because the value cell could break anywhere;
+         values are now unbreakable and the label column is the only thing that
+         gives way. */
+      const add = (k, v) => { if (v) rows.push('<tr><td style="color:#64748b;padding:1px 8px 1px 0;white-space:nowrap">' + Super.esc(k) + '</td><td style="font-weight:600;white-space:nowrap">' + Super.esc(v) + '</td></tr>'); };
       add('ID No', idNo);
       if (isStaff) { add('Designation', person.role); add('Department', person.department); add('Type', person.staff_type); }
       else {
@@ -917,13 +1110,31 @@ const Super = {
       const session = (s.session || (new Date().getFullYear() + '/' + (new Date().getFullYear() + 1)));
       const pc = person.pc || s.primary || 'var(--primary,#4f46e5)';
       const ac = person.ac || s.accent || 'var(--accent,#0ea5e9)';
-      const tpl = person.template || 'horizontal';
+      /* V12.77 — the template can arrive on the person (the page sets it) or in
+         opts (a caller printing one specific design). Both are honoured, so a
+         preview, a print and a PDF cannot render three different designs. */
+      /* V12.77 — LEGACY DESIGN NAMES KEEP WORKING. Cards and saved settings
+         written before this round carry names like "horizontal" or "elegant".
+         They are mapped onto the nearest design in the registry instead of
+         falling through to a default that no longer exists. */
+      const ALIAS = { horizontal:'premium', elegant:'heritage', compact:'minimal',
+                      classic:'premium', dark:'corporate', vertical2:'vertical',
+                      modern:'smart', simple:'minimal', badge2:'badge' };
+      const rawTpl = (opts && opts.template) || person.template || 'premium';
+      const tpl = ALIAS[rawTpl] || rawTpl;
       const logo = 'assets/img/logo.' + (s.logoExt || 'svg');
       const contactFooter = '<div style="background:#f1f5f9;padding:7px 14px;font-size:.62rem;color:#475569;text-align:center;line-height:1.5">' +
         (s.address ? Super.esc(s.address) + '<br>' : '') +
         [s.phone ? 'Tel: ' + Super.esc(s.phone) : '', s.email ? Super.esc(s.email) : ''].filter(Boolean).join(' · ') +
         (s.motto ? '<br><em style="color:#64748b">"' + Super.esc(s.motto) + '"</em>' : '') + '</div>';
       const credit = '<div style="background:#0f172a;color:#94a3b8;font-size:.56rem;text-align:center;padding:3px 0">If found, please return to the school office · Powered by HMG Concepts</div>';
+      /* V12.77 — THE FIXED-PIXEL FOOTER WAS WHY A CARD COULD NOT BE A CARD.
+         The credit line is set in rem, so it stayed ~24px tall on a 380px card
+         and on a 700px card alike. A design whose content height therefore had
+         a fixed floor could never be given the card's proportions, and the
+         printer fell back to letterboxing it (a 69 % card). Designs that size
+         themselves from the canvas use this relative line instead. */
+      const creditF = () => '<div style="background:#0f172a;color:#94a3b8;font-size:'+(VW(1.5))+';text-align:center;padding:'+(VW(0.6))+' 0">If found, please return to the school office · Powered by HMG Concepts</div>';
       const bigPhoto = photo
         ? '<img src="' + Super.esc(photo) + '" referrerpolicy="no-referrer" style="width:110px;height:110px;border-radius:12px;object-fit:cover;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.2);background:#f1f5f9" alt="photo" data-alt="' + Super.esc(this.driveAlt(person.photo_url || '')) + '" onerror="if(this.dataset.alt&&this.src!==this.dataset.alt){this.src=this.dataset.alt;this.dataset.alt=\'\';}else{this.onerror=null;this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';}"><div style="display:none;width:110px;height:110px;border-radius:12px;background:' + pc + ';color:#fff;align-items:center;justify-content:center;font-weight:900;font-size:2.4rem;border:3px solid #fff">' + initial + '</div>'
         : '<div style="width:110px;height:110px;border-radius:12px;background:' + pc + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:2.4rem;border:3px solid #fff">' + initial + '</div>';
@@ -1070,7 +1281,10 @@ const Super = {
       }
       // CORPORATE (dark, premium) horizontal template
       if (tpl === 'corporate') {
-        return '<div class="sc-idcard" style="width:360px;border-radius:16px;overflow:hidden;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 12px 30px rgba(0,0,0,.25);background:#0f172a;color:#e2e8f0">' +
+        /* V12.77 — this one hard-coded 360px and no height, so it could not fill
+           a card of any other shape; it now takes the card's own box like every
+           other design. */
+        return '<div class="sc-idcard" data-template="corporate" style="width:'+(_fit?_fit.w:'360px')+';'+(_fit?('height:'+_fit.h+';'):'')+'box-sizing:border-box;border-radius:16px;overflow:hidden;font-family:\'Segoe UI\',Arial,sans-serif;box-shadow:0 12px 30px rgba(0,0,0,.25);background:#0f172a;color:#e2e8f0;display:flex;flex-direction:column">' +
           '<div style="padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:2px solid ' + ac + '">' +
           '<img src="' + logo + '" style="width:40px;height:40px;border-radius:9px;background:#fff;padding:3px;object-fit:contain" onerror="this.style.display=\'none\'">' +
           '<div style="flex:1"><strong style="font-size:.98rem;color:#fff">' + Super.esc(s.name || 'School') + '</strong><div style="font-size:.64rem;color:#94a3b8">' + Super.esc(s.motto || '') + '</div></div>' +
@@ -1082,6 +1296,102 @@ const Super = {
           '<div style="background:#1e293b;padding:7px 14px;font-size:.6rem;color:#94a3b8;text-align:center">' + Super.esc(s.address || '') + ' · ' + Super.esc(s.phone || '') + ' · ' + Super.esc(s.email || '') + '<div style="display:flex;justify-content:center;margin-top:4px;filter:invert(0)"><span style="background:#fff;border-radius:6px;padding:2px 8px;display:inline-block">' + this.signBlock('#0f172a', 84) + '</span></div></div>' +
           '<div style="background:' + ac + ';color:#0f172a;font-size:.56rem;text-align:center;padding:3px 0;font-weight:700">' + this.validityNote(isStaff) + ' · Powered by HMG Concepts</div></div>';
       }
+      /* ============================================================
+         V12.77 (round 21, item 1) — FOUR NEW FAMILIES
+         Each is drawn with the same discipline as the templates above: the
+         outer box is the card's own box when one is supplied (so it fills the
+         card and prints at the right size), every colour comes from the
+         school's palette, and every card still carries the five things a card
+         must carry: who, which school, which number, a way to verify, and a
+         way to return it.
+         ============================================================ */
+
+      /* every size in the four families below is a share of the card's own
+         width, so they stay correct at ID-1, at 100x60 mm, and at any size a
+         school types in */
+      const VW = (n) => { const base = _fit ? _fit.pxW : 520; return (base / 100 * n).toFixed(2) + 'px'; };
+      // ACADEMIC CREST — gold seal, serif name, house band (academic boards)
+      if (tpl === 'crest') {
+        const gold = '#b8860b', ink = '#0b1f3a';
+        return '<div class="sc-idcard" data-template="crest" style="width:'+(_fit?_fit.w:'520px')+';'+(_fit?('height:'+_fit.h+';'):'')+'box-sizing:border-box;border-radius:14px;overflow:hidden;background:linear-gradient(180deg,#fbfaf5,#efe9d8);border:3px double '+gold+';font-family:Georgia,\'Times New Roman\',serif;display:flex;flex-direction:column">' +
+          '<div style="background:'+ink+';color:#f7f3e3;padding:'+(VW(2.6))+' '+(VW(4))+';display:flex;align-items:center;gap:'+(VW(2.4))+'">' +
+            '<img src="'+logo+'" style="width:'+(VW(11))+';height:'+(VW(11))+';object-fit:contain;background:#fff;border-radius:50%;padding:2px" onerror="this.style.display=\'none\'">' +
+            '<div style="flex:1;min-width:0"><div style="font-size:'+(VW(4))+';font-weight:700;letter-spacing:.5px;line-height:1.1">'+Super.esc((s.name||'SCHOOL').toUpperCase())+'</div>' +
+            '<div style="font-size:'+(VW(2.2))+';color:'+gold+';letter-spacing:2px;margin-top:2px">'+Super.esc(s.motto||'KNOWLEDGE · CHARACTER · SERVICE')+'</div></div>' +
+            '<div style="text-align:right;font-size:'+(VW(2.4))+';letter-spacing:1.5px;color:#e8d9a0">'+tag+'</div></div>' +
+          '<div style="height:'+(VW(1))+';background:'+gold+'"></div>' +
+          '<div style="display:flex;gap:'+(VW(3))+';padding:'+(VW(2.2))+' '+(VW(4))+';align-items:flex-start;flex:1;min-height:0;overflow:hidden">' +
+            '<div style="flex-shrink:0;text-align:center"><div style="padding:3px;border:2px solid '+gold+';border-radius:10px;background:#fff">'+miniPhoto(_fit?Math.round(_fit.pxW*0.19):96, _fit?Math.round(_fit.pxW*0.22):112, 8)+'</div>' +
+            '<div style="margin-top:'+(VW(1.4))+';font-size:'+(VW(1.9))+';letter-spacing:1.5px;color:'+gold+';font-weight:700">'+Super.esc(isStaff?'STAFF':'STUDENT')+'</div></div>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-size:'+(VW(4))+';font-weight:700;color:'+ink+';line-height:1.1;overflow-wrap:anywhere">'+Super.esc(person.full_name||'')+'</div>' +
+              '<div style="height:2px;width:'+(VW(16))+';background:'+gold+';margin:'+(VW(1))+' 0"></div>' +
+              '<table style="font-size:'+(VW(2.3))+';border-collapse:collapse;color:#3b3a33">'+rows.join('').replace(/#64748b/g,'#6b6a60').replace(/font-weight:600/g,'font-weight:700;color:'+ink)+'</table>' +
+              '<div style="margin-top:'+(VW(1))+';font-size:'+(VW(1.9))+';color:#6b6a60;font-style:italic">'+this.validityNote(isStaff)+'</div></div>' +
+            '<div style="text-align:center;flex-shrink:0"><div style="background:#fff;padding:4px;border:1px solid '+gold+';border-radius:6px">'+qrImg(_fit?Math.round(_fit.pxW*0.16):72)+'</div>' +
+            '<div style="font-size:'+(VW(1.8))+';font-weight:800;letter-spacing:1px;color:'+ink+';margin-top:3px">SCAN TO VERIFY</div></div></div>' +
+          '<div style="background:'+ink+';color:#e8d9a0;font-size:'+(VW(1.9))+';padding:'+(VW(1.6))+' '+(VW(5))+';display:flex;justify-content:space-between;gap:8px;align-items:center">' +
+            '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+Super.esc(s.address||'')+'</span>' +
+            '<span style="flex-shrink:0">'+Super.esc([s.phone,s.email].filter(Boolean).join(' · '))+'</span></div>' + creditF() + '</div>';
+      }
+
+      // CLINICAL STAFF — teal, cross motif, department prominence
+      if (tpl === 'clinical') {
+        const teal = pc || '#0f766e', deep = '#042f2e';
+        return '<div class="sc-idcard" data-template="clinical" style="width:'+(_fit?_fit.w:'520px')+';'+(_fit?('height:'+_fit.h+';'):'')+'box-sizing:border-box;border-radius:14px;overflow:hidden;background:#f8fafc;font-family:\'Segoe UI\',Arial,sans-serif;display:flex;flex-direction:column;border:1px solid #cbd5e1">' +
+          '<div style="background:'+teal+';color:#fff;padding:'+(VW(3.4))+' '+(VW(5))+';display:flex;align-items:center;gap:'+(VW(3))+'">' +
+            '<div style="width:'+(VW(9))+';height:'+(VW(9))+';border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+              '<div style="position:relative;width:60%;height:60%"><div style="position:absolute;left:36%;top:0;width:28%;height:100%;background:'+teal+';border-radius:2px"></div><div style="position:absolute;top:36%;left:0;height:28%;width:100%;background:'+teal+';border-radius:2px"></div></div></div>' +
+            '<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:'+(VW(3.4))+';line-height:1.12">'+Super.esc(s.name||'SCHOOL')+'</div>' +
+            '<div style="font-size:'+(VW(2.1))+';opacity:.9;letter-spacing:1px">HEALTH &amp; WELLBEING · '+tag+'</div></div>' +
+            '<img src="'+logo+'" style="width:'+(VW(8))+';height:'+(VW(8))+';object-fit:contain;background:#fff;border-radius:6px;padding:2px" onerror="this.style.display=\'none\'"></div>' +
+          '<div style="display:flex;gap:'+(VW(4))+';padding:'+(VW(4))+' '+(VW(5))+';align-items:flex-start;flex:1;min-height:0">' +
+            miniPhoto(_fit?Math.round(_fit.pxW*0.18):92, _fit?Math.round(_fit.pxW*0.21):108, 10) +
+            '<div style="flex:1;min-width:0"><div style="font-size:'+(VW(4.2))+';font-weight:800;color:'+deep+';line-height:1.12;overflow-wrap:anywhere">'+Super.esc(person.full_name||'')+'</div>' +
+            '<div style="display:inline-block;margin:'+(VW(1.2))+' 0;background:'+teal+';color:#fff;border-radius:999px;padding:1px '+(VW(2.4))+';font-size:'+(VW(2))+';font-weight:800;letter-spacing:.6px">'+Super.esc((person.role||'STAFF MEMBER').toUpperCase())+'</div>' +
+            '<table style="font-size:'+(VW(2.4))+';border-collapse:collapse;color:#334155">'+rows.join('').replace(/#64748b/g,'#0f766e')+'</table>' +
+            '<div style="margin-top:'+(VW(1.4))+';font-size:'+(VW(1.9))+';color:#0f766e;font-weight:700">'+Super.esc(isStaff?'In an emergency, contact the school office first.':'Allergies / conditions: see the medical record.')+'</div></div>' +
+            '<div style="text-align:center;flex-shrink:0"><div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:3px">'+qrImg(_fit?Math.round(_fit.pxW*0.15):68)+'</div>' +
+            '<div style="font-size:'+(VW(1.7))+';font-weight:800;color:'+deep+';margin-top:2px;letter-spacing:.8px">VERIFY</div></div></div>' +
+          '<div style="background:'+deep+';color:#99f6e4;font-size:'+(VW(1.8))+';padding:'+(VW(1.4))+' '+(VW(5))+';display:flex;justify-content:space-between;gap:8px">' +
+            '<span>'+Super.esc([s.phone,s.email].filter(Boolean).join(' · '))+'</span><span>'+Super.esc(s.address||'')+'</span></div>' + creditF() + '</div>';
+      }
+
+      // AURORA — soft modern gradient, watermark initials (sixth-form / college)
+      if (tpl === 'aurora') {
+        return '<div class="sc-idcard" data-template="aurora" style="width:'+(_fit?_fit.w:'520px')+';'+(_fit?('height:'+_fit.h+';'):'')+'box-sizing:border-box;position:relative;border-radius:18px;overflow:hidden;background:linear-gradient(135deg,'+pc+' 0%,'+ac+' 55%,#ffffff 160%);color:#fff;font-family:\'Segoe UI\',Arial,sans-serif;display:flex;flex-direction:column">' +
+          '<div style="position:absolute;right:-6%;top:-18%;width:'+(VW(46))+';height:'+(VW(46))+';border-radius:50%;background:rgba(255,255,255,.18)"></div>' +
+          '<div style="position:absolute;left:-10%;bottom:-30%;width:'+(VW(40))+';height:'+(VW(40))+';border-radius:50%;background:rgba(255,255,255,.12)"></div>' +
+          '<div style="position:relative;padding:'+(VW(3.4))+' '+(VW(5))+';display:flex;align-items:center;gap:'+(VW(3))+'">' +
+            '<img src="'+logo+'" style="width:'+(VW(9))+';height:'+(VW(9))+';object-fit:contain;background:#fff;border-radius:50%;padding:2px" onerror="this.style.display=\'none\'">' +
+            '<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:'+(VW(3.2))+';letter-spacing:.3px">'+Super.esc((s.shortName||s.name||'SCHOOL').toUpperCase())+'</div>' +
+            '<div style="font-size:'+(VW(1.9))+';opacity:.9">'+Super.esc(s.name||'')+'</div></div>' +
+            '<div style="font-size:'+(VW(1.9))+';letter-spacing:2px;opacity:.95">'+tag+'</div></div>' +
+          '<div style="position:relative;display:flex;gap:'+(VW(4))+';padding:'+(VW(1.6))+' '+(VW(5))+' '+(VW(2.2))+';align-items:center;flex:1;min-height:0;overflow:hidden">' +
+            '<div style="flex-shrink:0;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.25)">'+miniPhoto(_fit?Math.round(_fit.pxW*0.19):100, _fit?Math.round(_fit.pxW*0.205):110, 12)+'</div>' +
+            '<div style="flex:1;min-width:0"><div style="font-size:'+(VW(4.6))+';font-weight:800;line-height:1.1;text-shadow:0 1px 3px rgba(0,0,0,.25);overflow-wrap:anywhere">'+Super.esc(person.full_name||'')+'</div>' +
+            '<table style="font-size:'+(VW(2.4))+';margin-top:'+(VW(1.4))+';border-collapse:collapse;color:#f1f5f9;width:100%;table-layout:fixed">'+rows.join('').replace(/#64748b/g,'rgba(255,255,255,.75)').replace(/font-weight:600/g,'font-weight:700;color:#fff')+'</table></div>' +
+            '<div style="text-align:center;flex-shrink:0;background:rgba(255,255,255,.94);border-radius:10px;padding:4px">'+qrImg(_fit?Math.round(_fit.pxW*0.15):66)+'<div style="font-size:'+(VW(1.6))+';color:#0f172a;font-weight:900;letter-spacing:.6px">SCAN</div></div></div>' +
+          '<div style="position:relative;background:rgba(2,6,23,.55);backdrop-filter:blur(2px);padding:'+(VW(1.5))+' '+(VW(5))+';font-size:'+(VW(1.8))+';display:flex;justify-content:space-between;gap:8px;min-width:0"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+Super.esc(s.address||'')+'</span><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right">'+Super.esc([s.phone,s.email].filter(Boolean).join(' · '))+'</span></div>' + creditF() + '</div>';
+      }
+
+      // TRANSIT ACCESS — high contrast, big number, barcode strip
+      if (tpl === 'metro') {
+        return '<div class="sc-idcard" data-template="metro" style="width:'+(_fit?_fit.w:'340px')+';'+(_fit?('height:'+_fit.h+';'):'')+'box-sizing:border-box;border-radius:14px;overflow:hidden;background:#0b0f19;color:#f8fafc;font-family:\'Segoe UI\',Arial,sans-serif;display:flex;flex-direction:column;border:3px solid '+ac+'">' +
+          '<div style="background:'+ac+';color:#0b0f19;padding:'+(VW(2.6))+' '+(VW(4))+';display:flex;align-items:center;justify-content:space-between;gap:6px">' +
+            '<div style="font-weight:900;font-size:'+(VW(3))+';letter-spacing:1.2px">'+Super.esc((s.shortName||s.name||'SCHOOL').toUpperCase())+'</div>' +
+            '<div style="font-weight:900;font-size:'+(VW(2.1))+';letter-spacing:2px">ACCESS</div></div>' +
+          '<div style="padding:'+(VW(3))+' '+(VW(4))+';display:flex;flex-direction:column;align-items:center;gap:'+(VW(2))+';flex:1;min-height:0">' +
+            '<div style="border:2px solid '+ac+';border-radius:10px;padding:2px">'+miniPhoto(_fit?Math.round(_fit.pxW*0.42):120, _fit?Math.round(_fit.pxW*0.46):132, 10)+'</div>' +
+            '<div style="text-align:center;font-size:'+(VW(3.6))+';font-weight:800;line-height:1.1;overflow-wrap:anywhere">'+Super.esc(person.full_name||'')+'</div>' +
+            '<div style="width:100%;background:'+ac+';color:#0b0f19;border-radius:6px;text-align:center;font-weight:900;font-size:'+(VW(3))+';letter-spacing:1px;padding:'+(VW(1))+' 0">'+Super.esc(idNo||'—')+'</div>' +
+            '<table style="width:100%;font-size:'+(VW(2.2))+';border-collapse:collapse;color:#cbd5e1">'+rows.join('').replace(/#64748b/g,'#94a3b8')+'</table>' +
+            '<div style="margin-top:auto;display:flex;align-items:center;gap:'+(VW(3))+'"><img src="'+qr+'" style="width:'+(VW(18))+';height:'+(VW(18))+';background:#fff;padding:2px;border-radius:6px">' +
+            '<div><div style="font-size:'+(VW(2))+';font-weight:800;letter-spacing:1px;color:'+ac+'">SCAN AT THE GATE</div>' +
+            '<div style="font-size:'+(VW(1.8))+';color:#94a3b8">'+Super.esc(this.validityNote(isStaff))+'</div></div></div></div>' +
+          '<div style="background:#f8fafc;padding:'+(VW(1.2))+' '+(VW(4))+';display:flex;justify-content:center">'+this.barcodeImg(idNo, 130, 34)+'</div>' + creditF() + '</div>';
+      }
+
       /* ============================================================
          V12.71 (round-15 item 2, part B) — PORTRAIT IS A LAYOUT, NOT A
          CROP. Making the front fill a tall box was only half the job:
@@ -1230,8 +1540,17 @@ const Super = {
        stack. `opts` carries the finished size in millimetres (or the front's
        pixel width), so front and back can never disagree again. */
     backAspect(opts) {
-      const w = Number(opts && (opts.widthMm || opts.width)), h = Number(opts && (opts.heightMm || opts.height));
-      if (w > 0 && h > 0) return w > h ? 'landscape' : 'portrait';
+      /* V12.77 — the CANVAS decides the shape, exactly as it does for the back's
+         own box. Reading the millimetres first laid a tall back out in wide
+         mode whenever a portrait design had been drawn on a landscape card,
+         and its rules ran 150px past the bottom edge. */
+      const w = Number(opts && (opts.widthPx || opts.widthMm || opts.width)),
+            h = Number(opts && (opts.heightPx || opts.heightMm || opts.height));
+      /* V12.77 — a SQUARE card takes the wide back: its rules sit beside the QR
+         instead of under it, which is the layout that fits a card with no spare
+         height. (A square card is not one of the three shipped presets, but a
+         custom size must still print correctly.) */
+      if (w > 0 && h > 0) return w >= h ? 'landscape' : 'portrait';
       /* no explicit size: fall back to the front template's own proportions */
       const t = (opts && opts.template) || 'horizontal';
       return (t === 'badge' || t === 'vertical') ? 'portrait' : 'landscape';
@@ -1241,12 +1560,25 @@ const Super = {
       const s = Super.school || {};
       const isStaff = (person.type === 'staff');
       const portrait = this.backAspect(opts) === 'portrait';
+      /* V12.77 (round 21, items 1 & 2) — WHICH BACK BELONGS TO WHICH FRONT.
+         The reverse of every card was the same generic block, so a school that
+         chose the Academic Crest or the Transit Access design got a back that
+         looked like it came from a different product. The back now belongs to
+         the same family as its front (classic / modern / badge / clinical) —
+         same palette, same typography, same trim — and it is drawn at the exact
+         canvas the front was drawn on, so the two can never differ in shape. */
+      const family = this.templateFamily(opts.template || person.template);
       /* the back fills the same canvas the front was drawn on: prefer the
          exact millimetres, then an explicit pixel width, and only then the
          legacy 340px default. */
       const mmW = Number(opts.widthMm), mmH = Number(opts.heightMm);
-      const boxW = (mmW > 0 ? Math.round(mmW * 96 / 25.4) : 0) || Number(opts.widthPx) || 340;
-      const boxH = (mmH > 0 ? Math.round(mmH * 96 / 25.4) : 0) || Number(opts.heightPx)
+      /* V12.77 — ORDER MATTERS. `pairHtml` hands the back the exact canvas the
+         front was measured at; that canvas has to WIN over the millimetres,
+         because a design whose natural canvas is wider than the card (520 vs
+         323 px) was drawn small and then scaled by the FRONT's factor, so the
+         back came out visibly smaller than the front on the same card. */
+      const boxW = Number(opts.widthPx) || (mmW > 0 ? Math.round(mmW * 96 / 25.4) : 0) || 340;
+      const boxH = Number(opts.heightPx) || (mmH > 0 ? Math.round(mmH * 96 / 25.4) : 0)
                  || (portrait ? Math.round(boxW * 1.586) : Math.round(boxW / 1.586));
       const idNo = person.admission_no || person.staff_no || person.id || '';
       const pc = person.pc || s.primary || '#1e3a8a';
@@ -1296,7 +1628,7 @@ const Super = {
       const rulesHtml = '<div style="font-size:.6rem;font-weight:900;letter-spacing:1.6px;color:' + pc + ';margin-bottom:4px">CARD RULES · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>'
         + '<ol style="margin:0;padding-left:14px;font-size:.56rem;line-height:1.55;color:#334155">' + rules.map(r => '<li>' + r + '</li>').join('') + '</ol>';
       /* card-relative twin of the rules block, used by the TALL face */
-      const rulesHtmlP = '<div style="font-size:' + fb(3.0) + ';font-weight:900;letter-spacing:' + (ub*0.28).toFixed(2) + 'px;color:' + pc + ';margin-bottom:' + fb(1.2) + '">CARD RULES · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>'
+      const rulesHtmlP = '<div data-back-family="' + family + '" style="font-size:' + fb(3.0) + ';font-weight:900;letter-spacing:' + (ub*0.28).toFixed(2) + 'px;color:' + pc + ';margin-bottom:' + fb(1.2) + '">CARD RULES · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>'
         + '<ol style="margin:0;padding-left:' + fb(4.6) + ';font-size:' + fb(2.7) + ';line-height:1.5;color:#334155">' + rules.map(r => '<li>' + r + '</li>').join('') + '</ol>';
         + '<ol style="margin:0;padding-left:14px;font-size:.56rem;line-height:1.55;color:#334155">' + rules.map(r => '<li>' + r + '</li>').join('') + '</ol>';
       const qrHtml = '<div style="flex-shrink:0;text-align:center;width:86px">'
@@ -1322,9 +1654,9 @@ const Super = {
       /* WIDE face (landscape card): rules beside the QR, contacts and signature
          side by side — the same reading order as the printed PDF back.
          TALL face (portrait card): the blocks stack. */
-      const qrHtmlP = '<div style="flex-shrink:0;text-align:center;width:' + fb(26) + '">'
-        + '<img src="' + qr + '" style="width:' + fb(22) + ';height:' + fb(22) + '" alt="QR">'
-        + '<div style="font-size:' + fb(2.4) + ';font-weight:900;letter-spacing:' + (ub*0.2).toFixed(2) + 'px;color:' + pc + '">SCAN TO VERIFY</div>'
+      const qrHtmlP = '<div style="flex-shrink:0;text-align:center;width:' + fb(26) + ';box-sizing:border-box">'
+        + '<img src="' + qr + '" style="display:block;margin:0 auto;width:' + fb(22) + ';height:' + fb(22) + ';object-fit:contain" alt="QR">'
+        + '<div style="font-size:' + fb(2.4) + ';line-height:1.2;margin-top:' + fb(0.8) + ';font-weight:900;letter-spacing:' + (ub*0.2).toFixed(2) + 'px;color:' + pc + '">SCAN TO VERIFY</div>'
         + (person.blood_group ? '<div style="margin-top:' + fb(1.4) + ';background:#dc2626;color:#fff;border-radius:' + fb(1.6) + ';font-size:' + fb(2.6) + ';font-weight:900;padding:' + fb(0.6) + ' 0">' + Super.esc(person.blood_group) + '</div>' : '')
         + '</div>';
       const contactHtmlP = '<div style="flex:1;font-size:' + fb(2.6) + ';color:#475569;line-height:1.5">'
@@ -1334,15 +1666,25 @@ const Super = {
         + '</div>';
       const signHtmlP = '<div style="flex-shrink:0;text-align:center">' + this.signBlock(pc, Math.round(ub * 30))
         + '<div style="font-size:' + fb(2.2) + ';color:#64748b;margin-top:' + fb(0.8) + '">Issued ' + Super.esc(issued) + ' · ' + this.validityNote(isStaff) + '</div></div>';
+      /* the trim that identifies the family: a crest rule on an academic card, a
+         cross on a clinical one, a soft band on a modern one */
+      const trim = family === 'clinical'
+        ? '<div style="height:' + fb(2.2) + ';background:' + pc + ';margin-top:' + fb(2) + ';flex-shrink:0"></div>'
+        : family === 'modern'
+          ? '<div style="height:' + fb(2.2) + ';background:linear-gradient(90deg,' + pc + ',' + ac + ');margin-top:' + fb(2) + ';flex-shrink:0"></div>'
+          : family === 'badge'
+            ? '<div style="height:' + fb(2.2) + ';background:' + ac + ';margin-top:' + fb(2) + ';flex-shrink:0"></div>'
+            : '<div style="height:' + fb(2.2) + ';background:' + pc + ';margin-top:' + fb(2) + ';flex-shrink:0"></div>';
+      const familyLabel = { classic: 'CARD RULES', modern: 'YOUR CARD', badge: 'BADGE RULES', clinical: 'SAFETY & RULES' }[family] || 'CARD RULES';
       const stripeP = '<div style="height:' + fb(9) + ';background:#1f2937;margin-top:' + fb(3) + ';flex-shrink:0;box-sizing:border-box"></div>';
       /* landscape face: size against the card's *height* as well, since an
          ID-1 landscape card is only 54mm tall — the rem-based block needed
          464px for a 204px card and was cropped */
-      const rulesHtmlL = '<div style="font-size:' + fv(3.1) + ';font-weight:900;letter-spacing:' + (vb*0.3).toFixed(2) + 'px;color:' + pc + ';margin-bottom:' + fv(1) + '">CARD RULES · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>'
+      const rulesHtmlL = '<div style="font-size:' + fv(3.1) + ';font-weight:900;letter-spacing:' + (vb*0.3).toFixed(2) + 'px;color:' + pc + ';margin-bottom:' + fv(1) + '">' + familyLabel + ' · ' + (isStaff ? 'STAFF' : 'STUDENT') + '</div>'
         + '<ol style="margin:0;padding-left:' + fv(5) + ';font-size:' + fv(2.7) + ';line-height:1.26;color:#334155">' + rules.map(r => '<li>' + r + '</li>').join('') + '</ol>';
-      const qrHtmlL = '<div style="flex-shrink:0;text-align:center;width:' + fv(24) + '">'
-        + '<img src="' + qr + '" style="width:' + fv(20) + ';height:' + fv(20) + '" alt="QR">'
-        + '<div style="font-size:' + fv(2.5) + ';font-weight:900;letter-spacing:' + (vb*0.2).toFixed(2) + 'px;color:' + pc + '">SCAN TO VERIFY</div>'
+      const qrHtmlL = '<div style="flex-shrink:0;text-align:center;width:' + fv(24) + ';box-sizing:border-box">'
+        + '<img src="' + qr + '" style="display:block;margin:0 auto;width:' + fv(20) + ';height:' + fv(20) + ';object-fit:contain" alt="QR">'
+        + '<div style="font-size:' + fv(2.5) + ';line-height:1.2;margin-top:' + fv(0.6) + ';font-weight:900;letter-spacing:' + (vb*0.2).toFixed(2) + 'px;color:' + pc + '">SCAN TO VERIFY</div>'
         + (person.blood_group ? '<div style="margin-top:' + fv(1.2) + ';background:#dc2626;color:#fff;border-radius:' + fv(1.6) + ';font-size:' + fv(2.7) + ';font-weight:900;padding:' + fv(0.5) + ' 0">' + Super.esc(person.blood_group) + '</div>' : '')
         + '</div>';
       const contactHtmlL = '<div style="flex:1;font-size:' + fv(2.7) + ';color:#475569;line-height:1.35">'
@@ -1351,14 +1693,20 @@ const Super = {
         + '</div>';
       const signHtmlL = '<div style="flex-shrink:0;text-align:center">' + this.signBlock(pc, Math.round(boxH * 0.34))
         + '<div style="font-size:' + fv(2.3) + ';color:#64748b;margin-top:' + fv(0.6) + '">Issued ' + Super.esc(issued) + ' · ' + this.validityNote(isStaff) + '</div></div>';
+      /* V12.77 — the blocks are DISTRIBUTED, not piled at the top. When a back
+         is drawn on the card's own canvas there is spare height, and the old
+         layout parked all of it in one white band above the footer, which read
+         as a half-finished card. Rules sit at the top, the return address and
+         the signature sit at the foot, and the space between them breathes. */
       const body = portrait
-        ? '<div style="padding:' + fb(3) + ' ' + fb(3.6) + ' ' + fb(1.4) + ';display:flex;gap:' + fb(3) + ';align-items:flex-start"><div style="flex:1;min-width:0">' + rulesHtmlP + '</div>' + qrHtmlP + '</div>'
-          + '<div style="display:flex;gap:' + fb(3) + ';padding:' + fb(1.6) + ' ' + fb(3.6) + ';align-items:flex-end">' + contactHtmlP + signHtmlP + '</div>'
-          + '<div style="flex:1;min-height:0"></div>'
-        : '<div style="padding:' + fb(2.6) + ' ' + fb(4) + ' ' + fb(0.8) + ';display:flex;gap:' + fb(4) + ';align-items:flex-start;flex:1 1 auto;min-height:0;overflow:hidden"><div style="flex:2;min-width:0;max-height:100%;overflow:hidden">' + rulesHtmlL + '</div>' + qrHtmlL + '</div>'
-          + '<div style="display:flex;gap:' + fb(4) + ';padding:' + fb(1) + ' ' + fb(4) + ';align-items:flex-end;flex-shrink:0">' + contactHtmlL + signHtmlL + '</div>'
-          + '<div style="flex:1;min-height:0"></div>';
-      const inner = '<div ' + box + '>' + (portrait ? stripeP : stripe) + body + stripHtml + footHtml + '</div>';
+        ? '<div style="padding:' + fb(3) + ' ' + fb(3.6) + ' ' + fb(1.4) + ';display:flex;gap:' + fb(3) + ';align-items:flex-start;flex-shrink:0"><div style="flex:1;min-width:0">' + rulesHtmlP + '</div>' + qrHtmlP + '</div>'
+          + '<div style="flex:1 1 auto;min-height:0"></div>'
+          + '<div style="display:flex;gap:' + fb(3) + ';padding:' + fb(1.6) + ' ' + fb(3.6) + ';align-items:flex-end;flex-shrink:0">' + contactHtmlP + signHtmlP + '</div>'
+        : '<div style="padding:' + fb(2.6) + ' ' + fb(4) + ' ' + fb(0.8) + ';display:flex;gap:' + fb(4) + ';align-items:flex-start;flex:0 1 auto;min-height:0;overflow:hidden"><div style="flex:2;min-width:0;max-height:100%;overflow:hidden">' + rulesHtmlL + '</div>' + qrHtmlL + '</div>'
+          + '<div style="flex:1 1 auto;min-height:0"></div>'
+          + '<div style="display:flex;gap:' + fb(4) + ';padding:' + fb(1) + ' ' + fb(4) + ';align-items:flex-end;flex-shrink:0">' + contactHtmlL + signHtmlL + '</div>';
+      const inner = '<div ' + box + ' data-back-family="' + family + '" data-back-template="' + Super.esc(opts.template || person.template || 'horizontal') + '">'
+        + (portrait ? stripeP : stripe) + body + trim + stripHtml + footHtml + '</div>';
       /* A near-square face (a custom 70x70mm badge, say) cannot hold the full
          rule set at a legible size: measured, it needs ~294px inside 265px.
          Rather than crop the card rules — which the school is required to
@@ -1366,8 +1714,15 @@ const Super = {
          scaled down into the face. It stays one card, one box, one size; only
          the type is uniformly smaller, exactly as a printer would reduce a
          page. Everything is still on the card. */
+      /* V12.77 — the near-square special case is retired. It laid the back out
+         on a 1.2:1 canvas and scaled that into the face, which was reasonable
+         when each face measured itself; now that both faces are drawn on ONE
+         canvas of the card's own shape, that second scaling fought the first
+         and pushed the return address 110px past the right edge. A square card
+         simply uses the stacked (tall) back, like any other card that is not
+         wider than it is tall. */
       const ratio = boxW / boxH;
-      if (ratio > 0.95 && ratio < 1.25) {
+      if (false && ratio > 0.95 && ratio < 1.25) {
         /* the canvas is as WIDE as the face and only as tall as the content
            needs; the scale is applied only when that content is taller than
            the face, so the card is never enlarged, only reduced. */
@@ -1404,12 +1759,50 @@ const Super = {
         });
       }
       const box = this.faceBox(opts);
-      /* V12.75 (round-19 item 1): BOTH faces are now built by a renderer that
-         owns the physical box. The front is fitted (never clipped) and the back
-         draws itself into the same box, so orientation and size are identical
-         by construction rather than by hope. */
-      const front = this.fitFace(this.html(person, {}), box, 'front');
-      const back  = this.fitFace(this.backHtml(person, opts), box, 'back');
+      /* V12.75 (round-19 item 1): BOTH faces are built by a renderer that owns
+         the physical box. V12.77 (round-21 item 2) completes the guarantee: the
+         box alone was not enough, because each face was measured separately and
+         a design that could not fill the box was letterboxed by its own factor.
+         The pair now shares ONE canvas and ONE scale. */
+      const naturalFront = this.html(person, { template: opts.template || person.template });
+      const _tpl = opts.template || person.template;
+      let canvas = this.fitCanvas(naturalFront, box.pxW / box.pxH,
+                       (w, h) => this.html(person, { template: _tpl, widthPx: w, heightPx: h }))
+                     || { W: box.pxW, H: box.pxH, pad: 0 };
+      /* V12.77 — BOTH FACES MUST FIT THAT CANVAS, NOT JUST THE FRONT.
+         The canvas is measured from the front, and a back with five printed
+         rules is sometimes a little denser than the front it belongs to; on a
+         square card it ran 19px past the bottom edge. So the pair is measured
+         together: if the back does not fit, the canvas shrinks a step — the
+         card keeps its exact shape and the type gets uniformly smaller, which
+         is what a printer does with a page that is one line too long. */
+      const _aspect = box.pxW / box.pxH;
+      /* only a canvas that ALREADY matches the card's shape may be shrunk: a
+         design that could not fill the shape is drawn on its own canvas and
+         centred, and forcing the card's ratio onto it would crop the front. */
+      for (let i = 0; !canvas.mismatch && i < 5; i++) {
+        const h = Math.round(canvas.W / _aspect);
+        const f = this.measureBox(this.html(person, { template: _tpl, widthPx: canvas.W, heightPx: h }), canvas.W, h);
+        const b = this.measureBox(this.backHtml(person, { template: _tpl, widthPx: canvas.W, heightPx: h }), canvas.W, h);
+        const ok = f && b && f.overX <= 1 && f.overY <= 1 && b.overX <= 1 && b.overY <= 1;
+        if (ok) { canvas = { W: canvas.W, H: h, pad: 0, over: 0, err: 0 }; break; }
+        canvas = { W: Math.max(160, Math.round(canvas.W * 0.94)), H: 0, pad: 0, over: 0, err: 0, mismatch: canvas.mismatch };
+        canvas.H = Math.round(canvas.W / _aspect);
+      }
+      if (!canvas.H) canvas.H = Math.round(canvas.W / _aspect);
+      /* V12.77 — the front is then DRAWN AT that canvas, so what gets scaled is
+         a design laid out for the exact rectangle both faces share. */
+      const frontHtml = this.html(person, { template: _tpl, widthPx: canvas.W, heightPx: canvas.H });
+      /* the back is composed at the canvas the front ended up with, so it fills
+         the same rectangle rather than inventing its own proportions */
+      const backOpts = Object.assign({}, opts, {
+        template: opts.template, widthPx: canvas.W, heightPx: canvas.H
+      });
+      const front = this.fitFace(frontHtml, box, 'front', canvas);
+      const back  = this.fitFace(this.backHtml(person, backOpts), box, 'back', canvas);
+      this.lastPair = { canvasW: canvas.W, canvasH: canvas.H,
+                        scale: Math.min(box.pxW / canvas.W, box.pxH / canvas.H),
+                        box: box, template: opts.template || 'horizontal' };
       return '<div class="sc-idcard-pair" style="display:flex;gap:14px;align-items:stretch;flex-wrap:wrap;justify-content:center">' +
         '<div style="display:flex;align-items:stretch">' + front + '</div>' +
         '<div style="display:flex;align-items:stretch">' + back + '</div></div>';

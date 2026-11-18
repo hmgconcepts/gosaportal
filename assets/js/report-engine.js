@@ -1165,6 +1165,20 @@ window.ReportEngine = ReportEngine;
 const ReportPolicy = {
   esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
   _kind:'terminal', _data:{},
+  /* V12.77 (round 21, item 4) — WHY "LOAD CURRENT SETTING" DID NOTHING ON MIDTERM.
+     The loader derived its element prefix from the report type: 'midterm' meant
+     the ids mpol-body / mpol-term / mpol-show_position. The report-cards page
+     only ever writes the pol-* panel — there is not one mpol-* element in it —
+     so every lookup returned null, the routine returned before writing
+     anything, and the button looked dead while behaving exactly as written.
+     The prefix now follows the DOM: if the midterm panel exists it is used,
+     otherwise the shared panel is, for every kind. One helper, used by load,
+     save and save-all, so the three can never disagree again. */
+  _pfx(kind){
+    const k = String(kind || this._kind || 'terminal').toLowerCase();
+    if (k === 'midterm' && document.getElementById('mpol-body')) return 'mpol';
+    return 'pol';
+  },
   async initAll(){
     /* fill the term/session pickers from the same sources the pages use */
     const fill=async(id,table,col)=>{
@@ -1209,8 +1223,7 @@ const ReportPolicy = {
   },
   async load(kind){
     this._kind = kind || (document.getElementById('pol-kind')||{}).value || 'terminal';
-    const isMid = this._kind === 'midterm';
-    const p = isMid ? 'mpol' : 'pol';
+    const p = this._pfx(this._kind);
     const body = document.getElementById(p+'-body');
     const term = (document.getElementById(p+'-term')||{}).value || '';
     const session = (document.getElementById(p+'-session')||{}).value || '';
@@ -1259,7 +1272,14 @@ const ReportPolicy = {
           ? '✅ A setting is saved for this report'+(term||session?' and these dates':'')+'.'
           : '⚠️ No setting saved yet — the report currently shows positions (the old behaviour). Choose above and save.'}
       </p>`;
-    if(body) body.innerHTML = html;
+    if(body){
+      body.innerHTML = html;
+      /* V12.77 — the panel is shared by all three report types, so it names the
+         one being edited. Previously the midterm case wrote nothing at all. */
+      const title = { terminal:'Terminal report card', midterm:'Midterm report', subject:'Subject broadsheet' }[String(this._kind||'terminal').toLowerCase()] || this._kind;
+      const head = document.getElementById('pol-kind-note');
+      if(head) head.innerHTML = 'Editing: <b>' + this.esc(title) + '</b>' + (term||session ? ' · ' + this.esc([term,session].filter(Boolean).join(' · ')) : ' · current term');
+    }
     /* live toggle labels */
     ['show_position','show_subject_position','show_grade','show_remarks'].forEach(k=>{
       const cb=document.getElementById(p+'-'+k); if(!cb) return;
@@ -1267,7 +1287,7 @@ const ReportPolicy = {
     });
   },
   async _write(kind, term, session){
-    const isMid = kind==='midterm'; const p = isMid ? 'mpol' : 'pol';
+    const p = this._pfx(kind);
     const get=k=>{const el=document.getElementById(p+'-'+k);return el?!!el.checked:true;};
     const label=(document.getElementById(p+'-position_label')||{}).value||'Position in class';
     const r = await sb.rpc('sc_report_policy_save',{
@@ -1287,7 +1307,7 @@ const ReportPolicy = {
   },
   async save(kind){
     this._kind = kind || this._kind;
-    const isMid = this._kind==='midterm'; const p = isMid ? 'mpol' : 'pol';
+    const p = this._pfx(this._kind);
     const term=(document.getElementById(p+'-term')||{}).value||'';
     const session=(document.getElementById(p+'-session')||{}).value||'';
     try{
