@@ -95,7 +95,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
   <div class="pwa-install-header">
     <img src="assets/img/logo-512.png" alt="" class="pwa-install-icon">
     <div style="flex:1">
-      <div class="pwa-install-title">📲 Install GoSA</div>
+      <div class="pwa-install-title">📲 Install School Connect</div>
       <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
     </div>
     <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
@@ -501,17 +501,32 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           </div>
           <div class="form-group"><label>Professional template</label>
             <select class="form-select" id="ic-template" onchange="ICUI.pickTemplate()">
-              <option value="horizontal">Horizontal (classic)</option>
-              <option value="premium">Premium (like sample — navy/QR)</option><option value="executive">Executive (green & gold)</option><option value="minimal">Minimal (Swiss clean)</option><option value="gradient">Gradient (vibrant modern)</option><option value="badge">Badge (portrait conference)</option><option value="smart">Smart Card (fintech chip)</option><option value="heritage">Heritage (classic crest)</option><option value="vertical">Vertical (lanyard / portrait)</option>
-              <option value="corporate">Corporate (dark premium)</option>
-            </select>
-          </div>
+              <!-- V12.77 — the options are written here as a fallback and REPLACED at load
+                   from Super.idcard.TEMPLATES, so the list of professional designs has one
+                   source of truth and a new design can never be missing from the menu. -->
+              <option value="premium">Premium (like sample — navy/QR)</option>
+              <option value="executive">Executive (green & gold)</option>
+              <option value="minimal">Minimal (Swiss clean)</option>
+              <option value="gradient">Gradient (vibrant modern)</option>
+              <option value="badge">Badge (portrait conference)</option>
+              <option value="smart">Smart Card (fintech chip)</option>
+              <option value="heritage">Heritage (classic crest)</option>
+              <option value="vertical">Vertical (lanyard / portrait)</option>
+              <option value="corporate">Corporate (dark executive)</option>
+              <option value="crest">Academic Crest (gold seal) — new</option>
+              <option value="clinical">Clinical Staff (teal cross) — new</option>
+              <option value="aurora">Aurora (soft modern) — new</option>
+              <option value="metro">Transit Access (high contrast) — new</option></select>
+            <!-- V12.77 — every design states the card shape it was drawn for, and the
+                 page says so when the two disagree. A portrait design on a landscape
+                 card is not a bug the user should have to discover by printing it. -->
+            <div id="ic-template-note" style="font-size:.78rem;color:#64748b;margin-top:5px;line-height:1.45"></div>
           <div class="form-group"><label>Primary colour</label><input class="form-input" type="color" id="ic-pc" value="#0506ae" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Accent colour</label><input class="form-input" type="color" id="ic-ac" value="#964eec" oninput="ICUI.render()"></div>
         </div>
         <div class="grid grid-2">
           <div class="form-group"><label>Pick a <span id="ic-pick-label">student</span></label><select class="form-select" id="ic-student" onchange="ICUI.pick(this.value)"><option value="">— choose —</option></select></div>
-          <div class="form-group"><label>Search name / admission no <small style="color:var(--gray-500)">(scopes the PDF)</small></label><input class="form-input" id="ic-search" placeholder="e.g. Ada or GoSA/2024/001" oninput="ICUI.updatePdfLabel()"></div>
+          <div class="form-group"><label>Search name / admission no <small style="color:var(--gray-500)">(scopes the PDF)</small></label><input class="form-input" id="ic-search" placeholder="e.g. Ada or GOSA/2024/001" oninput="ICUI.updatePdfLabel()"></div>
           <div class="form-group"><label>…or enter manually</label><input class="form-input" id="ic-name" placeholder="Full name" oninput="ICUI.render()"></div>
           <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><select class="form-select" id="ic-class" onchange="ICUI.render();ICUI.updatePdfLabel()"><option value="">— All classes — whole school —</option></select><small style="color:var(--gray-500)">Select a class to filter bulk print — NOT printed on card (lifetime card). Choose "All classes" for whole school.</small></div>
           <div class="form-group"><label>ID / Admission / Staff no</label><input class="form-input" id="ic-id" placeholder="(auto)" oninput="ICUI.render()"></div>
@@ -744,7 +759,40 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
      not. When the user flips to Portrait we move to a design that is DRAWN for
      a portrait card - once, visibly, with the dropdown showing what happened -
      and never again after they have picked a template themselves. */
-  pickTemplate(){ this._tplPinned=true; this.render(); },
+  pickTemplate(){ this._tplPinned=true; try{ this.matchDesignShape(); }catch(_){} this.render(); },
+  /* V12.77 — a design's shape is part of the design. Choosing a lanyard badge
+     sets the card to portrait and SAYS SO, instead of printing a tall design
+     into a wide card with two thirds of the card left empty. */
+  matchDesignShape(){
+    const sel=document.getElementById('ic-template'); if(!sel) return;
+    const note=document.getElementById('ic-template-note');
+    const T=(window.Super&&Super.idcard&&Super.idcard.TEMPLATES)||[];
+    const t=T.filter(x=>x.id===sel.value)[0]; if(!t) return;
+    const want=t.native||'landscape';
+    const oSel=document.getElementById('ic-card-orientation');
+    const have=(oSel&&oSel.value)||'landscape';
+    const msg=(html)=>{ if(note) note.innerHTML=html; };
+    if(want!==have && oSel){
+      oSel.value=want;
+      try{ this.applyCardSize(); }catch(_){}
+      msg('<b style="color:#b45309">'+Super.esc(t.label.split('—')[0].trim())+'</b> is drawn for <b>'+want+'</b> cards, so the card has been set to '+want+'. Pick the other orientation again if you need this design on a '+have+' card — it will still print, centred, with margins.');
+      return;
+    }
+    msg('<b style="color:#334155">'+Super.esc(t.label.split('—')[0].trim())+'</b> is drawn for <b>'+want+'</b> cards — this matches the card in use.');
+  },
+  /* V12.77 — one list, generated. If the engine knows a design, the menu offers
+     it; if an older page has a stale hand-written list, this replaces it. */
+  refreshTemplateMenu(){
+    const sel=document.getElementById('ic-template'); if(!sel) return;
+    try{
+      const T=(window.Super&&Super.idcard&&Super.idcard.TEMPLATES)||null;
+      if(!T||!T.length) return;
+      const keep=sel.value;
+      sel.innerHTML=Super.idcard.templateOptions(keep);
+      if(keep) sel.value=keep;
+      sel.title='Professional designs: '+T.length;
+    }catch(e){ console.warn('template menu could not be rebuilt', e); }
+  },
   tplOpts(){ var t=document.getElementById('ic-template'),pc=document.getElementById('ic-pc'),ac=document.getElementById('ic-ac'); return { template:t?t.value:'horizontal', pc:pc?pc.value:undefined, ac:ac?ac.value:undefined }; },
   /* the finished card size, read from the same fields the PDF uses */
   faceOpts(){

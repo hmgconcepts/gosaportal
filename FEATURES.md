@@ -1,6 +1,6 @@
 # School Connect — Complete Feature Reference
 
-**Version:** 12.76 · **Date:** 8 November 2026
+**Version:** 12.77 · **Date:** 8 November 2026
 **Applies to:** the generator (`schoolconnect`), and both deployments (`gosaportal`, `schoolconnectdemo`).
 
 This document explains **every feature in the platform**: what it does, how it works, who may use it, and what the system guarantees about it. Nothing here is aspirational — every item listed exists in the shipped code and is exercised by the regression suite.
@@ -251,3 +251,69 @@ Two audits answer to all of the above and run in the gate: `tools/verification/t
 
 `bash /home/user/work/run-all-tests.sh` runs the whole gate: schema identity, ~50 SQL engine tests, browser tests for the ID card, PWA, CBT, positions and policies, plus static audits for page wiring, phantom columns, RPC signatures, template drift across the three repos, and a 513-assertion platform audit, and a security posture function that
 must agree with it.
+
+### 13.9 Professional ID cards — thirteen designs, one card, two faces
+
+*(V12.77)* The card designer offers **thirteen professional designs** in four
+families — classic, clinical, modern, badge — and the engine, the page, the
+print sheet, the PDF and the preview all read one registry
+(`Super.idcard.TEMPLATES`), so a design can never exist in one place and be
+missing in another. Six of them are drawn for landscape cards, three are lanyard
+portraits, and the four new designs of this round are **Academic Crest** (gold
+seal, motto band), **Clinical Staff** (teal, cross motif, department),
+**Aurora** (soft gradient, glass panels) and **Transit Access** (high-contrast
+pass with a barcode strip).
+
+What the platform guarantees, and what the automated test measures in a real
+browser on every design, orientation and card size (52 card pairs):
+
+* **Front and back are the same shape and the same size.** Not "similar" —
+  measured to the pixel (0 px difference in the face box, in the scaled wrapper
+  and in the painted card).
+* **Each design lays itself out for the card it is on.** The renderer measures
+  the design at the card's exact proportions and keeps the widest size at which
+  nothing overflows; a design that cannot fill the shape (a lanyard badge on a
+  landscape card) keeps its own proportions and is centred — and the page says so
+  in words, next to the dropdown.
+* **Nothing is clipped.** Not a name, not an ID number, not a rule.
+* **Every design owns its reverse** — same family, same palette, same trim — and
+  the family is printed in the markup (`data-back-family`).
+
+The physical geometry follows the card standards the industry actually prints to
+(CR80 / ISO-IEC 7810 ID-1: 85.60 × 53.98 mm, 0.76 mm, 3.175 mm corner radius,
+3.175 mm safe margin, 1.5875 mm bleed, 300 dpi), and the field set follows the
+same research: identity on the front; return instructions, emergency contact,
+blood group, verification QR, signature and the card rules on the back; and
+never a government ID number. `ID_CARD_PRINT_GUIDE.md` explains it for staff.
+
+**How to use it:** ID cards → *Professional template*. Choosing a portrait design
+sets the card to portrait and tells you why. Print, download and the on-screen
+preview all use the same renderer.
+
+### 13.10 CBT — 60 of 100, per candidate
+
+*(V12.77)* When a tutor uploads a 100-question bank and asks for 60, **every
+candidate's sixty are drawn at random from the whole bank** — not the first
+sixty. The draw is seeded from the exam and the candidate, so a refresh, a
+resumed attempt and a re-mark all see the same questions, while two candidates
+rarely see the same set. Option-order randomisation stays a separate switch, and
+a multi-subject paper draws inside each subject so "40 English + 20 Mathematics"
+keeps its shape. The server performs the same draw with the same seed, so the
+browser and the database cannot disagree about which questions a candidate saw.
+
+### 13.11 Marks that can never exceed their maximum
+
+*(V12.77)* The database now refuses a mark above its column maximum, keeps **one
+row per mark** (a second push updates instead of adding a duplicate that the
+report would sum), reports per-column `capped`/`overflow` figures when a mid-term
+sheet is rebuilt, and offers staff a reconciliation tool (`sc_mark_reconcile`)
+that finds and repairs historical rows. The three causes of a 21/20 — an over-max
+entry, a duplicated row, and a maximum lowered under existing marks — are each
+closed by name.
+
+### 13.12 The version banner tells the truth
+
+*(V12.77)* "New version available / Update now" now updates in place: the
+running worker's own version is what gets recorded as applied, a pending version
+is never counted as done, and the banner never returns once the platform is
+current.

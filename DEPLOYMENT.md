@@ -1,6 +1,6 @@
 # School Connect — Deployment Guide
 
-**Version 12.76 · 8 November 2026**
+**Version 12.77 · 8 November 2026**
 
 This guide takes a school from "nothing" to "a live, branded school platform with its own data" using **only free tools**. Follow it in order. Every step states exactly what to click or paste, what you should see when it worked, and what to do when it did not.
 
@@ -44,7 +44,8 @@ You do **not** need: a server, Docker, Node.js, a domain, a paid certificate, an
 4. Select **all** of it (`Ctrl/Cmd + A`), copy, and paste into the query window.
 5. Press **Run** (or `Ctrl/Cmd + Enter`).
 
-The file is ~979 KB across 15,320 lines. It takes **20–60 seconds**. You will see a series of "Success. N rows" messages, ending with a status row naming `V12.76 …` and then, from the final catalogue-reload notification, `Success. No rows returned`.
+The file is ~990 KB across 15,486 lines. It takes **20–60 seconds**. You will see a series of "Success. N rows" messages, ending with the status row
+`V12.77 installed — per-student CBT papers, no mark can exceed its maximum, one row per mark`, followed by the catalogue-reload notice which reports `Success. No rows returned` (that silent last line is the signal that makes the API see the new objects — it is supposed to say nothing) and then, from the final catalogue-reload notification, `Success. No rows returned`.
 
 **Check — do this before anything else:**
 
@@ -288,3 +289,42 @@ A single school of 1,000 learners fits comfortably inside the free tiers.
 - [ ] `sc_report_mark_audit()` clean
 - [ ] Backup taken
 - [ ] Two staff members shown the **Update now** bar and the *Feature Guide* page
+
+---
+
+## 15. What is new in V12.77, and the four checks that prove it installed
+
+If you are upgrading from V12.76 the procedure is the same four steps as §4 —
+back up, run `database/complete-schema.sql` once, upload the files, hard-reload.
+The database step is **not optional**: without it CBT pages will refuse to run
+(they detect the obsolete engine and stop before a candidate sees a question) and
+marks remain unprotected.
+
+After the pack has run, confirm each of these on the live site:
+
+1. **CBT per-candidate papers.** Open a CBT exam whose CSV holds more questions
+   than its *Select N questions* value (e.g. 100 questions, 60 selected). Sit it
+   as two different candidates: each gets 60 questions, the sets differ, and each
+   candidate's set is identical after a refresh. The server side records
+   `engine_version = 'v12.77'` and a `selection_seed` you can see in the audit.
+2. **No mark can exceed its maximum.** Enter 21 against a 20-mark column: the
+   save is refused with an explanation. A duplicated push updates the existing
+   row instead of adding a second (Reports → the mark no longer reads 21/20).
+3. **Reports → Mid Term → "Load current setting"** fills the panel and the panel
+   says *Editing: Mid Term · …*. Fees → **Fee Doctor**: the class dropdown opens
+   and lists your classes.
+4. **ID cards**: pick Academic Crest, Clinical Staff, Aurora, Transit Access.
+   Front and back are the same size and the same way up; choosing a portrait
+   design switches the card to portrait and says so.
+
+**Rolling back.** Restore the backup taken in step 1 and redeploy the previous
+ZIP. V12.77 only adds objects (two functions, two triggers, one unique index) and
+changes no column type, so a rollback of the files alone is safe for readers; the
+database rollback needs the backup.
+
+### Free-tier notes (unchanged)
+
+The whole release costs nothing to run: no AI API is called anywhere (the
+client-hardening audit prints `No paid AI API dependency introduced`), the
+database pack stays inside the Supabase free-tier 500 MB allowance, and the only
+network calls the browser makes are to your own Supabase project.

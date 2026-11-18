@@ -4,9 +4,9 @@
 <script>/* School Connect V12.23 pre-paint theme — robust like Fleet Console + Adewale — runs synchronously before CSS to avoid FOUC */(function(){try{var m=null;try{m=localStorage.getItem('sc-theme');}catch(e){}if(!m){try{m=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}catch(e){m='light';}}m=(m==='dark'?'dark':'light');document.documentElement.setAttribute('data-theme',m);document.documentElement.dataset.theme=m;try{var c=JSON.parse(localStorage.getItem('sc-theme-colors')||'null');if(c&&c.primary){var r=document.documentElement.style;r.setProperty('--primary',c.primary);r.setProperty('--sc-primary',c.primary);if(c.accent){r.setProperty('--accent',c.accent);r.setProperty('--sc-accent',c.accent);r.setProperty('--gradient','linear-gradient(135deg,'+c.primary+' 0%,'+c.accent+' 100%)');}}}catch(e){}}catch(e){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Fees &amp; Payments • God of Seed Academy</title>
-<meta name="description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
-<meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+<title>Fees &amp; Payments • School Connect Demo School</title>
+<meta name="description" content="School Connect Demo School — Fees &amp; Payments. Comprehensive school management platform.">
+<meta name="keywords" content="School Connect Demo School, school management, SCD, HMG Concepts">
 <meta name="theme-color" content="#0506ae">
 <link rel="icon" type="image/png" href="assets/img/logo-512.jpg">
 <link rel="manifest" href="manifest.json">
@@ -15,8 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 
-<meta property="og:title" content="Fees &amp; Payments • God of Seed Academy">
-<meta property="og:description" content="God of Seed Academy — Free school management by HMG Concepts">
+<meta property="og:title" content="Fees &amp; Payments • School Connect Demo School">
+<meta property="og:description" content="School Connect Demo School — Free school management by HMG Concepts">
 <meta property="og:image" content="assets/img/logo-512.jpg">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -62,22 +62,22 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 @media(min-width:901px){.app-topbar .mobile-toggle{display:none}}
 </style>
 
-    <meta name="description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
-    <meta name="keywords" content="God of Seed Academy, school management, GoSA, HMG Concepts">
+    <meta name="description" content="School Connect Demo School — Fees &amp; Payments. Comprehensive school management platform.">
+    <meta name="keywords" content="School Connect Demo School, school management, SCD, HMG Concepts">
     <meta name="author" content="HMG Concepts">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="./fees.html">
-    <meta property="og:title" content="Fees &amp; Payments • God of Seed Academy">
-    <meta property="og:description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
+    <meta property="og:title" content="Fees &amp; Payments • School Connect Demo School">
+    <meta property="og:description" content="School Connect Demo School — Fees &amp; Payments. Comprehensive school management platform.">
     <meta property="og:url" content="./fees.html">
     <meta property="og:type" content="website">
-    <meta property="og:site_name" content="School Connect v5 — God of Seed Academy">
+    <meta property="og:site_name" content="School Connect v5 — School Connect Demo School">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Fees &amp; Payments • God of Seed Academy">
-    <meta name="twitter:description" content="God of Seed Academy — Fees &amp; Payments. Comprehensive school management platform.">
+    <meta name="twitter:title" content="Fees &amp; Payments • School Connect Demo School">
+    <meta name="twitter:description" content="School Connect Demo School — Fees &amp; Payments. Comprehensive school management platform.">
     <link rel="alternate" href="https://hmgconcepts.pages.dev/" title="HMG Concepts Ecosystem">
   </head>
-<body data-theme="theme15" data-school="God of Seed Academy" data-font="plusjakarta">
+<body data-theme="theme15" data-school="School Connect Demo School" data-font="plusjakarta">
 
 <div id="notif-bell" class="notif-bell" title="Notifications" data-chatbot>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -95,7 +95,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
   <div class="pwa-install-header">
     <img src="assets/img/logo-512.png" alt="" class="pwa-install-icon">
     <div style="flex:1">
-      <div class="pwa-install-title">📲 Install GoSA</div>
+      <div class="pwa-install-title">📲 Install School Connect</div>
       <div class="pwa-install-msg">Get push notifications for messages, broadcasts, polls and result slips — even when the app is closed.</div>
     </div>
     <button class="modal-close" data-pwa-action="dismiss" title="Dismiss">×</button>
@@ -120,10 +120,10 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 <div class="app-layout sidebar" data-require-role="super_admin admin principal proprietor head_teacher bursar staff teacher parent student">
   <aside class="app-sidebar" id="app-sidebar">
       <div class="app-brand">
-        <img src="assets/img/logo-512.png" alt="God of Seed Academy" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
+        <img src="assets/img/logo-512.png" alt="School Connect Demo School" style="object-fit:contain" onerror="this.onerror=null;this.src='assets/img/logo.png'">
         <div>
-          <strong>God of Seed Academy</strong>
-          <div style="font-size:0.7rem;color:var(--gray-500)">GoSA</div>
+          <strong>School Connect Demo School</strong>
+          <div style="font-size:0.7rem;color:var(--gray-500)">SCD</div>
         </div>
       </div>
       <nav class="app-nav">
@@ -597,7 +597,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           Fixable problems are repaired; money records are <b>never</b> deleted by a tool.
         </p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select class="form-select" id="fdx-class" style="max-width:220px"><option value="">ALL classes</option></select>
+          <select class="form-select" id="fdx-class" data-class-picker style="max-width:220px"><option value="">ALL classes</option></select>
           <button class="btn btn-outline" onclick="FeeDoctor.run(false)">🔍 Check only (changes nothing)</button>
           <button class="btn btn-primary" style="background:#6d28d9;border-color:#5b21b6" onclick="FeeDoctor.run(true)">🩹 Fix everything fixable</button>
         </div>
@@ -611,7 +611,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         A learner with no bill is reported as <b>unknown, never as ₦0</b>, and the audit names the reason and the page that fixes it.
         This is the check that proves the Round-9 “₦0 total fees” fault is gone for every learner, not just the two reported.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
-          <div class="form-group" style="margin:0"><label>Class</label><select class="form-select" id="fba-class"><option value="">ALL classes</option></select></div>
+          <div class="form-group" style="margin:0"><label>Class</label><select class="form-select" id="fba-class" data-class-picker><option value="">ALL classes</option></select></div>
           <button class="btn btn-primary" onclick="FeeBillAudit.run()">🔎 Run the audit</button>
         </div>
         <div id="fba-out" style="margin-top:12px"></div>
@@ -702,7 +702,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
       <script>document.addEventListener('DOMContentLoaded',function(){ if(window.CRUD) CRUD.renderList('fees'); });</script>
     </div>
     <footer style="padding:20px 28px;border-top:1px solid var(--gray-200);font-size:0.82rem;color:var(--gray-500);text-align:center">
-      © 2026 God of Seed Academy · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
+      © 2026 School Connect Demo School · Licensed by <a href="https://hmgtechnologies.pages.dev" target="_blank" rel="noopener">HMG Technologies</a> · <a href="https://whatsapp.com/channel/0029Vb7kGoN2ER6feTzs8q2f" target="_blank" rel="noopener" title="Product news, tips and updates">📢 HMG Channel</a>
     </footer>
   </main>
 </div>
@@ -748,14 +748,9 @@ window.FeeDaily = FeeDaily;
 const FeeBillAudit = {
   esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
   money(n){return ((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});},
-  async fillClasses(){
-    try{const {data}=await sb.from('students').select('class').not('class','is',null).order('class');
-      const set=[...new Set((data||[]).map(x=>x.class).filter(Boolean))];
-      for(const id of ['fba-class']){const el=document.getElementById(id);if(!el)return;
-        set.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o);});}
-    }catch(_){}
-  },
+  async fillClasses(){ await window.FeeClassPickers.fill(); },
   async run(){
+    try{ const sel=document.getElementById('fdx-class'); if(sel && sel.options.length<=1) await window.FeeClassPickers.fill(); }catch(_){ }
     const box=document.getElementById('fba-out');if(!box)return;
     const cls=((document.getElementById('fba-class')||{}).value||'');
     box.innerHTML='<span class="pulse">Auditing every learner…</span>';
@@ -1477,6 +1472,40 @@ const FeeSegment={
   }
 };
 document.addEventListener('DOMContentLoaded',function(){ try{ FeeSegment.init(); }catch(_){ } });
+const FeeClassPickers = {
+  IDS: ['fdx-class', 'fba-class'],
+  async sources(){
+    const out = new Set();
+    const add = v => { const t = String(v == null ? '' : v).trim(); if (t) out.add(t); };
+    try { const r = await sb.from('students').select('class').not('class','is',null).limit(5000); (r.data||[]).forEach(x=>add(x.class)); } catch(_){ }
+    if (!out.size) { try { const r = await sb.from('classes').select('name').limit(500); (r.data||[]).forEach(x=>add(x.name)); } catch(_){ } }
+    if (!out.size) { try { const r = await sb.from('class_fee_structure').select('class').limit(500); (r.data||[]).forEach(x=>add(x.class)); } catch(_){ } }
+    return [...out].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
+  },
+  paint(el, list){
+    if (!el) return 0;
+    const keep = el.value;
+    const head = el.querySelector('option[value=""]');
+    const label = head ? head.textContent : 'ALL classes';
+    el.innerHTML = '<option value="">' + label + '</option>' +
+      list.map(c => '<option value="' + String(c).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])) + '">' + String(c).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])) + '</option>').join('');
+    if (keep && list.includes(keep)) el.value = keep;
+    el.disabled = list.length === 0;
+    el.title = list.length ? '' : 'No classes found yet — add learners or a class fee structure first.';
+    return list.length;
+  },
+  async fill(){
+    const els = [...new Set([...this.IDS, ...[...document.querySelectorAll('select[data-class-picker]')].map(e=>e.id).filter(Boolean)])]
+      .map(id => document.getElementById(id)).filter(Boolean);
+    if (!els.length) return 0;
+    const list = await this.sources();
+    let n = 0; els.forEach(el => { n = this.paint(el, list); });
+    return n;
+  }
+};
+window.FeeClassPickers = FeeClassPickers;
+document.addEventListener('DOMContentLoaded', () => { try { FeeClassPickers.fill(); } catch(_){ } });
+
 const FeeDoctor={
   esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
   /* V12.66 — prefer the 14-check doctor; fall back to the 7-check one on a
