@@ -1,6 +1,6 @@
 // School Connect — Service Worker (V5 cumulative release, generator v8)
 // Bump this literal on every runtime release so previously cached CBT/report code is purged.
-const CACHE = 'sc-client-v12.77-20261108-1';
+const CACHE = 'sc-client-v12.78-20261108-1';
 const CORE = [
   './', './index.html', './builder.html', './voting.html', './notifications.html',
   './install.html', './midterm-reports.html', './ecosystem.html', './about.html', './guide.html', './offline.html',
@@ -15,25 +15,49 @@ const CORE = [
   './assets/vendor/jsqr.min.js', './assets/vendor/jszip.min.js'
 ];
 
+/* V12.77 — IS THIS INSTALL AN UPGRADE, OR A FIRST VISIT?
+   The worker used to announce SW_UPDATED from activate() unconditionally, so a
+   first-time visitor was told "a new version is available" about the build they
+   had just downloaded, and the Update button then had nothing to do. The answer
+   is knowable: an upgrade is an install that finds another version's cache
+   already on the device. */
+let SC_IS_UPGRADE = false;
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(CORE).catch(err => console.warn('[SW] precache failed', err.message))).then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    try {
+      const keys = await caches.keys();
+      SC_IS_UPGRADE = keys.some(k => /^sc-/.test(k) && k !== CACHE);
+    } catch (_) { SC_IS_UPGRADE = false; }
+    try {
+      const c = await caches.open(CACHE);
+      await c.addAll(CORE).catch(err => console.warn('[SW] precache failed', err.message));
+    } catch (err) { console.warn('[SW] precache failed', err.message); }
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
-      .then(() => self.clients.matchAll({type: 'window'}).then(clients => {
-        clients.forEach(client => client.postMessage({type: 'SW_UPDATED', version: CACHE}));
-      }))
+      .then(() => {
+        if (!SC_IS_UPGRADE) return;                 /* a first install is not news */
+        return self.clients.matchAll({type: 'window'}).then(clients => {
+          clients.forEach(client => client.postMessage({type: 'SW_UPDATED', version: CACHE}));
+        });
+      })
   );
 });
 
 // Manual skipWaiting trigger (kept for pwa-install.js Update Now button)
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+  /* V12.77 — the last resort for a device that will not move: drop every cache
+     this app owns. The page then unregisters the worker and reloads, so the
+     next load comes from the network with nothing stale in front of it. */
+  if (e.data && e.data.type === 'CLEAR_CACHES') {
+    e.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
+  }
   /* V12.74 (item 8) — the client needs a REAL version identity. It used
      registration.scriptURL, which is the same string for every release, so it
      could not tell an old version from a new one and the "Update now" banner
@@ -47,6 +71,13 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
   if (url.origin !== location.origin && !e.request.url.includes('fonts.googleapis')) return;
+
+  /* The worker's own file is never served from a cache: it is the only way a
+     page can learn which build is deployed. */
+  if (/\/sw\.js$/i.test(url.pathname)) {
+    e.respondWith(fetch(new Request(e.request, { cache: 'no-store' })));
+    return;
+  }
 
   if (e.request.mode === 'navigate') {
     // Sensitive CBT entry/result page: never serve a cached candidate page on shared devices.
