@@ -1,15 +1,16 @@
 {
  "_meta": {
-  "built_bytes": 998854,
-  "built_from_bytes": 1468710,
+  "built_bytes": 992433,
+  "built_from_bytes": 1473222,
   "removed": {
    "banner-rule": 454,
    "banner-trimmed": 128,
    "blank-squeezed": 1,
-   "deindented": 39076,
+   "deindented": 39201,
    "duplicate-grant": 10,
    "inline-prose-shortened": 154,
    "notify-moved-last": 1,
+   "outer-comment-bytes": 10840,
    "progress-select": 163,
    "redundant-add-column": 149,
    "redundant-drop-index": 15,
@@ -799,6 +800,9 @@
   ],
   "sc_class_fee_master": [
    "p_class text default ''"
+  ],
+  "sc_class_key": [
+   "p text"
   ],
   "sc_cleanup_cbt_assignment": [
    ""
