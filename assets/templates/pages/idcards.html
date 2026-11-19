@@ -551,7 +551,13 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
             <div class="form-group" id="ic-custom-paper-height-wrap" style="display:none"><label>Custom sheet height (mm)</label><input class="form-input" id="ic-paper-height-mm" type="number" min="100" max="500" step="1" value="297"></div>
             <label style="display:flex;align-items:center;gap:8px;margin:8px 0"><input type="checkbox" id="ic-trim-guides" checked> Show cut/trim guides</label>
           </div>
-          <div id="ic-size-summary" class="notice" style="margin:8px 0 0;font-size:.82rem">Finished card: ISO ID-1 · 85.60 × 53.98 mm. Landscape/Portrait rotates the same physical standard.</div>
+          <div class="form-group" style="margin-top:10px"><label>What the PDF contains</label>
+          <select class="form-select" id="ic-pdf-source" onchange="ICUI.updatePdfLabel()">
+            <option value="exact" selected>Exactly what is previewed — the chosen design, pixel for pixel (recommended)</option>
+            <option value="vector">Re-drawn with editable text — same colours and wording, not the same artwork (for print shops that must edit the wording)</option>
+          </select>
+          <small>Every card is photographed from the same markup that draws the preview, at print resolution, and placed in its exact millimetre box. The download, the print and the proof sheet therefore cannot disagree with the screen. “Re-drawn” uses the older vector renderer: CorelDRAW and Illustrator can edit the text, but the artwork is a plain data layout, not your chosen design.</small></div>
+        <div id="ic-size-summary" class="notice" style="margin:8px 0 0;font-size:.82rem">Finished card: ISO ID-1 · 85.60 × 53.98 mm. Landscape/Portrait rotates the same physical standard.</div>
           <p style="font-size:.8rem;color:#475569;margin:8px 0 0">The output uses fixed physical millimetres and one student per print unit, so pages cannot flow into the next student. ISO/IEC 7810 ID-1 is the common plastic-card format. Card stock thickness/material is a printer/media choice; nominal ID-1 plastic stock is about 0.76 mm. Use paired-sheet mode for paper/cutting, or duplex mode for a two-sided card printer. Print a test on scrap first and confirm the printer's flip edge.</p>
         </div>
         <div class="notice" style="margin-bottom:10px;font-size:.82rem">🪪 <b>Lifetime card:</b> student cards omit class and expiry; staff cards omit expiry. Front and back stay together in the selected paired or duplex output, and every student starts on a fresh sheet.</div>
@@ -569,7 +575,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
         <h3 style="margin-top:0">⬇️ Download &amp; print your card</h3>
         <p id="ic-actions-note" style="color:var(--gray-600);margin:0 0 10px;font-size:.88rem">Loading…</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="ICUI.pdfAll()" title="Vector PDF at exact millimetres — opens in CorelDRAW, Illustrator, InDesign and Word with editable text">⬇ Download PDF <span id="ic-pdf-label">(all)</span></button>
+          <button class="btn btn-primary" onclick="ICUI.pdfAll()" title="Exactly the design shown in the preview, at exact millimetres and print resolution — opens in CorelDRAW, Illustrator, InDesign and Word like any normal PDF; switch to the re-drawn option if a print shop must edit the wording">⬇ Download PDF <span id="ic-pdf-label">(all)</span></button>
           <button class="btn btn-outline" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
           <button class="btn btn-outline" data-ic-bulk onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
           <button class="btn btn-outline" onclick="ICUI.downloadHtml()" title="HTML proof sheet — for archiving or emailing, never for print production">⬇ HTML proof</button>
@@ -599,6 +605,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 <script src="assets/js/idcard-pdf.js"></script>
 <script src="assets/js/idcard-pdf.selftest.js"></script>
 <script src="assets/js/super.js"></script>
+<script src="assets/js/idcard-raster.js"></script>
 <script src="assets/js/enterprise.js"></script>
 <script src="assets/js/theme-manager.js"></script>
 <script src="assets/js/legibility.js"></script>
@@ -1026,24 +1033,59 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     }catch(e){ console.warn('QR skipped:', e&&e.message); return null; }
   },
   /* Build the exact job list the PDF engine needs. */
+  /* V12.79 (round 23, item 3) — WHAT YOU SEE IS WHAT YOU DOWNLOAD.
+     The PDF used to be painted by a second renderer that only knew the person's
+     data, so a school that chose "Aurora" or "Heritage" downloaded a generic
+     layout. Every face is now photographed from the very markup the preview
+     uses (Super.idcard.frontFace/backHtml, same faceOpts) at print resolution and
+     handed to the PDF engine as one picture per face, which it places inside the
+     card's exact millimetre box. `vector` remains available for a print shop
+     that must edit the wording — see the "What the PDF contains" control. */
+  pdfSource(){
+    const el=document.getElementById('ic-pdf-source');
+    return (el&&el.value)==='vector'?'vector':'exact';
+  },
   async pdfCards(people,opts){
     opts=opts||{};
-    const S=window.SCHOOL||{}, self=location.origin+location.pathname;
-    const out=[];
-    for(const person of (people||[])){
-      const photo=await this.loadPhoto(person.photo_url);
-      const verify=S.slug? (location.origin+'/verify.html?id='+encodeURIComponent(person.admission_no||person.staff_no||'')) : self;
-      const qr=this.makeQr(verify);
-      out.push({
-        front:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
-                class:person.class, arm:person.arm, date_of_birth:person.date_of_birth,
-                blood_group:person.blood_group, type:person.type||this.kind, role:person.role,
-                department:person.department, phone:person.phone, photo:photo, qr:qr },
-        back:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
-               type:person.type||this.kind }
-      });
+    const list=people||[];
+    const fo=this.faceOpts();
+    const w=Number(fo.widthMm)||85.6, h=Number(fo.heightMm)||53.98;
+    /* 300 dpi for a handful of cards, 200 dpi for a whole school: at 300 dpi a
+       147-student run would be a 60 MB file nobody can email. */
+    const dpi=list.length>25?200:300;
+    if(this.pdfSource()!=='vector' && window.IDCardRaster && IDCardRaster.ready()){
+      const out=[];
+      let failed=0;
+      for(let i=0;i<list.length;i++){
+        const person=list[i];
+        /* both faces are photographed from ONE render of the pair, exactly as
+           the preview draws them, so front and back cannot drift apart. */
+        let front=null, back=null;
+        try{ const shots=await IDCardRaster.pair(person,{faceOpts:fo,widthMm:w,heightMm:h,dpi});
+             front=shots&&shots.front; back=shots&&shots.back; }
+        catch(e){ console.warn('card capture failed',e); }
+        if(!front&&!back){ failed++; }
+        out.push(front||back?{front,back}:this.vectorCard(person,w,h));
+        if(opts.onProgress) opts.onProgress(i+1,list.length);
+      }
+      if(out.some(c=>c&&(c.front||c.back))) return out;
+      console.warn('[ID card] nothing could be photographed — falling back to the vector layout');
     }
-    return out;
+    return list.map(p=>this.vectorCard(p,w,h));
+  },
+  /* the older data-only card, kept as the explicit "vector" choice and as the
+     last-resort fallback if a browser refuses to photograph the DOM */
+  vectorCard(person,w,h){
+    const S=window.SCHOOL||{}, self=location.origin+location.pathname;
+    const verify=S.slug?(location.origin+'/verify.html?id='+encodeURIComponent(person.admission_no||person.staff_no||'')):self;
+    return {
+      front:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
+              class:person.class, arm:person.arm, date_of_birth:person.date_of_birth,
+              blood_group:person.blood_group, type:person.type||this.kind, role:person.role,
+              department:person.department, phone:person.phone, photo:null, qr:this.makeQr(verify) },
+      back:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
+             type:person.type||this.kind }
+    };
   },
   pdfLayout(cfg){
     if(cfg.mode==='duplex') return 'single';
@@ -1111,7 +1153,10 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
               (warns[0].detail?' — '+warns[0].detail:''),'warning',14000);
       }else{
         toast('PDF ready — '+cards.length+' card'+(cards.length===1?'':'s')+', '+(bytes.length/1024).toFixed(0)+
-              ' KB. Text is editable, every card is at exact size, and photos and signatures are embedded.','success',8000);
+              ' KB. '+(this.pdfSource()==='vector'
+                ? 'Drawn as editable text at exact size, with photos and signatures embedded.'
+                : 'Exactly the design you previewed, at exact size and print resolution, with the QR and every photo embedded.'),
+              'success',8000);
       }
       if(window.CRUD&&CRUD.audit) try{ CRUD.audit('idcards','download-pdf',label,'',{count:cards.length}); }catch(_){}
       return true;
