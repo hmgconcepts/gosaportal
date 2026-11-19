@@ -1,6 +1,6 @@
 # School Connect — Deployment Guide
 
-**Version 12.78 · 8 November 2026**
+**Version 12.79 · 8 November 2026**
 
 This guide takes a school from "nothing" to "a live, branded school platform with its own data" using **only free tools**. Follow it in order. Every step states exactly what to click or paste, what you should see when it worked, and what to do when it did not.
 
@@ -251,6 +251,16 @@ A restore is: create a new project, paste the schema, then import the export.
 
 ## 12. Troubleshooting
 
+> **"The download page keeps saying *Updating…*" / "the ZIP button does nothing."**
+> Two different things, neither of them a broken file. The workspace file viewer
+> publishes the whole workspace (~75 MB) before it hands over any file — that is
+> the spinner. And an in-app preview panel is a sandboxed frame, which browsers
+> forbid from starting a download. Use the download shelf instead
+> (`python3 /home/user/work/downloads.py`, port 8080): open it in its **own tab**
+> (the ⤢ control), where a click downloads immediately, or press **Copy link** on
+> the file you want and paste that address into a normal browser tab. The shelf
+> prints each ZIP's size and SHA-256 so you can confirm the download finished.
+
 | Symptom | Cause | Fix |
 |---|---|---|
 | Every page says **"Database not configured"** | keys not pasted | redo step 4; ensure the file is `assets/js/config.js` at the site root's `assets/js/` |
@@ -292,7 +302,7 @@ A single school of 1,000 learners fits comfortably inside the free tiers.
 
 ---
 
-## 15. What is new in V12.78, and the four checks that prove it installed
+## 15. What is new in V12.79, and the four checks that prove it installed
 
 If you are upgrading from V12.77 the procedure is the same four steps as §4 —
 back up, run `database/complete-schema.sql` once, upload the files, hard-reload.
@@ -303,7 +313,7 @@ and the three new functions live there, and the pages degrade politely (they say
 After the pack has run you should see this line among the results:
 
 ```
-V12.78 installed — a prep exam set for a class is a timetable sitting, and every learner can find it
+V12.79 installed — a prep exam set for a class is a timetable sitting, and every learner can find it
 ```
 
 Then confirm each of these on the live site:
@@ -330,13 +340,13 @@ Then confirm each of these on the live site:
    type and class controls are still staff-only.
 
 **Rolling back.** Restore the backup taken in step 1 and redeploy the previous
-ZIP. V12.78 only *adds* objects (one column on `cbt_exams`, three on
+ZIP. V12.79 only *adds* objects (one column on `cbt_exams`, three on
 `exam_timetable`, one unique index, three functions, one trigger) and changes no
 column type, so a file-only rollback is safe for readers; the database rollback
 needs the backup.
 
 > **Note for the next release (schema budget).** The pack is now 999,867 bytes
-> against Supabase's 1,000,000-byte limit for a pasted script. V12.78 fit by
+> against Supabase's 1,000,000-byte limit for a pasted script. V12.79 fit by
 > trimming its own comments; the next round must reclaim space from older,
 > superseded narrative before adding objects.
 

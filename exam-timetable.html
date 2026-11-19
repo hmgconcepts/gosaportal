@@ -584,7 +584,8 @@ const EXT={
       let h='<div class="table-wrap"><table><thead><tr><th>Date</th><th>Time</th><th>Subject</th><th>Class</th><th>Venue</th><th>Status</th><th></th></tr></thead><tbody>';
       rows.forEach(x=>{
         const sit=(x.status==='open'&&x.code)?'<a class="btn btn-sm btn-primary" href="cbt-exam.html?code='+encodeURIComponent(x.code)+'">Sit now →</a>'
-          :(x.status==='upcoming'?'<span style="font-size:.78rem;color:var(--gray-500)">opens '+esc(x.start_local||'')+'</span>':'');
+          :(x.status==='upcoming'?(window.App&&App.prepWhenCell?App.prepWhenCell(x)
+            :'<span style="font-size:.78rem;color:var(--gray-500)">opens '+esc(x.start_local||'')+'</span>'):'');
         h+='<tr><td><b>'+esc(x.start_local||'')+'</b></td>'
           +'<td>'+esc(x.start_time||'')+'–'+esc(x.end_time||'')+'<br><small>'+Number(x.duration_min||0)+' min</small></td>'
           +'<td><b>'+esc(x.title||x.subject||'')+'</b><br><small>'+esc(x.subject||'')+'</small></td>'
@@ -593,6 +594,9 @@ const EXT={
       h+='</tbody></table></div><p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">'+rows.length+' prep sitting(s) · school time · last score: '+
         rows.map(x=>esc(x.code||'')+' '+(x.attempts_used?Number(x.last_percent).toFixed(0)+'%':'—')).join(' · ')+'</p>';
       box.innerHTML=h;
+      /* V12.79 (item 5) — a page left open upgrades the row by itself at the
+         moment the paper opens; the server is asked again, never assumed. */
+      if(window.App&&App.armPrepOpeners) App.armPrepOpeners(()=>EXT.loadPrep());
     }catch(e){
       box.innerHTML='<p style="color:var(--gray-500);font-size:.9rem;margin:0">💤 Prep sittings appear here after a one-time database update (admin: run database/complete-schema.sql).</p>';
     }

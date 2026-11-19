@@ -1,6 +1,6 @@
 # School Connect — Complete Feature Reference
 
-**Version:** 12.78 · **Date:** 8 November 2026
+**Version:** 12.79 · **Date:** 8 November 2026
 **Applies to:** the generator (`schoolconnect`), and both deployments (`gosaportal`, `schoolconnectdemo`).
 
 This document explains **every feature in the platform**: what it does, how it works, who may use it, and what the system guarantees about it. Nothing here is aspirational — every item listed exists in the shipped code and is exercised by the regression suite.
@@ -401,3 +401,32 @@ closed by name.
 running worker's own version is what gets recorded as applied, a pending version
 is never counted as done, and the banner never returns once the platform is
 current.
+
+### 6.8 The card you download IS the card you see — and every file opens in a print shop (V12.79)
+
+Until V12.79 there were two renderers: the preview drew your chosen design, and the PDF engine was handed
+only the person's data and painted its own generic idea of a card. Same student, two drawings. The PDF is
+now a photograph of the real card — the same markup, the same colours, the same template, at print
+resolution — placed in the card's exact millimetre box, so download = print = proof sheet = screen.
+A missing photo becomes a marked placeholder and the run continues.
+
+Every file is a plain PDF with a single JPEG image and no transparency groups, so CorelDRAW, Illustrator,
+InDesign and Word all open it. For print shops that must edit the wording, the page offers the old vector
+renderer as an explicit second choice, and says plainly that its artwork is a data layout rather than your
+chosen design.
+
+### 6.9 A signature that actually saves (V12.79)
+
+A tutor's drawn signature went to the admin-only `branding` bucket and was refused by RLS — and even on
+their own row the embedded-media guard rejected a `data:image` value. Signatures now have their own bucket
+(public read, own-folder writes), one write RPC that accepts a drawn image up to 200 KB, and a page that
+reads the value back before it says "saved".
+
+### 4.10 The prep exam door opens by itself (V12.79)
+
+A prep exam is sittable inside its window and nowhere else. Until V12.79 a learner who already had the
+Exam Timetable open saw "opens 09:00" for ever, and — worse — a student opening that page was shown
+"🔒 Restricted Page", because the access check consulted the module maps instead of the page's own
+`data-role-allow` list. A role named in a page's own allow list is now believed, read-only, and every
+upcoming row carries a live countdown that re-reads the server at the due second, so **Sit now** appears
+without a reload.
