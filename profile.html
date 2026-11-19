@@ -331,53 +331,114 @@
       _sigPad.canvas.toBlob(res,'image/png');
     });
   }
+  /* V12.79 (round 23, item 1) — "SAVE THIS SIGNATURE" now always saves.
+     The old code uploaded into the **branding** bucket, whose INSERT policy is
+     `is_admin(auth.uid())`. A tutor is not an admin, so the database refused the
+     row and the page blamed a missing bucket. Three routes now, in order, each
+     one tried and reported honestly:
+       1. the `signatures` bucket, own folder only (installed by complete-schema.sql);
+       2. the `branding` bucket (legacy path — works for admins, harmless otherwise);
+       3. the database itself, as a small drawn image on the tutor's own profile —
+          so a school whose storage was never configured still gets a signature.
+     After saving, the value is read BACK from the server; "Saved" is only said
+     when the server confirms it. */
+  function sigDataUrl(blob){
+    return new Promise(function(res){
+      var fr=new FileReader();
+      fr.onload=function(){ res(String(fr.result||'')); };
+      fr.onerror=function(){ res(''); };
+      fr.readAsDataURL(blob);
+    });
+  }
   async function saveSignaturePad(){
     var msg=$('sig-msg');
-    if(!_sigPad.dirty){ if(msg) msg.textContent='Draw your signature on the pad first.'; return; }
+    var say=function(html){ if(msg) msg.innerHTML=html; };
+    if(!_sigPad.dirty){ say('Draw your signature on the pad first.'); return; }
     var sb=window.sb;
-    if(!sb||!_currentUser){ if(msg) msg.textContent='Not signed in.'; return; }
-    if(msg) msg.textContent='Saving…';
+    if(!sb||!_currentUser){ say('Not signed in.'); return; }
+    say('Saving…');
     try{
       var blob=await signaturePadBlob();
-      if(!blob){ if(msg) msg.textContent='Could not read the pad. Draw again.'; return; }
-      if(blob.size>190000){
-        if(msg) msg.textContent='That drawing is too large ('+Math.round(blob.size/1024)+' KB). Clear it and sign again with fewer strokes.';
+      if(!blob){ say('Could not read the pad. Draw again.'); return; }
+      if(blob.size>150000){
+        say('That drawing is too large ('+Math.round(blob.size/1024)+' KB). Press Clear and sign again with fewer strokes.');
         return;
       }
-      var path='signatures/teacher-'+_currentUser.id+'-'+Date.now()+'.png';
-      var up=await sb.storage.from('branding').upload(path,blob,{contentType:'image/png',upsert:false});
-      if(up.error){
-        if(msg) msg.innerHTML='Upload failed: '+esc(up.error.message)+' — if the storage bucket is missing, ask the administrator to run <b>database/complete-schema.sql</b> once.';
-        return;
+      var url='', notes=[];
+      /* 1 — the school's own signature storage */
+      try{
+        var path=_currentUser.id+'/signature-'+Date.now()+'.png';
+        var up=await sb.storage.from('signatures').upload(path,blob,{contentType:'image/png',upsert:false});
+        if(!up.error){
+          var pub=sb.storage.from('signatures').getPublicUrl(path);
+          url=(pub.data&&pub.data.publicUrl)||'';
+          if(url) notes.push('stored in School Storage');
+        } else if(!/bucket|not found|does not exist/i.test(up.error.message||'')){
+          notes.push('signature storage said: '+up.error.message);
+        }
+      }catch(_){}
+      /* 2 — the older branding bucket (admin-owned, kept for compatibility) */
+      if(!url){
+        try{
+          var path2='signatures/teacher-'+_currentUser.id+'-'+Date.now()+'.png';
+          var up2=await sb.storage.from('branding').upload(path2,blob,{contentType:'image/png',upsert:false});
+          if(!up2.error){
+            var pub2=sb.storage.from('branding').getPublicUrl(path2);
+            url=(pub2.data&&pub2.data.publicUrl)||'';
+            if(url) notes.push('stored in School Storage (branding folder)');
+          }
+        }catch(_){}
       }
-      var pub=sb.storage.from('branding').getPublicUrl(path);
-      var url=(pub.data&&pub.data.publicUrl)||'';
-      if(!url){ if(msg) msg.textContent='Uploaded, but the public link could not be read. Check the bucket is public.'; return; }
-      /* the authoritative write: the server stamps who and when */
-      var saved=null;
+      /* 3 — no storage at all: the signature lives on the tutor's own profile */
+      if(!url){
+        var dataUrl=await sigDataUrl(blob);
+        if(!dataUrl || dataUrl.length>195000){
+          say('This browser could not hand the drawing to storage, and the drawing is too large to keep on your profile ('+Math.round(blob.size/1024)+' KB). Sign again with fewer strokes — a few short lines are enough.');
+          return;
+        }
+        url=dataUrl;
+        notes.push('kept safely on your own profile (no storage bucket needed)');
+      }
+      /* the authoritative write — the server stamps who and when */
+      var saved=null, werr=null;
       try{
         var r=await sb.rpc('sc_signature_save',{p_url:url,p_name:(_currentProfile&&_currentProfile.full_name)||''});
-        if(r.error) throw r.error;
-        saved=r.data;
-      }catch(_){ /* older database: fall back to the direct profile write */ }
-      if(!saved||saved.ok!==true){
+        if(r.error) werr=r.error; else saved=r.data;
+      }catch(e){ werr=e; }
+      if((!saved||saved.ok!==true) && !werr){
         var w=await sb.from('profiles').update({signature_url:url}).eq('id',_currentUser.id);
-        if(w.error) throw w.error;
+        if(!w.error) saved={ok:true};
+        else werr=w.error;
       }
-      var inp=$('teacher-signature-url'); if(inp) inp.value=url;
+      if(!saved||saved.ok!==true){
+        var why=(saved&&saved.error)||(werr&&werr.message)||'the server did not confirm the save';
+        say('Could not save your signature: '+esc(String(why)));
+        return;
+      }
+      /* prove it stuck before claiming success */
+      var readBack='';
+      try{
+        var chk=await sb.rpc('sc_my_signature');
+        var row=(chk&&chk.data&&chk.data[0])||null;
+        readBack=(row&&row.url)||'';
+      }catch(_){}
+      var inp=$('teacher-signature-url'); if(inp) inp.value=(url.indexOf('data:')===0?'':url);
       _currentProfile.signature_url=url;
       if(window.SC_PROFILE) SC_PROFILE.signature_url=url;
-      try{ localStorage.setItem('sc-class-teacher-signature-url',url); }catch(_){}
+      if(url.indexOf('data:')!==0){ try{ localStorage.setItem('sc-class-teacher-signature-url',url); }catch(_){} }
       updateSignaturePreview();
       clearSignaturePad();
-      if(msg) msg.innerHTML='✅ Signature saved ('+Math.round(blob.size/1024)+' KB). It now prints on every document you sign.';
+      if(readBack && readBack!==url){
+        say('⚠️ The upload worked but the profile still holds a different signature. Press Save once more, or ask the administrator to run database/complete-schema.sql.');
+        return;
+      }
+      say('✅ Signature saved ('+Math.round(blob.size/1024)+' KB, '+(notes.join('; ')||'saved')+'). It now prints on every document you sign.');
     }catch(e){
-      var m2=String(e.message||e);
-      if(msg) msg.innerHTML=/function|schema cache|does not exist/i.test(m2)
-        ? 'Saved the image but could not link it: '+esc(m2)+' — ask the administrator to run the latest <b>complete-schema.sql</b>.'
-        : 'Could not save: '+esc(m2);
+      var m2=String((e&&e.message)||e);
+      say('Could not save: '+esc(m2));
     }
   }
+
 
   function updateSignaturePreview(){
     const input=$('teacher-signature-url'),prev=$('teacher-signature-preview');if(!input||!prev)return;const url=driveDirect(input.value);
