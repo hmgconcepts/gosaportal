@@ -610,6 +610,36 @@ def build(raw: str) -> tuple[str, dict]:
         return '\n'.join(out)
     out = _drop_release_essays(out)
     out = _trim_banner(out)
+
+    # ---- 9b2. the last of the prose ---------------------------------------
+    # V12.79 — after the release essays and the banner are gone, the pack still
+    # carried ~48 KB of comment-only lines: explanation written for a maintainer,
+    # sitting inside a file that must fit Supabase's 1 MB SQL editor. The RAW
+    # source (complete-schema.raw.sql) keeps every one of those comments, and the
+    # release notes carry the reasoning; the shipped pack carries the statements.
+    # Comments INSIDE dollar-quoted bodies are left exactly as written — a
+    # function body is code, and rewriting code to save bytes is how silent
+    # breakage happens.
+    def _strip_outer_comments(text):
+        lines = text.split('\n')
+        res, tag, dropped = [], None, 0
+        for ln in lines:
+            if tag is None:
+                m = re.search(r'\$(\w*)\$', ln)
+                if m:
+                    # open a body unless the tag also closes on this same line
+                    tag = m.group(0)
+                if ln.lstrip().startswith('--'):
+                    dropped += len(ln) + 1
+                    continue
+                res.append(ln)
+            else:
+                res.append(ln)
+                if ln.count(tag) % 2 == 1:
+                    tag = None
+        stats['outer-comment-bytes'] += dropped
+        return '\n'.join(res)
+    out = _strip_outer_comments(out)
     # ---- 9c. blank-line squeeze (outside bodies only) --------------------
     # Runs of blank lines carry no meaning to Postgres and none to a reader.
     out = re.sub(r'\n{3,}', '\n\n', out)
