@@ -231,6 +231,8 @@ In the browser:
 When a new release ZIP arrives:
 
 1. **Database first.** Paste the new `database/complete-schema.sql` into the SQL Editor and Run. It is idempotent; existing data is untouched. Wait for the final "reload schema" row.
+
+   This file is written to **upgrade a database that already has an older School Connect**, not only to create a new one. Functions whose returned column list grew (for example `sc_my_prep_exams`, which gained two columns in V12.79) are dropped and re-created automatically before the rest of the script runs — Postgres cannot change a function's return type in place, so the file does the drop for you. **You never have to drop a function by hand.** You may see notices such as `School Connect: public.sc_my_prep_exams(text,text) kept in place`; they mean a dependent object held that one function and the script carried on safely.
 2. **Then the files.** Upload the new folder over the old one on your host (Netlify: drag the folder onto the existing site → *Deploys*; Vercel/Cloudflare: same idea).
 3. **Then let the devices catch up.** Open the site on a phone. A bar appears: **"New version available"** → press **Update now**. The page reloads on the new version, and **the bar does not come back** — the applied version is recorded per device.
 
@@ -266,6 +268,7 @@ A restore is: create a new project, paste the schema, then import the export.
 | Every page says **"Database not configured"** | keys not pasted | redo step 4; ensure the file is `assets/js/config.js` at the site root's `assets/js/` |
 | Dashboard is empty but the login works | role not set, or no data yet | `select role from public.profiles where email='…';` then complete step 7 |
 | "Could not find the function …" in the console | the database predates the page | re-run `database/complete-schema.sql` (step 10.1) |
+| `ERROR: 42P13: cannot change return type of existing function` | you are pasting an **older** ZIP's schema into a database created by a newer one — `create or replace function` cannot change a returned column list | download the current ZIP and paste the schema from it; the current file drops those functions itself. Never drop a function by hand |
 | A page renders unstyled | the folder was uploaded flat | re-upload so that `index.html`, `assets/`, and the pages sit at the same level |
 | "Mark X is above the maximum Y" | correct, by design | lower the mark, or raise the column maximum in *Report Cards → Settings* |
 | ID card back looks a different shape | a cached old `super.js` | hard-reload (`Ctrl+Shift+R`), then press **Update now** on any other device |
