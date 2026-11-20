@@ -7,7 +7,7 @@
 -- platform needs. Safe on a new or an existing project, and safe to
 -- run more than once.
 --
--- Size: 993,419 bytes - inside the Supabase SQL Editor 1 MB request cap.
+-- Size: 994,469 bytes - inside the Supabase SQL Editor 1 MB request cap.
 -- Paste the whole file into SQL Editor and press Run once.
 -- Each section is independently re-runnable.
 --
@@ -122,6 +122,19 @@ end $$;
 grant usage on schema public to anon, authenticated, service_role;
 create extension if not exists "uuid-ossp";
 create extension if not exists "pgcrypto";
+-- V12.79 — A ROW-RETURNING FUNCTION CANNOT BE REPLACED IN PLACE.
+-- `returns table(...)` puts the column list in the signature, so adding a
+-- column to one of these functions makes a re-run of this file fail with
+-- 42P13 on every school that already installed the older version. They are
+-- dropped first (only if they exist, and only if nothing depends on them —
+-- a failure here is reported, never fatal).
+do $sc_upgrade$declare r record;begin
+for r in select p.oid::regprocedure::text sig from pg_proc p
+join pg_namespace n on n.oid=p.pronamespace
+where n.nspname='public' and p.proname in ('verify_certificate','table_sizes','retention_candidates','sc_list_student_archives','sc_diary_acks','sc_security_posture','sc_my_prep_exams') loop
+begin execute 'drop function '||r.sig;
+exception when others then raise notice 'School Connect: % kept in place (%). A dependent object holds it; drop that object first.',r.sig,sqlerrm;
+end;end loop;end$sc_upgrade$;
 create or replace function public.sc_set_updated_at()
 returns trigger language plpgsql security invoker as $$
 begin
@@ -10684,6 +10697,7 @@ return jsonb_build_object('ok',true,'held',true,'student',coalesce(st.full_name,
 end $$;
 revoke all on function public.sc_report_hold_position(text,text,text,text,text,text,boolean) from public, anon;
 grant execute on function public.sc_report_hold_position(text,text,text,text,text,text,boolean) to authenticated;
+drop view if exists public.sc_report_hold_list cascade;
 create or replace view public.sc_report_hold_list as
 select h.id, h.student_id_ref, h.class, h.term, h.session, h.kind, h.reason,
 coalesce(s.full_name, '') as student_name, h.created_at
@@ -15525,5 +15539,5 @@ end $sigbucket$;
 -- API until the cache expires — which is exactly how a perfectly good
 -- database came to report "run database/v9.4-fees-and-exams.sql".
 -- ---------------------------------------------------------------------
-select 'V12.78 installed — a prep exam set for a class is a timetable sitting, and every learner can find it' as status;
+select 'V12.79 installed — prep exams, a preview-exact ID-card PDF, and a schema that upgrades an older install instead of failing on it' as status;
 select pg_notify('pgrst', 'reload schema');

@@ -1,7 +1,7 @@
 {
  "_meta": {
-  "built_bytes": 992433,
-  "built_from_bytes": 1473222,
+  "built_bytes": 993479,
+  "built_from_bytes": 1473278,
   "removed": {
    "banner-rule": 454,
    "banner-trimmed": 128,
@@ -23,7 +23,8 @@
    "superseded-policy": 72,
    "superseded-table": 21,
    "superseded-trigger": 3,
-   "superseded-view": 1
+   "superseded-view": 1,
+   "upgrade-prelude-functions": 7
   }
  },
  "columns": [
