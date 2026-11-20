@@ -1,5 +1,34 @@
 # Student/staff ID card print guide
 
+## What each button makes (V12.80)
+
+The action bar carries a **scope**; every button works on that scope, and the
+line above the buttons always states what the run will contain.
+
+| Scope | What it makes | Use it for |
+|---|---|---|
+| **This person** | front and back of the one record on screen | printing a card for the learner or staff member you just picked |
+| **A class / section** | everyone in the class box, optionally narrowed by the **Section / arm** box | one class, or one arm of a class (JSS 1 · A) |
+| **Everyone in this list** | whatever the class box + search box currently select | "find them, then print what you found" |
+| **All students** | the whole student roll, from any tab | the yearly student-card run |
+| **All staff** | the whole staff roll, from any tab | the staff-card run |
+
+- **⬇ Download PDF** makes the file for the scope. **🖨 Print ALL** sends that same
+  file to the printer. **🖨 Print ID Card (front + back)** is always exactly one
+  card — the person on screen — whatever the scope says.
+- The **All students / All staff** scopes are for the admin tier. A learner or a
+  parent is told no, and the list they may see is untouched: a learner's scope is
+  their own card, a parent's is their linked children.
+- The class box holds a **class**; it is ignored by an "All staff" run, because a
+  class means nothing to a staff record. To print one department, switch to the
+  **Staff** tab — the same box then lists departments, staff types and roles.
+- A class or section that matches nobody prints **nothing** and says so. A filter
+  never widens into the whole school.
+- If a record has no photo on file the scope line says how many, and those cards
+  print with the design's own initial-letter tile rather than a blank box. Photos
+  stored as Google Drive links are read through the Drive preview hosts; a photo
+  host that refuses to be read is reported, not silently blanked.
+
 ## Finished card formats
 
 The ID Cards page now offers ISO-size presets and custom finished dimensions:

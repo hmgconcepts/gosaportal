@@ -1,6 +1,6 @@
 # School Connect — Deployment Guide
 
-**Version 12.79 · 8 November 2026**
+**Version 12.81 · 20 November 2026**
 
 This guide takes a school from "nothing" to "a live, branded school platform with its own data" using **only free tools**. Follow it in order. Every step states exactly what to click or paste, what you should see when it worked, and what to do when it did not.
 
@@ -305,7 +305,57 @@ A single school of 1,000 learners fits comfortably inside the free tiers.
 
 ---
 
-## 15. What is new in V12.79, and the four checks that prove it installed
+## 15. What is new in V12.81, and the five checks that prove it installed
+
+If you are upgrading from V12.79 the procedure is the same four steps as §4 —
+back up, run `database/complete-schema.sql` once, upload the files, hard-reload.
+This round changes **no table and no column type**: it corrects how a time is
+read, when a sitting closes, and what a learner is allowed to see.
+
+After the pack has run you should see this line among the results:
+
+```
+V12.81 installed — a prep exam opens at the time the school typed, closes when it ends, and keeps the answers of anyone already sitting
+```
+
+Then confirm each of these on the live site:
+
+1. **10:00 means 10:00.** CBT → **+ New Exam / Test** → 🧪 Prep Exam, class
+   `JSS 1`, **Starts at** *today 10:00*, duration 45. Under the field the live
+   preview reads *"Opens … 10:00 (09:00 UTC)"*. Save, then open the learner's
+   dashboard: the sitting says 10:00 and its **Sit now →** button appears at
+   10:00 — not 11:00.
+2. **The edit form shows your clock.** Edit that exam: the **Starts at** field
+   says 10:00 (it used to say 09:00, and re-saving silently moved the paper).
+   Save without touching it — the paper does not move.
+3. **A sitting closes when it ends.** Take a paper whose window has passed and
+   open its link: it is refused with *"This exam has closed."* It used to stay
+   open for ever when no closing time was set, and the Exam Timetable now
+   advertises exactly the end the database enforces.
+4. **A learner inside the window keeps their answers.** Start a paper 5 minutes
+   before it closes and submit after it closes: the answers are marked, not
+   thrown away.
+5. **Already-wrong sittings are repairable in one click.** CBT → **🕒 Check prep
+   times** lists every sitting with the school clock, the instant actually
+   stored, and **−1 h / −15 m / +15 m / +1 h**. One click rewrites the exam and
+   its Exam Timetable row together.
+
+Also in this round, silently: a lesson's attempt count is no longer shared by
+two learners with the same name, an unreleased score no longer appears on a
+learner's dashboard, "0 attempts" reads as unlimited instead of one, and an
+exam can no longer be 30 minutes long and 60 minutes long at the same time.
+
+**Rolling back.** Restore the backup taken in step 1 and redeploy the previous
+ZIP. V12.81 adds one column (`school_settings.school_timezone`, defaulted), two
+functions and one trigger, and changes the bodies of six others; nothing is
+dropped, so a file-only rollback is safe for readers.
+
+> **Note for the next release (schema budget).** The pack is 998,626 bytes
+> against Supabase's 1,000,000-byte limit for a pasted script — about 1.3 KB of
+> room. The next round must reclaim space from older, superseded narrative
+> before adding objects.
+
+## 15b. What was new in V12.79
 
 If you are upgrading from V12.77 the procedure is the same four steps as §4 —
 back up, run `database/complete-schema.sql` once, upload the files, hard-reload.

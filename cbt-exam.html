@@ -705,10 +705,15 @@ textarea.form-input{min-height:80px;resize:vertical}
       /* V12.72 (item 4) — a learner should not have to guess when to come back.
          Show the exact opening moment AND a live countdown to it. */
       const _opens = window.fmtDMYT ? fmtDMYT(data.start_at) : new Date(data.start_at).toLocaleString();
-      const _ms = data.start_at ? (new Date(data.start_at).getTime() - Date.now()) : 0;
+      /* V12.81 — the countdown runs on the SERVER's clock. A phone whose clock
+         is wrong used to show a countdown that never reached zero (or reached
+         it an hour early); the paper still opened on the server's word, so the
+         learner saw the two disagree. */
+      const _skew = data.server_now ? (new Date(data.server_now).getTime() - Date.now()) : 0;
+      const _ms = data.start_at ? (new Date(data.start_at).getTime() - (Date.now() + _skew)) : 0;
       this.root().innerHTML = '<div class="card"><h2>⏳ Not open yet</h2>'
         + '<p>'+esc(data.message||'This exam has not started yet.')+'</p>'
-        + '<p>Opens at <strong>'+esc(_opens)+'</strong>.</p>'
+        + '<p>Opens at <strong>'+esc(_opens)+'</strong>'+(data.closes_at?' and closes at <strong>'+esc(window.fmtDMYT?fmtDMYT(data.closes_at):new Date(data.closes_at).toLocaleString())+'</strong>':'')+'.</p>'
         + '<div id="cbt-countdown" style="font-size:1.5rem;font-weight:700;color:#1e3a8a;margin:10px 0">'+this.countdownText(_ms)+'</div>'
         + '<p style="font-size:.88rem;color:#475569">Keep this page open — it will unlock by itself the moment the test opens. Do not reload.</p>'
         + '<button class="btn btn-outline" onclick="Exam.reload()">🔄 Check again now</button></div>';

@@ -483,6 +483,7 @@
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px" data-staff-only>
         <button class="btn btn-primary" onclick="CBTUI.newExam()">+ New Exam / Test</button>
         <button class="btn btn-outline" onclick="CBTUI.resyncPrep()" title="Re-write every prep exam's row on the Exam Timetable from the exams themselves">🔄 Reschedule prep exams</button>
+        <button class="btn btn-outline" onclick="CBTUI.prepTimes()" title="Every prep sitting, in school time and in UTC, with a one-click correction">🕒 Check prep times</button>
         <button class="btn btn-outline" onclick="CBTUI.downloadTemplate()">⬇ CSV Template</button>
         <button class="btn btn-outline" onclick="CBTUI.refresh()">↻ Refresh</button>
         <button class="btn btn-outline" onclick="CBTUI.importBackup()">📥 Import offline backup (JSON)</button>
@@ -686,8 +687,11 @@ window.CBTUI = {
     const sv=s&&s.value, cv=c&&c.value;
     if(!sv&&!cv){ box.textContent='No window — the link works whenever the test is open.'; return; }
     if(sv&&cv&&new Date(cv)<=new Date(sv)){ box.innerHTML='<span style="color:#b91c1c">The closing time must be AFTER the opening time.</span>'; return; }
-    const f=v=>new Date(v).toLocaleString(undefined,{weekday:'short',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    box.textContent = (sv?'Opens '+f(sv)+'. ':'Opens immediately. ')+(cv?'Closes '+f(cv)+'.':'Stays open until you close it.');
+    const f=v=>new Date(window.SCTime?SCTime.toIso(v):v).toLocaleString(undefined,{weekday:'short',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    /* the UTC instant is printed too: a tutor can see exactly what the school's
+       clock and the database agree on, instead of trusting an invisible one */
+    const utc=v=>{const i=window.SCTime?SCTime.toIso(v):new Date(v);return i?new Date(i).toISOString().slice(11,16)+' UTC':'';};
+    box.textContent = (sv?'Opens '+f(sv)+' ('+utc(sv)+'). ':'Opens immediately. ')+(cv?'Closes '+f(cv)+' ('+utc(cv)+').':'Stays open until you close it.');
   },
   onEditTypeChange(val){
     const help=document.getElementById('ed-type-help');
@@ -930,6 +934,10 @@ window.CBTUI = {
     document.getElementById('mq-mark').value='1';
     toast('Question added! Add more or create the exam.','success',2000);
   },
+  /* NOTE (V12.81): this body is REPLACED later in the file by
+     `CBTUI.save = async function(){...}` (the V12.28 validation version), which
+     is what the Create button actually runs. Both must build the same payload —
+     see the schedule fields there. */
   async save(){
     if(!sb){ toast('Database not configured.','warning'); return; }
     const csv = document.getElementById('ex-csv').value.trim();
@@ -958,8 +966,11 @@ window.CBTUI = {
       select_count: parseInt(document.getElementById('ex-sel').value)||0,
       instructions: document.getElementById('ex-instr').value,
       is_open: true,
-      start_at: (function(){ const v=document.getElementById('ex-start'); return v&&v.value?new Date(v.value).toISOString():null; })(),
-      close_at: (function(){ const v=document.getElementById('ex-close'); return v&&v.value?new Date(v.value).toISOString():null; })(),
+      /* V12.81 — the wall-clock the tutor typed, read back as the instant it
+         names. `new Date("2026-11-20T10:00")` is parsed differently by
+         different browsers; SCTime.toIso is not. */
+      start_at: (function(){ const v=document.getElementById('ex-start'); return v&&v.value?(window.SCTime?SCTime.toIso(v.value):new Date(v.value).toISOString()):null; })(),
+      close_at: (function(){ const v=document.getElementById('ex-close'); return v&&v.value?(window.SCTime?SCTime.toIso(v.value):new Date(v.value).toISOString()):null; })(),
       venue: (function(){ const v=document.getElementById('ex-venue'); return v&&v.value?v.value.trim():''; })(),
       anti_cheat_config: {tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5')},
       csv_data: questions
@@ -983,6 +994,62 @@ window.CBTUI = {
       if(typeof App!=='undefined'&&App.logActivity) App.logActivity('sync','cbt_prep_timetable',String(r.scheduled||0));
       CBTUI.refresh();
     }catch(e){ toast('Could not reschedule prep exams: '+(e.message||e)+' — run database/complete-schema.sql if this is a new install.','danger',12000); }
+  },
+  /* V12.81 — THE PREP TIME DOCTOR.
+     A sitting that was written an hour late is impossible to spot on a list
+     that prints one clock. This shows BOTH clocks side by side (school time and
+     the UTC instant actually stored), the row the learner reads on the
+     timetable, and whether the paper is open now — then moves it a step at a
+     time. Nothing is guessed: the school sees the numbers it is changing. */
+  async prepTimes(){
+    if(!sb){ toast('Database not configured.','warning'); return; }
+    let rows=[];
+    try{
+      const {data,error}=await sb.from('cbt_exams')
+        .select('id,code,title,class,start_at,close_at,duration,duration_min,assessment_type,is_archived')
+        .not('start_at','is',null).order('start_at').limit(500);
+      if(error) throw error;
+      rows=(data||[]).filter(e=>/prep|rehears/i.test(String(e.assessment_type||'')));
+    }catch(e){ toast('Could not read prep times: '+(e.message||e),'danger',10000); return; }
+    this._prepTimes=rows;
+    const T=window.SCTime;
+    const fmt=iso=>iso?(window.fmtDMYT?fmtDMYT(iso):new Date(iso).toLocaleString()):'—';
+    const utc=iso=>iso?new Date(iso).toISOString().slice(0,16).replace('T',' ')+' UTC':'—';
+    const body = rows.length
+      ? '<div class="table-wrap"><table><thead><tr><th>Exam</th><th>Class</th><th>School time</th><th>Stored as</th><th>Wrong by</th></tr></thead><tbody>'+
+        rows.map((e,i)=>{
+          const closes=e.close_at||(e.start_at?new Date(new Date(e.start_at).getTime()+(Number(e.duration_min||e.duration||45))*60000).toISOString():null);
+          return '<tr><td><b>'+esc(e.title||e.code||'')+'</b>'+(e.is_archived?' <small>(archived)</small>':'')+'</td>'
+            +'<td>'+esc(e.class||'all')+'</td>'
+            +'<td><b>'+esc(fmt(e.start_at))+'</b><br><small>closes '+esc(fmt(closes))+'</small></td>'
+            +'<td><small>'+esc(utc(e.start_at))+'</small></td>'
+            +'<td style="white-space:nowrap">'
+            +'<button class="btn btn-sm btn-outline" title="This exam opened an hour late — move it one hour earlier" onclick="CBTUI.shiftPrep(\''+e.id+'\',-60)">−1 h</button> '
+            +'<button class="btn btn-sm btn-outline" onclick="CBTUI.shiftPrep(\''+e.id+'\',-15)">−15m</button> '
+            +'<button class="btn btn-sm btn-outline" onclick="CBTUI.shiftPrep(\''+e.id+'\',15)">+15m</button> '
+            +'<button class="btn btn-sm btn-outline" onclick="CBTUI.shiftPrep(\''+e.id+'\',60)">+1 h</button>'
+            +'</td></tr>';
+        }).join('')+'</tbody></table></div>'
+        +'<p style="font-size:.82rem;color:var(--gray-600);margin-top:8px">School time is what the learner reads; “stored as” is the instant the database holds. They must describe the same moment. Moving a sitting rewrites it and its Exam Timetable row together — the learner sees the corrected time immediately.</p>'
+      : '<p style="color:var(--gray-500);margin:0">No prep sitting has a date and time yet. Set “Starts at” when you create one and it appears here.</p>';
+    openModal('🕒 Prep exam times — school clock vs stored instant',
+      body, '<button class="btn btn-outline" onclick="closeModal()">Close</button>');
+  },
+  async shiftPrep(id, minutes){
+    const e=(this._prepTimes||[]).find(x=>x.id===id);
+    if(!e){ toast('Reload the list and try again.','warning'); return; }
+    const shift=iso=>iso?new Date(new Date(iso).getTime()+minutes*60000).toISOString():null;
+    const patch={start_at:shift(e.start_at),close_at:shift(e.close_at),updated_at:new Date().toISOString()};
+    try{
+      const {error}=await sb.from('cbt_exams').update(patch).eq('id',id);
+      if(error) throw error;
+      /* the timetable row is written by the database from the exam, so ask it
+         to re-read rather than duplicating the rule in the browser */
+      await sb.rpc('sc_prep_sync_exam',{p_exam_id:id}).catch(()=>null);
+      toast('✅ '+((e.title||e.code||'Exam'))+' moved '+(minutes>0?'+':'')+minutes+' minutes. It now opens '+(window.fmtDMYT?fmtDMYT(patch.start_at):patch.start_at)+'.','success',8000);
+      this.prepTimes();
+      if(typeof CBTUI!=='undefined'&&CBTUI.refresh) CBTUI.refresh();
+    }catch(err){ toast('Could not move that sitting: '+(err.message||err),'danger',10000); }
   },
   async toggle(id,open){ if(!sb)return; const {data,error}=await sb.from('cbt_exams').update({is_open:open,updated_at:new Date().toISOString()}).eq('id',id).select('id,code,is_open').maybeSingle(); if(error){toast('Could not '+(open?'open':'close')+' exam: '+error.message,'danger',9000);return;} if(!data||data.is_open!==open){toast('Exam status was not confirmed. Check your role/RLS permissions.','danger',9000);return;} try{localStorage.removeItem('cbt-exam-cache-'+String(data.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''));}catch(_){} toast('Exam '+(open?'opened':'closed')+' successfully.','success'); CBTUI.refresh(); },
   async preview(id){
@@ -1145,8 +1212,8 @@ window.CBTUI = {
         <div class="form-group"><label>Negative mark per wrong answer</label><input class="form-input" type="number" step="0.25" min="0" id="ed-neg" value="${Number(e.negative_mark||0)}"></div>
         <div class="form-group"><label>Pass mark (%)</label><input class="form-input" type="number" min="0" max="100" id="ed-pass" value="${Number(e.pass_mark||50)}"></div>
         <div class="form-group"><label>Topic / package label</label><input class="form-input" id="ed-topic" value="${esc(e.topic||'')}"></div>
-        <div class="form-group"><label>Starts at (optional)</label><input class="form-input" type="datetime-local" id="ed-start" value="${e.start_at?String(e.start_at).slice(0,16):''}"></div>
-        <div class="form-group"><label>Closes at (optional)</label><input class="form-input" type="datetime-local" id="ed-close" value="${e.close_at?String(e.close_at).slice(0,16):''}"></div>
+        <div class="form-group"><label>Starts at (optional)</label><input class="form-input" type="datetime-local" id="ed-start" value="${window.SCTime?SCTime.toLocalInput(e.start_at):(e.start_at?String(e.start_at).slice(0,16):'')}"></div>
+        <div class="form-group"><label>Closes at (optional)</label><input class="form-input" type="datetime-local" id="ed-close" value="${window.SCTime?SCTime.toLocalInput(e.close_at):(e.close_at?String(e.close_at).slice(0,16):'')}"></div>
         <div class="form-group"><label>Venue / hall (optional)</label><input class="form-input" id="ed-venue" value="${e.venue?String(e.venue).replace(/"/g,'&quot;'):''}" placeholder="e.g. Main Hall"><small>A prep exam's sitting keeps its place and time on the Exam Timetable automatically.</small></div>
       </div>
       <div class="form-group"><label>Candidate instructions</label><textarea class="form-input" id="ed-instr" rows="3">${esc(e.instructions||'')}</textarea></div>
@@ -1191,7 +1258,11 @@ window.CBTUI = {
   syncEditMax(){const s=document.getElementById('ed-col'),m=document.getElementById('ed-max');if(!s||!m)return;const o=s.options[s.selectedIndex];m.value=o&&o.value?Number(o.dataset.max||0):0;},
   async saveEdit(id){
     const v=x=>(document.getElementById(x)||{}).value||'',c=x=>!!(document.getElementById(x)||{}).checked,e=this._editExam||{};const subject=v('ed-subject')||e.subject,className=v('ed-class'),term=v('ed-term'),session=v('ed-session'),title=v('ed-title').trim();
-    if(!title||!subject||!className||!term||!session){toast('Title, subject, class, term and session are required. Pick each from the supplied controls.','warning',9000);return;}const start=v('ed-start'),close=v('ed-close');if(start&&close&&new Date(close)<=new Date(start)){toast('Closing time must be after starting time.','warning');return;}
+    if(!title||!subject||!className||!term||!session){toast('Title, subject, class, term and session are required. Pick each from the supplied controls.','warning',9000);return;}/* V12.81 — a `datetime-local` value has no zone. Posted raw it is read by
+       Postgres in the DATABASE's timezone (UTC on Supabase), so 10:00 became
+       11:00 school time every time this form was saved. Convert first. */
+    const isoOf=(txt,orig)=>!txt?null:(window.SCTime?SCTime.toIso(txt):new Date(txt).toISOString())||orig||null;
+    const start=isoOf(v('ed-start'),e.start_at),close=isoOf(v('ed-close'),e.close_at);if(start&&close&&new Date(close)<=new Date(start)){toast('Closing time must be after starting time.','warning');return;}
     // V12.20: Full editing including anti-cheat and exam security (previously missing)
     const existingAC=(e.anti_cheat_config||{});
     const acPatch={
@@ -2266,7 +2337,7 @@ CBTUI.refresh();
     if(!reportCol){
       toast('⚠️ Report column not selected — exam will be created but report-card push will need manual column. Tip: create report columns in Report Cards first for class '+klass+' / '+subj+' / '+term+' / '+session,'warning',7000);
     }
-    const exam={ title, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(subj||multiSubjects[0]||'General'), class:klass, term, session, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:reportCol, max_score:parseFloat(document.getElementById('ex-max').value)||100, duration:parseInt(document.getElementById('ex-dur').value)||45, duration_min:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions: document.getElementById('ex-instr').value, attempt_limit: parseInt(document.getElementById('ex-attempt')?.value||'1')||1, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions };
+    const exam={ title, subject:multiSubjects.length>1?('MULTI-SUBJECT: '+multiSubjects.join(', ')):(subj||multiSubjects[0]||'General'), class:klass, term, session, assessment_type:document.getElementById('ex-type').value, exam_mode:document.getElementById('ex-mode')?.value||'registered', topic:document.getElementById('ex-package').value || (multiSubjects.length>1?multiSubjects.join(', '):''), report_column:reportCol, max_score:parseFloat(document.getElementById('ex-max').value)||100, duration:parseInt(document.getElementById('ex-dur').value)||45, duration_min:parseInt(document.getElementById('ex-dur').value)||45, negative_mark:parseFloat(document.getElementById('ex-neg').value)||0, select_count:parseInt(document.getElementById('ex-sel').value)||0, instructions: document.getElementById('ex-instr').value, attempt_limit: parseInt(document.getElementById('ex-attempt')?.value||'1')||1, is_open:true, anti_cheat_config:{tab_switch:document.getElementById('ac-tab')?.checked!==false,window_blur:document.getElementById('ac-blur')?.checked!==false,copy_paste:document.getElementById('ac-copy')?.checked!==false,right_click:document.getElementById('ac-right')?.checked!==false,fullscreen:document.getElementById('ac-full')?.checked!==false,watermark:document.getElementById('ac-watermark')?.checked!==false,camera:document.getElementById('ac-camera')?.checked===true,audio_monitor:document.getElementById('ac-audio')?.checked===true,devtools:true,max_violations:parseInt(document.getElementById('ac-max')?.value||'5'),subject_breakdown:subject_breakdown,subjects:multiSubjects,multi_subject:multiSubjects.length>1}, csv_data:questions, /* V12.81 - THIS is the save() that runs (the one at the top of the file is overridden by this block), and it was silently dropping the whole schedule: a start time, a closing time and a venue typed on the New Exam form never reached the database, so a prep exam created here had no window at all. */ public_link:'', start_at:(function(){const el=document.getElementById('ex-start');return el&&el.value?(window.SCTime?SCTime.toIso(el.value):new Date(el.value).toISOString()):null;})(), close_at:(function(){const el=document.getElementById('ex-close');return el&&el.value?(window.SCTime?SCTime.toIso(el.value):new Date(el.value).toISOString()):null;})(), venue:(function(){const el=document.getElementById('ex-venue');return el&&el.value?el.value.trim():'';})(), enable_math_keyboard:document.getElementById('ex-mathkb')?.checked!==false, enable_calculator:document.getElementById('ex-calc')?.checked!==false, show_score_on_submit:document.getElementById('ex-showscore')?.checked!==false };
 
     try{
       const {data,error}=await CBT.createExam(exam);
