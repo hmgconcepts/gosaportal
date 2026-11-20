@@ -927,11 +927,11 @@ const Super = {
          A canvas whose proportions ARE the card's needs no letterboxing at
          all: the scale is uniform, the artwork covers the whole face and the
          front and back are identical by construction. So we sample widths,
-         give each one a height of exactly w/aspect, and keep the LARGEST
-         width at which the design still fits inside that height — larger
-         means bigger type on the printed card. Only when no width fits (a
-         design that is simply too dense for the shape) does the older
-         proportion-matching search below take over. */
+         give each one a height of exactly w/aspect, and (since V12.80) keep
+         the SMALLEST width at which the design still fits inside it: the
+         canvas that the design actually fills, which is also the one scaled up
+         most into the face. Only when no width fits (a design that is simply
+         too dense for the shape) does the fallback below take over. */
       /* V12.77 — MEASURE THE DESIGN AS IT WILL BE DRAWN. Forcing a width onto
          the *natural* markup and measuring that is one design; drawing the
          template at that width is another, because the good templates size
@@ -950,26 +950,43 @@ const Super = {
         return tried[w];
       };
       const widths=[0.4,0.5,0.6,0.7,0.8,0.9,1.0,1.15,1.3,1.5].map(f=>Math.round(naturalW*f));
-      let lo=0, hi=0;                       /* lo = largest width that FITS */
-      widths.forEach(w=>{ if(fits(w)){ if(w>lo) lo=w; } else if(!hi||w<hi) hi=w; });
+      /* V12.80 — FILL THE CARD, DO NOT LETTERBOX IT.
+         The search used to keep the LARGEST width that fitted, on the theory
+         that a wider canvas means bigger type. Measured against the shipped
+         designs that is backwards: a template sets its type, photo and QR in
+         PIXELS, so its content height stops growing with the canvas (premium:
+         360 px of content at every width from 480 px up) while the canvas
+         height keeps growing with the width. The largest fitting canvas was
+         therefore the EMPTIEST one - a premium card at 780x491 held 360 px of
+         design and left a third of the card blank, which is exactly what a
+         school reads as "the front is missing information".
+         The smallest width that still fits is the one whose content fills the
+         box; it is also the one that is scaled up most into the face, so the
+         type is bigger on paper. Same rule, opposite direction. */
+      const FLOOR=Math.max(140, Math.round(naturalW*0.75));
+      let smallest=0, largestShort=0;          /* smallest fit · largest miss */
+      widths.forEach(w=>{
+        if(w<FLOOR) return;
+        if(fits(w)){ if(!smallest||w<smallest) smallest=w; }
+        else if(w>largestShort) largestShort=w;
+      });
+      /* the ceiling for the walk-down is the widest width BELOW the fit that
+         still overflowed; it brackets the tightest canvas that works */
+      let lo=smallest, hi=0;
+      if(lo) widths.forEach(w=>{ if(w<lo && w>=FLOOR && !fits(w) && w>hi) hi=w; });
       /* nothing in the spread fitted: step down, because a narrower canvas needs
          a shorter height and content shrinks more slowly than the card does */
-      /* V12.77 — a canvas is never shrunk below 75 % of the design's own width.
-         Searching far into the small sizes found "fits" answers that filled a
-         third of the card: a letterboxed card is the failure this round is
-         fixing, so the floor is explicit and the fallback below is preferred. */
-      const FLOOR=Math.max(140, Math.round(naturalW*0.75));
       for(let step=0;!lo&&step<3;step++){
         const w=Math.round(naturalW*0.9*Math.pow(0.88,step+1));
         if(w<FLOOR) break;
-        if(fits(w)) lo=w; else if(!hi||w<hi) hi=w;
+        if(fits(w)) lo=w; else if(w>largestShort) largestShort=w;
       }
-      /* then walk back UP towards the largest fitting width: bigger canvas means
-         bigger type on the printed card */
+      /* then walk DOWN towards the smallest fitting width: a tighter canvas is a
+         fuller card and a larger print scale */
       if(lo){
-        const ceil=hi||Math.round(lo*1.35);
-        for(let i=0;i<5&&ceil-lo>4;i++){
-          const mid=Math.round((lo+ceil)/2);
+        for(let i=0;i<5&&(!hi||lo-hi>4);i++){
+          const mid=Math.round((lo+hi)/2);
+          if(mid<=hi||mid>=lo) break;
           if(fits(mid)) lo=mid; else hi=mid;
         }
       }

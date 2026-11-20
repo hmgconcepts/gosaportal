@@ -69,6 +69,68 @@ function fmtDMYT(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d)) return 
   return fmtDMY(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
 window.fmtDMY = fmtDMY; window.fmtDMYT = fmtDMYT;
 
+/* ---------------------------------------------------------------------------
+   V12.81 — SCHOOL TIME, WRITTEN DOWN ONCE.
+   ---------------------------------------------------------------------------
+   A `<input type="datetime-local">` hands the page a string with NO timezone:
+   "2026-11-20T10:00". What that string means depends on who reads it:
+
+     · `new Date("2026-11-20T10:00")`  → the DEVICE's local time (ES2016+; older
+       WebKit read it as UTC, so the same page meant two different times);
+     · a text column posted straight to Postgres → the DATABASE's session
+       timezone, which on Supabase is UTC. A tutor in Lagos typing 10:00 was
+       therefore writing 10:00Z = 11:00 school time, and the learner could not
+       start until 11:00.
+
+   One conversion, used by every page that reads or writes a timetable instant.
+   `toIso` reads the parts and builds a local Date, so the meaning never depends
+   on the browser's parser; `toLocalInput` is its exact inverse, so opening a
+   form and saving it unchanged can never move the exam.
+   --------------------------------------------------------------------------- */
+const SCTime = {
+  TZ: 'Africa/Lagos',
+  parts(v) {
+    const m = String(v == null ? '' : v).trim().match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (!m) return null;
+    const p = { y: +m[1], mo: +m[2], d: +m[3], h: +m[4], mi: +m[5], s: +(m[6] || 0) };
+    if (!(p.mo >= 1 && p.mo <= 12 && p.d >= 1 && p.d <= 31 && p.h <= 23 && p.mi <= 59)) return null;
+    return p;
+  },
+  /* datetime-local text → the instant it names, as UTC ISO. Null when empty. */
+  toIso(v) {
+    const p = this.parts(v);
+    if (!p) return null;
+    const d = new Date(p.y, p.mo - 1, p.d, p.h, p.mi, p.s, 0);
+    if (isNaN(d)) return null;
+    /* a wall-clock the device does not have (DST gap) still has to mean
+       something: the nearest real instant is better than silently null */
+    if (d.getFullYear() !== p.y && p.y > 1970) {
+      const alt = new Date(p.y, p.mo - 1, p.d, p.h, p.mi + 60, 0, 0);
+      return isNaN(alt) ? d.toISOString() : alt.toISOString();
+    }
+    return d.toISOString();
+  },
+  /* an instant (ISO / timestamptz) → datetime-local text in the SAME clock */
+  toLocalInput(v) {
+    if (!v) return '';
+    const d = new Date(v);
+    if (isNaN(d)) return typeof v === 'string' ? String(v).slice(0, 16) : '';
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+      'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  },
+  /* "HH:MM" of an instant, on this device's clock */
+  hhmm(v) { const t = this.toLocalInput(v); return t ? t.slice(11, 16) : ''; },
+  /* is the text a bare wall-clock with no zone/offset? (the dangerous kind) */
+  isNaive(v) {
+    const s = String(v == null ? '' : v).trim();
+    return !!s && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s);
+  }
+};
+window.SC = window.SC || {};
+window.SC.time = SCTime;
+window.SCTime = SCTime;
+
 function currentPage() {
   return (location.pathname.split('/').pop() || 'index.html').replace('.html','');
 }

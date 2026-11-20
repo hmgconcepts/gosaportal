@@ -528,6 +528,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
           <div class="form-group"><label>Pick a <span id="ic-pick-label">student</span></label><select class="form-select" id="ic-student" onchange="ICUI.pick(this.value)"><option value="">— choose —</option></select></div>
           <div class="form-group"><label>Search name / admission no <small style="color:var(--gray-500)">(scopes the PDF)</small></label><input class="form-input" id="ic-search" placeholder="e.g. Ada or GoSA/2024/001" oninput="ICUI.updatePdfLabel()"></div>
           <div class="form-group"><label>…or enter manually</label><input class="form-input" id="ic-name" placeholder="Full name" oninput="ICUI.render()"></div>
+          <div class="form-group"><label id="ic-arm-label">Section / arm (bulk filter only)</label><select class="form-select" id="ic-arm" onchange="ICUI.render();ICUI.updatePdfLabel()"><option value="">— All sections —</option></select><small style="color:var(--gray-500)">Print just one arm of the class (e.g. JSS 1 · A). Leave on “All sections” to print the whole class.</small></div>
           <div class="form-group"><label id="ic-class-label">Class (bulk-print filter only — NOT printed: the card is a lifetime card)</label><select class="form-select" id="ic-class" onchange="ICUI.render();ICUI.updatePdfLabel()"><option value="">— All classes — whole school —</option></select><small style="color:var(--gray-500)">Select a class to filter bulk print — NOT printed on card (lifetime card). Choose "All classes" for whole school.</small></div>
           <div class="form-group"><label>ID / Admission / Staff no</label><input class="form-input" id="ic-id" placeholder="(auto)" oninput="ICUI.render()"></div>
           <div class="form-group"><label>Gender</label><input class="form-input" id="ic-gender" placeholder="male/female" oninput="ICUI.render()"></div>
@@ -572,12 +573,28 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
            already scoped to the signed-in person (a student: themselves and
            nothing else; a parent: their linked children; staff: the school). -->
       <div class="card" id="ic-actions" style="margin-bottom:16px">
-        <h3 style="margin-top:0">⬇️ Download &amp; print your card</h3>
+        <h3 style="margin-top:0">⬇️ Download &amp; print ID cards</h3>
         <p id="ic-actions-note" style="color:var(--gray-600);margin:0 0 10px;font-size:.88rem">Loading…</p>
+        <!-- V12.80 — WHAT TO MAKE, SAID OUT LOUD.
+             The three buttons used to be ambiguous: "Download PDF" meant the
+             whole filtered list, "Print ID Card" was supposed to mean the one
+             person on screen but actually printed the first record in the list,
+             and there was no way to ask for staff cards while the page was on
+             students, or for one section rather than the whole class. The scope
+             is now a control, and every button says what it will do. -->
+        <div id="ic-scope-row" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:0 0 8px;font-size:.86rem">
+          <b>What to make:</b>
+          <label style="display:flex;gap:6px;align-items:center;margin:0"><input type="radio" name="ic-scope" value="one" onchange="ICUI.scopeChanged()"> This person</label>
+          <label style="display:flex;gap:6px;align-items:center;margin:0"><input type="radio" name="ic-scope" value="class" onchange="ICUI.scopeChanged()"> A class / section</label>
+          <label style="display:flex;gap:6px;align-items:center;margin:0"><input type="radio" name="ic-scope" value="list" checked onchange="ICUI.scopeChanged()"> Everyone in this list</label>
+          <label data-ic-cross style="display:none;gap:6px;align-items:center;margin:0"><input type="radio" name="ic-scope" value="students" onchange="ICUI.scopeChanged()"> All students</label>
+          <label data-ic-cross style="display:none;gap:6px;align-items:center;margin:0"><input type="radio" name="ic-scope" value="staff" onchange="ICUI.scopeChanged()"> All staff</label>
+        </div>
+        <div id="ic-scope-summary" class="notice" style="margin:0 0 10px;font-size:.82rem">Reading the list…</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="ICUI.pdfAll()" title="Exactly the design shown in the preview, at exact millimetres and print resolution — opens in CorelDRAW, Illustrator, InDesign and Word like any normal PDF; switch to the re-drawn option if a print shop must edit the wording">⬇ Download PDF <span id="ic-pdf-label">(all)</span></button>
-          <button class="btn btn-outline" onclick="ICUI.print()">🖨 Print ID Card (front + back)</button>
-          <button class="btn btn-outline" data-ic-bulk onclick="ICUI.printAll()" title="Select a class from dropdown to print only that class — All classes = whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
+          <button class="btn btn-primary" onclick="ICUI.pdfAll()" title="Exactly the design shown in the preview, at exact millimetres and print resolution — opens in CorelDRAW, Illustrator, InDesign and Word like any normal PDF">⬇ Download PDF <span id="ic-pdf-label">(all)</span></button>
+          <button class="btn btn-outline" onclick="ICUI.print()" title="The person currently selected on this page — front and back. Nothing else is printed.">🖨 Print ID Card (front + back)</button>
+          <button class="btn btn-outline" data-ic-bulk onclick="ICUI.printAll()" title="Prints exactly what the scope above says — a class, a section, one list, or the whole school">🖨 Print ALL <span id="ic-all-label">students</span> (or per class)</button>
           <button class="btn btn-outline" onclick="ICUI.downloadHtml()" title="HTML proof sheet — for archiving or emailing, never for print production">⬇ HTML proof</button>
         </div>
         <p style="font-size:.8rem;color:#475569;margin:10px 0 0">The card is printed at the school's standard size (ISO/IEC 7810 ID-1, 85.60 × 53.98 mm) with the front and back on one sheet; the PDF is the same file the printer receives, so what you download is exactly what comes out of the printer.</p>
@@ -640,7 +657,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     document.getElementById('ic-pick-label').textContent=t; document.getElementById('ic-class-label').textContent=(t==='staff'?'Type':'Class');
     document.getElementById('ic-dept-wrap').style.display=(t==='staff'?'block':'none');
     document.getElementById('ic-all-label').textContent=(t==='staff'?'staff':'students');
-    this.load(); this.render(); try{this.applyRole();}catch(_){} },
+    this.load(); this.render(); try{this.loadArms();}catch(_){} try{this.applyRole();}catch(_){} },
   /* V12.78 (item 1): who is looking, and what may this bar offer them?
      Staff/admin print the school; a parent prints their linked children; a
      student prints their own card. The bulk button is merely hidden — the
@@ -654,16 +671,137 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   applyRole(){
     const w=this.whoami();
     document.querySelectorAll('[data-ic-bulk]').forEach(el=>{ el.style.display = w.bulk ? '' : 'none'; });
+    document.querySelectorAll('[data-ic-cross]').forEach(el=>{ el.style.display = w.adminTier ? 'flex' : 'none'; });
     const what = this.kind==='staff' ? 'staff' : 'students';
     const bulkLabel = document.getElementById('ic-all-label');
     if(bulkLabel) bulkLabel.textContent = w.adminTier ? what : 'my children';
     const note=document.getElementById('ic-actions-note');
     if(note) note.innerHTML = w.adminTier
-      ? 'You are staff: these buttons cover the list you have selected (or the whole school when nothing is selected and a class filter is empty). Pick a class above to print only that class.'
+      ? 'You are staff. <b>What to make</b> decides the run: one person, a class or a single section of it, the list the class/search boxes select, the whole student roll, or the whole staff roll. Pick a class (and a section) above to make only that class — the line under the buttons names the run before you press anything.'
       : (w.role==='parent'
         ? 'These are <b>your linked children</b> only. Download the PDF to keep the card, or print it at home — you never need to ask the school for a file.'
         : 'This is <b>your own card</b>. Download the PDF to keep it or print it; the front and back are both on the sheet. You cannot see or print anyone else\'s card.');
     return w;
+  },
+  async fetchKind(kind){
+    /* ONE loader for both families, cached per kind. It exists because the page
+       can now be asked for staff cards while it is showing students (and the
+       other way round), and asking must not change what is in the picker. The
+       scoping rules are the old ones, unchanged: a student sees only their own
+       record, a parent only their linked children, the admin tier sees the
+       school. */
+    const cache=this._rows||(this._rows={});
+    if(cache[kind]) return cache[kind];
+    if(!window.sb){ cache[kind]=[]; return cache[kind]; }
+    const profile=window.SC_PROFILE||{};
+    const role=String(profile.role||(window.SCHOOL_USER&&SCHOOL_USER.role)||'').toLowerCase();
+    const uid=profile.id||(window.SCHOOL_USER&&window.SCHOOL_USER.id)||null;
+    const adminTier=['super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(role);
+    let rows=[];
+    if(kind==='staff'){
+      const mk=()=>{ let q=sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url,user_id').order('full_name');
+        if(!adminTier&&uid) q=q.eq('user_id',uid); return q; };
+      rows=await this.pageAll(mk);
+    } else {
+      const mk=()=>{ let q=sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').order('full_name');
+        if(role==='student'&&uid) q=q.eq('user_id',uid); return q; };
+      let parentIds=null;
+      if(role==='parent'&&uid){
+        const linked=await sb.from('parent_child').select('student_id').eq('parent_id',uid);
+        parentIds=(linked.data||[]).map(x=>x.student_id).filter(Boolean);
+        if(!parentIds.length){ cache[kind]=[]; return cache[kind]; }
+      }
+      rows=await this.pageAll(()=>{ const q=mk(); return parentIds?q.in('id',parentIds):q; });
+      /* V12.2: if the student record was never LINKED (user_id null — common
+         on onboarded schools) the eq() above returns nothing and the page
+         fell back to a sample card with no photo. Name-match fallback keeps
+         the real record (and its staff-entered photo) on screen. */
+      if(role==='student'&&uid&&!(rows||[]).length&&profile.full_name){
+        try{ const nm=await sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').ilike('full_name',profile.full_name).limit(1); if((nm.data||[]).length) rows=nm.data; }catch(_){ }
+      }
+    }
+    await this.fillPhotos(rows||[]);
+    cache[kind]=rows||[];
+    return cache[kind];
+  },
+  /* ======================================================================
+     V12.80 — WHAT A RUN COVERS, AND WHICH PERSON "ONE" MEANS.
+     ----------------------------------------------------------------------
+     Reports this fixes:
+       · "Print ID Card (front + back)" printed SOMEBODY ELSE. It took the
+         first record of the loaded list, not the record on screen, because
+         exportSource() returns the whole list and the single print sliced [0].
+       · There was no way to ask for the staff cards while the page sat on
+         students, or for one arm of a class rather than the whole class.
+     The scope is now explicit and every entry point asks for it:
+       one · class (class + section) · list (whatever is filtered) ·
+       students · staff  (the last two load the other family on demand).
+     ====================================================================== */
+  scope(){
+    const el=document.querySelector('input[name="ic-scope"]:checked');
+    return (el&&el.value)||'list';
+  },
+  setScope(v){
+    const el=document.querySelector('input[name="ic-scope"][value="'+v+'"]');
+    if(el) el.checked=true;
+    this.scopeChanged();
+  },
+  scopeChanged(){
+    try{ this.updatePdfLabel(); }catch(_){ }
+    const note=document.getElementById('ic-actions-note');
+    if(note&&this.kind){ try{ this.applyRole(); }catch(_){} }
+  },
+  scopeLabel(v){
+    const s=v||this.scope();
+    if(s==='one'){ const r=this.selectedRow(); return r&&r.full_name ? r.full_name : 'this person'; }
+    if(s==='class'){ const f=this.currentFilter(); const bits=[f.class||'(no class chosen)', f.arm?('· '+f.arm):''].filter(Boolean); return bits.join(' '); }
+    if(s==='students') return 'all students';
+    if(s==='staff') return 'all staff';
+    return this.filterLabel(this.currentFilter());
+  },
+  /* the record on screen: the picked row, or what was typed into the form.
+     A sample card is never a person. */
+  selectedRow(){
+    if(this.cur && (this.cur.full_name||this.cur.id)) return this.cur;
+    const typed=String((document.getElementById('ic-name')||{}).value||'').trim();
+    if(typed) return this.manualRecord();
+    return null;
+  },
+  /* every record a scope covers, in one place, with the family it belongs to */
+  async scopeRecords(scope, warn){
+    const v=scope||this.scope();
+    this._scopeFamily = (v==='staff'||v==='students') ? (v==='staff'?'staff':'student') : this.kind;
+    if(v==='one'){
+      const row=this.selectedRow();
+      if(!row){ if(warn) toast('Pick a person (or type a name) first — “This person” makes exactly one card.','warning',7000); return []; }
+      return [row];
+    }
+    if(v==='students'||v==='staff'){
+      /* the whole school is the admin tier's to print; a learner or a parent
+         asking for it is told no, and the list they MAY see is untouched */
+      if(!this.whoami().adminTier){
+        if(warn) toast('Only staff can print the whole '+v+' list. Your own card is on this page.','warning',8000);
+        return [];
+      }
+      let rows=[];
+      try{ rows=await this.fetchKind(v); }
+      catch(e){ console.warn('ID-card scope load failed', e); if(warn) toast('Could not load the '+v+' list: '+(e.message||e),'warning',8000); return []; }
+      if(!rows.length){ if(warn) toast('There are no '+v+' records in this school yet.','warning',7000); return []; }
+      /* The class box holds a CLASS; it is meaningless for staff, and applying
+         it silently emptied "All staff" whenever a learner had been picked
+         before (picking a learner fills the class box). A cross-family run
+         honours the search box only — narrow the staff list by department by
+         switching to the Staff tab, where that same box lists departments. */
+      const f=this.currentFilter();
+      const forFamily = v==='staff' ? { class:'', arm:'', q:f.q } : f;
+      return this.applyFilter(rows, forFamily, warn, v);
+    }
+    const f=this.currentFilter();
+    if(v==='class' && !f.class){
+      if(warn) toast('Choose a class above (and a section if you want one) — that is what “A class / section” prints.','warning',7000);
+      return [];
+    }
+    return this.applyFilter(this.all||[], f, warn);
   },
   async load(){ const sel=document.getElementById('ic-student'); if(!sel)return;
     while(sel.options.length>1)sel.remove(1);
@@ -674,45 +812,42 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       await new Promise(r => setTimeout(r, 100));
     }
     try{
-      if(this.kind==='staff'){
-        /* V11.7 (#4): staff self-service — teachers/staff see and print THEIR OWN
-           card; the admin tier still sees everyone. */
-        const sRole=((window.SC_PROFILE&&SC_PROFILE.role)||'').toLowerCase();
-        const sUid=(window.SC_PROFILE&&SC_PROFILE.id)||null;
-        const adminTier=['super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(sRole);
-        const mkStaff=()=>{ let sq=sb.from('staff').select('id,full_name,staff_no,role,department,staff_type,gender,phone,photo_url,user_id').order('full_name');
-          if(!adminTier&&sUid) sq=sq.eq('user_id',sUid); return sq; };
-        const data=await this.pageAll(mkStaff);
-        await ICUI.fillPhotos(data||[]);
-        ICUI.all=data||[]; ICUI.loadClasses(); const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.staff_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.role||s.staff_type||'staff')+')'; sel.appendChild(o); });
-        if(!adminTier&&ICUI.all.length){ setTimeout(()=>{ sel.value=JSON.stringify(ICUI.all[0]); ICUI.pick(sel.value); },100); }
-      } else {
-        const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.SCHOOL_USER && SCHOOL_USER.role) || '';
-        const userId = (window.SC_PROFILE && SC_PROFILE.id) || (window.SCHOOL_USER && SCHOOL_USER.id) || null;
-        const mkStu=()=>{ let query = sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').order('full_name');
-          if (role === 'student' && userId) query=query.eq('user_id',userId); return query; };
-        /* V12.2: if the student record was never LINKED (user_id null — common
-           on onboarded schools), the eq() above returns nothing and the page
-           fell back to a sample card with no photo. Name-match fallback keeps
-           the real record (and its staff-entered photo) on screen. */
-        let parentIds=null;
-        if (role === 'parent' && userId) { const linked=await sb.from('parent_child').select('student_id').eq('parent_id',userId); parentIds=(linked.data||[]).map(x=>x.student_id).filter(Boolean); if(!parentIds.length){ICUI.all=[];this.loaded=true;this.render();return;} }
-        let data = await this.pageAll(()=>{ const q=mkStu(); return parentIds?q.in('id',parentIds):q; });
-        if(role==='student'&&userId&&!(data||[]).length&&window.SC_PROFILE&&SC_PROFILE.full_name){
-          try{ const nm=await sb.from('students').select('id,full_name,class,arm,admission_no,admission_year,gender,photo_url,date_of_birth,created_at,guardian_phone,user_id').ilike('full_name',SC_PROFILE.full_name).limit(1); if((nm.data||[]).length) data=nm.data; }catch(_){ }
-        }
-        await ICUI.fillPhotos(data||[]);
-        ICUI.all=data||[]; ICUI.loadClasses(); const seen=new Set(); (data||[]).forEach(s=>{ const key=String(s.id||s.admission_no||s.full_name||'').toLowerCase(); if(!key||seen.has(key))return; seen.add(key); const o=document.createElement('option'); o.value=JSON.stringify(s); o.textContent=(s.full_name||'Unnamed')+' ('+(s.class||'student')+')'; sel.appendChild(o); });
-        // Auto-select an actual linked child/self, never a sample object.
-        if (ICUI.all.length > 0 && (role === 'parent' || role === 'student')) {
-          setTimeout(() => {
-            sel.value = JSON.stringify(ICUI.all[0]);
-            ICUI.pick(sel.value);
-          }, 100);
-        }
-      }
+      const data=await this.fetchKind(this.kind);
+      ICUI.all=data||[]; ICUI.loadClasses(); ICUI.loadArms(); ICUI.fillPicker();
+      const role=String(((window.SC_PROFILE&&SC_PROFILE.role)||(window.SCHOOL_USER&&SCHOOL_USER.role)||'')).toLowerCase();
+      const adminTier=['super_admin','admin','principal','proprietor','head_teacher','bursar'].includes(role);
+      /* staff open the page on their own card; a parent/student lands on theirs */
+      const auto = (this.kind==='staff') ? (!adminTier&&ICUI.all.length)
+                                         : (ICUI.all.length>0 && (role==='parent'||role==='student'));
+      if(auto){ setTimeout(()=>{ const s=document.getElementById('ic-student'); if(!s)return; s.value=JSON.stringify(ICUI.all[0]); ICUI.pick(s.value); },100); }
     }catch(e){ console.warn('ID-card list load failed:', e); if(typeof toast==='function')toast('Could not load list. You can still type details manually and print.', 'warning', 7000); }
     this.loaded=true; this.render(); try{this.applyRole();}catch(_){} try{this.updatePdfLabel();}catch(_){}
+  },
+  fillPicker(){
+    const sel=document.getElementById('ic-student'); if(!sel) return;
+    while(sel.options.length>1)sel.remove(1);
+    const seen=new Set();
+    (this.all||[]).forEach(s=>{
+      const key=String(s.id||s.staff_no||s.admission_no||s.full_name||'').toLowerCase();
+      if(!key||seen.has(key))return; seen.add(key);
+      const o=document.createElement('option'); o.value=JSON.stringify(s);
+      o.textContent=(s.full_name||'Unnamed')+' ('+(this.kind==='staff'?(s.role||s.staff_type||'staff'):(s.class||'student'))+')';
+      sel.appendChild(o);
+    });
+  },
+  /* the arm/section list for whichever class is chosen — read from the records
+     already in hand, so choosing a section costs no query */
+  loadArms(){
+    const sel=document.getElementById('ic-arm'); if(!sel) return;
+    const cls=this.normCls((document.getElementById('ic-class')||{}).value);
+    const keep=sel.value;
+    const arms=[...new Set((this.all||[])
+      .filter(r=>!cls || this.normCls(r.class)===cls || this.normCls(r.class).indexOf(cls)===0)
+      .map(r=>String(r.arm||'').trim()).filter(Boolean))].sort();
+    sel.innerHTML='<option value="">— All sections —</option>'+arms.map(a=>'<option value="'+esc(a)+'">'+esc(a)+'</option>').join('');
+    if(keep && arms.includes(keep)) sel.value=keep;
+    const wrap=document.getElementById('ic-arm-label');
+    if(wrap) wrap.textContent = this.kind==='staff' ? 'Section / arm (bulk filter only)' : 'Section / arm (bulk filter only)';
   },
   /* V11.7 (#3): AUTO PHOTO — people set their photo on My Profile
      (profiles.photo_url). Any student/staff row without its own photo_url
@@ -1065,26 +1200,39 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
              front=shots&&shots.front; back=shots&&shots.back; }
         catch(e){ console.warn('card capture failed',e); }
         if(!front&&!back){ failed++; }
-        out.push(front||back?{front,back}:this.vectorCard(person,w,h));
+        out.push(front||back?{front,back}:await this.vectorCard(person,w,h));
         if(opts.onProgress) opts.onProgress(i+1,list.length);
       }
       if(out.some(c=>c&&(c.front||c.back))) return out;
       console.warn('[ID card] nothing could be photographed — falling back to the vector layout');
     }
-    return list.map(p=>this.vectorCard(p,w,h));
+    return Promise.all(list.map(p=>this.vectorCard(p,w,h)));
   },
   /* the older data-only card, kept as the explicit "vector" choice and as the
      last-resort fallback if a browser refuses to photograph the DOM */
-  vectorCard(person,w,h){
+  /* V12.80 — THE FALLBACK IS NOT AN EXCUSE TO LOSE THE PHOTO.
+     When a browser refuses to photograph the card (an old WebView, a Safari
+     that will not rasterise an SVG <foreignObject>), every card came out of
+     the older vector renderer with `photo: null` and only a name and a number —
+     the "no pictures and half the front missing" report. The photo is fetched
+     here with the same tolerant loader the page uses elsewhere, and every field
+     the record holds is handed over, so a fallback card is still a card. */
+  async vectorCard(person,w,h){
     const S=window.SCHOOL||{}, self=location.origin+location.pathname;
     const verify=S.slug?(location.origin+'/verify.html?id='+encodeURIComponent(person.admission_no||person.staff_no||'')):self;
+    let img=person.photo||null;
+    if(!img && person.photo_url){
+      try{ img=await this.loadPhoto(person.photo_url); }catch(e){ img=null; }
+    }
     return {
       front:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
               class:person.class, arm:person.arm, date_of_birth:person.date_of_birth,
               blood_group:person.blood_group, type:person.type||this.kind, role:person.role,
-              department:person.department, phone:person.phone, photo:null, qr:this.makeQr(verify) },
+              department:person.department, staff_type:person.staff_type, admission_year:person.admission_year,
+              phone:person.phone, photo:img, photo_url:person.photo_url||'', qr:this.makeQr(verify) },
       back:{ full_name:person.full_name, admission_no:person.admission_no, staff_no:person.staff_no,
-             type:person.type||this.kind }
+             type:person.type||this.kind, class:person.class, arm:person.arm, role:person.role,
+             department:person.department, phone:person.phone }
     };
   },
   pdfLayout(cfg){
@@ -1098,15 +1246,9 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       return false;
     }
     const to=this.tplOpts();
-    const filter=this.currentFilter();
-    let source=this.exportSource();
-    if(!source.length){
-      toast('Nothing selected. Pick a '+(this.kind==='staff'?'staff member':'student')+' from the list, or type a name to print a single card. The on-screen sample is never exported.','warning',8000);
-      return false;
-    }
-    source=this.applyFilter(source,filter,true);
+    let source=await this.scopeRecords(this.scope(), true);
     if(!source.length) return false;
-    const label=this.filterLabel(filter);
+    const label=this.scopeLabel();
     const btn=document.querySelector('[onclick="ICUI.pdfAll()"]');
     const restore=btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='⏳ Building PDF…'; }
     try{
@@ -1131,7 +1273,8 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         brand:this.brand(), title:'ID Cards — '+label,
         creator:(window.SCHOOL&&SCHOOL.name)||'School Connect'
       });
-      const name=(this.kind==='staff'?'staff':'student')+'-id-cards-'+
+      const fam=(this._scopeFamily||this.kind)==='staff'?'staff':'student';
+      const name=fam+'-id-cards-'+
                  String(label).replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()+'-'+
                  new Date().toISOString().slice(0,10)+'.pdf';
       const blob=new Blob([bytes],{type:'application/pdf'});
@@ -1166,12 +1309,29 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       return false;
     }finally{ if(btn){ btn.disabled=false; btn.innerHTML=restore; } }
   },
-  updatePdfLabel(){
-    const el=document.getElementById('ic-pdf-label'); if(!el) return;
-    const f=this.currentFilter();
-    let n=null;
-    try{ n=this.applyFilter((this.all&&this.all.length)?this.all:[],f,false).length || null; }catch(_){}
-    el.textContent='('+(n!=null?n+' · ':'')+this.filterLabel(f)+')';
+  async updatePdfLabel(){
+    const el=document.getElementById('ic-pdf-label');
+    const sum=document.getElementById('ic-scope-summary');
+    const v=this.scope();
+    let rows=[], err=null;
+    try{ rows=await this.scopeRecords(v,false); }catch(e){ err=e; }
+    if(el) el.textContent='('+(rows.length?(rows.length+' · '):'')+this.scopeLabel(v)+')';
+    if(!sum) return;
+    const what = (v==='staff'||(v!=='students'&&this.kind==='staff')) ? 'staff' : 'student';
+    let msg;
+    if(err){
+      msg='⚠ Could not read the scope ('+(err.message||err)+').';
+    } else if(!rows.length){
+      msg = (v==='class' && !this.currentFilter().class)
+        ? '⚠ Choose a class above (and a section, if you want one) — “A class / section” prints exactly that class.'
+        : '⚠ Nothing is in scope right now — pick a person, a class, or another scope.';
+    } else {
+      const missing=rows.filter(r=>!r.photo_url).length;
+      msg='<b>'+rows.length+' '+what+' card'+(rows.length===1?'':'s')+'</b> — '+esc(this.scopeLabel(v))+'.'
+        +(v==='one'?' Front and back of this one person only.':'')
+        +(missing?' <span style="color:#b45309">'+missing+' have no photo on file and will print without one.</span>':'');
+    }
+    sum.innerHTML=msg;
   },
   paperDims(paper){
     if(paper==='Letter') return [215.9,279.4];
@@ -1188,12 +1348,14 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   currentFilter(){
     const el=document.getElementById('ic-class');
     const cls=String((el&&el.value)||'').trim();
+    const armEl=document.getElementById('ic-arm');
+    const arm=String((armEl&&armEl.value)||'').trim();
     const q=String((document.getElementById('ic-search')&&document.getElementById('ic-search').value)||'').trim().toLowerCase();
-    return { class:cls, q:q };
+    return { class:cls, arm:arm, q:q };
   },
   filterLabel(f){
     if(f&&f.q) return 'search “'+f.q+'”';
-    if(f&&f.class) return f.class;
+    if(f&&f.class) return String(f.class)+(f.arm?' · '+f.arm:'');
     /* V12.78 (item 1): the label used to promise "whole school" to everybody,
        including the student whose list holds one record and the parent whose
        list holds their children. It now says what the file actually contains. */
@@ -1207,12 +1369,13 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
      match is an empty result, and the caller says so. Whitespace, casing and
      "JSS1"/"JSS 1" spelling are all normalised. */
   normCls(v){ return String(v||'').toUpperCase().replace(/[\s\-_]+/g,''); },
-  applyFilter(source,f,warn){
+  applyFilter(source,f,warn,family){
     let list=(source||[]).slice();
+    const kind=family||this.kind;
     const cls=this.normCls(f&&f.class);
     if(cls){
       list=list.filter(x=>{
-        if(this.kind==='staff'){
+        if(kind==='staff'){
           return [x.department,x.staff_type,x.role,x.designation]
             .some(v=>{ const n=this.normCls(v); return n && (n===cls||n.indexOf(cls)===0 || cls.indexOf(n)===0); });
         }
@@ -1220,7 +1383,18 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
         return c===cls || (c && c.indexOf(cls)===0) || (c+'-'+a)===cls;
       });
       if(!list.length){
-        if(warn) toast('No '+(this.kind==='staff'?'staff':'students')+' found for “'+String(f.class)+'”. Nothing will be printed — pick another filter.','warning',7000);
+        if(warn) toast('No '+(kind==='staff'?'staff':'students')+' found for “'+String(f.class)+'”. Nothing will be printed — pick another filter.','warning',7000);
+        return [];
+      }
+    }
+    /* V12.80 — a SECTION, not just a class. JSS 1 · A prints eleven cards, not
+       the whole of JSS 1. An arm that does not exist narrows to nothing and
+       says so, exactly like a class that does not exist. */
+    const arm=String((f&&f.arm)||'').trim().toLowerCase();
+    if(arm && kind!=='staff'){
+      list=list.filter(x=>String(x.arm||'').trim().toLowerCase()===arm);
+      if(!list.length){
+        if(warn) toast('No students in “'+String(f.class||'')+'” section “'+String(f.arm)+'”. Nothing will be printed.','warning',7000);
         return [];
       }
     }
@@ -1238,9 +1412,10 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   /* keep the old HTML proof sheet, but make its purpose unmistakable */
   downloadHtml(){
     const to=this.tplOpts();
-    let source=this.exportSource();
-    if(!source.length){ toast('Nothing selected — pick a record or type a name first.','warning',6000); return false; }
-    source=this.applyFilter(source,this.currentFilter(),true);
+    return this.downloadHtmlAsync(to);
+  },
+  async downloadHtmlAsync(to){
+    const source=await this.scopeRecords(this.scope(), true);
     if(!source.length) return false;
     const people=source.map(x=>this.recordPerson(x,to));
     /* the proof sheet shows front and back side by side, so it must use the
@@ -1302,9 +1477,10 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
     if(this.kind==='staff'){ r.role=v('ic-dept'); r.department=v('ic-dept'); }
     return r;
   },
-  recordPerson(row,to){
-    const p={full_name:row.full_name||'',photo_url:row.photo_url||'',gender:row.gender||'',phone:row.phone||row.guardian_phone||'',blood_group:row.blood_group||'',type:this.kind,template:to.template,pc:to.pc,ac:to.ac};
-    if(this.kind==='staff'){p.staff_no=this.idNumber(row,'staff_no');p.role=row.role||'';p.department=row.department||'';p.staff_type=row.staff_type||'';}
+  recordPerson(row,to,family){
+    const kind=family||this._scopeFamily||this.kind;
+    const p={full_name:row.full_name||'',photo_url:row.photo_url||'',gender:row.gender||'',phone:row.phone||row.guardian_phone||'',blood_group:row.blood_group||'',type:kind,template:to.template,pc:to.pc,ac:to.ac};
+    if(kind==='staff'){p.staff_no=this.idNumber(row,'staff_no');p.role=row.role||'';p.department=row.department||'';p.staff_type=row.staff_type||'';}
     else{p.admission_no=this.idNumber(row,'admission_no');p.admission_year=row.admission_year||'';p.date_of_birth=row.date_of_birth||row.dob||'';p.class=row.class||'';p.arm=row.arm||'';}
     return p;
   },
@@ -1382,18 +1558,14 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       toast('The PDF/print engine did not load. Reload the page and try again.','warning',8000);
       return false;
     }
-    let source=this.exportSource();
-    if(!source.length){
-      toast('Nothing selected. Pick a record from the list, or type a name to print a single card. The on-screen sample is never printed.','warning',8000);
-      return false;
-    }
-    if(allRecords){
-      const f=this.currentFilter();
-      source=this.applyFilter(source,f,true);
-      if(!source.length) return false;
-    } else {
-      source=source.slice(0,1);
-    }
+    /* V12.80 — THE PRINT THAT PRINTED SOMEBODY ELSE.
+       print() took the first record of the loaded list and printed that, so a
+       teacher who had just picked a learner in the dropdown printed the
+       alphabetically first learner in the school. "One card" now means the
+       person on screen, and nothing else. */
+    const source = allRecords ? await this.scopeRecords(this.scope(), true)
+                              : await this.scopeRecords('one', true);
+    if(!source.length) return false;
     const btn=document.querySelector(allRecords?'[onclick="ICUI.printAll()"]':'[onclick="ICUI.print()"]');
     const restore=btn?btn.innerHTML:'';
     if(btn){ btn.disabled=true; btn.innerHTML='⏳ Preparing print…'; }

@@ -92,21 +92,102 @@
     return c.toDataURL('image/png');
   }
 
+  /* V12.80 — THE MISSING PHOTOGRAPHS.
+     The report was exact: "the cards have no pictures of the staff or the
+     students". The cause: a photo that lives on ANOTHER ORIGIN has to be read
+     byte-for-byte before it can go into a canvas (a canvas that has merely
+     SEEN a cross-origin picture cannot be read back), and the old loader gave
+     up after one fetch of one URL — then painted a grey box with the word
+     "photo" on it. Google Drive, which the page advertises, answers that fetch
+     with no CORS header at all, so on a real school every Drive photo became a
+     grey box.
+     Now, per picture:
+       · the card's own URL, then the card's documented SECOND source (every
+         template writes data-alt — for a Drive link that is
+         lh3.googleusercontent.com, which does allow the read),
+       · each of those as fetch, then as a crossOrigin <img>, then as a plain
+         <img> drawn into a canvas (same-origin needs neither);
+       · and if every route fails, the card's OWN fallback is used — the
+         initial-letter tile the preview shows — instead of a grey rectangle
+         pretending to be a photo.
+     The count is published as lastReport() so the page can tell the school
+     which records are missing artwork. */
+  async function inlineOneTrusted(url) {
+    if (!url) return '';
+    var src = absUrl(url);
+    if (/^data:/i.test(src)) return src;
+    if (_imgCache[src] !== undefined) return _imgCache[src];
+    var got = await inlineOne(src);                 /* fetch + blob (CORS) */
+    if (!got) {
+      /* the same bytes through an <img>, which succeeds wherever the server
+         allows the read even when fetch is blocked by an opaque redirect */
+      got = await inlineViaImg(src);
+    }
+    _imgCache[src] = got || '';
+    return got || '';
+  }
+
+  function inlineViaImg(src) {
+    return new Promise(function (res) {
+      var im = new Image();
+      im.crossOrigin = 'anonymous';
+      im.onload = function () {
+        try {
+          var c = document.createElement('canvas');
+          c.width = im.naturalWidth || im.width; c.height = im.naturalHeight || im.height;
+          if (!c.width || !c.height) return res('');
+          c.getContext('2d').drawImage(im, 0, 0);
+          res(c.toDataURL('image/png'));
+        } catch (e) { res(''); }
+      };
+      im.onerror = function () { res(''); };
+      im.src = src;
+      setTimeout(function () { res(''); }, DEFAULTS.mountTimeoutMs * 2);
+    });
+  }
+
+  var _lastReport = { inlined: 0, missing: 0, items: [] };
+  function lastReport() { return _lastReport; }
+
+  /* the markup's own fallback, exactly: a picture that cannot be embedded
+     reveals the initial-letter tile the template put beside it */
+  function dropImage(img, why) {
+    var sib = img.nextElementSibling;
+    img.removeAttribute('data-alt');
+    img.style.display = 'none';
+    if (sib && sib.style) { sib.style.display = 'flex'; return true; }
+    return false;
+  }
+
   async function inlineImages(root) {
     var imgs = [].slice.call(root.querySelectorAll('img'));
+    var inlined = 0, missing = 0, items = [];
     for (var i = 0; i < imgs.length; i++) {
       var img = imgs[i];
       var src = img.getAttribute('src') || '';
-      var data = await inlineOne(src);
-      if (!data) {
-        var w = img.getAttribute('width') || img.clientWidth || 120;
-        var h = img.getAttribute('height') || img.clientHeight || 120;
-        data = placeholder(Number(w), Number(h));
+      var alt = img.getAttribute('data-alt') || '';
+      var data = await inlineOneTrusted(src);
+      if (!data && alt) data = await inlineOneTrusted(alt);
+      if (data) {
+        img.setAttribute('src', data);
+        img.removeAttribute('srcset');
+        img.removeAttribute('loading');
+        img.removeAttribute('data-alt');
+        inlined++;
+      } else {
+        var kept = dropImage(img, 'unreadable');
+        if (!kept) {
+          var w = img.getAttribute('width') || img.clientWidth || 120;
+          var h = img.getAttribute('height') || img.clientHeight || 120;
+          img.setAttribute('src', placeholder(Number(w), Number(h)));
+          img.style.display = '';
+        }
+        missing++;
+        items.push({ src: src, alt: alt, kept: kept });
+        try { console.warn('[ID card] a picture could not be embedded:', src); } catch (_) {}
       }
-      img.setAttribute('src', data);
-      img.removeAttribute('srcset');
-      img.removeAttribute('loading');
     }
+    _lastReport = { inlined: inlined, missing: missing, items: items };
     return imgs.length;
   }
 
@@ -305,7 +386,20 @@
 
      So the PDF now renders the SAME pair, at print resolution, and photographs
      it. One renderer, one measurement, one card. */
-  var PRINT_DPI = 300;          /* the pair is laid out at print size */
+  /* V12.80 — LAY THE CARD OUT AT THE SIZE THE PREVIEW LAID IT OUT AT.
+     The pair used to be mounted at 300 dpi (85.6 mm = 1011 px) and then
+     photographed. A template sets its type, its photo box and its QR in
+     PIXELS, so re-rendering it on a canvas three times wider is a DIFFERENT
+     LAYOUT, not a bigger one: the same 14 px line of text fills a third of the
+     card, rows stop where they stopped, and the rest of the card comes out
+     empty — while the preview on screen had been laid out at 96 dpi (324 px)
+     and looked full. "The downloaded card is not the card I saw" for the third
+     time in three releases, this time in the artwork rather than the design.
+     The card is therefore mounted at exactly the CSS pixel size the preview
+     uses, and the resolution comes from the SVG rasteriser (capture() scales
+     the drawing up to the requested dpi), so the LAYOUT is the preview's and
+     only the pixel density changes. */
+  var CSS_DPI = 96;             /* the size the preview lays the card out at */
 
   async function pair(person, opts) {
     opts = opts || {};
@@ -315,8 +409,8 @@
     var mmH = Number(opts.heightMm) || 53.98;
     var dpi = Number(opts.dpi) || DEFAULTS.dpi;
 
-    var natW = mmToPx(mmW, PRINT_DPI);
-    var natH = mmToPx(mmH, PRINT_DPI);
+    var natW = mmToPx(mmW, CSS_DPI);
+    var natH = mmToPx(mmH, CSS_DPI);
     var faceOpts = Object.assign({}, opts.faceOpts || {}, {
       widthMm: mmW, heightMm: mmH, widthPx: natW, heightPx: natH
     });
@@ -369,6 +463,7 @@
     pair: pair,
     capture: capture,
     inlineImages: inlineImages,
+    lastReport: lastReport,
     DEFAULTS: DEFAULTS
   };
 })(window);
