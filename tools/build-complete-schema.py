@@ -738,7 +738,7 @@ def build(raw: str) -> tuple[str, dict]:
                 # success LOOKS like. It sits BEFORE the reload signal, because the
                 # notification must remain the last executable statement in the
                 # file (see tmp-notify-order.mjs and tmp-selfcontained.mjs).
-                "select 'V12.79 installed — prep exams, a preview-exact ID-card PDF, and a schema that upgrades an older install instead of failing on it' as status;\n"
+                "select 'V12.81 installed — a prep exam opens at the time the school typed, closes when it ends, and keeps the answers of anyone already sitting' as status;\n"
                 "select pg_notify('pgrst', 'reload schema');\n")
         stats['notify-moved-last'] += 1
     return out, stats, drop, st
