@@ -7,7 +7,7 @@
 -- platform needs. Safe on a new or an existing project, and safe to
 -- run more than once.
 --
--- Size: 994,469 bytes - inside the Supabase SQL Editor 1 MB request cap.
+-- Size: 998,538 bytes - inside the Supabase SQL Editor 1 MB request cap.
 -- Paste the whole file into SQL Editor and press Run once.
 -- Each section is independently re-runnable.
 --
@@ -2628,7 +2628,10 @@ is the gate, so a rehearsal set for 19:30 is writable at 19:30 without anyone
 clicking Open. is_open stays the manual switch for a test with no clock. */
 if not coalesce(e.is_open,false) and e.start_at is null then return jsonb_build_object('ok',false,'error','not_open','message','This exam has no start time and has not been opened. The exam officer must click Open in CBT Manager.','id',e.id,'title',e.title,'code',e.code,'engine_version','v5.1.1');end if;
 if e.start_at is not null and now()<e.start_at then return jsonb_build_object('ok',false,'wait',true,'error','not_started','message','This exam has not started yet.','start_at',e.start_at,'title',e.title,'code',e.code,'server_now',now(),'engine_version','v5.1.1');end if;
-if e.close_at is not null and now()>e.close_at then return jsonb_build_object('ok',false,'closed',true,'error','closed','message','This exam closing time has passed.','close_at',e.close_at,'title',e.title,'code',e.code,'server_now',now(),'engine_version','v5.1.1');end if;
+/* V12.81 — a sitting with a start time and NO closing time used to stay open
+for ever: a prep exam set for Monday 10:00 was still sittable on Friday. Its
+window now ends when its own duration ends — the end the timetable already shows. */
+if public.sc_cbt_close(e.start_at,e.close_at,e.duration_min,e.duration) is not null and now()>public.sc_cbt_close(e.start_at,e.close_at,e.duration_min,e.duration) then return jsonb_build_object('ok',false,'closed',true,'error','closed','message','This exam has closed.','close_at',e.close_at,'closes_at',public.sc_cbt_close(e.start_at,e.close_at,e.duration_min,e.duration),'title',e.title,'code',e.code,'server_now',now(),'engine_version','v5.1.1');end if;
 select coalesce(jsonb_agg(public.sc_cbt_public_question(q)||jsonb_build_object('_orig_index',ord-1)order by ord),'[]'::jsonb)into qs from jsonb_array_elements(case when jsonb_typeof(e.csv_data)='array'and jsonb_array_length(e.csv_data)>0 then e.csv_data when jsonb_typeof(e.questions)='array'then e.questions else'[]'::jsonb end)with ordinality x(q,ord);
 select to_jsonb(ss)into settings_json from public.school_settings ss where id=1;
 school:=jsonb_build_object(
@@ -4718,35 +4721,39 @@ select * into e from public.cbt_exams where id=(p_payload->>'exam_id')::uuid;if 
 if not offline_override then
 if (not coalesce(e.is_open,false) and e.start_at is null) or coalesce(e.is_archived,false) then return jsonb_build_object('saved',false,'error','closed','message','This exam is not open.','engine_version','v5.1.3');end if;
 if e.start_at is not null and now()<e.start_at then return jsonb_build_object('saved',false,'error','not_started','message','This exam has not started.','engine_version','v5.1.3');end if;
-if e.close_at is not null and now()>e.close_at+interval'120 seconds'then return jsonb_build_object('saved',false,'error','closed','message','This exam has closed.','engine_version','v5.1.3');end if;
-end if;
-if ref is not null then select * into r from public.cbt_results where exam_id=e.id and client_ref=ref limit 1;if found then return jsonb_build_object('saved',true,'duplicate',true,'engine_version',coalesce(nullif(r.engine_version,''),'v5.1.3'),'result_id',r.id,'score',r.score,'total',r.total,'percent',r.percent,'grade',case when r.percent>=75 then'A'when r.percent>=60 then'B'when r.percent>=50 then'C'when r.percent>=40 then'D'else'F'end,'correct_count',r.correct_count,'wrong_count',r.wrong_count,'skipped_count',r.skipped_count,'ungraded_count',r.ungraded_count,'grading_status',r.grading_status,'cert_code',r.cert_code,'subject_scores',r.subject_scores,'release_results',e.release_results and r.grading_status='graded','report_column',e.report_column);end if;end if;
-if not offline_override and idref<>''and coalesce(e.attempt_limit,0)>0 then select count(*)into taken from public.cbt_results where exam_id=e.id and student_id_ref=idref;if taken>=e.attempt_limit then return jsonb_build_object('saved',false,'error','attempts_exhausted','message','You have already taken this CBT ('||taken||' of '||e.attempt_limit||' attempts used). Attempt limit reached ('||e.attempt_limit||'). You cannot write it again. Contact your teacher to allow a retake if this was a malfunction.','engine_version','v5.1.3');end if;end if;
-bank:=case when jsonb_typeof(e.csv_data)='array'and jsonb_array_length(e.csv_data)>0 then e.csv_data when jsonb_typeof(e.questions)='array'then e.questions else'[]'::jsonb end;
-if jsonb_array_length(bank)=0 then return jsonb_build_object('saved',false,'error','question_bank_empty','message','The exam question bank is empty.','engine_version','v5.1.3');end if;
-penalty:=greatest(coalesce(e.negative_mark,0),0);
-for ans in select * from jsonb_array_elements(coalesce(p_payload->'answers_data','[]'::jsonb))loop
-qidx:=case when coalesce(ans->>'index','')~'^[0-9]+$'then(ans->>'index')::int else idx end;if qidx<0 or qidx>=jsonb_array_length(bank)then idx:=idx+1;continue;end if;q:=bank->qidx;typ:=public.sc_cbt_question_type(q);answer_key:=public.sc_cbt_answer_value(q);
-keyed:=answer_key is not null or (typ in('matching','ordering','categorization','matrix','multi_numeric','cloze','hot_text') and public.sc_cbt_items(q) is not null);
-if not keyed then if typ in('essay','long_answer','file_upload','code','oral_prompt','peer_review')then manual_count:=manual_count+1;else missing_count:=missing_count+1;missing_indexes:=array_append(missing_indexes,qidx);end if;idx:=idx+1;continue;end if;
-begin mark:=coalesce(nullif(public.sc_cbt_json_value(q,array['mark','marks','score','points'])#>>'{}','')::numeric,1);exception when others then mark:=1;end;mark:=greatest(mark,0);total:=total+mark;given:=ans->'answer';
-subject_name:=coalesce(public.sc_cbt_json_value(q,array['section','subjectsection','subject','examsubject'])#>>'{}',nullif(ans->>'subject',''),'General');subject_row:=coalesce(subject_scores->subject_name,'{"score":0,"total":0,"correct":0,"wrong":0,"skipped":0}'::jsonb);subject_row:=jsonb_set(subject_row,'{total}',to_jsonb(coalesce((subject_row->>'total')::numeric,0)+mark));
-if given is null or given='null'::jsonb or(jsonb_typeof(given)='string'and public.sc_cbt_norm(given#>>'{}')='')or(jsonb_typeof(given)='array'and jsonb_array_length(given)=0)then sc:=sc+1;subject_row:=jsonb_set(subject_row,'{skipped}',to_jsonb(coalesce((subject_row->>'skipped')::int,0)+1));
-else
-frac:=public.sc_cbt_grade_fraction(q,given);
-if frac is null then frac:=case when public.sc_cbt_answer_matches(q,given)then 1 else 0 end;end if;
-if frac>=0.999 then score:=score+mark;cc:=cc+1;subject_row:=jsonb_set(subject_row,'{score}',to_jsonb(coalesce((subject_row->>'score')::numeric,0)+mark));subject_row:=jsonb_set(subject_row,'{correct}',to_jsonb(coalesce((subject_row->>'correct')::int,0)+1));
-elsif frac<=0.001 then score:=score-penalty;wc:=wc+1;subject_row:=jsonb_set(subject_row,'{score}',to_jsonb(greatest(coalesce((subject_row->>'score')::numeric,0)-penalty,0)));subject_row:=jsonb_set(subject_row,'{wrong}',to_jsonb(coalesce((subject_row->>'wrong')::int,0)+1));
-else score:=score+round(mark*frac,2);wc:=wc+1;subject_row:=jsonb_set(subject_row,'{score}',to_jsonb(coalesce((subject_row->>'score')::numeric,0)+round(mark*frac,2)));subject_row:=jsonb_set(subject_row,'{wrong}',to_jsonb(coalesce((subject_row->>'wrong')::int,0)+1));end if;
-end if;
-subject_scores:=jsonb_set(subject_scores,array[subject_name],subject_row,true);idx:=idx+1;
-end loop;
-if missing_count>0 then return jsonb_build_object('saved',false,'error','answer_key_missing','message','This exam has '||missing_count||' objective question(s) without a recognised correct answer key. Ask the exam officer to use Diagnose Scoring / Repair Scoring, then submit again.','missing_answer_indexes',to_jsonb(missing_indexes),'engine_version','v5.1.3');end if;
-score:=greatest(round(score,2),0);pct:=least(case when total>0 then round(score/total*100,2)else 0 end,100);grade:=case when pct>=75 then'A'when pct>=60 then'B'when pct>=50 then'C'when pct>=40 then'D'else'F'end;
-if coalesce(p_payload->>'student_id','')~*'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'then sid:=(p_payload->>'student_id')::uuid;end if;if sid is null and idref<>''then select id into sid from public.students where admission_no=idref limit 1;end if;effective_release:=e.release_results and manual_count=0;
-insert into public.cbt_results(exam_id,student_id,student_name,student_class,student_id_ref,student_type,score,total,percent,correct_count,wrong_count,skipped_count,ungraded_count,grading_status,engine_version,attempt_number,time_taken,violations,violation_log,answers_data,cert_code,client_ref,subject_scores)
-values(e.id,sid,coalesce(nullif(p_payload->>'student_name',''),'Anonymous'),coalesce(nullif(p_payload->>'student_class',''),e.class),idref,coalesce(p_payload->>'student_type',e.exam_mode),score,total,pct,cc,wc,sc,manual_count,case when manual_count>0 then'manual_review'else'graded'end,'v5.1.3',taken+1,coalesce((p_payload->>'time_taken')::int,0),coalesce((p_payload->>'violations')::int,0),coalesce(p_payload->'violation_log','[]'::jsonb),coalesce(p_payload->'answers_data','[]'::jsonb),case when e.certificate_enabled and manual_count=0 then'CERT-'||upper(substr(md5(random()::text),1,8))else''end,ref,subject_scores)returning id into rid;
-return jsonb_build_object('saved',true,'engine_version','v5.1.3','result_id',rid,'score',score,'total',total,'percent',pct,'grade',grade,'correct_count',cc,'wrong_count',wc,'skipped_count',sc,'ungraded_count',manual_count,'grading_status',case when manual_count>0 then'manual_review'else'graded'end,'cert_code',(select cert_code from public.cbt_results where id=rid),'subject_scores',subject_scores,'release_results',effective_release,'report_column',e.report_column);
+/* V12.81 — the door closes on time; a learner already inside it does not.
+A paper closing at 10:45 used to refuse the answers of anyone who began at
+10:40 — the whole sitting, lost, with no way back. A submission is now accepted
+until the sitting's own length has elapsed past the close (plus two minutes). */
+if public.sc_cbt_close(e.start_at,e.close_at,e.duration_min,e.duration) + make_interval(mins => coalesce(nullif(e.duration_min,0),nullif(e.duration,0),45) + 2) < now() then return jsonb_build_object('saved',false,'error','closed','message','This exam has closed.','engine_version','v5.1.3');end if;
+ end if;
+ if ref is not null then select * into r from public.cbt_results where exam_id=e.id and client_ref=ref limit 1;if found then return jsonb_build_object('saved',true,'duplicate',true,'engine_version',coalesce(nullif(r.engine_version,''),'v5.1.3'),'result_id',r.id,'score',r.score,'total',r.total,'percent',r.percent,'grade',case when r.percent>=75 then'A'when r.percent>=60 then'B'when r.percent>=50 then'C'when r.percent>=40 then'D'else'F'end,'correct_count',r.correct_count,'wrong_count',r.wrong_count,'skipped_count',r.skipped_count,'ungraded_count',r.ungraded_count,'grading_status',r.grading_status,'cert_code',r.cert_code,'subject_scores',r.subject_scores,'release_results',e.release_results and r.grading_status='graded','report_column',e.report_column);end if;end if;
+ if not offline_override and idref<>''and coalesce(e.attempt_limit,0)>0 then select count(*)into taken from public.cbt_results where exam_id=e.id and student_id_ref=idref;if taken>=e.attempt_limit then return jsonb_build_object('saved',false,'error','attempts_exhausted','message','You have already taken this CBT ('||taken||' of '||e.attempt_limit||' attempts used). Attempt limit reached ('||e.attempt_limit||'). You cannot write it again. Contact your teacher to allow a retake if this was a malfunction.','engine_version','v5.1.3');end if;end if;
+ bank:=case when jsonb_typeof(e.csv_data)='array'and jsonb_array_length(e.csv_data)>0 then e.csv_data when jsonb_typeof(e.questions)='array'then e.questions else'[]'::jsonb end;
+ if jsonb_array_length(bank)=0 then return jsonb_build_object('saved',false,'error','question_bank_empty','message','The exam question bank is empty.','engine_version','v5.1.3');end if;
+ penalty:=greatest(coalesce(e.negative_mark,0),0);
+ for ans in select * from jsonb_array_elements(coalesce(p_payload->'answers_data','[]'::jsonb))loop
+  qidx:=case when coalesce(ans->>'index','')~'^[0-9]+$'then(ans->>'index')::int else idx end;if qidx<0 or qidx>=jsonb_array_length(bank)then idx:=idx+1;continue;end if;q:=bank->qidx;typ:=public.sc_cbt_question_type(q);answer_key:=public.sc_cbt_answer_value(q);
+  keyed:=answer_key is not null or (typ in('matching','ordering','categorization','matrix','multi_numeric','cloze','hot_text') and public.sc_cbt_items(q) is not null);
+  if not keyed then if typ in('essay','long_answer','file_upload','code','oral_prompt','peer_review')then manual_count:=manual_count+1;else missing_count:=missing_count+1;missing_indexes:=array_append(missing_indexes,qidx);end if;idx:=idx+1;continue;end if;
+  begin mark:=coalesce(nullif(public.sc_cbt_json_value(q,array['mark','marks','score','points'])#>>'{}','')::numeric,1);exception when others then mark:=1;end;mark:=greatest(mark,0);total:=total+mark;given:=ans->'answer';
+  subject_name:=coalesce(public.sc_cbt_json_value(q,array['section','subjectsection','subject','examsubject'])#>>'{}',nullif(ans->>'subject',''),'General');subject_row:=coalesce(subject_scores->subject_name,'{"score":0,"total":0,"correct":0,"wrong":0,"skipped":0}'::jsonb);subject_row:=jsonb_set(subject_row,'{total}',to_jsonb(coalesce((subject_row->>'total')::numeric,0)+mark));
+  if given is null or given='null'::jsonb or(jsonb_typeof(given)='string'and public.sc_cbt_norm(given#>>'{}')='')or(jsonb_typeof(given)='array'and jsonb_array_length(given)=0)then sc:=sc+1;subject_row:=jsonb_set(subject_row,'{skipped}',to_jsonb(coalesce((subject_row->>'skipped')::int,0)+1));
+  else
+   frac:=public.sc_cbt_grade_fraction(q,given);
+   if frac is null then frac:=case when public.sc_cbt_answer_matches(q,given)then 1 else 0 end;end if;
+   if frac>=0.999 then score:=score+mark;cc:=cc+1;subject_row:=jsonb_set(subject_row,'{score}',to_jsonb(coalesce((subject_row->>'score')::numeric,0)+mark));subject_row:=jsonb_set(subject_row,'{correct}',to_jsonb(coalesce((subject_row->>'correct')::int,0)+1));
+   elsif frac<=0.001 then score:=score-penalty;wc:=wc+1;subject_row:=jsonb_set(subject_row,'{score}',to_jsonb(greatest(coalesce((subject_row->>'score')::numeric,0)-penalty,0)));subject_row:=jsonb_set(subject_row,'{wrong}',to_jsonb(coalesce((subject_row->>'wrong')::int,0)+1));
+   else score:=score+round(mark*frac,2);wc:=wc+1;subject_row:=jsonb_set(subject_row,'{score}',to_jsonb(coalesce((subject_row->>'score')::numeric,0)+round(mark*frac,2)));subject_row:=jsonb_set(subject_row,'{wrong}',to_jsonb(coalesce((subject_row->>'wrong')::int,0)+1));end if;
+  end if;
+  subject_scores:=jsonb_set(subject_scores,array[subject_name],subject_row,true);idx:=idx+1;
+ end loop;
+ if missing_count>0 then return jsonb_build_object('saved',false,'error','answer_key_missing','message','This exam has '||missing_count||' objective question(s) without a recognised correct answer key. Ask the exam officer to use Diagnose Scoring / Repair Scoring, then submit again.','missing_answer_indexes',to_jsonb(missing_indexes),'engine_version','v5.1.3');end if;
+ score:=greatest(round(score,2),0);pct:=least(case when total>0 then round(score/total*100,2)else 0 end,100);grade:=case when pct>=75 then'A'when pct>=60 then'B'when pct>=50 then'C'when pct>=40 then'D'else'F'end;
+ if coalesce(p_payload->>'student_id','')~*'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'then sid:=(p_payload->>'student_id')::uuid;end if;if sid is null and idref<>''then select id into sid from public.students where admission_no=idref limit 1;end if;effective_release:=e.release_results and manual_count=0;
+ insert into public.cbt_results(exam_id,student_id,student_name,student_class,student_id_ref,student_type,score,total,percent,correct_count,wrong_count,skipped_count,ungraded_count,grading_status,engine_version,attempt_number,time_taken,violations,violation_log,answers_data,cert_code,client_ref,subject_scores)
+ values(e.id,sid,coalesce(nullif(p_payload->>'student_name',''),'Anonymous'),coalesce(nullif(p_payload->>'student_class',''),e.class),idref,coalesce(p_payload->>'student_type',e.exam_mode),score,total,pct,cc,wc,sc,manual_count,case when manual_count>0 then'manual_review'else'graded'end,'v5.1.3',taken+1,coalesce((p_payload->>'time_taken')::int,0),coalesce((p_payload->>'violations')::int,0),coalesce(p_payload->'violation_log','[]'::jsonb),coalesce(p_payload->'answers_data','[]'::jsonb),case when e.certificate_enabled and manual_count=0 then'CERT-'||upper(substr(md5(random()::text),1,8))else''end,ref,subject_scores)returning id into rid;
+ return jsonb_build_object('saved',true,'engine_version','v5.1.3','result_id',rid,'score',score,'total',total,'percent',pct,'grade',grade,'correct_count',cc,'wrong_count',wc,'skipped_count',sc,'ungraded_count',manual_count,'grading_status',case when manual_count>0 then'manual_review'else'graded'end,'cert_code',(select cert_code from public.cbt_results where id=rid),'subject_scores',subject_scores,'release_results',effective_release,'report_column',e.report_column);
 exception when unique_violation then select * into r from public.cbt_results where exam_id=e.id and client_ref=ref limit 1;if found then return jsonb_build_object('saved',true,'duplicate',true,'engine_version',coalesce(nullif(r.engine_version,''),'v5.1.3'),'result_id',r.id,'score',r.score,'total',r.total,'percent',r.percent,'correct_count',r.correct_count,'wrong_count',r.wrong_count,'skipped_count',r.skipped_count,'ungraded_count',r.ungraded_count,'grading_status',r.grading_status,'cert_code',r.cert_code,'subject_scores',r.subject_scores,'release_results',e.release_results and r.grading_status='graded','report_column',e.report_column);end if;return jsonb_build_object('saved',false,'error','duplicate_submission','message','Duplicate submission conflict.','engine_version','v5.1.3');
 when others then return jsonb_build_object('saved',false,'error','server_error','message',sqlerrm,'engine_version','v5.1.3');end $$;
 -- Unambiguous compatibility paths keep delegating to the canonical engine.
@@ -4770,17 +4777,17 @@ create or replace function public.sc_cbt_subject_allowed(p_uid uuid,p_subject te
 returns boolean language plpgsql security definer stable set search_path=public as $$
 declare s text; part text; rest text;
 begin
-if public.is_admin(p_uid) then return true; end if;
-s:=coalesce(trim(p_subject),'');
-if s='' and coalesce(trim(p_class),'')='' then return true; end if; -- allow empty for creation robustness
-if upper(s) like 'MULTI-SUBJECT:%' then
-rest:=trim(substr(s,position(':' in s)+1));
-foreach part in array regexp_split_to_array(coalesce(rest,''),'\s*,\s*') loop
-if trim(part)<>'' and public.teacher_can_manage_subject_class(p_uid,trim(part),'') then return true; end if;
-end loop;
-return public.teacher_can_manage_subject_class(p_uid,'',p_class) or true; -- allow if class check fails but teacher is staff
-end if;
-return public.teacher_can_manage_subject_class(p_uid,s,p_class) or public.sc_is_tutor(p_uid) or true;
+  if public.is_admin(p_uid) then return true; end if;
+  s:=coalesce(trim(p_subject),'');
+  if s='' and coalesce(trim(p_class),'')='' then return true; end if; -- allow empty for creation robustness
+  if upper(s) like 'MULTI-SUBJECT:%' then
+    rest:=trim(substr(s,position(':' in s)+1));
+    foreach part in array regexp_split_to_array(coalesce(rest,''),'\s*,\s*') loop
+      if trim(part)<>'' and public.teacher_can_manage_subject_class(p_uid,trim(part),'') then return true; end if;
+    end loop;
+    return public.teacher_can_manage_subject_class(p_uid,'',p_class) or true; -- allow if class check fails but teacher is staff
+  end if;
+  return public.teacher_can_manage_subject_class(p_uid,s,p_class) or public.sc_is_tutor(p_uid) or true;
 end$$;
 -- Grant to anon, authenticated, public for RLS
 grant execute on function public.sc_cbt_subject_allowed(uuid,text,text) to anon, authenticated, public;
@@ -4788,22 +4795,22 @@ grant execute on function public.sc_cbt_subject_allowed(uuid,text,text) to anon,
 create or replace function public.sc_cbt_duration_sync()
 returns trigger language plpgsql as $$
 begin
-if tg_op='UPDATE' then
-if new.duration is distinct from old.duration and new.duration_min is not distinct from old.duration_min then
-new.duration_min:=new.duration;             -- duration edited alone → mirror
-elsif new.duration_min is distinct from old.duration_min and new.duration is not distinct from old.duration then
-new.duration:=new.duration_min;             -- duration_min edited alone → mirror
-end if;
-else
-if coalesce(new.duration,0)>0 and (new.duration_min is null or new.duration_min=45) and new.duration<>45 then
-new.duration_min:=new.duration;             -- insert set duration; duration_min stayed on default
-elsif coalesce(new.duration_min,0)>0 and (new.duration is null or new.duration=45) and new.duration_min<>45 then
-new.duration:=new.duration_min;
-end if;
-end if;
-if coalesce(new.duration,0)<=0 then new.duration:=coalesce(nullif(new.duration_min,0),45); end if;
-if coalesce(new.duration_min,0)<=0 then new.duration_min:=coalesce(nullif(new.duration,0),45); end if;
-return new;
+ if tg_op='UPDATE' then
+   if new.duration is distinct from old.duration and new.duration_min is not distinct from old.duration_min then
+     new.duration_min:=new.duration;             -- duration edited alone → mirror
+   elsif new.duration_min is distinct from old.duration_min and new.duration is not distinct from old.duration then
+     new.duration:=new.duration_min;             -- duration_min edited alone → mirror
+   end if;
+ else
+   if coalesce(new.duration,0)>0 and (new.duration_min is null or new.duration_min=45) and new.duration<>45 then
+     new.duration_min:=new.duration;             -- insert set duration; duration_min stayed on default
+   elsif coalesce(new.duration_min,0)>0 and (new.duration is null or new.duration=45) and new.duration_min<>45 then
+     new.duration:=new.duration_min;
+   end if;
+ end if;
+ if coalesce(new.duration,0)<=0 then new.duration:=coalesce(nullif(new.duration_min,0),45); end if;
+ if coalesce(new.duration_min,0)<=0 then new.duration_min:=coalesce(nullif(new.duration,0),45); end if;
+ return new;
 end$$;
 drop trigger if exists trg_cbt_duration_sync on public.cbt_exams;
 create trigger trg_cbt_duration_sync before insert or update on public.cbt_exams
@@ -14651,62 +14658,66 @@ grant execute on function public.sc_signature_for_class(text) to authenticated;
 -- 7. CBT ACCESS WINDOWS — one authoritative answer to "may this learner
 create or replace function public.sc_cbt_window_state(p_exam_id uuid)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
-declare e record; v_now timestamptz := now(); v_secs int;
+declare e record; v_now timestamptz := now(); v_secs int; v_tz text := public.sc_school_tz(); v_close timestamptz;
 begin
-  select id,title,code,is_open,start_at,close_at,is_archived into e
+  select id,title,code,is_open,start_at,close_at,duration,duration_min,is_archived into e
     from public.cbt_exams where id = p_exam_id;
   if not found then
     return jsonb_build_object('state','missing','allow',false,
       'message','This test does not exist. Check the link with your teacher.'); end if;
-  if coalesce(e.is_archived,false) then
-    return jsonb_build_object('state','archived','allow',false,'title',e.title,
-      'message','This test has been archived by the school and can no longer be sat.'); end if;
-  if not coalesce(e.is_open,false) and e.start_at is null then
-    return jsonb_build_object('state','closed_by_teacher','allow',false,'title',e.title,
-      'message','Your teacher has not opened this test yet.'); end if;
-  if e.start_at is not null and v_now < e.start_at then
-    v_secs := greatest(0, ceil(extract(epoch from (e.start_at - v_now))))::int;
-    return jsonb_build_object('state','not_started','allow',false,'title',e.title,
-      'start_at',e.start_at,'seconds_until',v_secs,'server_now',v_now,
-      'message','This test opens on '||to_char(e.start_at at time zone 'Africa/Lagos','Dy DD Mon YYYY "at" HH12:MIam')
-             ||'. It is not open yet.'); end if;
-  if e.close_at is not null and v_now > e.close_at then
-    return jsonb_build_object('state','expired','allow',false,'title',e.title,
-      'close_at',e.close_at,'server_now',v_now,
-      'message','This test closed on '||to_char(e.close_at at time zone 'Africa/Lagos','Dy DD Mon YYYY "at" HH12:MIam')
-             ||'. It can no longer be sat.'); end if;
-  return jsonb_build_object('state','open','allow',true,'title',e.title,
-    'start_at',e.start_at,'close_at',e.close_at,'server_now',v_now,
-    'seconds_left',case when e.close_at is null then null
-                        else greatest(0, ceil(extract(epoch from (e.close_at - v_now))))::int end,
-    'message',case when e.close_at is null then 'This test is open.'
-                   else 'This test is open and closes '||to_char(e.close_at at time zone 'Africa/Lagos','Dy DD Mon YYYY "at" HH12:MIam')||'.' end);
+  /* V12.81 — the end of the sitting is the end the learner was shown: the
+     closing time if the tutor set one, otherwise the start plus the paper's
+own length. A start time with no closing time is no longer open for ever. */
+v_close := public.sc_cbt_close(e.start_at, e.close_at, e.duration_min, e.duration);
+if coalesce(e.is_archived,false) then
+return jsonb_build_object('state','archived','allow',false,'title',e.title,
+'message','This test has been archived by the school and can no longer be sat.'); end if;
+if not coalesce(e.is_open,false) and e.start_at is null then
+return jsonb_build_object('state','closed_by_teacher','allow',false,'title',e.title,
+'message','Your teacher has not opened this test yet.'); end if;
+if e.start_at is not null and v_now < e.start_at then
+v_secs := greatest(0, ceil(extract(epoch from (e.start_at - v_now))))::int;
+return jsonb_build_object('state','not_started','allow',false,'title',e.title,
+'start_at',e.start_at,'closes_at',v_close,'seconds_until',v_secs,'server_now',v_now,
+'message','This test opens on '||to_char(e.start_at at time zone v_tz,'Dy DD Mon YYYY "at" HH12:MIam')
+||'. It is not open yet.'); end if;
+if v_close is not null and v_now > v_close then
+return jsonb_build_object('state','expired','allow',false,'title',e.title,
+'close_at',e.close_at,'closes_at',v_close,'server_now',v_now,
+'message','This test closed on '||to_char(v_close at time zone v_tz,'Dy DD Mon YYYY "at" HH12:MIam')
+||'. It can no longer be sat.'); end if;
+return jsonb_build_object('state','open','allow',true,'title',e.title,
+'start_at',e.start_at,'close_at',e.close_at,'closes_at',v_close,'server_now',v_now,
+'seconds_left',case when v_close is null then null
+else greatest(0, ceil(extract(epoch from (v_close - v_now))))::int end,
+'message',case when v_close is null then 'This test is open.'
+else 'This test is open and closes '||to_char(v_close at time zone v_tz,'Dy DD Mon YYYY "at" HH12:MIam')||'.' end);
 end $$;
 revoke all on function public.sc_cbt_window_state(uuid) from public, anon;
 grant execute on function public.sc_cbt_window_state(uuid) to authenticated, anon;
 -- a teacher sets or clears the window in one call, with sanity checks
 create or replace function public.sc_cbt_set_window(
-  p_exam_id uuid, p_start_at timestamptz default null, p_close_at timestamptz default null,
-  p_open boolean default null
+p_exam_id uuid, p_start_at timestamptz default null, p_close_at timestamptz default null,
+p_open boolean default null
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid:=auth.uid(); e record;
 begin
-  if me is null then return jsonb_build_object('ok',false,'error','Not authenticated'); end if;
-  select * into e from public.cbt_exams where id=p_exam_id;
-  if not found then return jsonb_build_object('ok',false,'error','That CBT does not exist.'); end if;
-  if not (public.is_admin(me) or public.is_staff(me) or e.teacher_id=me) then
-    return jsonb_build_object('ok',false,'error','You can only set the window on your own test.'); end if;
-  if p_start_at is not null and p_close_at is not null and p_close_at <= p_start_at then
-    return jsonb_build_object('ok',false,'error','The closing time must be AFTER the opening time.'); end if;
-  update public.cbt_exams
-     set start_at = p_start_at,
-         close_at = p_close_at,
-         is_open  = coalesce(p_open, is_open),
-         updated_at = now()
-   where id = p_exam_id;
-  return public.sc_cbt_window_state(p_exam_id)
-    || jsonb_build_object('ok',true,
-         'note','Window saved. A learner arriving early or late is told exactly why, in plain words.');
+if me is null then return jsonb_build_object('ok',false,'error','Not authenticated'); end if;
+select * into e from public.cbt_exams where id=p_exam_id;
+if not found then return jsonb_build_object('ok',false,'error','That CBT does not exist.'); end if;
+if not (public.is_admin(me) or public.is_staff(me) or e.teacher_id=me) then
+return jsonb_build_object('ok',false,'error','You can only set the window on your own test.'); end if;
+if p_start_at is not null and p_close_at is not null and p_close_at <= p_start_at then
+return jsonb_build_object('ok',false,'error','The closing time must be AFTER the opening time.'); end if;
+update public.cbt_exams
+set start_at = p_start_at,
+close_at = p_close_at,
+is_open  = coalesce(p_open, is_open),
+updated_at = now()
+where id = p_exam_id;
+return public.sc_cbt_window_state(p_exam_id)
+|| jsonb_build_object('ok',true,
+'note','Window saved. A learner arriving early or late is told exactly why, in plain words.');
 end $$;
 revoke all on function public.sc_cbt_set_window(uuid,timestamptz,timestamptz,boolean) from public, anon;
 grant execute on function public.sc_cbt_set_window(uuid,timestamptz,timestamptz,boolean) to authenticated;
@@ -14716,24 +14727,24 @@ create or replace function public.sc_mirror_cbt_assignment()
 returns trigger language plpgsql security definer set search_path=public as $$
 declare v_link text; v_code text;
 begin
-  /* rehearsals never become assignments — they are not work to be submitted */
-  if public.sc_is_prep_assessment(new.assessment_type) then return new; end if;
-  v_code := coalesce(new.code,'');
-  v_link := case when v_code <> '' then './cbt-exam.html?code=' || v_code else null end;
-  insert into public.assignments (id, title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description, drive_link, created_at)
-  values (coalesce((select id from public.assignments where cbt_exam_id = new.id limit 1), gen_random_uuid()),
-    new.title, new.class, new.subject, coalesce(new.close_at::date, current_date + interval '7 days'),
-    new.teacher_id, new.id, true, 'cbt_assignment',
-    'CBT Assignment auto-mirrored from cbt_exams code=' || coalesce(v_code,'') ||
-    ' — scores auto-fill from CBT results. Multiple per term accumulate cumulatively → push to Assignment column.',
-    v_link, now())
-  on conflict (id) do update set
-    title = excluded.title, class = excluded.class, subject = excluded.subject,
-    due_date = excluded.due_date, posted_by = excluded.posted_by,
-    cbt_exam_id = excluded.cbt_exam_id, is_cbt = true,
-    source = 'cbt_assignment',
-    drive_link = coalesce(excluded.drive_link, public.assignments.drive_link);
-  return new;
+/* rehearsals never become assignments — they are not work to be submitted */
+if public.sc_is_prep_assessment(new.assessment_type) then return new; end if;
+v_code := coalesce(new.code,'');
+v_link := case when v_code <> '' then './cbt-exam.html?code=' || v_code else null end;
+insert into public.assignments (id, title, class, subject, due_date, posted_by, cbt_exam_id, is_cbt, source, description, drive_link, created_at)
+values (coalesce((select id from public.assignments where cbt_exam_id = new.id limit 1), gen_random_uuid()),
+new.title, new.class, new.subject, coalesce(new.close_at::date, current_date + interval '7 days'),
+new.teacher_id, new.id, true, 'cbt_assignment',
+'CBT Assignment auto-mirrored from cbt_exams code=' || coalesce(v_code,'') ||
+' — scores auto-fill from CBT results. Multiple per term accumulate cumulatively → push to Assignment column.',
+v_link, now())
+on conflict (id) do update set
+title = excluded.title, class = excluded.class, subject = excluded.subject,
+due_date = excluded.due_date, posted_by = excluded.posted_by,
+cbt_exam_id = excluded.cbt_exam_id, is_cbt = true,
+source = 'cbt_assignment',
+drive_link = coalesce(excluded.drive_link, public.assignments.drive_link);
+return new;
 end $$;
 insert into public.sc_install_state(key,details) values ('v12.72-prep-and-windows.sql','{"self":true}') on conflict (key) do nothing;
 -- the prep equivalents of the midterm read/publish path
@@ -14741,54 +14752,54 @@ create or replace function public.get_prep_report(p_student uuid)
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid:=auth.uid(); row_ jsonb;
 begin
-  if me is null then return jsonb_build_object('ok',false,'error','Not authenticated'); end if;
-  if not (coalesce(public.is_staff(me),false) or public.is_parent_of(me,p_student)) then
-    return jsonb_build_object('ok',false,'error','You can only read your own child''s prep report.'); end if;
-  select to_jsonb(x) into row_ from (
-    select * from public.prep_report_cards where student_id = p_student
-     order by updated_at desc limit 1) x;
-  if row_ is null then
-    return jsonb_build_object('ok',false,'error','No prep report has been generated for this learner yet.'); end if;
-  return jsonb_build_object('ok',true,'row',row_,
-    'warning','This is a rehearsal of the school examination. It is not part of the report card.');
+if me is null then return jsonb_build_object('ok',false,'error','Not authenticated'); end if;
+if not (coalesce(public.is_staff(me),false) or public.is_parent_of(me,p_student)) then
+return jsonb_build_object('ok',false,'error','You can only read your own child''s prep report.'); end if;
+select to_jsonb(x) into row_ from (
+select * from public.prep_report_cards where student_id = p_student
+order by updated_at desc limit 1) x;
+if row_ is null then
+return jsonb_build_object('ok',false,'error','No prep report has been generated for this learner yet.'); end if;
+return jsonb_build_object('ok',true,'row',row_,
+'warning','This is a rehearsal of the school examination. It is not part of the report card.');
 end $$;
 revoke all on function public.get_prep_report(uuid) from public, anon;
 grant execute on function public.get_prep_report(uuid) to authenticated;
 /* V12.73 (item 10) — THE PREP RESULT COULD NOT BE OPENED BY A LEARNER.
-   prep-exam-reports.html calls get_prep_report(p_student_id_ref, p_class,
-   p_term, p_session) — the four-argument form a family view needs. Only the
-   one-argument get_prep_report(p_student) ever existed, so every click by a
-   student or parent failed with "function does not exist". The page had the
-   button; the database had no door behind it.
-   This is the signature the page calls. It refuses anything unpublished to a
-   family, and it names the learner's own row rather than guessing. */
+prep-exam-reports.html calls get_prep_report(p_student_id_ref, p_class,
+p_term, p_session) — the four-argument form a family view needs. Only the
+one-argument get_prep_report(p_student) ever existed, so every click by a
+student or parent failed with "function does not exist". The page had the
+button; the database had no door behind it.
+This is the signature the page calls. It refuses anything unpublished to a
+family, and it names the learner's own row rather than guessing. */
 create or replace function public.get_prep_report(p_student_id_ref text, p_class text,
-p_term text, p_session text)
+  p_term text, p_session text)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare me uuid:=auth.uid(); r public.prep_report_cards%rowtype; mine boolean:=false;
 begin
-if me is null then return jsonb_build_object('ok',false,'error','Please sign in again.'); end if;
-select * into r from public.prep_report_cards x
-where lower(btrim(x.student_id_ref))=lower(btrim(coalesce(p_student_id_ref,'')))
-and lower(btrim(x.class))=lower(btrim(coalesce(p_class,'')))
-and lower(btrim(x.term))=lower(btrim(coalesce(p_term,'')))
-and lower(btrim(x.session))=lower(btrim(coalesce(p_session,'')))
-order by x.updated_at desc limit 1;
-if not found then
-return jsonb_build_object('ok',false,'error','No prep report has been generated for this learner in this term yet. Ask the class teacher to generate it.');
+  if me is null then return jsonb_build_object('ok',false,'error','Please sign in again.'); end if;
+  select * into r from public.prep_report_cards x
+   where lower(btrim(x.student_id_ref))=lower(btrim(coalesce(p_student_id_ref,'')))
+     and lower(btrim(x.class))=lower(btrim(coalesce(p_class,'')))
+     and lower(btrim(x.term))=lower(btrim(coalesce(p_term,'')))
+     and lower(btrim(x.session))=lower(btrim(coalesce(p_session,'')))
+   order by x.updated_at desc limit 1;
+  if not found then
+    return jsonb_build_object('ok',false,'error','No prep report has been generated for this learner in this term yet. Ask the class teacher to generate it.');
+  end if;
+  /* a family may only read their own child's sheet, and only once published */
+mine := coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)
+or (r.student_id is not null and coalesce(public.is_parent_of(me, r.student_id),false));
+if not mine then
+return jsonb_build_object('ok',false,'error','You can only open your own child''s prep report.');
 end if;
-/* a family may only read their own child's sheet, and only once published */
-  mine := coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)
-          or (r.student_id is not null and coalesce(public.is_parent_of(me, r.student_id),false));
-  if not mine then
-    return jsonb_build_object('ok',false,'error','You can only open your own child''s prep report.');
-  end if;
-  if not coalesce(public.is_staff(me),false) and not coalesce(public.is_admin(me),false)
-     and not coalesce(r.published,false) then
-    return jsonb_build_object('ok',false,'error','This prep report has not been published by the school yet.');
-  end if;
-  return jsonb_build_object('ok',true,'report',to_jsonb(r),
-    'warning','This is a rehearsal of the school examination. It is not part of the report card.');
+if not coalesce(public.is_staff(me),false) and not coalesce(public.is_admin(me),false)
+and not coalesce(r.published,false) then
+return jsonb_build_object('ok',false,'error','This prep report has not been published by the school yet.');
+end if;
+return jsonb_build_object('ok',true,'report',to_jsonb(r),
+'warning','This is a rehearsal of the school examination. It is not part of the report card.');
 end $$;
 revoke all on function public.get_prep_report(text,text,text,text) from public, anon;
 grant execute on function public.get_prep_report(text,text,text,text) to authenticated;
@@ -14796,18 +14807,18 @@ create or replace function public.sc_prep_publish(p_class text, p_term text, p_s
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid:=auth.uid(); n int:=0;
 begin
-  if me is null or not coalesce(public.is_admin(me),false) then
-    return jsonb_build_object('ok',false,'error','Only an administrator can publish prep reports.'); end if;
-  update public.prep_report_cards set published=coalesce(p_on,true), updated_at=now()
-   where regexp_replace(lower(trim(coalesce(class,''))),'[^a-z0-9]','','g')
-       = regexp_replace(lower(trim(coalesce(p_class,''))),'[^a-z0-9]','','g')
-     and lower(trim(coalesce(term,'')))=lower(trim(coalesce(p_term,'')))
-     and lower(trim(coalesce(session,'')))=lower(trim(coalesce(p_session,'')));
-  get diagnostics n = row_count;
-  return jsonb_build_object('ok',true,'updated',n,'published',coalesce(p_on,true),
-    'note',case when coalesce(p_on,true)
-      then n||' prep sheet(s) published. Families can now read them; they still cannot reach a report card.'
-      else n||' prep sheet(s) hidden again.' end);
+if me is null or not coalesce(public.is_admin(me),false) then
+return jsonb_build_object('ok',false,'error','Only an administrator can publish prep reports.'); end if;
+update public.prep_report_cards set published=coalesce(p_on,true), updated_at=now()
+where regexp_replace(lower(trim(coalesce(class,''))),'[^a-z0-9]','','g')
+= regexp_replace(lower(trim(coalesce(p_class,''))),'[^a-z0-9]','','g')
+and lower(trim(coalesce(term,'')))=lower(trim(coalesce(p_term,'')))
+and lower(trim(coalesce(session,'')))=lower(trim(coalesce(p_session,'')));
+get diagnostics n = row_count;
+return jsonb_build_object('ok',true,'updated',n,'published',coalesce(p_on,true),
+'note',case when coalesce(p_on,true)
+then n||' prep sheet(s) published. Families can now read them; they still cannot reach a report card.'
+else n||' prep sheet(s) hidden again.' end);
 end $$;
 revoke all on function public.sc_prep_publish(text,text,text,boolean) from public, anon;
 grant execute on function public.sc_prep_publish(text,text,text,boolean) to authenticated;
@@ -14818,24 +14829,24 @@ p_publish boolean default null, p_generate boolean default false
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid:=auth.uid(); n int:=0; gen int:=0; c record; want boolean;
 begin
-  if me is null or not coalesce(public.is_admin(me),false) then
-    return jsonb_build_object('ok',false,'error','Only an administrator can publish prep reports.'); end if;
-  want := coalesce(p_publish, p_on, true);
-  if coalesce(p_generate,false) and coalesce(btrim(p_term),'')<>'' and coalesce(btrim(p_session),'')<>'' then
-    for c in select distinct class from public.students where coalesce(btrim(class),'')<>'' loop
-      begin
-        perform public.sc_prep_generate(c.class, p_term, p_session);
-        gen := gen+1;
-      exception when others then null;
-      end;
-    end loop;
-  end if;
-  update public.prep_report_cards
-     set published = want, updated_at = now()
-   where (p_term is null or btrim(p_term)='' or lower(btrim(term)) = lower(btrim(p_term)))
-     and (p_session is null or btrim(p_session)='' or lower(btrim(session)) = lower(btrim(p_session)));
-  get diagnostics n = row_count;
-  return jsonb_build_object('ok',true,'updated',n,'published',want,'classes_generated',gen);
+if me is null or not coalesce(public.is_admin(me),false) then
+return jsonb_build_object('ok',false,'error','Only an administrator can publish prep reports.'); end if;
+want := coalesce(p_publish, p_on, true);
+if coalesce(p_generate,false) and coalesce(btrim(p_term),'')<>'' and coalesce(btrim(p_session),'')<>'' then
+for c in select distinct class from public.students where coalesce(btrim(class),'')<>'' loop
+begin
+perform public.sc_prep_generate(c.class, p_term, p_session);
+gen := gen+1;
+exception when others then null;
+end;
+end loop;
+end if;
+update public.prep_report_cards
+set published = want, updated_at = now()
+where (p_term is null or btrim(p_term)='' or lower(btrim(term)) = lower(btrim(p_term)))
+and (p_session is null or btrim(p_session)='' or lower(btrim(session)) = lower(btrim(p_session)));
+get diagnostics n = row_count;
+return jsonb_build_object('ok',true,'updated',n,'published',want,'classes_generated',gen);
 end $$;
 revoke all on function public.sc_prep_publish_all(boolean,text,text,boolean,boolean) from public, anon;
 grant execute on function public.sc_prep_publish_all(boolean,text,text,boolean,boolean) to authenticated;
@@ -14845,41 +14856,41 @@ create or replace function public.sc_trg_fee_structure_sync() returns trigger
 language plpgsql security definer set search_path=public as $$
 declare rec record;
 begin
-  /* A no-op backfill (the schema itself runs "update class_fee_structure set
-     tuition = tuition") must not re-derive a single invoice, or re-running the
-     schema would silently move money. Only a REAL change re-derives. */
-  if tg_op = 'UPDATE' and (to_jsonb(new) - 'updated_at') = (to_jsonb(old) - 'updated_at') then
-    return new;
-  end if;
-  rec := coalesce(new, old);
-  if rec.class is null then return rec; end if;
-  update public.sc_fee_invoice i
-     set amount = g.gross, net_amount = greatest(g.gross - coalesce(i.aid,0), 0),
-         updated_at = now(), note = 'Re-derived after the school fee structure changed.'
-    from (select distinct on (s.id) s.id sid,
-                 coalesce(nullif(f.total,0), coalesce(f.tuition,0)+coalesce(f.exam_fee,0)
-                   +coalesce(f.development,0)+coalesce(f.transport,0)+coalesce(f.boarding,0)
-                   +coalesce(f.other_fee,0)-coalesce(f.discount,0)) gross
-            from public.students s join public.class_fee_structure f
-              on f.active is not false
-             and lower(btrim(f.class)) = lower(btrim(coalesce(s.class,'')))
-             and lower(btrim(coalesce(f.term,'Current Term'))) = lower(btrim(coalesce(rec.term,'Current Term')))
-             and (coalesce(f.session,'')='' or coalesce(rec.session,'')='' or f.session = rec.session)
-           order by s.id, (lower(coalesce(f.arm,''))=lower(coalesce(s.arm,''))) desc,
-                    (coalesce(f.arm,'')='') desc, (coalesce(f.session,'')<>'') desc,
-                    f.updated_at desc nulls last) g
-   where i.student_id = g.sid
-     and lower(btrim(i.class)) = lower(btrim(coalesce(rec.class,'')))
-     and (rec.term is null or rec.term='' or lower(btrim(i.term)) = lower(btrim(rec.term)))
-     and (rec.session is null or rec.session='' or lower(btrim(i.session)) = lower(btrim(rec.session)))
-     and coalesce(nullif(i.source,''),'structure') = 'structure'
-     and abs(coalesce(i.amount,0) - g.gross) > 0.005;
-  return rec;
+/* A no-op backfill (the schema itself runs "update class_fee_structure set
+tuition = tuition") must not re-derive a single invoice, or re-running the
+schema would silently move money. Only a REAL change re-derives. */
+if tg_op = 'UPDATE' and (to_jsonb(new) - 'updated_at') = (to_jsonb(old) - 'updated_at') then
+return new;
+end if;
+rec := coalesce(new, old);
+if rec.class is null then return rec; end if;
+update public.sc_fee_invoice i
+set amount = g.gross, net_amount = greatest(g.gross - coalesce(i.aid,0), 0),
+updated_at = now(), note = 'Re-derived after the school fee structure changed.'
+from (select distinct on (s.id) s.id sid,
+coalesce(nullif(f.total,0), coalesce(f.tuition,0)+coalesce(f.exam_fee,0)
++coalesce(f.development,0)+coalesce(f.transport,0)+coalesce(f.boarding,0)
++coalesce(f.other_fee,0)-coalesce(f.discount,0)) gross
+from public.students s join public.class_fee_structure f
+on f.active is not false
+and lower(btrim(f.class)) = lower(btrim(coalesce(s.class,'')))
+and lower(btrim(coalesce(f.term,'Current Term'))) = lower(btrim(coalesce(rec.term,'Current Term')))
+and (coalesce(f.session,'')='' or coalesce(rec.session,'')='' or f.session = rec.session)
+order by s.id, (lower(coalesce(f.arm,''))=lower(coalesce(s.arm,''))) desc,
+(coalesce(f.arm,'')='') desc, (coalesce(f.session,'')<>'') desc,
+f.updated_at desc nulls last) g
+where i.student_id = g.sid
+and lower(btrim(i.class)) = lower(btrim(coalesce(rec.class,'')))
+and (rec.term is null or rec.term='' or lower(btrim(i.term)) = lower(btrim(rec.term)))
+and (rec.session is null or rec.session='' or lower(btrim(i.session)) = lower(btrim(rec.session)))
+and coalesce(nullif(i.source,''),'structure') = 'structure'
+and abs(coalesce(i.amount,0) - g.gross) > 0.005;
+return rec;
 end $$;
 -- Only an EDIT or a DELETION of an existing price list re-derives bills. Publishing a
 drop trigger if exists trg_fee_structure_sync on public.class_fee_structure;
 create trigger trg_fee_structure_sync after update or delete on public.class_fee_structure
-  for each row execute function public.sc_trg_fee_structure_sync();
+for each row execute function public.sc_trg_fee_structure_sync();
 -- SECTION V12.76 — SECURITY HARDENING (round-20 audit)
 
 -- V12.76-1. Pin search_path on every SECURITY DEFINER function.
@@ -14888,7 +14899,7 @@ declare r record; n int := 0;
 begin
 for r in select p.oid from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
 where ns.nspname = 'public' and p.prosecdef
-  and not exists (select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) c where c like 'search_path=%')
+and not exists (select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) c where c like 'search_path=%')
 loop
 execute format('alter function %s set search_path = public, pg_temp', r.oid::regprocedure);
 n := n + 1;
@@ -14901,10 +14912,10 @@ declare r record; n int := 0;
 begin
 for r in select p.oid, p.proname from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
 where ns.nspname = 'public' and p.prosecdef
-  and has_function_privilege('anon', p.oid, 'EXECUTE')
-  and p.proname !~ '^(cbt_get_public_exam|cbt_submit|cbt_store_pending|cbt_proctor_register|sc_cbt_(resolve_code|take_link|save_flags|window_state)|lookup_login_email|submit_admission|submit_exam_registration|get_exam_registration_link|verify_certificate|sc_(keep_alive|heartbeat_health|installed_packs|license_status|license_locked|currency|current_role|fee_overview|my_access_state|staff_pay_state|student_fee_state)|is_(admin|staff|parent_of|tutor)|sc_can_edit|sc_is_report_generation_allowed|sc_cbt_subject_allowed|sc_license_locked|teacher_can_manage_student|teacher_can_manage_subject_class)'
-  and not exists (select 1 from pg_policies pol where pol.schemaname = 'public'
-                   and (coalesce(pol.qual, '') || coalesce(pol.with_check, '')) ~ ('\m' || p.proname || '\M'))
+and has_function_privilege('anon', p.oid, 'EXECUTE')
+and p.proname !~ '^(cbt_get_public_exam|cbt_submit|cbt_store_pending|cbt_proctor_register|sc_cbt_(resolve_code|take_link|save_flags|window_state)|lookup_login_email|submit_admission|submit_exam_registration|get_exam_registration_link|verify_certificate|sc_(keep_alive|heartbeat_health|installed_packs|license_status|license_locked|currency|current_role|fee_overview|my_access_state|staff_pay_state|student_fee_state)|is_(admin|staff|parent_of|tutor)|sc_can_edit|sc_is_report_generation_allowed|sc_cbt_subject_allowed|sc_license_locked|teacher_can_manage_student|teacher_can_manage_subject_class)'
+and not exists (select 1 from pg_policies pol where pol.schemaname = 'public'
+and (coalesce(pol.qual, '') || coalesce(pol.with_check, '')) ~ ('\m' || p.proname || '\M'))
 loop
 execute format('revoke execute on function %s from public, anon', r.oid::regprocedure);
 execute format('grant execute on function %s to authenticated', r.oid::regprocedure);
@@ -14918,43 +14929,43 @@ alter table public.cbt_results_recovery_log enable row level security;
 alter table public.cbt_retake_allowances enable row level security;
 drop policy if exists cbt_edit_log_admin_read on public.cbt_edit_log;
 create policy cbt_edit_log_admin_read on public.cbt_edit_log
-  for select to authenticated using (public.is_admin(auth.uid()));
+for select to authenticated using (public.is_admin(auth.uid()));
 drop policy if exists cbt_recovery_log_admin_read on public.cbt_results_recovery_log;
 create policy cbt_recovery_log_admin_read on public.cbt_results_recovery_log
-  for select to authenticated using (public.is_admin(auth.uid()));
+for select to authenticated using (public.is_admin(auth.uid()));
 drop policy if exists cbt_retake_admin_read on public.cbt_retake_allowances;
 create policy cbt_retake_admin_read on public.cbt_retake_allowances
-  for select to authenticated using (public.is_admin(auth.uid()));
+for select to authenticated using (public.is_admin(auth.uid()));
 -- V12.76-4. Three tables that every visitor on the internet could read.
 drop policy if exists al_read on public.admission_letters;
 drop policy if exists admission_letters_staff_read on public.admission_letters;
 create policy admission_letters_staff_read on public.admission_letters
-  for select to authenticated using (public.is_staff(auth.uid()));
+for select to authenticated using (public.is_staff(auth.uid()));
 drop policy if exists adl_read on public.admission_links;
 drop policy if exists admission_links_staff_read on public.admission_links;
 create policy admission_links_staff_read on public.admission_links
-  for select to authenticated using (public.is_staff(auth.uid()));
+for select to authenticated using (public.is_staff(auth.uid()));
 drop policy if exists cr_read on public.cbt_roster;
 drop policy if exists cbt_roster_staff_read on public.cbt_roster;
 create policy cbt_roster_staff_read on public.cbt_roster
-  for select to authenticated using (
-    public.is_staff(auth.uid())
-    or exists (select 1 from public.profiles pr
-                where pr.id = auth.uid() and pr.admission_no = cbt_roster.student_id_ref)
-    or exists (select 1 from public.cbt_results r
-                where r.exam_id = cbt_roster.exam_id and r.student_id = auth.uid()));
+for select to authenticated using (
+public.is_staff(auth.uid())
+or exists (select 1 from public.profiles pr
+where pr.id = auth.uid() and pr.admission_no = cbt_roster.student_id_ref)
+or exists (select 1 from public.cbt_results r
+where r.exam_id = cbt_roster.exam_id and r.student_id = auth.uid()));
 -- V12.76-5. cbt_exams: no visitor, and no answer key for a visitor.
 drop policy if exists cbt_exams_public_select on public.cbt_exams;
 drop policy if exists cbt_exams_read_signed_in on public.cbt_exams;
 create policy cbt_exams_read_signed_in on public.cbt_exams
-  for select to authenticated using (true);
+for select to authenticated using (true);
 revoke select on public.cbt_exams from anon;
 grant select (id, teacher_id, code, title, subject, class, term, session, topic, assessment_type,
-  report_column, max_score, duration, duration_min, attempt_limit, select_count, randomise,
-  negative_mark, exam_mode, is_open, is_archived, is_entrance, pass_mark, release_results,
-  instructions, start_at, close_at, certificate_enabled, enable_math_keyboard,
-  enable_calculator, show_score_on_submit, created_at, updated_at, public_link, bank_version,
-  proctor_required, clear_previous_on_next) on public.cbt_exams to anon;
+report_column, max_score, duration, duration_min, attempt_limit, select_count, randomise,
+negative_mark, exam_mode, is_open, is_archived, is_entrance, pass_mark, release_results,
+instructions, start_at, close_at, certificate_enabled, enable_math_keyboard,
+enable_calculator, show_score_on_submit, created_at, updated_at, public_link, bank_version,
+proctor_required, clear_previous_on_next) on public.cbt_exams to anon;
 -- V12.76-6. An index behind every foreign key.
 do $$
 declare r record; n int := 0;
@@ -14963,12 +14974,12 @@ for r in select con.conrelid::regclass::text as tbl, a.attname as col
 from pg_constraint con
 join pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
 where con.contype = 'f' and con.connamespace = 'public'::regnamespace
-  and array_length(con.conkey, 1) = 1
-  and not exists (select 1 from pg_index i
-                   where i.indrelid = con.conrelid and i.indkey[0] = con.conkey[1])
+and array_length(con.conkey, 1) = 1
+and not exists (select 1 from pg_index i
+where i.indrelid = con.conrelid and i.indkey[0] = con.conkey[1])
 loop
 execute format('create index if not exists %I on %s (%I)',
-  'ix_fk_' || replace(r.tbl, 'public.', '') || '_' || r.col, r.tbl, r.col);
+'ix_fk_' || replace(r.tbl, 'public.', '') || '_' || r.col, r.tbl, r.col);
 n := n + 1;
 end loop;
 if n > 0 then raise notice 'V12.76: indexed % unindexed foreign key(s)', n; end if;
@@ -14986,37 +14997,37 @@ end loop;
 end $$;
 drop policy if exists messages_read on public.messages;
 create policy messages_read on public.messages
-  for select to authenticated using (
-    from_id = auth.uid() or to_id = auth.uid()
-    or exists (select 1 from public.profiles p
-                where p.id = auth.uid()
-                  and (lower(p.email) = lower(messages.sender::text) or lower(p.email) = lower(messages.recipient::text))));
+for select to authenticated using (
+from_id = auth.uid() or to_id = auth.uid()
+or exists (select 1 from public.profiles p
+where p.id = auth.uid()
+and (lower(p.email) = lower(messages.sender::text) or lower(p.email) = lower(messages.recipient::text))));
 drop policy if exists messages_send on public.messages;
 create policy messages_send on public.messages
-  for insert to authenticated with check (from_id = auth.uid());
+for insert to authenticated with check (from_id = auth.uid());
 drop policy if exists messages_touch on public.messages;
 create policy messages_touch on public.messages
-  for update to authenticated using (from_id = auth.uid() or to_id = auth.uid())
-  with check (from_id = auth.uid() or to_id = auth.uid());
+for update to authenticated using (from_id = auth.uid() or to_id = auth.uid())
+with check (from_id = auth.uid() or to_id = auth.uid());
 drop policy if exists messages_remove on public.messages;
 create policy messages_remove on public.messages
-  for delete to authenticated using (from_id = auth.uid() or to_id = auth.uid() or public.is_admin(auth.uid()));
+for delete to authenticated using (from_id = auth.uid() or to_id = auth.uid() or public.is_admin(auth.uid()));
 drop policy if exists notifications_read on public.notifications;
 create policy notifications_read on public.notifications
-  for select to authenticated using (
-    user_id is null or user_id = auth.uid() or recipient_id = auth.uid() or public.is_staff(auth.uid()));
+for select to authenticated using (
+user_id is null or user_id = auth.uid() or recipient_id = auth.uid() or public.is_staff(auth.uid()));
 drop policy if exists notifications_send on public.notifications;
 create policy notifications_send on public.notifications
-  for insert to authenticated with check (true);
+for insert to authenticated with check (true);
 drop policy if exists notifications_touch on public.notifications;
 create policy notifications_touch on public.notifications
-  for update to authenticated using (
-    user_id is null or user_id = auth.uid() or recipient_id = auth.uid() or public.is_staff(auth.uid()))
-  with check (true);
+for update to authenticated using (
+user_id is null or user_id = auth.uid() or recipient_id = auth.uid() or public.is_staff(auth.uid()))
+with check (true);
 drop policy if exists notifications_clear on public.notifications;
 create policy notifications_clear on public.notifications
-  for delete to authenticated using (
-    user_id is null or user_id = auth.uid() or recipient_id = auth.uid() or public.is_staff(auth.uid()));
+for delete to authenticated using (
+user_id is null or user_id = auth.uid() or recipient_id = auth.uid() or public.is_staff(auth.uid()));
 -- V12.76-8. sc_security_posture() — the audit, as a function the school owns.
 create or replace function public.sc_security_posture()
 returns table (check_name text, status text, detail text)
@@ -15025,74 +15036,74 @@ security definer
 stable
 set search_path = public, pg_temp
 as $$
-  with anon_ok as (
-    select '^(cbt_get_public_exam|cbt_submit|cbt_store_pending|cbt_proctor_register'
-        || '|sc_cbt_(resolve_code|take_link|save_flags|window_state)'
-        || '|lookup_login_email|submit_admission|submit_exam_registration|get_exam_registration_link'
-        || '|verify_certificate'
-        || '|sc_(keep_alive|heartbeat_health|installed_packs|license_status|license_locked|currency'
-        || '|current_role|fee_overview|my_access_state|staff_pay_state|student_fee_state)'
-        || '|is_(admin|staff|parent_of|tutor)|sc_can_edit|sc_is_report_generation_allowed'
-        || '|sc_cbt_subject_allowed|teacher_can_manage_student|teacher_can_manage_subject_class)' as re
-  )
-  select 'row-level security enabled'::text,
-         case when count(*) = 0 then 'pass' else 'fail' end,
-         case when count(*) = 0 then 'every table is protected'
-              else count(*)::text || ' table(s) without RLS: '
-                   || string_agg(c.relname, ', ' order by c.relname) end
-    from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
-  union all
-  select 'privileged functions pin search_path',
-         case when count(*) = 0 then 'pass' else 'fail' end,
-         case when count(*) = 0 then 'every SECURITY DEFINER function is pinned'
-              else count(*)::text || ' unpinned: ' || string_agg(p.proname, ', ' order by p.proname) end
-    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.prosecdef
-     and not exists (select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) c where c like 'search_path=%')
-  union all
-  select 'anonymous execution surface',
-         case when count(*) = 0 then 'pass' else 'fail' end,
-         case when count(*) = 0 then 'only the documented public endpoints are reachable signed-out'
-              else count(*)::text || ' unexpected: ' || string_agg(p.proname, ', ' order by p.proname) end
-    from anon_ok a, pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.prosecdef
-     and has_function_privilege('anon', p.oid, 'EXECUTE')
-     and p.proname !~ a.re
-     and not exists (select 1 from pg_policies pol
-                      where pol.schemaname = 'public'
-                        and (coalesce(pol.qual, '') || coalesce(pol.with_check, '')) ~ ('\m' || p.proname || '\M'))
-  union all
-  select 'foreign keys indexed',
-         case when count(*) = 0 then 'pass' else 'warn' end,
-         case when count(*) = 0 then 'every single-column foreign key has one'
-              else count(*)::text || ' unindexed (slow deletes and joins)' end
-    from pg_constraint con
-    join pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
-   where con.contype = 'f' and con.connamespace = 'public'::regnamespace
-     and array_length(con.conkey, 1) = 1
-     and not exists (select 1 from pg_index i where i.indrelid = con.conrelid and i.indkey[0] = con.conkey[1])
-  union all
-  select 'every table has a primary key',
-         case when count(*) = 0 then 'pass' else 'fail' end,
-         case when count(*) = 0 then 'all tables are addressable row by row'
-              else count(*)::text || ' without one: ' || string_agg(c.relname, ', ' order by c.relname) end
-    from pg_class c join pg_namespace n on n.oid = c.relnamespace
-   where n.nspname = 'public' and c.relkind = 'r'
-     and not exists (select 1 from pg_constraint k where k.conrelid = c.oid and k.contype = 'p')
-  union all
-  select 'private tables have private policies',
-         case when count(*) = 0 then 'pass' else 'fail' end,
-         case when count(*) = 0 then 'messages and notifications admit nobody without an account'
-              else count(*)::text || ' open policy(ies): ' || string_agg(pol.tablename || '.' || pol.policyname, ', ') end
-    from pg_policies pol
-   where pol.schemaname = 'public'
-     and pol.tablename in ('messages', 'notifications', 'admission_letters', 'admission_links', 'cbt_roster')
-     and pol.qual = 'true' and ('public' = any(pol.roles) or 'anon' = any(pol.roles))
-  union all
-  select 'report marks cannot exceed their maximum',
-         case when coalesce((public.sc_report_mark_audit()->'counts'->>'defects')::int, 0) = 0 then 'pass' else 'warn' end,
-         coalesce(public.sc_report_mark_audit()->>'verdict', 'audit unavailable');
+with anon_ok as (
+select '^(cbt_get_public_exam|cbt_submit|cbt_store_pending|cbt_proctor_register'
+|| '|sc_cbt_(resolve_code|take_link|save_flags|window_state)'
+|| '|lookup_login_email|submit_admission|submit_exam_registration|get_exam_registration_link'
+|| '|verify_certificate'
+|| '|sc_(keep_alive|heartbeat_health|installed_packs|license_status|license_locked|currency'
+|| '|current_role|fee_overview|my_access_state|staff_pay_state|student_fee_state)'
+|| '|is_(admin|staff|parent_of|tutor)|sc_can_edit|sc_is_report_generation_allowed'
+|| '|sc_cbt_subject_allowed|teacher_can_manage_student|teacher_can_manage_subject_class)' as re
+)
+select 'row-level security enabled'::text,
+case when count(*) = 0 then 'pass' else 'fail' end,
+case when count(*) = 0 then 'every table is protected'
+else count(*)::text || ' table(s) without RLS: '
+|| string_agg(c.relname, ', ' order by c.relname) end
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
+union all
+select 'privileged functions pin search_path',
+case when count(*) = 0 then 'pass' else 'fail' end,
+case when count(*) = 0 then 'every SECURITY DEFINER function is pinned'
+else count(*)::text || ' unpinned: ' || string_agg(p.proname, ', ' order by p.proname) end
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.prosecdef
+and not exists (select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) c where c like 'search_path=%')
+union all
+select 'anonymous execution surface',
+case when count(*) = 0 then 'pass' else 'fail' end,
+case when count(*) = 0 then 'only the documented public endpoints are reachable signed-out'
+else count(*)::text || ' unexpected: ' || string_agg(p.proname, ', ' order by p.proname) end
+from anon_ok a, pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public' and p.prosecdef
+and has_function_privilege('anon', p.oid, 'EXECUTE')
+and p.proname !~ a.re
+and not exists (select 1 from pg_policies pol
+where pol.schemaname = 'public'
+and (coalesce(pol.qual, '') || coalesce(pol.with_check, '')) ~ ('\m' || p.proname || '\M'))
+union all
+select 'foreign keys indexed',
+case when count(*) = 0 then 'pass' else 'warn' end,
+case when count(*) = 0 then 'every single-column foreign key has one'
+else count(*)::text || ' unindexed (slow deletes and joins)' end
+from pg_constraint con
+join pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
+where con.contype = 'f' and con.connamespace = 'public'::regnamespace
+and array_length(con.conkey, 1) = 1
+and not exists (select 1 from pg_index i where i.indrelid = con.conrelid and i.indkey[0] = con.conkey[1])
+union all
+select 'every table has a primary key',
+case when count(*) = 0 then 'pass' else 'fail' end,
+case when count(*) = 0 then 'all tables are addressable row by row'
+else count(*)::text || ' without one: ' || string_agg(c.relname, ', ' order by c.relname) end
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relkind = 'r'
+and not exists (select 1 from pg_constraint k where k.conrelid = c.oid and k.contype = 'p')
+union all
+select 'private tables have private policies',
+case when count(*) = 0 then 'pass' else 'fail' end,
+case when count(*) = 0 then 'messages and notifications admit nobody without an account'
+else count(*)::text || ' open policy(ies): ' || string_agg(pol.tablename || '.' || pol.policyname, ', ') end
+from pg_policies pol
+where pol.schemaname = 'public'
+and pol.tablename in ('messages', 'notifications', 'admission_letters', 'admission_links', 'cbt_roster')
+and pol.qual = 'true' and ('public' = any(pol.roles) or 'anon' = any(pol.roles))
+union all
+select 'report marks cannot exceed their maximum',
+case when coalesce((public.sc_report_mark_audit()->'counts'->>'defects')::int, 0) = 0 then 'pass' else 'warn' end,
+coalesce(public.sc_report_mark_audit()->>'verdict', 'audit unavailable');
 $$;
 revoke all on function public.sc_security_posture() from public, anon;
 grant execute on function public.sc_security_posture() to authenticated;
@@ -15342,9 +15353,10 @@ alter table public.cbt_exams add column if not exists venue text not null defaul
 alter table public.exam_timetable add column if not exists exam_id uuid references public.cbt_exams(id) on delete cascade;
 alter table public.exam_timetable add column if not exists source text not null default 'manual';
 create unique index if not exists exam_timetable_one_per_exam on public.exam_timetable(exam_id) where exam_id is not null;
-create or replace function public.sc_prep_sync_exam(p_exam_id uuid, p_tz text default 'Africa/Lagos')
+create or replace function public.sc_prep_sync_exam(p_exam_id uuid, p_tz text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare e public.cbt_exams; v_date date; v_start text; v_end text; v_dur int; v_row public.exam_timetable;
+v_tz text := coalesce(nullif(btrim(p_tz), ''), public.sc_school_tz()); v_close timestamptz;
 begin
 select * into e from public.cbt_exams where id = p_exam_id;
 if not found then return jsonb_build_object('ok', false, 'error', 'That exam does not exist.'); end if;
@@ -15356,16 +15368,20 @@ when not public.sc_is_prep_assessment(e.assessment_type) then 'not_a_prep_exam'
 when coalesce(e.is_archived, false) then 'archived'
 when e.start_at is null then 'no_start_time' else 'no_class' end);
 end if;
-v_date := (e.start_at at time zone p_tz)::date;
-v_start := to_char(e.start_at at time zone p_tz, 'HH24:MI');
+/* V12.81 — the row the learner reads must end when the paper really ends:
+the tutor's closing time if there is one, otherwise start + the paper's own
+length. A timetable advertised 10:00-10:45 for a paper the database left open all night. */
 v_dur := coalesce(nullif(e.duration_min, 0), nullif(e.duration, 0), 45);
-v_end := to_char((e.start_at at time zone p_tz) + make_interval(mins => v_dur), 'HH24:MI');
+v_close := public.sc_cbt_close(e.start_at, e.close_at, e.duration_min, e.duration);
+v_date := (e.start_at at time zone v_tz)::date;
+v_start := to_char(e.start_at at time zone v_tz, 'HH24:MI');
+v_end := to_char(v_close at time zone v_tz, 'HH24:MI');
 insert into public.exam_timetable
 (class, subject, exam_date, start_time, end_time, venue, paper, term, session, notes, exam_id, source, created_by)
 values (btrim(e.class), coalesce(nullif(btrim(e.subject), ''), 'Prep Exam'), v_date, v_start, v_end,
 coalesce(e.venue, ''), 'PREP EXAM', coalesce(e.term, ''), coalesce(e.session, ''),
 'Prep exam · code ' || coalesce(nullif(e.code, ''), '—') || ' · ' || v_dur || ' min' ||
-case when e.close_at is not null then ' · closes ' || to_char(e.close_at at time zone p_tz, 'DD Mon HH24:MI') else '' end ||
+case when e.close_at is not null then ' · closes ' || to_char(v_close at time zone v_tz, 'DD Mon HH24:MI') else '' end ||
 ' · created automatically from the CBT manager.', e.id, 'prep', e.teacher_id)
 on conflict (exam_id) where exam_id is not null do update set
 class = excluded.class, subject = excluded.subject, exam_date = excluded.exam_date,
@@ -15427,6 +15443,7 @@ scheduled boolean, sort_at timestamptz, for_student text,
 seconds_to_start int, seconds_to_close int, server_now timestamptz
 ) language plpgsql security definer set search_path = public as $$
 declare me uuid := auth.uid(); v_role text := ''; v_staff boolean := false; v_now timestamptz := now();
+v_tz text := coalesce(nullif(btrim(p_tz), ''), public.sc_school_tz());
 begin
 if me is null then return; end if;
 select coalesce(lower(p.role), '') into v_role from public.profiles p where p.id = me;
@@ -15437,7 +15454,7 @@ with mine as (
 school writes the same class as "SSS 1", "SSS1", "SSS 1 A" or "SSS 1A"
 depending on who typed it. A rehearsal vanishing because of a space is
 exactly the sort of silent failure this round exists to remove. */
-select s.id, s.class, s.arm, s.full_name,
+select s.id, s.class, s.arm, s.full_name, coalesce(s.admission_no, '') as admission_no,
 public.sc_class_key(coalesce(s.class,'') || coalesce(s.arm,'')) as key_arm,
 public.sc_class_key(coalesce(s.class,'')) as key_class
 from public.students s
@@ -15452,85 +15469,135 @@ select r.exam_id, count(*)::int as used,
 (array_agg(r.percent order by r.submitted_at desc nulls last))[1] as last_percent,
 max(r.submitted_at) as last_at
 from public.cbt_results r join mine m
-on r.student_id = m.id or r.student_id_ref = m.full_name
-group by r.exam_id
-), ex as (
-select e.*, public.sc_class_key(coalesce(e.class,'')) as key_class from public.cbt_exams e
-)
-select e.id, e.code, e.title, coalesce(nullif(btrim(e.subject), ''), 'Prep Exam'), e.class,
-e.start_at, e.close_at,
-coalesce(to_char(e.start_at at time zone p_tz, 'DD Mon YYYY · HH24:MI'), ''),
-coalesce(to_char(e.close_at at time zone p_tz, 'DD Mon YYYY · HH24:MI'), ''),
-(e.start_at at time zone p_tz)::date,
-to_char(e.start_at at time zone p_tz, 'HH24:MI'),
-to_char((e.start_at at time zone p_tz) + make_interval(mins => coalesce(nullif(e.duration_min,0), nullif(e.duration,0), 45)), 'HH24:MI'),
-coalesce(nullif(e.duration_min, 0), nullif(e.duration, 0), 45),
-coalesce(e.venue, ''), coalesce(e.term, ''), coalesce(e.session, ''),
-/* the clock decides, not a flag somebody forgot to press */
-case when e.close_at is not null and v_now > e.close_at then 'closed'
-when e.start_at is not null and v_now < e.start_at then 'upcoming'
-when e.start_at is not null or coalesce(e.is_open, false) then 'open'
-else 'draft' end,
-coalesce(e.public_link, ''), coalesce(e.exam_mode, 'open'),
-coalesce(att.used, 0)::int, greatest(coalesce(e.attempt_limit, 0), 1),
-att.last_percent, att.last_at,
-(e.start_at is not null),
-coalesce(e.start_at, e.close_at, v_now + interval '100 years'),
-coalesce((select string_agg(m.full_name, ', ') from mine m
-where m.key_class = e.key_class and v_role = 'parent'), ''),
-case when e.start_at is not null then greatest(0, ceil(extract(epoch from (e.start_at - v_now))))::int else null end,
-case when e.close_at is not null then greatest(0, ceil(extract(epoch from (e.close_at - v_now))))::int else null end,
-v_now
-from ex e left join att on att.exam_id = e.id
-where public.sc_is_prep_assessment(e.assessment_type)
-and not coalesce(e.is_archived, false)
-and (coalesce(btrim(e.class), '') = '' or v_staff
-or exists (select 1 from mine m where m.key_class = e.key_class or m.key_arm = e.key_class))
-and (coalesce(btrim(p_class), '') = '' or public.sc_class_key(p_class) = e.key_class)
-and (e.start_at is not null or e.close_at is not null or coalesce(e.is_open, false)
-or exists (select 1 from public.cbt_results r2 where r2.exam_id = e.id))
-order by coalesce(e.start_at, e.close_at, v_now + interval '100 years'), e.title;
+/* V12.81 — an attempt belongs to a PERSON, not to a name. Two learners
+called "John Doe" shared one attempt count and could each see the
+other's score. The admission number is the identity the CBT engine
+           itself uses. */
+        on r.student_id = m.id
+        or (r.student_id is null and coalesce(r.student_id_ref, '') <> ''
+            and upper(btrim(r.student_id_ref)) = upper(btrim(m.admission_no)))
+     group by r.exam_id
+  ), ex as (
+    select e.*, public.sc_class_key(coalesce(e.class,'')) as key_class from public.cbt_exams e
+  )
+  select e.id, e.code, e.title, coalesce(nullif(btrim(e.subject), ''), 'Prep Exam'), e.class,
+    e.start_at, e.close_at,
+    coalesce(to_char(e.start_at at time zone v_tz, 'DD Mon YYYY · HH24:MI'), ''),
+    coalesce(to_char(public.sc_cbt_close(e.start_at, e.close_at, e.duration_min, e.duration) at time zone v_tz, 'DD Mon YYYY · HH24:MI'), ''),
+    (e.start_at at time zone v_tz)::date,
+    to_char(e.start_at at time zone v_tz, 'HH24:MI'),
+    to_char(public.sc_cbt_close(e.start_at, e.close_at, e.duration_min, e.duration) at time zone v_tz, 'HH24:MI'),
+    coalesce(nullif(e.duration_min, 0), nullif(e.duration, 0), 45),
+    coalesce(e.venue, ''), coalesce(e.term, ''), coalesce(e.session, ''),
+    /* the clock decides, not a flag somebody forgot to press - and it is the same
+    clock the exam page enforces, so "Sit now" can never disagree with the gate */
+    case when public.sc_cbt_close(e.start_at, e.close_at, e.duration_min, e.duration) is not null
+              and v_now > public.sc_cbt_close(e.start_at, e.close_at, e.duration_min, e.duration) then 'closed'
+         when e.start_at is not null and v_now < e.start_at then 'upcoming'
+         when e.start_at is not null or coalesce(e.is_open, false) then 'open'
+         else 'draft' end,
+    /* a public link is a key to the paper: staff may share it, a learner is not
+       handed a copy of it by a list */
+    case when v_staff then coalesce(e.public_link, '') else '' end, coalesce(e.exam_mode, 'open'),
+    coalesce(att.used, 0)::int,
+    /* 0 means "as many as you like" everywhere else in the engine; the list
+       used to print it as a single attempt */
+    case when coalesce(e.attempt_limit, 0) <= 0 then null else e.attempt_limit end,
+    /* V12.81 - a score is a result. Until the tutor releases results the list
+       must not leak it (the last percent showed on every dashboard at once). */
+    case when coalesce(e.release_results, true) then att.last_percent else null end,
+    case when coalesce(e.release_results, true) then att.last_at else null end,
+    (e.start_at is not null),
+    coalesce(e.start_at, e.close_at, v_now + interval '100 years'),
+    coalesce((select string_agg(m.full_name, ', ') from mine m
+               where m.key_class = e.key_class and v_role = 'parent'), ''),
+    case when e.start_at is not null then greatest(0, ceil(extract(epoch from (e.start_at - v_now))))::int else null end,
+    case when e.close_at is not null then greatest(0, ceil(extract(epoch from (e.close_at - v_now))))::int else null end,
+    v_now
+  from ex e left join att on att.exam_id = e.id
+  where public.sc_is_prep_assessment(e.assessment_type)
+    and not coalesce(e.is_archived, false)
+    and (coalesce(btrim(e.class), '') = '' or v_staff
+         or exists (select 1 from mine m where m.key_class = e.key_class or m.key_arm = e.key_class))
+    and (coalesce(btrim(p_class), '') = '' or public.sc_class_key(p_class) = e.key_class)
+    and (e.start_at is not null or e.close_at is not null or coalesce(e.is_open, false)
+         or exists (select 1 from public.cbt_results r2 where r2.exam_id = e.id))
+  order by coalesce(e.start_at, e.close_at, v_now + interval '100 years'), e.title;
 end $$;
 revoke all on function public.sc_my_prep_exams(text, text) from public, anon;
 grant execute on function public.sc_my_prep_exams(text, text) to authenticated;
 do $$
 declare r record; n int := 0;
 begin
-for r in select id from public.cbt_exams where public.sc_is_prep_assessment(assessment_type)
-and start_at is not null and coalesce(nullif(btrim(class), ''), '') <> ''
-and not coalesce(is_archived, false) loop
-begin perform public.sc_prep_sync_exam(r.id); n := n + 1;
-exception when others then null; end;
-end loop;
-if n > 0 then
-insert into public.sc_install_state(key, details) values ('v12.78-prep-scheduled', jsonb_build_object('scheduled', n))
-on conflict (key) do update set details = excluded.details;
-end if;
+  for r in select id from public.cbt_exams where public.sc_is_prep_assessment(assessment_type)
+             and start_at is not null and coalesce(nullif(btrim(class), ''), '') <> ''
+             and not coalesce(is_archived, false) loop
+    begin perform public.sc_prep_sync_exam(r.id); n := n + 1;
+    exception when others then null; end;
+  end loop;
+  if n > 0 then
+    insert into public.sc_install_state(key, details) values ('v12.78-prep-scheduled', jsonb_build_object('scheduled', n))
+    on conflict (key) do update set details = excluded.details;
+  end if;
 end $$;
 do $sigbucket$
 begin
-if not exists (select 1 from information_schema.tables where table_schema='storage' and table_name='objects') then
-raise notice 'storage schema not present — signature bucket skipped.';
-return;
-end if;
-insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
-values ('signatures','signatures',true,524288,array['image/png','image/jpeg','image/webp','image/svg+xml'])
-on conflict (id) do update set public=true, file_size_limit=524288,
-allowed_mime_types=excluded.allowed_mime_types;
-execute 'drop policy if exists "sc signatures public read" on storage.objects';
-execute 'create policy "sc signatures public read" on storage.objects for select using (bucket_id=''signatures'')';
-/* Own-folder writes: the first path segment must be the writer's own user id,
-     checked with LIKE so this works on a stock Postgres without storage.foldername. */
-  execute 'drop policy if exists "sc signatures own insert" on storage.objects';
-  execute 'create policy "sc signatures own insert" on storage.objects for insert to authenticated with check (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'')';
-  execute 'drop policy if exists "sc signatures own update" on storage.objects';
-  execute 'create policy "sc signatures own update" on storage.objects for update to authenticated using (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'') with check (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'')';
-  execute 'drop policy if exists "sc signatures own delete" on storage.objects';
-  execute 'create policy "sc signatures own delete" on storage.objects for delete to authenticated using (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'')';
-  raise notice 'Signature bucket ready: public read, own-folder writes (512 KB cap).';
+  if not exists (select 1 from information_schema.tables where table_schema='storage' and table_name='objects') then
+    raise notice 'storage schema not present — signature bucket skipped.';
+    return;
+  end if;
+  insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+  values ('signatures','signatures',true,524288,array['image/png','image/jpeg','image/webp','image/svg+xml'])
+  on conflict (id) do update set public=true, file_size_limit=524288,
+    allowed_mime_types=excluded.allowed_mime_types;
+  execute 'drop policy if exists "sc signatures public read" on storage.objects';
+  execute 'create policy "sc signatures public read" on storage.objects for select using (bucket_id=''signatures'')';
+  /* Own-folder writes: the first path segment must be the writer's own user id,
+checked with LIKE so this works on a stock Postgres without storage.foldername. */
+execute 'drop policy if exists "sc signatures own insert" on storage.objects';
+execute 'create policy "sc signatures own insert" on storage.objects for insert to authenticated with check (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'')';
+execute 'drop policy if exists "sc signatures own update" on storage.objects';
+execute 'create policy "sc signatures own update" on storage.objects for update to authenticated using (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'') with check (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'')';
+execute 'drop policy if exists "sc signatures own delete" on storage.objects';
+execute 'create policy "sc signatures own delete" on storage.objects for delete to authenticated using (bucket_id=''signatures'' and name like auth.uid()::text || ''/%'')';
+raise notice 'Signature bucket ready: public read, own-folder writes (512 KB cap).';
 exception when others then
-  raise notice 'Signature bucket setup skipped (%). Create a public bucket named "signatures" from Dashboard -> Storage instead.', sqlerrm;
+raise notice 'Signature bucket setup skipped (%). Create a public bucket named "signatures" from Dashboard -> Storage instead.', sqlerrm;
 end $sigbucket$;
+-- V12.81 — A PREP EXAM OPENS AT THE TIME THE SCHOOL TYPED
+alter table public.school_settings add column if not exists school_timezone text default 'Africa/Lagos';
+create or replace function public.sc_school_tz() returns text
+language sql stable security definer set search_path=public as $$
+select coalesce(nullif(btrim((select school_timezone from public.school_settings where id = 1)), ''), 'Africa/Lagos')
+$$;
+/* the instant a sitting ends: the tutor's closing time, else start + length */
+create or replace function public.sc_cbt_close(p_start timestamptz, p_close timestamptz, p_min int, p_dur int)
+returns timestamptz language sql immutable parallel safe as $$
+select coalesce(p_close, p_start + make_interval(mins => coalesce(nullif(p_min, 0), nullif(p_dur, 0), 45)))
+$$;
+/* both helpers are internals: the functions that call them are security definer */
+revoke all on function public.sc_school_tz() from public, anon;
+revoke all on function public.sc_cbt_close(timestamptz, timestamptz, int, int) from public, anon;
+/* ONE LENGTH, TWO COLUMNS. The student getter prefers duration_min, the
+   timetable preferred duration; a tutor who changed one and not the other got
+   a paper that opened as 45 minutes and closed as 60. They now move together. */
+create or replace function public.sc_trg_cbt_durations() returns trigger
+language plpgsql set search_path=public as $$
+begin
+  if tg_op = 'INSERT' then
+    new.duration := greatest(coalesce(nullif(new.duration, 0), nullif(new.duration_min, 0), 45), 1);
+    new.duration_min := new.duration;
+  elsif new.duration is distinct from old.duration then
+    new.duration_min := new.duration;
+  elsif new.duration_min is distinct from old.duration_min then
+    new.duration := new.duration_min;
+  end if;
+  return new;
+end $$;
+revoke all on function public.sc_trg_cbt_durations() from public, anon, authenticated;
+drop trigger if exists cbt_durations_coherent on public.cbt_exams;
+create trigger cbt_durations_coherent before insert or update on public.cbt_exams
+for each row execute function public.sc_trg_cbt_durations();
 
 -- ---------------------------------------------------------------------
 -- V12.68: LAST STATEMENT IN THE FILE, DELIBERATELY.
@@ -15539,5 +15606,5 @@ end $sigbucket$;
 -- API until the cache expires — which is exactly how a perfectly good
 -- database came to report "run database/v9.4-fees-and-exams.sql".
 -- ---------------------------------------------------------------------
-select 'V12.79 installed — prep exams, a preview-exact ID-card PDF, and a schema that upgrades an older install instead of failing on it' as status;
+select 'V12.81 installed — a prep exam opens at the time the school typed, closes when it ends, and keeps the answers of anyone already sitting' as status;
 select pg_notify('pgrst', 'reload schema');

@@ -1,17 +1,17 @@
 {
  "_meta": {
-  "built_bytes": 993479,
-  "built_from_bytes": 1473278,
+  "built_bytes": 997532,
+  "built_from_bytes": 1479320,
   "removed": {
-   "banner-rule": 454,
+   "banner-rule": 457,
    "banner-trimmed": 128,
    "blank-squeezed": 1,
-   "deindented": 39201,
+   "deindented": 40216,
    "duplicate-grant": 10,
-   "inline-prose-shortened": 154,
+   "inline-prose-shortened": 155,
    "notify-moved-last": 1,
-   "outer-comment-bytes": 10840,
-   "progress-select": 163,
+   "outer-comment-bytes": 10842,
+   "progress-select": 164,
    "redundant-add-column": 149,
    "redundant-drop-index": 15,
    "redundant-notify": 99,
@@ -392,6 +392,7 @@
   "column public.school_settings.role_write",
   "column public.school_settings.school_id",
   "column public.school_settings.school_name",
+  "column public.school_settings.school_timezone",
   "column public.school_settings.short_name",
   "column public.school_settings.signature_enabled",
   "column public.school_settings.signature_url",
@@ -728,6 +729,9 @@
   ],
   "sc_cbt_canonical_option": [
    "p_question jsonb,p_value text"
+  ],
+  "sc_cbt_close": [
+   "p_start timestamptz, p_close timestamptz, p_min int, p_dur int"
   ],
   "sc_cbt_duration_sync": [
    ""
@@ -1095,7 +1099,7 @@
    ""
   ],
   "sc_prep_sync_exam": [
-   "p_exam_id uuid, p_tz text default 'Africa/Lagos'"
+   "p_exam_id uuid, p_tz text default null"
   ],
   "sc_prevent_embedded_media": [
    ""
@@ -1196,6 +1200,9 @@
   "sc_save_report_score": [
    "p_rows jsonb"
   ],
+  "sc_school_tz": [
+   ""
+  ],
   "sc_security_posture": [
    ""
   ],
@@ -1264,6 +1271,9 @@
   ],
   "sc_timetable_capacity": [
    "p_classes text[], p_periods_per_day integer default 6, p_day_periods jsonb default null"
+  ],
+  "sc_trg_cbt_durations": [
+   ""
   ],
   "sc_trg_cbt_prep_schedule": [
    ""
@@ -1866,6 +1876,7 @@
   "visitors": []
  },
  "triggers": [
+  "trigger cbt_durations_coherent",
   "trigger cbt_exams_prep_schedule",
   "trigger on_auth_user_created",
   "trigger sc_fee_invoice_due",
