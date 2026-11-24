@@ -79,15 +79,28 @@ window.MessagesCenter = (function(){
     root.querySelector("#mc-new").addEventListener("click", renderPicker);
     root.querySelector("#mc-search").addEventListener("input", e=>renderThreads(e.target.value));
     loadAll(rootId);
+    /* V12.82 — these two timers were the chat page's own disk-IO bill: a badge
+       query every 45 s and a full thread re-read every 30 s, per open tab. They
+       now go through the app's single scheduler, respect a hidden tab, stop
+       while an exam is running, and lean on Realtime for the live case. */
     if(pollTimer) clearInterval(pollTimer);
-    pollTimer=setInterval(()=>{ if(document.visibilityState==="visible") refreshBadges(); },45000);
     if(threadTimer) clearInterval(threadTimer);
-    threadTimer=setInterval(async()=>{
+    pollTimer=null; threadTimer=null;
+    const badgeTick=()=>{ if(document.visibilityState==="visible") refreshBadges(); };
+    const threadTick=async()=>{
       if(!active||document.visibilityState!=="visible") return;
       const ta=document.querySelector(".mc-reply");
       if(ta&&ta.value.trim()) return;
       await openThread(active,activeName,true);
-    },30000);
+    };
+    if(window.SCNet&&SCNet.poll){
+      SCNet.poll('messages-badge', badgeTick, 180000);
+      SCNet.poll('messages-thread', threadTick, 60000);
+    }else{
+      pollTimer=setInterval(badgeTick,180000);
+      threadTimer=setInterval(threadTick,60000);
+    }
+    try{ if(window.SCNet) SCNet.pollNow('messages-badge'); }catch(_){}
   }
 
   async function loadAll(rootId){

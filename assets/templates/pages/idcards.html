@@ -609,6 +609,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{display:none!importa
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -691,8 +692,12 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
        record, a parent only their linked children, the admin tier sees the
        school. */
     const cache=this._rows||(this._rows={});
-    if(cache[kind]) return cache[kind];
-    if(!window.sb){ cache[kind]=[]; return cache[kind]; }
+    /* V12.83 — an EMPTY answer is not a fact, it is a question we could not
+       ask: the list arrives before the shell has finished resolving who is
+       signed in, and caching that first empty result made the picker stay
+       empty until someone thought to reload. Only a real list is remembered. */
+    if(cache[kind]&&cache[kind].length) return cache[kind];
+    if(!window.sb){ return []; }
     const profile=window.SC_PROFILE||{};
     const role=String(profile.role||(window.SCHOOL_USER&&SCHOOL_USER.role)||'').toLowerCase();
     const uid=profile.id||(window.SCHOOL_USER&&window.SCHOOL_USER.id)||null;
@@ -721,8 +726,8 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       }
     }
     await this.fillPhotos(rows||[]);
-    cache[kind]=rows||[];
-    return cache[kind];
+    if(rows&&rows.length) cache[kind]=rows;
+    return rows||[];
   },
   /* ======================================================================
      V12.80 — WHAT A RUN COVERS, AND WHICH PERSON "ONE" MEANS.
@@ -806,10 +811,20 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
   async load(){ const sel=document.getElementById('ic-student'); if(!sel)return;
     while(sel.options.length>1)sel.remove(1);
     if(!window.sb){ this.loaded=true; this.render(); return; }
-    // Wait for role resolution so we know if the user is a parent or student
-    for (let i = 0; i < 30; i++) {
+    /* V12.83 — wait for the identity, then LISTEN for it.
+       Three seconds of waiting was not enough on a line that drops the first
+       two requests, and once the wait ended nothing tried again: the picker
+       stayed empty until someone reloaded the whole page. Wait longer, and
+       re-run this load when the shell announces the role. */
+    for (let i = 0; i < 80; i++) {
       if (window.SC_PROFILE && window.SC_PROFILE.role) break;
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 150));
+    }
+    if (!(window.SC_PROFILE && window.SC_PROFILE.role)) {
+      if (!window.__icRoleWait) {
+        window.__icRoleWait = true;
+        window.addEventListener('sc-role-ready', function () { try { ICUI.load(); } catch (_) {} }, { once: true });
+      }
     }
     try{
       const data=await this.fetchKind(this.kind);
@@ -1276,7 +1291,7 @@ const ICUI={ cur:{}, all:[], kind:'student', loaded:false,
       const fam=(this._scopeFamily||this.kind)==='staff'?'staff':'student';
       const name=fam+'-id-cards-'+
                  String(label).replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()+'-'+
-                 new Date().toISOString().slice(0,10)+'.pdf';
+                 scDay(new Date())+'.pdf';
       const blob=new Blob([bytes],{type:'application/pdf'});
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a'); a.href=url; a.download=name;

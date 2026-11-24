@@ -1289,7 +1289,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
       default:['Sample record one','Sample record two','Sample record three']
     };
     const titles=TITLES[key]||TITLES.default;
-    const today=(n)=>new Date(Date.now()+ (n||0)*86400000).toISOString().slice(0,10);
+    const today=(n)=>scDay(new Date(Date.now()+ (n||0)*86400000));
     const cols=(d&&(d.listCols||d.cols))||[];
     const rows=[];
     for(let i=0;i<3;i++){
@@ -1809,7 +1809,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
      name. Every auto-choice stays fully editable. */
   autofillToday(){
     try {
-      const today = new Date().toISOString().slice(0,10);
+      const today = scDay(new Date());
       const SAFE = ['date','ref_date','award_date','date_taken','payment_date','visit_date','checkin_date','entry_date','issue_date','start_date','date_of_leaving'];
       SAFE.forEach(k => {
         const el = document.getElementById('cf-'+CRUD.fid(k));
@@ -1945,12 +1945,53 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
             if (fr.error || f.ok === false) {
               totEl.readOnly = false;
               if (typeof toast === 'function') toast(fr.error ? 'Auto fee lookup needs the v9.4 database update — enter the total manually for now.' : (f.error || 'Fee lookup failed.'), 'warning', 8000);
-            } else if (f.matched === false || (Number(f.bill||0) === 0 && Number(f.total_due||0) === 0 && Number(f.paid||0) === 0)) {
-              /* V10 (#1): the RPC found NO fee structure for this student's
-                 class/term — say so loudly instead of quietly writing 0. */
+            } else if (f.bill_known === false || f.matched === false) {
+              /* V12.84 — WHY the bill is unknown decides what we say, and what we
+                 do about it. The old code lumped every reason into one warning
+                 and then left an empty box the bursar could fill with anything,
+                 which is how two learners in the same class ended up charged
+                 from two different price lists. Now:
+                   ambiguous_arm          → the priced arms are NAMED, nothing is
+                                            suggested, and nothing is charged;
+                   no_structure_this_term → the last published figure is offered,
+                                            and accepted only if the bursar says
+                                            yes (it is then recorded as a figure
+                                            set by hand, for this learner only);
+                   no_structure / none    → a pointer to the price list page. */
+              const ms = String(f.match_status || '');
+              const note = String(f.match_note || '');
               totEl.readOnly = false; totEl.value = '';
-              totEl.placeholder = 'No fee structure found — enter manually';
-              if (typeof toast === 'function') toast('⚠️ No Class Fee Structure matched ' + (f.class||'this student\'s class') + ' for ' + (f.term||'the current term') + '. Check: (a) a CURRENT-term bill exists for the class on the 💳 Class Fee Structure page, (b) the class name spelling matches the student record, (c) the row is active. You can type the total manually for now.', 'warning', 12000);
+              totEl.dataset.scAutoTotal = ''; totEl.dataset.scOverridden = ''; totEl.dataset.scFallback = '';
+              if (ms === 'ambiguous_arm') {
+                const cands = Array.isArray(f.candidates) ? f.candidates : [];
+                totEl.placeholder = 'Arm not set — choose the arm or type the total';
+                if (typeof toast === 'function') toast('⚠️ '
+                  + (note || ('Class ' + (f.class || '') + ' is priced per arm and this learner has no arm set.'))
+                  + (cands.length ? ' Priced arms: ' + cands.map(c => money(c.total) + (c.arm ? ' (' + c.arm + ')' : '')).join(' · ') + '.' : '')
+                  + ' Nothing has been charged. Set the arm on the student record, or publish one whole-class bill with the arm left blank.', 'warning', 16000);
+              } else if (ms === 'no_structure_this_term' && f.fallback && Number(f.fallback.bill) > 0) {
+                const fb = f.fallback, val = Number(fb.bill) || 0;
+                const where = (f.term || 'this term') + (f.session ? ' ' + f.session : '');
+                totEl.placeholder = 'No bill for ' + (f.term || 'this term') + ' — type it, or use the last published one';
+                if (typeof toast === 'function') toast('⚠️ ' + (note || ('No class fee has been published for ' + where + '.')) , 'warning', 16000);
+                const ask = 'No class fee has been published for ' + where + '.\n\n'
+                  + 'The last published bill for ' + (fb.class || 'this class') + (fb.arm ? ' ' + fb.arm : '')
+                  + ' is ' + money(val) + ' (' + (fb.term || '') + (fb.session ? ' ' + fb.session : '') + ').\n\n'
+                  + 'Use that figure for this learner? It is recorded as a total set by hand for this term only — the class price list is left untouched.';
+                if (typeof window !== 'undefined' && typeof window.confirm === 'function' && window.confirm(ask)) {
+                  totEl.value = val.toFixed(2);
+                  totEl.dataset.scFallback = '1';
+                  totEl.dataset.scAutoTotal = String(val);
+                  totEl.dataset.scOverridden = '1';
+                  if (typeof toast === 'function') toast('💬 ' + money(val) + ' taken from the ' + (fb.term || '') + ' price list and recorded as this learner\'s total for ' + where + '. Publish the real bill on the 💳 Class Fee Structure page so every learner in the class gets it.', 'info', 13000);
+                }
+              } else {
+                totEl.placeholder = 'Bill not published — type it';
+                if (typeof toast === 'function') toast('⚠️ '
+                  + (note || ('No Class Fee Structure matched ' + (f.class || 'this student\'s class') + ' for ' + (f.term || 'the current term') + '.'))
+                  + ' Nothing has been charged. Publish the term bill on the 💳 Class Fee Structure page.', 'warning', 16000);
+              }
+              paintGlance();
             } else {
               /* V12.67 ROOT-CAUSE FIX —— this used to write f.total_due, which is
                  the learner's WHOLE outstanding (bill + arrears − everything paid).
@@ -3198,7 +3239,7 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
      are written as absent (admin can edit). */
   async importAttendanceFromCheckin() {
     if (!this.sb) { toast('Database not configured.', 'warning'); return; }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = scDay(new Date());
     const { data: checkins } = await this.sb.from('attendance_checkins').select('student_name,student_id_ref,class,checkin_at').gte('checkin_at', today + 'T00:00:00').limit(5000);
     if (!checkins || !checkins.length) { toast('No QR check-ins recorded today yet.', 'warning', 6000); return; }
     const present = {}; checkins.forEach(c => { const n = c.student_name || c.student_id_ref; if (n) present[n] = c.class || ''; });

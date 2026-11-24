@@ -130,7 +130,7 @@ const Proctor = {
       const corner=document.createElement('div');
       corner.id='proctor-watermark-corner';
       corner.style.cssText='position:fixed;bottom:8px;right:8px;font-size:.70rem;font-weight:700;color:rgba(15,23,42,.35);background:rgba(255,255,255,.7);padding:2px 6px;border-radius:6px;pointer-events:none;z-index:9999';
-      corner.textContent=`${this.slug(candidateName)} · ${this.slug(examCode)} · ${new Date().toISOString().slice(0,10)}`;
+      corner.textContent=`${this.slug(candidateName)} · ${this.slug(examCode)} · ${scDay(new Date())}`;
       document.body.appendChild(corner);
     }catch(_){}
   },

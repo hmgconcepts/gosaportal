@@ -38,7 +38,7 @@ const Analytics = {
 
   /* Load the full KPI set. Each is resilient to a missing/empty table. */
   async loadKpis() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = scDay(new Date());
     const [students, staff, exams, results, polls, complaints, admissions,
            feesPaid, donations, attendanceToday, assignments, library, events,
            announcements, books, checkins, leave, visitors, lessonPlans, tickets] = await Promise.all([

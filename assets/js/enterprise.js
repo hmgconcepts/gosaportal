@@ -176,7 +176,7 @@ const Enterprise = {
   /* ================= 9) Offline Attendance QR Bulk-Scanner ================= */
   attendanceBulk: {
     scanList(qrTexts, cls, date) {
-      const dt = date || new Date().toISOString().slice(0, 10);
+      const dt = date || scDay(new Date());
       const rows = qrTexts.map(txt => {
         const o = Enterprise.checkin.parseQR(txt);
         return { student_id: o.id || null, student_name: o.name || txt, class: cls || '', date: dt, status: 'present', recorded_by: 'bulk-scan' };
@@ -333,7 +333,7 @@ const Enterprise = {
         const sc = window.SCHOOL || {};
         const meta = { exported_at: new Date().toISOString(), school_name: sc.name || 'School', total_records: (data || []).length, tamper_evident_verified: true, logs: data || [] };
         const blob = new Blob([JSON.stringify(meta, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tamper-evident-audit-trail-' + new Date().toISOString().slice(0, 10) + '.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'tamper-evident-audit-trail-' + scDay(new Date()) + '.json'; a.click();
       } catch (e) { alert('Export failed: ' + e.message); }
     }
   },

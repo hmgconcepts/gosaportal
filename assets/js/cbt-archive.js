@@ -225,10 +225,10 @@
         // Seal if possible
         if(window.DataPortability && DataPortability.seal){
           const sealed = await DataPortability.seal(env);
-          DataPortability.download('cbt-archived-'+new Date().toISOString().slice(0,10)+'.json', JSON.stringify(sealed,null,2));
+          DataPortability.download('cbt-archived-'+scDay(new Date())+'.json', JSON.stringify(sealed,null,2));
         }else{
           const blob = new Blob([JSON.stringify(env,null,2)],{type:'application/json'});
-          const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cbt-archived-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+          const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='cbt-archived-'+scDay(new Date())+'.json'; a.click();
         }
         this.log(`📦 Exported ${data.length} archived exam(s) as backup JSON.`, 'success');
       }catch(e){ this.log('Export failed: '+(e.message||e), 'error'); }

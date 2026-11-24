@@ -335,7 +335,7 @@ const ArchiveHub = {
       if(error) throw error;
       const env = await DataPortability.envelope({cbt_exams:data},{kind:'cbt-archived-export', row_count:data.length, exported_at:new Date().toISOString()});
       const sealed = await DataPortability.seal(env);
-      DataPortability.download('cbt-archived-'+new Date().toISOString().slice(0,10)+'.json', JSON.stringify(sealed,null,2));
+      DataPortability.download('cbt-archived-'+scDay(new Date())+'.json', JSON.stringify(sealed,null,2));
       this.log(`📦 Exported ${data.length} archived exam(s) as portable backup. Keep this file safe — you can re-import it anytime.`, 'success');
     }catch(e){ this.log('Export failed: '+(e.message||e), 'error'); }
   },

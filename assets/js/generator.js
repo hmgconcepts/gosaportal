@@ -1250,7 +1250,7 @@ ${Generator.bellAndBanner(cfg)}
     // includes offline.html, and the cache name embeds the build date so
     // every regenerated site invalidates stale caches.
     const logoExt = (cfg && cfg.logoExt) || 'svg';
-    const stamp = new Date().toISOString().slice(0, 10);
+    const stamp = scDay(new Date());
     return `/**
  * School Connect — Service Worker v8
  * Caches: HTML, CSS, JS, fonts, images. Offline fallback: offline.html.
@@ -1858,7 +1858,7 @@ ${(Array.isArray(cfg.modules) ? cfg.modules : []).map(m => `- ${m.replace(/_/g, 
       attendance: Array.from({ length: 20 }, (_, i) => ({
         id: 'at' + i, student_id: 's' + (i % 8),
         status: i % 5 === 0 ? 'absent' : 'present',
-        date: new Date(Date.now() - i * 864e5).toISOString().slice(0, 10)
+        date: scDay(new Date(Date.now() - i * 864e5))
       })),
       polls: [{ id: 'p1', title: 'Head Boy Election 2026', status: 'open', audience: 'all', candidates: JSON.stringify([
         { id: 'c1', name: 'Adaeze Okeke', info: 'SSS 3A', photo: '' },

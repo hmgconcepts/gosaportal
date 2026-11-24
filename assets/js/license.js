@@ -329,6 +329,10 @@
   function boot() { tick(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else setTimeout(boot, 0);
-  setInterval(tick, POLL_MS);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) tick(); });
+  /* V12.82 — a licence verdict changes at most once a day; asking for it on
+     every tab focus and every 15 minutes on every device was pure request noise
+     on a free-tier instance. It now rides the app's single scheduler: once every
+     30 minutes, only while the tab is visible, and never during a sitting. */
+  if (window.SCNet && SCNet.poll) SCNet.poll('license', tick, 30 * 60 * 1000);
+  else setInterval(tick, 30 * 60 * 1000);
 })();

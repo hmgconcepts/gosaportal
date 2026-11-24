@@ -263,7 +263,7 @@ const DriveSync = {
         const el = document.getElementById('gd-status'); if (el && window.GD) GD.refreshStatus();
         return;
       } catch (silentErr) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = scDay(new Date());
         if (!document.hidden && st.interactiveAskDay !== today) {
           this.setState({ interactiveAskDay: today });
           if (typeof toast === 'function') toast('☁️ Scheduled Drive backup is due — approving Google access now (one click)…', 'info', 6000);

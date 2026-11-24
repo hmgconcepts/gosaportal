@@ -20,7 +20,7 @@ const Preview = {
         }));
         const me = profiles[0];
         const today = new Date();
-        const fmt = d => d.toISOString().slice(0, 10);
+        const fmt = d => scDay(d);
         return {
             me,
             tables: {

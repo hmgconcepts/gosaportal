@@ -351,22 +351,38 @@ const App = {
       this.showDashboardLoading(false);
       return;
     }
-    // Retry logic with exponential backoff for slow network
+    /* V12.82 — LOCAL SESSION FIRST, NETWORK SECOND.
+       This used to call auth.getUser() up to four times. getUser() is an HTTP
+       request to the auth service, so on a bad connection (or when the auth
+       service rate-limits the shared IP address a whole class sits behind) all
+       four attempts failed, `user` stayed null, and the portal sent a signed-in
+       learner to the login page: the "sudden logout" the school reported during
+       home prep exams. The session is already in this browser; read it there.
+       Only fall back to the network when there is no local session at all. */
     let user = null;
-    let retries = 3;
-    for (let attempt=0; attempt<=retries; attempt++) {
-      try {
-        const u = await currentSb.auth.getUser();
-        user = u && u.data && u.data.user;
-        if (user) break;
-      } catch (e) {
-        if (attempt < retries) {
-          await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
-          continue;
-        }
+    try {
+      if (window.SCNet && window.SCNet.session) {
+        const r = await window.SCNet.session(currentSb);
+        user = (r && r.user) || (r && r.session && r.session.user) || null;
+        if (!user && r && r.stale) user = cached || null;   /* keep a stale-but-real session */
       }
-      if (attempt < retries && !user) {
-        await new Promise(r => setTimeout(r, 400));
+    } catch (_) {}
+    if (!user) {
+      /* no local session at all: ask the network, generously. This path is only
+         reached when the browser holds nothing, so a slow answer here is a slow
+         sign-in, not a session being thrown away. */
+      let retries = 3;
+      for (let attempt=0; attempt<=retries; attempt++) {
+        try {
+          const u = await currentSb.auth.getUser();
+          user = u && u.data && u.data.user;
+          if (user) break;
+        } catch (e) {
+          if (attempt < retries) {
+            await new Promise(r => setTimeout(r, 600 * Math.pow(2, attempt)));
+            continue;
+          }
+        }
       }
     }
     if (!user) {
@@ -386,17 +402,44 @@ const App = {
     }
 
     let role = '', status = 'active', name = '', profile = null;
+
+    /* V12.83 — WHO AM I IS NOT A QUESTION YOU ASK ONCE.
+       ------------------------------------------------------------------
+       The role came from ONE call to sc_current_role, with a profile select
+       and then `|| 'student'` behind it. On the connection this platform is
+       actually used over — a phone at home, a shared hostel line — that one
+       call is exactly the one that times out, and the result was that a
+       TEACHER was rendered as a student: their classes vanished, their prep
+       diary came up empty, and nothing on the screen said why. The page was
+       not broken; it had been told the wrong thing and believed it.
+
+       Now: ask with backoff (a timeout is not an answer), prefer the role this
+       device already proved, and if neither is available say so plainly
+       instead of impersonating a learner. */
+    const cachedRole = (() => {
+      try { return String(localStorage.getItem('sc-last-role') || '').toLowerCase(); } catch (_) { return ''; }
+    })();
+    const askRole = () => {
+      const call = () => currentSb.rpc('sc_current_role').then(r => {
+        /* a transient failure is not an empty answer — retry() must see it */
+        if (r && r.error && window.SCNet && SCNet.transient && SCNet.transient(r.error)) throw r.error;
+        return r;
+      });
+      return (window.SCNet && SCNet.retry)
+        ? SCNet.retry(call, { attempts: 4, base: 900, label: 'role' })
+        : call();
+    };
     try {
-      const rpc = await currentSb.rpc('sc_current_role');
+      const rpc = await askRole();
       if (rpc && rpc.data && !rpc.error) {
         profile = rpc.data;
-        role = String(profile.role || 'student').toLowerCase();
+        role = String(profile.role || '').toLowerCase();
         status = String(profile.status || 'active').toLowerCase();
         name = profile.full_name || user.email || 'User';
       }
     } catch (_) {}
     if (!role) {
-      for (let attempt=0; attempt<2; attempt++) {
+      for (let attempt=0; attempt<3; attempt++) {
         try {
           const { data, error } = await currentSb.from('profiles').select('full_name,email,role,status,photo_url,phone').eq('id', user.id).maybeSingle();
           if (error) throw error;
@@ -406,13 +449,19 @@ const App = {
           name = (profile && profile.full_name) || user.user_metadata?.full_name || user.email || 'User';
           break;
         } catch (err) {
-          if (attempt===0) await new Promise(r=>setTimeout(r, 600));
+          await new Promise(r=>setTimeout(r, 700 * (attempt + 1)));
         }
       }
       if (!role) {
-        role = user.user_metadata?.role || cached?.role || 'student';
+        role = String(user.user_metadata?.role || cached?.role || cachedRole || '').toLowerCase();
         status = 'active';
         name = user.user_metadata?.full_name || cached?.full_name || user.email || 'User';
+      }
+      /* Still nothing? Do NOT invent 'student'. A teacher shown a learner's
+         portal is worse than a page that says it is still connecting. */
+      if (!role) {
+        App.showReconnectPanel();
+        return;
       }
     }
     if (status === 'pending') {
@@ -516,6 +565,14 @@ const App = {
     this.showDashboardLoading(false);
     try { localStorage.setItem('sc-last-role', App.currentRole); } catch(_){}
     App._roleResolved = true;
+    /* V12.83 — TELL THE PAGE. A page that asked the database for "my classes"
+       a moment before the shell finished resolving the role was told "none",
+       and nothing ever asked again. Any page can now re-run its own loader
+       when the identity finally lands. */
+    try {
+      window.dispatchEvent(new CustomEvent('sc-role-ready', { detail: { role: App.currentRole } }));
+      document.documentElement.setAttribute('data-sc-role', App.currentRole);
+    } catch (_) {}
   },
 
   /* v15 compatibility wrapper. Now delegates to resolveAndApplyRole
@@ -1539,19 +1596,22 @@ const App = {
     }
   },
 
+  /* V12.82 — one request, not two. This used to ask the auth service who the
+     user was (a network round trip) before every single activity row. The id is
+     already known once the page has signed in; a logged activity must never
+     cost the database an extra call under load. */
   logActivity(action, entity, entityId, details) {
     const supabase = window.sb || this.sb || null;
     if (!supabase) return;
     try {
-      supabase.auth.getUser().then(({ data }) => {
-        const u = data && data.user;
-        supabase.from('activity_log').insert({
-          actor_id: u ? u.id : null,
-          actor_email: u ? u.email : entityId,
-          action, entity, entity_id: String(entityId || ''),
-          details: details || null
-        }).then(() => {}, () => {});
-      });
+      const p = window.SC_PROFILE || {};
+      const uid = p.id || (window.App && App.currentUser && App.currentUser.id) || null;
+      supabase.from('activity_log').insert({
+        actor_id: uid,
+        actor_email: p.email || entityId,
+        action, entity, entity_id: String(entityId || ''),
+        details: details || null
+      }).then(() => {}, () => {});
     } catch (_) {}
   },
 
@@ -1571,10 +1631,39 @@ const App = {
     localStorage.setItem('sc-theme', document.body.dataset.theme);
   },
 
+  /* V12.83 — the honest waiting room. Shown only when the portal genuinely
+     cannot learn who the visitor is; it retries by itself and offers a way
+     out. No learner is ever impersonated while it is up. */
+  showReconnectPanel() {
+    if (document.getElementById('sc-reconnect')) return;
+    const tries = Number(sessionStorage.getItem('sc-role-tries') || 0) + 1;
+    try { sessionStorage.setItem('sc-role-tries', String(tries)); } catch(_){}
+    const host = document.createElement('div');
+    host.id = 'sc-reconnect';
+    host.style.cssText = 'position:fixed;inset:0;z-index:2147483100;background:#f8fafc;display:flex;align-items:center;justify-content:center;padding:24px';
+    host.innerHTML = '<div style="max-width:460px;text-align:center;background:#fff;padding:38px 30px;border-radius:18px;box-shadow:0 20px 50px rgba(15,23,42,.16)">' +
+      '<div style="font-size:2.6rem">📶</div>' +
+      '<h2 style="margin:8px 0 10px;color:#0f172a">Still connecting to the school</h2>' +
+      '<p style="color:#475569;line-height:1.6">The portal has not been able to confirm who you are yet — the connection dropped before the school server answered. Nothing has been changed and nothing is lost.</p>' +
+      '<p style="color:#94a3b8;font-size:.85rem;margin-top:6px">Attempt ' + tries + ' of 3 — retrying automatically…</p>' +
+      '<div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
+      '<button class="btn btn-primary" id="sc-reconnect-now">Try again now</button>' +
+      '<a class="btn btn-outline" href="login.html">Sign in again</a></div></div>';
+    document.body.appendChild(host);
+    const again = () => { try { sessionStorage.removeItem('sc-role-tries'); } catch(_){} location.reload(); };
+    const btn = document.getElementById('sc-reconnect-now');
+    if (btn) btn.addEventListener('click', again);
+    if (tries <= 3) setTimeout(again, 6000);
+  },
+
   signOut() {
     const supabase = window.sb || this.sb || null;
-    if (!supabase) { location.href = 'login.html'; return; }
+    /* V12.83 — a sign-out is a DEVICE event, not a tab event: tell the other
+       tabs (they leave too), and drop the cached PAGES so the next person at
+       this phone cannot read the previous session's screens offline. */
+    try { if (window.SCNet && SCNet.signedOut) SCNet.signedOut(); } catch(_){}
     try { localStorage.removeItem('sc-cached-profile'); localStorage.removeItem('sc-last-role'); } catch(_){}
+    if (!supabase) { location.href = 'login.html'; return; }
     // V6.0: record the sign-out in the login audit trail before the session ends.
     try { if (window.SecurityGuard) SecurityGuard.audit('logout'); } catch(_){}
     supabase.auth.signOut().then(() => { location.href = 'login.html'; });
@@ -1982,7 +2071,7 @@ const App = {
         const ids = (l.data || []).map(x => x.student_id);
         if (ids.length) { const st = await sb.from('students').select('class').in('id', ids); classes = [...new Set((st.data || []).map(x => x.class).filter(Boolean))]; }
       }
-      let q = sb.from('exam_timetable').select('*').gte('exam_date', new Date().toISOString().slice(0, 10)).order('exam_date').order('start_time').limit(60);
+      let q = sb.from('exam_timetable').select('*').gte('exam_date', scDay(new Date())).order('exam_date').order('start_time').limit(60);
       if (classes.length) q = q.in('class', classes);
       const r = await q;
       if (r.error) { paint('<p style="color:var(--gray-500);font-size:.85rem">💤 The exam timetable appears here after a one-time database update (admin: run database/complete-schema.sql or complete-schema.sql).</p>'); return; }

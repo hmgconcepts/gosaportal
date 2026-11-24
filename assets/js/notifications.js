@@ -34,10 +34,21 @@ const Notifications = {
     this.sw = serviceWorkerRegistration||null;
     if('Notification' in window) this.permission = Notification.permission;
     this.bindBell();
-    try{ const r=await this.sb.auth.getUser(); this._uid=(r.data&&r.data.user&&r.data.user.id)||''; }catch(_){ this._uid=''; }
+    /* V12.82 — the local session names the user; ask the network only if there is none. */
+    try{
+      if(window.SCNet&&SCNet.session){ const r=await SCNet.session(this.sb);
+        this._uid=(r&&((r.user&&r.user.id)||(r.session&&r.session.user&&r.session.user.id)))||''; }
+      if(!this._uid){ const r=await this.sb.auth.getUser(); this._uid=(r.data&&r.data.user&&r.data.user.id)||''; }
+    }catch(_){ this._uid=this._uid||''; }
     await this.startRealtimeListener();
     await this.refreshUnreadCount();
-    if(!this._pollTimer) this._pollTimer=setInterval(()=>this.refreshUnreadCount().catch(()=>{}),30000);
+    /* V12.82 — ONE scheduler, ONE small query, every two minutes, and none of
+       it while the tab is hidden or the exam page is telling us to be quiet.
+       (This was a 50-row select plus a /user round trip every 30 seconds for
+       every signed-in learner — the largest single consumer of the free tier's
+       disk-IO budget during an evening of home prep exams.) */
+    if(window.SCNet&&SCNet.poll){ SCNet.poll('bell', ()=>this.refreshUnreadCount().catch(()=>{}), 120000); }
+    else if(!this._pollTimer) this._pollTimer=setInterval(()=>this.refreshUnreadCount().catch(()=>{}),120000);
     if(this.permission==='granted'){ try{ await this.subscribeToPush(); }catch(_){} }
     try{ this.loadDropdownItems(); }catch(_){}
     try{ await this.renderPageList(); }catch(_){}
@@ -342,19 +353,56 @@ const Notifications = {
     }catch(_){}
   },
 
+  /* V12.82 — THE BADGE IS A COUNT, NOT A LIST.
+     The old version pulled the 50 newest notification rows, asked the auth
+     service who the user was (a second network request) and then filtered in
+     the browser — every 30 seconds, on every open tab, for every learner. The
+     database now answers bell + message badge + licence in ONE call. The list is
+     still fetched, but only when the bell is actually opened. */
   async refreshUnreadCount(){
     const badge=document.getElementById('notif-badge');
-    this.refreshMessageBadge().catch(()=>{});
-    if(!badge) return;
-    if(!this.sb){ badge.style.display='none'; await this.renderPageList(); return; }
-    let items,user;
-    try{ items=await this.fetchRecent(50); }catch(e){ items=[]; }
-    try{ const r=await this.sb.auth.getUser(); user=r.data&&r.data.user; }catch(e){ user=null; }
-    const unread=items.filter(n=>!(n.read_by||[]).includes(user?.id||'')).length;
-    if(unread>0){ badge.textContent=unread>99?'99+':String(unread); badge.style.display='flex'; }
-    else{ badge.style.display='none'; }
-    this._maybeAutoPopup(items);
-    try{ await this.renderPageList(items, user?.id||''); }catch(e){}
+    if(!this.sb){ if(badge) badge.style.display='none'; return; }
+    let n=null, msgs=null;
+    try{
+      const {data,error}=await this.sb.rpc('sc_poll_bundle');
+      if(error) throw error;
+      if(data&&data.ok){ n=Number(data.notif)||0; msgs=Number(data.msgs)||0; }
+    }catch(_){}
+    if(n===null){
+      /* the bundle is not installed yet on an older database: fall back, but
+         still without the /user round trip */
+      try{
+        const items=await this.fetchRecent(50);
+        const uid=this._uid||'';
+        n=items.filter(x=>!(x.read_by||[]).includes(uid)).length;
+      }catch(_){ n=0; }
+    }
+    if(badge){
+      if(n>0){ badge.textContent=n>99?'99+':String(n); badge.style.display='flex'; }
+      else{ badge.style.display='none'; }
+    }
+    if(msgs!==null) this._paintMessageBadge(msgs);
+    return n;
+  },
+
+  /* same badge markup as refreshMessageBadge(), without the second RPC */
+  _paintMessageBadge(n){
+    try{
+      document.querySelectorAll('a[href="messages.html"]').forEach(a=>{
+        let b=a.querySelector('.mc-nav-badge');
+        if(n>0){
+          if(!b){ b=document.createElement('span'); b.className='mc-nav-badge';
+            if(!document.getElementById('mc-badge-styles')){
+              const s=document.createElement('style'); s.id='mc-badge-styles';
+              s.textContent='.mc-nav-badge{margin-left:6px;background:#dc2626;color:#fff;border-radius:999px;font-size:.66rem;font-weight:800;padding:1px 6px;display:inline-block}';
+              document.head.appendChild(s);
+            }
+            a.appendChild(b);
+          }
+          b.textContent=n>99?'99+':String(n);
+        }else if(b) b.remove();
+      });
+    }catch(_){}
   },
 
   async renderPageList(prefetchedItems=null, currentUserId=''){
@@ -513,6 +561,12 @@ const Notifications = {
 
   async startRealtimeListener(){
     if(!this.sb||!this.sb.channel) return;
+    /* V12.82 — two Realtime channels per open tab is a connection and a WAL
+       stream per learner on a free-tier instance. During a sitting the exam
+       page turns this off; everywhere else the badge poll (one small query per
+       two minutes) is enough, so the live channels are only used when the
+       school has <= 60 signed-in devices and the browser is not already idle. */
+    try{ if(window.SCNet&&SCNet.state&&(SCNet.state.exam||SCNet.state.online===false)) return; }catch(_){}
     try{
       this.sb.channel('notifications-live')
         .on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications'},payload=>{

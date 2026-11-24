@@ -379,13 +379,26 @@ const PWAInstall = {
         self.showUpdateBanner(e.data.version);
       }
     });
-    // When new SW takes control, reload once
+    /* V12.83 — A FIRST VISIT IS NOT AN UPDATE.
+       This used to reload on ANY controllerchange. On a first-ever visit the
+       page starts uncontrolled, the worker installs, skipWaiting()+claim() give
+       it control, and this listener threw the page away and rebuilt it — while
+       the visitor was already typing. (app.js had the guard; this file did not,
+       so the guard was defeated.) Only a page that HAD a controller and now has
+       a DIFFERENT one is an update worth reloading for, and only once per load,
+       with the same sessionStorage flag app.js uses so both listeners cannot
+       both fire. */
+    const hadController = !!navigator.serviceWorker.controller;
     let refreshing = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshing) return;
+      if (refreshing || !hadController) return;
+      try {
+        if (sessionStorage.getItem('sc-sw-reloaded') === '1') return;
+        sessionStorage.setItem('sc-sw-reloaded', '1');
+      } catch (_) {}
       refreshing = true;
-      console.log('[PWA] controllerchange — new SW controlling, reloading');
       self._hasReloaded = true;
+      try { console.log('[PWA] new worker took control — reloading once'); } catch (_) {}
       window.location.reload();
     });
     // Periodic checks
