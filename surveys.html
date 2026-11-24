@@ -524,6 +524,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -738,7 +739,7 @@ const SV={
     const last7 = [];
     for(let i=6;i>=0;i--){
       const d=new Date(Date.now()-i*86400000);
-      const ds=d.toISOString().slice(0,10);
+      const ds=scDay(d);
       const cnt=r.filter(x=>x.created_at && x.created_at.slice(0,10)===ds).length;
       last7.push({date:ds,label:d.toLocaleDateString('en',{weekday:'short'}),count:cnt});
     }

@@ -541,6 +541,7 @@
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -581,9 +582,9 @@ var Punct = {
     z.innerHTML = '<h3>🛠 One-time database step needed</h3><p>The Punctuality Points engine needs its tables + functions. Run <b>database/complete-schema.sql</b> (or simply re-run the full <b>database/complete-schema.sql</b> — it is idempotent) in your Supabase SQL Editor, then reload this page. New builds (schema v12.4+) already include it.</p>';
   },
   pickDefaults() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = scDay(new Date());
     if (this.el('f-date') && !this.el('f-date').value) this.el('f-date').value = today;
-    if (this.el('f-from') && !this.el('f-from').value) { const d = new Date(); d.setDate(d.getDate() - 30); this.el('f-from').value = d.toISOString().slice(0, 10); this.el('f-to').value = today; }
+    if (this.el('f-from') && !this.el('f-from').value) { const d = new Date(); d.setDate(d.getDate() - 30); this.el('f-from').value = scDay(d); this.el('f-to').value = today; }
   },
   async loadConfig() {
     const r = await sb.from('punctuality_config').select('*').eq('id', 1).maybeSingle();
@@ -603,7 +604,7 @@ var Punct = {
     toast('✅ Punctuality rules saved.', 'success');
   },
   async compute() {
-    const date = this.el('f-date').value || new Date().toISOString().slice(0, 10);
+    const date = this.el('f-date').value || scDay(new Date());
     const cls = this.el('f-class').value.trim();
     toast('Grading punctuality for ' + date + '…', 'info', 1500);
     let awarded = null;

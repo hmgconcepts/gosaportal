@@ -49,7 +49,7 @@
   </div>
 
   <div class="ph-toc">
-    <a href="#sec-keepalive">🫀 Keep-alive 14 Layers</a><a href="#sec-doctor">🩺 Schema Doctor</a><a href="#sec-space">💾 Space</a><a href="#sec-backup">☁️ Backup & Archives</a><a href="#sec-license">🔑 Licence</a><a href="#sec-security">🛡️ Security</a><a href="#sec-fleet">🛰️ Fleet Console</a><a href="#sec-audit">🕵️ Login Audit</a><a href="#sec-cbt-advanced">🧪 CBT Advanced</a><a href="#sec-tutoring">📚 Tutoring Features</a>
+    <a href="#sec-keepalive">🫀 Keep-alive 14 Layers</a><a href="#sec-doctor">🩺 Schema Doctor</a><a href="#sec-space">💾 Space</a><a href="#sec-backup">☁️ Backup & Archives</a><a href="#sec-load">🩺 Load &amp; Disk IO</a><a href="#sec-license">🔑 Licence</a><a href="#sec-security">🛡️ Security</a><a href="#sec-fleet">🛰️ Fleet Console</a><a href="#sec-audit">🕵️ Login Audit</a><a href="#sec-cbt-advanced">🧪 CBT Advanced</a><a href="#sec-tutoring">📚 Tutoring Features</a>
   </div>
 
   <div id="health-error" class="card" style="display:none;background:#fef2f2;border-color:#fca5a5;color:#991b1b"></div>
@@ -120,6 +120,37 @@
     </div>
     <div id="ph-archive" style="margin-bottom:12px"></div>
     <div class="dc-scroll"><table class="dc-table"><thead><tr><th>Started</th><th>Destination</th><th>Trigger</th><th>Status</th><th>Rows</th><th>SHA-256</th></tr></thead><tbody id="bk-runs"><tr><td colspan="6" class="dc-muted">Loading…</td></tr></tbody></table></div>
+  </section>
+
+  <!-- 5a. Database load & Disk IO (V12.82) -->
+  <section id="sec-load" class="dc-section">
+    <h2>🩺 Load &amp; Disk IO — which table is doing the writing</h2>
+    <p class="lead">
+      Supabase's free tier runs on <b>Nano</b>: half a gigabyte of memory and a daily
+      <b>Disk IO budget</b>. When that budget is spent the instance drops to baseline disk
+      throughput and <i>everything</i> slows at once — sign-ins, submissions, page loads — which
+      looks like a broken portal rather than a busy database. This report names the tables that
+      are being written most and the ones being read without an index. Read-only, admin only,
+      safe at any time.
+    </p>
+    <div class="dc-kpi-grid" style="margin-bottom:12px">
+      <div class="dc-kpi"><div class="l">Database size</div><div class="v" style="font-size:1rem" id="io-size">—</div><div class="s">whole project</div></div>
+      <div class="dc-kpi"><div class="l">App tables</div><div class="v" id="io-tables">—</div><div class="s">public schema</div></div>
+      <div class="dc-kpi"><div class="l">App indexes</div><div class="v" id="io-indexes">—</div><div class="s">every insert writes these</div></div>
+      <div class="dc-kpi"><div class="l">Connections now</div><div class="v" id="io-conn">—</div><div class="s" id="io-conn-note">of the pool</div></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" type="button" onclick="PH.loadReport()">↻ Read the report</button>
+      <button class="btn btn-outline btn-sm" type="button" onclick="PH.pruneNoise()" title="Delete notifications and login-audit rows older than the window">🧹 Prune old notices</button>
+      <span class="dc-muted" style="align-self:center;font-size:.82rem">Counters are cumulative since the database started; they reset on the weekly restart.</span>
+    </div>
+    <h4 style="margin:10px 0 4px">Most written tables</h4>
+    <div class="dc-scroll"><table class="dc-table"><thead><tr><th>Table</th><th>Writes</th><th>Inserts</th><th>Updates</th><th>Deletes</th></tr></thead><tbody id="io-writers"><tr><td colspan="5" class="dc-muted">Press “Read the report”.</td></tr></tbody></table></div>
+    <h4 style="margin:14px 0 4px">Read without an index (full scans)</h4>
+    <div class="dc-scroll"><table class="dc-table"><thead><tr><th>Table</th><th>Full scans</th><th>Rows read</th><th>Index scans</th></tr></thead><tbody id="io-scans"><tr><td colspan="4" class="dc-muted">—</td></tr></tbody></table></div>
+    <h4 style="margin:14px 0 4px">Bloat — rows VACUUM has not reclaimed</h4>
+    <div class="dc-scroll"><table class="dc-table"><thead><tr><th>Table</th><th>Live rows</th><th>Dead rows</th><th>Last autovacuum</th></tr></thead><tbody id="io-bloat"><tr><td colspan="4" class="dc-muted">—</td></tr></tbody></table></div>
+    <div id="io-advice" style="margin-top:12px"></div>
   </section>
 
   <!-- 5. Licence -->
@@ -224,6 +255,7 @@
 <div id="modal-backdrop" class="modal-backdrop" onclick="if(event.target===this)closeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9998;align-items:center;justify-content:center"><div class="modal" onclick="event.stopPropagation()" style="background:#fff;border-radius:16px;max-width:600px;width:90%;max-height:80vh;overflow:auto;padding:20px"><div class="modal-header" style="display:flex;justify-content:space-between;align-items:center"><h2 id="modal-title">Modal</h2><button class="modal-close" onclick="closeModal()" style="background:#f1f5f9;border:1px solid #e2e8f0;border-radius:8px;width:32px;height:32px">×</button></div><div id="modal-body" class="modal-body" style="margin-top:12px"></div><div id="modal-footer" class="modal-footer" style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end"></div></div></div>
 
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -669,6 +701,55 @@ const PH={
     }
   },
 
+  /* V12.82 — read the disk-IO report and put it on the page in plain words.
+     The RPC does the gathering (pg_stat_user_tables); this only renders it. */
+  async loadReport(){
+    const set=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;};
+    const bad=(id,msg)=>{const e=document.getElementById(id); if(e) e.innerHTML='<tr><td colspan="5" class="dc-muted">'+this.esc(msg)+'</td></tr>';};
+    if(!window.sb){ bad('io-writers','Connect the portal to Supabase first.'); return; }
+    if(typeof toast==='function') toast('Reading the load report…','info',2000);
+    try{
+      const {data,error}=await sb.rpc('sc_io_report');
+      if(error) throw error;
+      if(!data||data.ok===false) throw new Error((data&&data.error)||'The load report is not installed.');
+      set('io-size', data.database_size||'—');
+      set('io-tables', data.app_tables==null?'—':String(data.app_tables));
+      set('io-indexes', data.app_indexes==null?'—':String(data.app_indexes));
+      set('io-conn', (data.connections==null?'—':data.connections)+'');
+      set('io-conn-note', 'of '+(data.max_connections||'—')+' allowed');
+      const writers=(data.top_writers||[]).filter(w=>Number(w.writes)>0).slice(0,12);
+      const wt=document.getElementById('io-writers');
+      if(wt) wt.innerHTML = writers.length ? writers.map(w=>`<tr><td class="mono">${this.esc(w.table)}</td><td><b>${w.writes}</b></td><td>${w.inserts}</td><td>${w.updates}</td><td>${w.deletes}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="dc-muted">Nothing has been written since the database started — that is a good sign.</td></tr>';
+      const scans=(data.top_full_scans||[]).slice(0,10);
+      const st=document.getElementById('io-scans');
+      if(st) st.innerHTML = scans.length ? scans.map(r=>`<tr><td class="mono">${this.esc(r.table)}</td><td>${r.seq_scans}</td><td>${r.rows_read}</td><td>${r.idx_scans}</td></tr>`).join('')
+        : '<tr><td colspan="4" class="dc-muted">No full scans recorded.</td></tr>';
+      const bloat=(data.bloat||[]).slice(0,10);
+      const bt=document.getElementById('io-bloat');
+      if(bt) bt.innerHTML = bloat.length ? bloat.map(r=>`<tr><td class="mono">${this.esc(r.table)}</td><td>${r.live}</td><td>${r.dead}</td><td>${r.last_autovacuum?new Date(r.last_autovacuum).toLocaleString():'never'}</td></tr>`).join('')
+        : '<tr><td colspan="4" class="dc-muted">No dead rows — nothing for VACUUM to do.</td></tr>';
+      const adv=document.getElementById('io-advice');
+      if(adv&&Array.isArray(data.advice)) adv.innerHTML='<div class="card" style="background:#f8fafc"><b>What to do with this</b><ul style="margin:6px 0 0;padding-left:18px;font-size:.88rem;line-height:1.65">'+
+        data.advice.map(a=>'<li>'+this.esc(a)+'</li>').join('')+'</ul></div>';
+    }catch(e){
+      bad('io-writers', 'Load report unavailable: '+(e.message||e)+' — an administrator must run database/complete-schema.sql once.');
+    }
+  },
+
+  async pruneNoise(){
+    if(!window.sb){ if(typeof toast==='function') toast('Connect the portal first.','warning'); return; }
+    const days=Number(window.prompt('Delete notifications and login-audit rows older than how many days?','120')||0);
+    if(!days||days<30){ if(days) toast('The minimum window is 30 days.','warning'); return; }
+    try{
+      const {data,error}=await sb.rpc('sc_prune_noise',{p_days:days});
+      if(error) throw error;
+      if(data&&data.ok===false) throw new Error(data.error||'Refused.');
+      if(typeof toast==='function') toast('Pruned: '+(data.notifications_deleted||0)+' notification(s) and '+(data.login_audit_deleted||0)+' audit row(s) older than '+days+' days.','success',7000);
+      this.loadReport();
+    }catch(e){ if(typeof toast==='function') toast('Prune failed: '+(e.message||e),'danger',8000); }
+  },
+
   async license(){
     const b=document.getElementById('ph-license');
     const licModel=document.getElementById('lic-model');
@@ -972,6 +1053,16 @@ PH.postureJson = async function postureJson(){
 };
 
 document.addEventListener('DOMContentLoaded', ()=>{ setTimeout(()=>PH.refresh(), 900); });
+/* V12.82 — the load report is read when the section is opened, not on page load:
+   a health page that costs the database a scan of pg_stat to be looked at is
+   part of the problem it is meant to diagnose. */
+document.addEventListener('DOMContentLoaded', ()=>{
+  const sec=document.getElementById('sec-load');
+  if(sec&&'IntersectionObserver' in window){
+    let once=false;
+    new IntersectionObserver((ents)=>{ ents.forEach(e=>{ if(e.isIntersecting&&!once){ once=true; PH.loadReport(); } }); },{threshold:0.15}).observe(sec);
+  }
+});
 // Bind filter events
 document.addEventListener('DOMContentLoaded', ()=>{
   const days=document.getElementById('audit-days');

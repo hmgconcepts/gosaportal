@@ -1,6 +1,6 @@
 // School Connect — Service Worker (V5 cumulative release, generator v8)
 // Bump this literal on every runtime release so previously cached CBT/report code is purged.
-const CACHE = 'sc-client-v12.81-20261120-1';
+const CACHE = 'sc-client-v12.84-20261130-1';
 const CORE = [
   './', './index.html', './builder.html', './voting.html', './notifications.html',
   './install.html', './midterm-reports.html', './ecosystem.html', './about.html', './guide.html', './offline.html',
@@ -64,6 +64,29 @@ self.addEventListener('message', e => {
      reappeared even when the platform was already current. */
   if (e.data && e.data.type === 'GET_VERSION' && e.ports && e.ports[0]) {
     e.ports[0].postMessage({ version: CACHE });
+  }
+  /* V12.83 — DROP THE CACHED PAGES, KEEP THE SHELL.
+     Every navigation the worker sees is cached so the portal opens on a bad
+     line. That same cache is readable by the NEXT person at a shared phone or
+     staff-room machine, offline, with no sign-in: the previous session's
+     dashboard, marks and names. So a sign-out (in any tab) asks for the pages
+     to be dropped. Static assets stay — they are the same for everybody and
+     they are what makes the app open at all. */
+  if (e.data && e.data.type === 'PURGE_DOCS') {
+    e.waitUntil((async () => {
+      try {
+        const c = await caches.open(CACHE);
+        const reqs = await c.keys();
+        await Promise.all(reqs.map(async (req) => {
+          const url = new URL(req.url);
+          const isDoc = req.mode === 'navigate' || /\.html$/i.test(url.pathname);
+          const keep = /\/(offline|index)\.html$/i.test(url.pathname) || url.pathname === '/' || url.pathname.endsWith('/');
+          if (isDoc && !keep) await c.delete(req);
+        }));
+        const clients = await self.clients.matchAll({ type: 'window' });
+        clients.forEach(cl => cl.postMessage({ type: 'DOCS_PURGED', version: CACHE }));
+      } catch (err) { console.warn('[SW] purge failed', err && err.message); }
+    })());
   }
 });
 

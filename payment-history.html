@@ -58,6 +58,7 @@
   </div>
 </main>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -71,7 +72,7 @@ const PH = {
   rows: [],
   cur(){ return (window.SCHOOL && SCHOOL.currency) || '₦'; },
   dmy(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d)) return String(v); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear(); },
-  iso(d){ return d.toISOString().slice(0,10); },
+  iso(d){ return scDay(d); },
   preset(p){
     const now=new Date(); const from=document.getElementById('ph-from'), to=document.getElementById('ph-to');
     const set=(a,b)=>{ from.value=a?this.iso(a):''; to.value=b?this.iso(b):''; };

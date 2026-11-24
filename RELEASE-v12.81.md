@@ -136,7 +136,7 @@ idempotence test, `audit-v5` **513/0**.
 
 ## Database
 
-`database/complete-schema.sql` — V12.81, 998,626 bytes (Supabase's editor limit
+`database/complete-schema.sql` — V12.81, 998,538 bytes (Supabase's editor limit
 is 1,000,000). One defaulted column, two functions, one trigger; six function
 bodies corrected. Nothing is dropped; nothing is renamed.
 
