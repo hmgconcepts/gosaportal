@@ -162,6 +162,21 @@ def build(raw: str) -> tuple[str, dict]:
     # and the dashboard reported that as "run database/v9.4-fees-and-exams.sql".
     # Keep the LAST one, and move it to the very end of the file so it really is
     # the last statement the server executes.
+    # V12.82 — the reload signal was written TWO ways (`select pg_notify(...)` and
+    # `notify pgrst,'reload schema'`), and one pack glued them onto the end of
+    # another statement with no newline, so the statement-level rule above saw
+    # neither. The result: 100 reload signals in the shipped file, 99 of them
+    # firing hours before the objects they were supposed to announce — the exact
+    # defect V12.68 set out to remove. Catch every spelling, keep the last.
+    RELOAD_RE = re.compile(
+        r"^(?:select\s+pg_notify\s*\(\s*'pgrst'\s*,\s*'reload schema'\s*\)"
+        r"|notify\s+pgrst\s*,\s*'reload schema')\s*;?$", re.I)
+    reloads = [s for s in st
+               if RELOAD_RE.match(norm(s).replace(' ', ' ') if False else
+                                  re.sub(r'\s+', ' ', body_of(s).strip()).strip().rstrip(';').strip())]
+    if reloads:
+        for s in reloads[:-1]:
+            kill(s, 'reload-signal')
     notifies = [s for s in st if noise_kind(s) == 'notify']
     for s in notifies[:-1]:
         kill(s, 'redundant-notify')
@@ -189,6 +204,90 @@ def build(raw: str) -> tuple[str, dict]:
             else:
                 seen.add(k)
 
+    # ---- 2b. install-state markers: ONE ROW PER KEY --------------------------
+    # V12.82 — the release-marker rows are the single largest block of dead
+    # weight in the file: every pack re-marks the packs before it ("retro"),
+    # so `v12.25-...` is inserted eleven times, each time with
+    # `on conflict (key) do nothing`. The FIRST insert of a key is the row the
+    # database ends up holding; every later one is a guaranteed no-op. Dropping
+    # them is unobservable (proved by verify-complete-schema.mjs, which compares
+    # the resulting catalogue) and reclaims ~R of headroom under the 1 MB
+    # Studio cap, which the round-27 schema additions need.
+    #
+    # Only single-row literal inserts are touched. Markers written from inside
+    # `do $$ ... $$` blocks (artifact probes) are left alone: their guards, not
+    # their literal text, decide what happens.
+    mark_re = re.compile(r"^\s*insert\s+into\s+public\.sc_install_state\s*\(\s*key\s*,\s*details\s*\)\s*values\s*\(\s*'([^']+)'", re.I)
+    seen_mark = set()
+    for s_ in st:
+        if s_.kind != 'data':
+            continue
+        b = body_of(s_).lstrip()
+        m = mark_re.match(b)
+        if not m:
+            continue
+        k = m.group(1)
+        if k in seen_mark:
+            kill(s_, 'duplicate-install-marker')
+        else:
+            seen_mark.add(k)
+
+    # ---- 2c. repeated `enable row level security` ---------------------------
+    # V12.82 — `enable row level security` is a property, not a queue: running
+    # it twice leaves the table exactly as running it once. Packs re-assert it
+    # on tables they touch (147 tables, ~250 statements). Keep the first per
+    # table; the only thing that resets the guard is an explicit DISABLE for the
+    # same table later in the file (there is none today, but the rule is written
+    # so a future one behaves).
+    rls_on_re = re.compile(r'^\s*alter\s+table\s+(?:if\s+exists\s+)?(?:public\.)?("?[\w$]+"?)\s+enable\s+row\s+level\s+security', re.I)
+    rls_off_re = re.compile(r'^\s*alter\s+table\s+(?:if\s+exists\s+)?(?:public\.)?("?[\w$]+"?)\s+disable\s+row\s+level\s+security', re.I)
+    rls_seen = set()
+    for s_ in st:
+        b = body_of(s_).lstrip()
+        off = rls_off_re.match(b)
+        if off:
+            rls_seen.discard(off.group(1).lower().strip('"'))
+            continue
+        m = rls_on_re.match(b)
+        if not m:
+            continue
+        k = m.group(1).lower().strip('"')
+        if k in rls_seen:
+            kill(s_, 'duplicate-enable-rls')
+        else:
+            rls_seen.add(k)
+
+    # ---- 2d. grants already covered by a later grant ------------------------
+    # V12.82 — `grant execute on function f(...) to authenticated;` appears, then
+    # two packs later `grant execute on function f(...) to anon, authenticated;`.
+    # The second covers the first: the first grants nothing the second does not
+    # grant again. Same for `revoke all ... from public` followed by a wider
+    # `revoke all ... from public, anon`. 55 such statements cost 4.7 KB.
+    # Matching is on (function name, argument list) — not on the role list — and
+    # only a LATER statement that covers EVERY role of the earlier one counts.
+    G_RE = re.compile(r'^grant\s+execute\s+on\s+function\s+([\w.\"]+)\s*\(([^)]*)\)\s+to\s+([a-z_, ]+)$', re.I | re.S)
+    R_RE = re.compile(r'^revoke\s+all\s+on\s+function\s+([\w.\"]+)\s*\(([^)]*)\)\s+from\s+([a-z_, ]+)$', re.I | re.S)
+
+    def _flat(x):
+        return re.sub(r'\s+', ' ', body_of(x).strip()).strip().rstrip(';').strip()
+
+    def _roles(txt):
+        return {r.strip() for r in txt.split(',') if r.strip()}
+
+    for regex, why in ((G_RE, 'covered-grant'), (R_RE, 'covered-revoke')):
+        entries = []
+        for s_ in st:
+            if s_.index in drop:
+                continue
+            m = regex.match(_flat(s_))
+            if m:
+                entries.append((s_, m.group(1).lower(), re.sub(r'\s+', '', m.group(2)), _roles(m.group(3))))
+        for i, (x, f, a, roles) in enumerate(entries):
+            for (_y, f2, a2, roles2) in entries[i + 1:]:
+                if f == f2 and a == a2 and roles <= roles2:
+                    kill(x, why)
+                    break
+
     # ---- 3. superseded function declarations --------------------------------
     # A function may be referenced LONG before its final body appears (policies,
     # views and other functions are created against it). So the FIRST
@@ -202,6 +301,47 @@ def build(raw: str) -> tuple[str, dict]:
     for key, g in group.items():
         for s in g[1:-1]:
             kill(s, 'superseded-function')
+
+    # ---- 3b. superseded function BODIES (V12.84) ---------------------------
+    # Rule 3 above keeps the FIRST declaration and the LAST, and only removes
+    # what sits strictly between them. With two declarations (the common case)
+    # that removes nothing — and the built file ended up carrying **28 earlier
+    # function bodies, 61 KB**, that no run can ever execute: the final
+    # `create or replace` is the one PostgreSQL keeps.
+    #
+    # Dropping an earlier body is a no-op UNLESS something between the two
+    # definitions needs the function to exist at that point — a policy, a view,
+    # a trigger or another function whose TEXT is created earlier and validated
+    # then. Bodies are not validated against the functions they call, so the
+    # test is: does the name appear in any statement between the definitions,
+    # outside a dollar-quoted body? If it does, the first definition stays
+    # (exactly as before). If it does not, the earlier body is dead weight.
+    group = collections.defaultdict(list)
+    for s in st:
+        if s.kind == 'function' and getattr(s, 'replaceable', False) and getattr(s, 'key', None):
+            group[s.key].append(s)
+    for key, g in group.items():
+        if len(g) < 2:
+            continue
+        last = g[-1]
+        fname = last.name.split('.')[-1]
+        for s in g[:-1]:
+            if s.index in drop:
+                continue
+            # EVERYTHING before the last body, not merely between the two: a
+            # trigger written before BOTH definitions (`create trigger … execute
+            # function f()`) already needed f() to exist, and dropping the first
+            # body broke the install — the verifier caught exactly that.
+            between = '\n'.join(x.text for x in st
+                                 if x.index < last.index and x.index not in drop
+                                 and not (x.kind == 'function' and getattr(x, 'key', None) == key))
+            between = re.sub(r'\$\$.*?\$\$', ' ', between, flags=re.S)
+            between = strip_comments(between)
+            # `execute function public.f()` is a reference too — the schema
+            # qualifier must not hide it from the lookbehind.
+            if re.search(r'(?<![\w])(?:\w+\.)?' + re.escape(fname) + r'\s*\(', between, re.I):
+                continue                      # genuinely referenced before the last body
+            kill(s, 'superseded-function-body')
 
     # ---- 4. superseded views (same rule) ------------------------------------
     group = collections.defaultdict(list)
@@ -738,7 +878,7 @@ def build(raw: str) -> tuple[str, dict]:
                 # success LOOKS like. It sits BEFORE the reload signal, because the
                 # notification must remain the last executable statement in the
                 # file (see tmp-notify-order.mjs and tmp-selfcontained.mjs).
-                "select 'V12.81 installed — a prep exam opens at the time the school typed, closes when it ends, and keeps the answers of anyone already sitting' as status;\n"
+                "select 'V12.82 installed — every tutor reads every prep timetable, and a sitting asks the database for one count instead of three queries' as status;\n"
                 "select pg_notify('pgrst', 'reload schema');\n")
         stats['notify-moved-last'] += 1
     return out, stats, drop, st
