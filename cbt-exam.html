@@ -113,6 +113,7 @@ textarea.form-input{min-height:80px;resize:vertical}
 </main>
 
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/theme-manager.js"></script>
 <script src="assets/js/legibility.js"></script>
@@ -232,6 +233,20 @@ textarea.form-input{min-height:80px;resize:vertical}
     idx: 0,
     timer: null,
     deadline: 0,
+    /* V12.84 — a phone call is not a submission. While the page is away the
+       countdown is paused, the answers are written to the device, and the time
+       the interruption took is handed back when the candidate returns. */
+    pausedAt: 0,
+    /* V12.84 — THE PHONE'S CLOCK IS NOT THE SCHOOL'S CLOCK.
+       A paper taken at home is timed by whatever clock the device has, and a
+       phone that is four minutes fast closes a ninety-minute paper four minutes
+       early. The exam reader already returns `server_now`; we anchor to it once
+       at the start of the sitting and use it for every deadline calculation. */
+    serverSkew: 0,
+    interruptTotalMs: 0,
+    interruptLog: [],
+    _awayFlagged: false,
+    _timeUpShown: false,
     monitor: null,
     flags: {},
     startTs: 0,
@@ -605,7 +620,53 @@ textarea.form-input{min-height:80px;resize:vertical}
       localStorage.setItem(draftKey, JSON.stringify({ version:2, answers:keyed, index:(current._orig_index != null ? current._orig_index : this.idx), client_ref:this.clientRef, student_ref: this.student && this.student.id_ref || '', t:Date.now() }));
       // Also keep legacy key for backward compat (will be cleaned on submit)
       try{ localStorage.setItem('cbt-draft-' + (this.data && this.data.code), JSON.stringify({ version:2, answers:keyed, index:(current._orig_index != null ? current._orig_index : this.idx), client_ref:this.clientRef, t:Date.now() })); }catch(_){}
-    } catch(e) {}
+      /* V12.84 — a full or blocked device store used to fail in silence, and the
+         learner discovered it only when a call cost them their answers. */
+      this._draftSavedAt = Date.now();
+    } catch(e) {
+      if (!this._storageWarned) {
+        this._storageWarned = true;
+        try { toast('⚠ This device will not let the page save your answers locally (storage full or blocked). Keep this page open until you press Send — do not switch apps for long, and ask the exam officer for help if the phone is short of space.', 'danger', 20000); } catch(_) {}
+      }
+    }
+  };
+
+  /* V12.84 — ONE SITTING PER DEVICE.
+     Two tabs of the same paper on one phone (a very common accident: the learner
+     taps the link twice) both run a clock and both submit, so the second attempt
+     overwrites the first and an honest candidate can be recorded with a worse
+     score than they earned. A heartbeat in localStorage is enough to notice. */
+  Exam.lockKey = function(){
+    const c = String((this.data && this.data.code) || '').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const st = String((this.student && this.student.id_ref) || this.clientRef || 'anon').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
+    return 'cbt-active-' + c + '-' + st;
+  };
+  Exam.takeSitting = function(){
+    try {
+      const key = this.lockKey(), now = Date.now();
+      const mine = this._sittingId || (this._sittingId = Math.random().toString(36).slice(2) + now.toString(36));
+      let held = null;
+      try { held = JSON.parse(localStorage.getItem(key) || 'null'); } catch(_) {}
+      const alive = held && held.id !== mine && (now - Number(held.at || 0)) < 12000;
+      if (alive) return { held: true, by: held.id };
+      localStorage.setItem(key, JSON.stringify({ id: mine, at: now }));
+      if (this._beat) clearInterval(this._beat);
+      this._beat = setInterval(() => { try { localStorage.setItem(key, JSON.stringify({ id: mine, at: Date.now() })); } catch(_) {} }, 4000);
+      return { held: false };
+    } catch(_) { return { held: false }; }
+  };
+  Exam.forceSitting = function(){
+    try { localStorage.removeItem(this.lockKey()); } catch(_) {}
+    this.takeSitting();
+    this.load(true);
+  };
+  Exam.releaseSitting = function(){
+    try { if (this._beat) { clearInterval(this._beat); this._beat = null; } } catch(_) {}
+    try {
+      const key = this.lockKey();
+      const held = JSON.parse(localStorage.getItem(key) || 'null');
+      if (!held || held.id === this._sittingId) localStorage.removeItem(key);
+    } catch(_) {}
   };
 
   Exam.confirmSubmit = function(){
@@ -792,18 +853,33 @@ textarea.form-input{min-height:80px;resize:vertical}
     // If a required camera is denied/unavailable, beginMonitor returns false and exam never begins.
     const monitoringReady = await this.beginMonitor();
     if (monitoringReady === false) return;
-    this.startTs = Date.now();
+    /* V12.84 — one sitting per device: a second tab must not run a second clock
+       and post a second attempt over the first. */
+    const _sitting = this.takeSitting();
+    if (_sitting && _sitting.held) {
+      this.root().innerHTML = '<div class="card"><div class="notice" style="background:#fffbeb;border-color:#fcd34d;color:#78350f">'
+        + '<h2 style="margin-top:0">📱 This paper is already open in another tab</h2>'
+        + '<p>Only one tab of this paper can run at a time on this device, so that two clocks cannot send two attempts over each other. '
+        + 'Close the other tab and reload this one — or continue here, which will end the sitting in the other tab.</p>'
+        + '<button class="btn btn-primary" onclick="Exam.forceSitting()">Continue in this tab</button> '
+        + '<button class="btn btn-outline" onclick="location.reload()">Reload</button></div></div>';
+      return;
+    }
+    this.startTs = this.now();
     // Timer starts only after identity, instructions and required proctor permission are complete.
-    const _deadlineKey='cbt-deadline-'+String(data.code||canonicalCode).toUpperCase().replace(/[^A-Z0-9]/g,'')+'-'+String(this.student&&this.student.id_ref||this.clientRef||'anon').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
+    const _deadlineKey=this.deadlineKey(data.code||canonicalCode);
+    /* V12.84 — anchor the whole sitting to the server's clock. */
+    this.serverSkew = data.server_now ? (new Date(data.server_now).getTime() - Date.now()) : 0;
+    try { localStorage.setItem(_deadlineKey + '-skew', String(this.serverSkew)); } catch(_){}
     const _savedDeadline=Number(localStorage.getItem(_deadlineKey)||0);
-    if(_savedDeadline && _savedDeadline>Date.now() && _savedDeadline - Date.now() < (data.duration||45)*60*1000*2){
+    if(_savedDeadline && _savedDeadline>this.now() && _savedDeadline - this.now() < (data.duration||45)*60*1000*2){
       this.deadline=_savedDeadline;
-      this.startTs=Date.now()-(((data.duration||45)*60*1000)-(this.deadline-Date.now()));
+      this.startTs=this.now()-(((data.duration||45)*60*1000)-(this.deadline-this.now()));
     }else{
-      this.deadline = Date.now() + ((data.duration || 45) * 60 * 1000);
+      this.deadline = this.now() + ((data.duration || 45) * 60 * 1000);
       try{ localStorage.setItem(_deadlineKey, String(this.deadline)); }catch(_){}
     }
-    this.remaining = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
+    this.remaining = Math.max(0, Math.ceil((this.deadline - this.now()) / 1000));
     this.tick();
     this.render();
   };
@@ -868,31 +944,148 @@ textarea.form-input{min-height:80px;resize:vertical}
       return false;
     }
     if (window.CBT && typeof window.CBT.startAntiCheat === 'function') {
-      this.monitor = window.CBT.startAntiCheat(cfg, (type, n) => {
-        this.violations = n;
-        this.violationLog = this.monitor.log;
-        const v = document.getElementById('viol');
-        if (v) v.textContent = '⚠ ' + n + ' integrity flag(s)';
-        if ((cfg.max_violations || 5) && n >= (cfg.max_violations || 5)) {
-          toast('Too many integrity violations — submitting.', 'danger');
-          this.submit();
-        }
-      });
+      this.monitor = window.CBT.startAntiCheat(cfg, (type, n) => this.onViolation(type, n));
     }
     return true;
+  };
+
+  /* V12.84 — ONE KEY, ONE PLACE. The deadline used to be stored under a key
+     built inline in three different places; a screen that pauses the clock has
+     to write the NEW deadline back to the same key, or a reload resurrects the
+     old one and charges the candidate for the call. */
+  /* the school's clock, not the device's */
+  Exam.now = function(){ return Date.now() + (this.serverSkew || 0); };
+
+  Exam.deadlineKey = function(code){
+    const c = String(code || (this.data && this.data.code) || '').toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const st = String((this.student && this.student.id_ref) || this.clientRef || 'anon').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
+    return 'cbt-deadline-' + c + '-' + st;
+  };
+
+  /* ---- THE INTERRUPTION POLICY (V12.84) -------------------------------
+     A call, a notification, a locked screen or a browser that is put away all
+     look the same to a web page: the document becomes hidden and JavaScript is
+     throttled or frozen. Two things used to go wrong, and both of them cost the
+     candidate the paper they had already answered:
+
+       1. the wall clock kept running while the page was frozen, so the first
+          tick after the call found `remaining = 0` and submitted instantly;
+       2. every blur was counted as a fresh integrity violation, so a call that
+          produced blur + hidden + return could reach `max_violations` and
+          submit on its own.
+
+     Now: the clock pauses while the page is away, the time away is given back
+     (capped, and logged), at most ONE integrity flag is counted per away
+     period, and nothing is ever submitted while the page is not in front of
+     the candidate. The interruption log travels with the attempt, so the exam
+     officer can see exactly what happened rather than inferring it. */
+  /* V12.84 — THE INTEGRITY RECORD, DECIDED IN ONE PLACE.
+     A phone call used to fire `window_blur`, then `visibilitychange`, then a
+     focus loss on return: three integrity flags for one ring, and at the fifth
+     the paper submitted itself. Now at most ONE flag is recorded per away
+     period, and nothing escalates to a submission while the page is not in
+     front of the candidate — the escalation is held until they come back, so
+     it is never a surprise they never saw. */
+  Exam.onViolation = function(type, n){
+    this.violations = n;
+    try { this.violationLog = (this.monitor && this.monitor.log) || this.violationLog || []; } catch(_) {}
+    const intr = ['window_blur','tab_switch','visibility_hidden','hidden','blur'];
+    if (intr.indexOf(String(type)) >= 0) {
+      if (this._awayFlagged) return;
+      this._awayFlagged = true;
+    }
+    const v = document.getElementById('viol');
+    if (v) v.textContent = '⚠ ' + n + ' integrity flag(s)';
+    const cfg = (this.data && this.data.anti_cheat_config) || {};
+    const max = cfg.max_violations || 5;
+    if (max && n >= max) {
+      if (this.pausedAt || (typeof document !== 'undefined' && document.hidden)) {
+        this._pendingSubmit = true;
+        toast('Integrity limit reached. Your paper will be sent as soon as you return to this page — nothing has been sent yet.', 'danger', 30000);
+        return;
+      }
+      toast('Too many integrity violations — submitting.', 'danger');
+      this.submit();
+    }
+  };
+
+  Exam.pauseForInterruption = function(why){
+    if (this._done || this.pausedAt) return;
+    this.pausedAt = Date.now();
+    this._awayFlagged = false;
+    try { this.saveDraft(); } catch(_) {}
+    try { const c = document.getElementById('clock'); if (c) { c.classList.remove('urgent'); c.textContent = '⏸ paused'; } } catch(_) {}
+  };
+
+  Exam.resumeFromInterruption = function(){
+    if (!this.pausedAt || this._done) { this.pausedAt = 0; return; }
+    const away = Math.max(0, Date.now() - this.pausedAt);
+    this.pausedAt = 0;
+    this._awayFlagged = false;
+    /* a learner may not park the paper for a day and come back to a full clock */
+    const cap = 30 * 60 * 1000;
+    const credit = Math.min(away, cap);
+    this.deadline += credit;
+    this.interruptTotalMs = (this.interruptTotalMs || 0) + credit;
+    (this.interruptLog = this.interruptLog || []).push({ away_ms: away, credited_ms: credit, at: new Date().toISOString() });
+    try { localStorage.setItem(this.deadlineKey(), String(this.deadline)); } catch(_) {}
+    try { this.saveDraft(); } catch(_) {}
+    try {
+      if (away > 3000) {
+        const left = Math.max(0, Math.ceil((this.deadline - this.now()) / 60000));
+        toast('⏸ Your paper was paused while you were away — ' + Math.round(credit / 1000) + 's handed back.'
+          + ' ' + left + ' minute(s) left. Your answers are saved on this device.', 'info', 12000);
+      }
+    } catch(_) {}
+    if (this._pendingSubmit && !this._done) {
+      this._pendingSubmit = false;
+      if (typeof window !== 'undefined' && window.confirm) {
+        if (window.confirm('The integrity limit was reached while you were away. Your answers are saved. Send the paper now?')) this.submit();
+      } else { this.submit(); }
+      return;
+    }
+    if (!this._timeUpShown) this.tick();
+  };
+
+  /* time is up — but the candidate is the one who presses Send */
+  Exam.timeUp = function(){
+    if (this._done || this._timeUpShown) return;
+    this._timeUpShown = true;
+    try { this.saveDraft(); } catch(_) {}
+    try { localStorage.setItem(this.deadlineKey(), String(Date.now())); } catch(_) {}
+    const btn = '<button class="btn btn-primary" style="font-size:1.05rem;padding:14px 22px" id="sc-timeup-send">Send my answers now</button>';
+    const t = document.getElementById('clock'); if (t) { t.textContent = '0:00'; t.classList.add('urgent'); }
+    const host = this.root();
+    if (host) host.insertAdjacentHTML('afterbegin',
+      '<div id="sc-timeup" class="card" style="border-left:5px solid #b91c1c;background:#fef2f2;position:sticky;top:0;z-index:60">'
+      + '<h3 style="margin:0 0 6px;color:#b91c1c">⏱ Time is up</h3>'
+      + '<p style="margin:0 0 10px;color:#7f1d1d;font-size:.9rem">Your answers are saved. Nothing has been sent yet — '
+      + 'press the button so the paper is submitted under your name. It will be sent automatically in 2 minutes, or as soon as you come back if you step away.</p>'
+      + btn + '</div>');
+    const send = () => { try { document.getElementById('sc-timeup').remove(); } catch(_) {} this.submit(); };
+    const el = document.getElementById('sc-timeup-send'); if (el) el.addEventListener('click', send);
+    /* a visible, attended page submits itself after a grace period; a page that
+       is hidden waits — being on a call must never send the paper for you */
+    setTimeout(() => { if (this._done || !this._timeUpShown) return; if (document.hidden) return; send(); }, 120000);
   };
 
   Exam.tick = function(){
     if (this.timer) clearInterval(this.timer);
     const update = () => {
-      this.remaining = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
+      this.remaining = Math.max(0, Math.ceil((this.deadline - this.now()) / 1000));
       const t = document.getElementById('clock');
       if (t) {
         const m = Math.floor(this.remaining / 60), ss = this.remaining % 60;
         t.textContent = m + ':' + String(ss).padStart(2, '0');
         if (this.remaining <= 60) t.classList.add('urgent');
       }
-      if (this.remaining <= 0) { clearInterval(this.timer); this.timer = null; toast('Time up — submitting.', 'warning'); this.submit(); }
+      if (this.remaining <= 0) {
+        clearInterval(this.timer); this.timer = null;
+        /* never submit on behalf of a candidate who is not looking at the page */
+        if (this.pausedAt || (typeof document !== 'undefined' && document.hidden)) return;
+        toast('Time up.', 'warning');
+        this.timeUp();
+      }
     };
     update();
     this.timer = setInterval(update, 1000);
@@ -901,12 +1094,14 @@ textarea.form-input{min-height:80px;resize:vertical}
   Exam.submit = async function(){
     if (this._done) return;
     this._done = true;
+    try { this.releaseSitting(); } catch(_) {}   /* the sitting is over: free the device */
     clearInterval(this.timer);
     try { if (window.CBTSpeech) CBTSpeech.stop(); } catch(_) {}   /* V10.8: audio never outlives the exam */
     if (this.monitor) try { this.monitor.stop(); } catch (e) {}
     if (window.Proctor && Proctor.active) try { Proctor.stop(); } catch (e) {}
     const graded = (window.CBT && window.CBT.gradeSubmission) ? window.CBT.gradeSubmission(this.data, this.answers) : { score: 0, total: 0, percent: 0, grade: 'F', correct: 0, wrong: 0, skipped: 0 };
-    const timeTaken = Math.round((Date.now() - this.startTs) / 1000);
+    /* V12.84 — the same clock that set the deadline measures the time taken. */
+    const timeTaken = Math.round((this.now() - this.startTs) / 1000);
     const payload = {
       exam_id: this.data.id,
       student_id: this.student.id || null,
@@ -921,6 +1116,14 @@ textarea.form-input{min-height:80px;resize:vertical}
       score: graded.score, total: graded.total, percent: graded.percent,
       correct_count: graded.correct, wrong_count: graded.wrong, skipped_count: graded.skipped,
       time_taken: timeTaken, violations: this.violations || 0, violation_log: this.violationLog || [],
+      /* V12.84 — what the connection and the phone did to this sitting travels
+         with the attempt: how long the page was away, how much was credited
+         back, and how many interruptions there were. A tutor marking a paper
+         that was paused for a call can see it instead of guessing. */
+      interruptions: (this.interruptLog || []).length,
+      interruption_ms: this.interruptTotalMs || 0,
+      interruption_log: (this.interruptLog || []).slice(-20),
+      paused_clock: (this.interruptTotalMs || 0) > 0,
       answers_data: this.qs().map((q, i) => ({
         index: (q._orig_index != null ? q._orig_index : i),
         subject: (q.section || q.subject || 'General'),
@@ -936,6 +1139,10 @@ textarea.form-input{min-height:80px;resize:vertical}
         .filter(n => Number.isFinite(n)),
       flag_notes: (this.flagNotes || {})
     };
+    /* V12.82 — the sitting tells the shell to be quiet: while a paper is
+       running the notification bell, the chat badge and the licence check all
+       stand down, so the only traffic on the connection is the paper itself. */
+    try { if (window.SCNet && SCNet.examMode) SCNet.examMode(true); } catch(_) {}
     let resp = null;
     for (let attempt = 0; attempt < 6; attempt++) {
       try { resp = await window.sb.rpc('cbt_submit_with_wal', { p_payload: payload }); if(resp.error) throw resp.error; } catch (e) { try{ resp = await window.sb.rpc('cbt_submit_v6', { p_payload: payload }); } catch(e2){ resp = { error: e2 }; } }
@@ -962,6 +1169,34 @@ textarea.form-input{min-height:80px;resize:vertical}
     const terminalError=resp&&resp.data&&['closed','not_started','attempts_exhausted','exam_not_found','answer_key_missing','question_bank_empty','wrong_class','not_on_roster','invalid_admission','admission_required'].includes(resp.data.error);
     if (!confirmed && !terminalError) {
       try { const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]'); q.push(payload); localStorage.setItem('cbt-pending-queue', JSON.stringify(q.slice(-10))); } catch (_) {}
+      /* V12.82 — a paper that could not be sent is QUEUED, not lost: the same
+         payload is handed to the resilience layer, which retries it on its own
+         schedule and again the moment the connection returns. The learner is
+         told plainly what is happening instead of being shown a failure. */
+      try {
+        if (window.SCNet && SCNet.enqueue) {
+          SCNet.enqueue({ kind: 'cbt-submit', key: 'cbt:' + (payload.client_ref || payload.exam_id),
+                          payload: Object.assign({ client_engine: 'v5.5' }, payload),
+                          label: 'answers for ' + (this.data.code || 'the paper') });
+          SCNet.examMode(false);
+          SCNet.flush(window.sb, async function (item, sb) {
+            var r = null;
+            try { r = await sb.rpc('cbt_submit_with_wal', { p_payload: item.payload }); if (r.error) throw r.error; }
+            catch (_) { r = await sb.rpc('cbt_submit_v6', { p_payload: item.payload }); }
+            if (r && r.error) throw r.error;
+            var d = (r && r.data) || {};
+            if (!(d.saved && String(d.engine_version || '').startsWith('v5.1'))) {
+              /* a real refusal (closed / exhausted) is final: stop retrying it */
+              if (d.error) return d;
+              throw new Error('not confirmed yet');
+            }
+            try { const q = JSON.parse(localStorage.getItem('cbt-pending-queue') || '[]')
+              .filter(function (x) { return (x.client_ref || '') !== (item.payload.client_ref || ''); });
+              localStorage.setItem('cbt-pending-queue', JSON.stringify(q)); } catch (_) {}
+            return d;
+          });
+        }
+      } catch (_) {}
       // V12.39: also store to server pending (device-independent, tutor can flush via cbt_flush_pending_server)
       try { if(window.sb) window.sb.rpc('cbt_store_pending',{p_payload: payload}).then(()=>console.log('[CBT] Stored to server pending')).catch(()=>{}); } catch(_){}
     } else if (confirmed) {
@@ -982,10 +1217,14 @@ textarea.form-input{min-height:80px;resize:vertical}
       const blob = new Blob([JSON.stringify({ payload, graded }, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const rpcMissing=resp&&resp.error&&/cbt_submit_v6|schema cache|function/i.test(String(resp.error.message||resp.error));
-      const message=rpcMissing?'The V5.1 grading engine is not installed in this database. An administrator must run the latest database/complete-schema.sql before results can be accepted.':((resp&&resp.data&&(resp.data.message||resp.data.error))||'The server could not confirm this submission.');
+      const offline = (typeof navigator!=='undefined' && navigator.onLine===false) || (resp&&resp.error && window.SCNet && SCNet.transient && SCNet.transient(resp.error));
+      const message= offline
+        ? 'The connection dropped before the paper reached the server, so your answers are saved on THIS device and will be sent automatically the moment the signal returns. Do not close this browser tab. You can also download a copy as proof.'
+        : (rpcMissing?'The V5.1 grading engine is not installed in this database. An administrator must run the latest database/complete-schema.sql before results can be accepted.':((resp&&resp.data&&(resp.data.message||resp.data.error))||'The server could not confirm this submission.'));
       this.root().innerHTML =
-        '<div class="card"><h2>⚠️ Submission not confirmed</h2>' +
+        '<div class="card"><h2>'+(offline?'⏳ Saved on this device — waiting for the network':'⚠️ Submission not confirmed')+'</h2>' +
         '<p>'+esc(message)+'</p><p>Your answers remain saved locally. If your teacher asks for proof, download the encrypted-safe answer payload below; it contains no answer key.</p>' +
+        '<p><button type="button" class="btn btn-outline" onclick="try{if(window.SCNet){SCNet.note(\'manual-retry\');SCNet.flush(window.sb,async function(i,sb){var r=await sb.rpc(\'cbt_submit_with_wal\',{p_payload:i.payload});if(r.error)throw r.error;return r.data;});toast(\'Trying again…\',\'info\')}}catch(_){}">↻ Try sending again now</button></p>' +
         '<a class="btn btn-primary" href="' + url + '" download="exam-backup-' + this.data.code + '.json">⬇ Download backup</a> <a class="btn btn-outline" href="cbt-exam.html">Return</a></div>';
       return;
     }
@@ -1051,7 +1290,25 @@ textarea.form-input{min-height:80px;resize:vertical}
   })();
 
   // V12.33 draft persistence on browser close (expert fix 4g)
-  window.addEventListener('beforeunload', ()=>{ try{ Exam.saveDraft(); if(Exam.deadline){ const codeNorm=String(Exam.data&&Exam.data.code||'').toUpperCase().replace(/[^A-Z0-9]/g,''); const stuNorm=String(Exam.student&&Exam.student.id_ref||Exam.clientRef||'anon').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12); try{ localStorage.setItem('cbt-deadline-'+codeNorm+'-'+stuNorm, String(Exam.deadline)); }catch(_){} } }catch(_){} });
+  window.addEventListener('beforeunload', ()=>{ try{ Exam.saveDraft(); if(Exam.deadline){ try{ localStorage.setItem(Exam.deadlineKey(), String(Exam.deadline)); }catch(_){} } }catch(_){} });
+  /* V12.84 — THE PHONE CALL.
+     `visibilitychange` is the only signal every mobile browser gives reliably
+     for "a call came in", "the screen locked", "the candidate switched apps".
+     It is also fired by a plain tab switch, so it is treated as an
+     INTERRUPTION (pause the clock, save the answers, hand the time back), never
+     as a reason to submit. The integrity monitor still records one flag per
+     away period — see beginMonitor — so the record is honest without the paper
+     being taken away from a candidate whose phone simply rang. */
+  document.addEventListener('visibilitychange', ()=>{
+    try {
+      if (!Exam.data || Exam._done) return;
+      if (document.hidden) Exam.pauseForInterruption('hidden');
+      else Exam.resumeFromInterruption();
+    } catch(_) {}
+  });
+  window.addEventListener('pagehide', ()=>{ try { if (Exam.data && !Exam._done) Exam.pauseForInterruption('pagehide'); } catch(_) {} });
+  window.addEventListener('pageshow', (e)=>{ try { if (Exam.data && !Exam._done && Exam.pausedAt) Exam.resumeFromInterruption(); } catch(_) {} });
+  window.addEventListener('focus', ()=>{ try { if (!document.hidden && Exam.pausedAt) Exam.resumeFromInterruption(); } catch(_) {} });
 
   // Exposed for accessibility tooling, automated regression tests and the
   // manager's safe preview—not for grading (grading remains server-authoritative).

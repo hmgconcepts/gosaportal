@@ -533,6 +533,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -565,7 +566,7 @@ const DRY={
     await this.loadClasses();
     await this.loadEntries();
     await this.loadStats();
-    const today = new Date().toISOString().slice(0,10);
+    const today = scDay(new Date());
     const d = document.getElementById('dry-date'); if(d && !d.value) d.value = today;
     await this.loadByDate();
   },
@@ -596,7 +597,7 @@ const DRY={
     this.renderToday();
   },
   renderToday(){
-    const today = new Date().toISOString().slice(0,10);
+    const today = scDay(new Date());
     const todayRows = this.rows.filter(r => (r.date||'').slice(0,10) === today);
     const box = document.getElementById('dry-today');
     if(!todayRows.length){ box.innerHTML = '<p style="color:#94a3b8">No entries for today.</p>'; return; }
@@ -652,7 +653,7 @@ const DRY={
     const ss = '<option value="">— optional —</option>' + this.subjects.map(c => '<option value="'+this.esc(c.name)+'">'+this.esc(c.name)+'</option>').join('');
     openModal('📔 Post a new diary entry',
       '<div class="grid grid-2">'
-      +'<div class="form-group"><label>Date *</label><input type="date" class="form-input" id="dry-p-date" value="'+new Date().toISOString().slice(0,10)+'"></div>'
+      +'<div class="form-group"><label>Date *</label><input type="date" class="form-input" id="dry-p-date" value="'+scDay(new Date())+'"></div>'
       +'<div class="form-group"><label>Class *</label><select class="form-select" id="dry-p-class">'+ps+'</select></div>'
       +'<div class="form-group"><label>Subject</label><select class="form-select" id="dry-p-subject">'+ss+'</select></div>'
       +'<div class="form-group"><label>Period / Time</label><input class="form-input" id="dry-p-period" placeholder="e.g. Period 3"></div>'

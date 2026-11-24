@@ -545,6 +545,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -606,7 +607,7 @@ const AN={
       const feesTotal = (fees||[]).reduce((a,b)=>a + (Number(b.amount_paid)||0), 0);
       set('an-fees', '₦' + feesTotal.toLocaleString());
       /* V11.4: the KPI says 30d — measure 30 days, not all-time. */
-      const cut30 = new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+      const cut30 = scDay(new Date(Date.now()-30*86400000));
       const att30 = (att||[]).filter(a=>(a.date||'') >= cut30);
       const attPresent = att30.filter(a=>String(a.status).toLowerCase()==='present').length;
       set('an-att', att30.length ? Math.round(attPresent/att30.length*100)+'%' : '—');
@@ -706,7 +707,7 @@ const AN={
    report card. */
 const cohortSubjects=new Set(rows.map(x=>String(x.subject||'').trim()).filter(Boolean)).size||1;
 const students=Object.values(studentMap).map(x=>({...x,avg:(x.values.reduce((a,b)=>a+b,0)/cohortSubjects)})).sort((a,b)=>b.avg-a.avg),classes=Object.entries(classMap).map(([name,v])=>({name,avg:avg(v)})).sort((a,b)=>b.avg-a.avg),subjects=Object.entries(subjectMap).map(([name,v])=>({name,avg:avg(v),pass:v.filter(x=>x>=50).length/v.length*100})).sort((a,b)=>b.avg-a.avg);this.academicExport.summary={school_average:schoolAvg,pass_rate:pass,student_count:students.length,class_count:classes.length,subject_count:subjects.length,students,classes,subjects};const table=(title,data,extra)=>'<div><h4>'+title+'</h4><div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Average</th>'+(extra?'<th>Pass rate</th>':'')+'</tr></thead><tbody>'+data.map((x,i)=>'<tr><td>'+(i+1)+'</td><td>'+this.esc(x.name)+'</td><td><b>'+x.avg.toFixed(1)+'%</b></td>'+(extra?'<td>'+x.pass.toFixed(1)+'%</td>':'')+'</tr>').join('')+'</tbody></table></div></div>';host.innerHTML='<div class="stats-grid"><div class="stat-card"><div class="stat-value">'+schoolAvg.toFixed(1)+'%</div><div class="stat-label">School average</div></div><div class="stat-card"><div class="stat-value">'+pass.toFixed(1)+'%</div><div class="stat-label">Subject pass rate</div></div><div class="stat-card"><div class="stat-value">'+students.length+'</div><div class="stat-label">Students analysed</div></div><div class="stat-card"><div class="stat-value">'+rows.length+'</div><div class="stat-label">Student-subject records</div></div></div><div class="grid grid-2">'+table('Class performance',classes,false)+table('Subject performance',subjects,true)+'</div><div class="notice" style="margin-top:10px">Decision guide: prioritise subjects/classes below 50%; compare pass rate and average; review learners in the at-risk table; document intervention and re-check next term.</div>';const studentRows=(arr,status)=>'<div class="table-wrap"><table><thead><tr><th>Rank</th><th>Student</th><th>Class</th><th>Average</th><th>Status</th></tr></thead><tbody>'+arr.map((x,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+this.esc(x.name)+'</b></td><td>'+this.esc(x.class||'')+'</td><td>'+x.avg.toFixed(1)+'%</td><td>'+status(x.avg)+'</td></tr>').join('')+'</tbody></table></div>';document.getElementById('an-top-students').innerHTML=studentRows(students.slice(0,10),x=>x>=80?'Excellent':x>=70?'Very good':'Good');document.getElementById('an-low-students').innerHTML=studentRows(students.slice().sort((a,b)=>a.avg-b.avg).slice(0,10),x=>x<40?'Critical':x<50?'At risk':'Monitor');},
-  exportAcademicInsights(){if(!this.academicExport){toast('Run the academic analysis first.','warning');return;}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(this.academicExport,null,2)],{type:'application/json'}));a.download='academic-performance-'+new Date().toISOString().slice(0,10)+'.json';a.click();},
+  exportAcademicInsights(){if(!this.academicExport){toast('Run the academic analysis first.','warning');return;}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(this.academicExport,null,2)],{type:'application/json'}));a.download='academic-performance-'+scDay(new Date())+'.json';a.click();},
   async renderTopStudents(){
     const box = document.getElementById('an-top-students');
     try{

@@ -500,8 +500,34 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
         </p>
         <div id="prep-exam-list"><span class="pulse">Loading prep exams…</span></div>
       </div>
+      <!-- V12.82 — the tutor's own diary, and every other tutor's, so a wrong
+           time or a wrong length is caught the day it is typed instead of on
+           the morning of the paper. Staff only: the whole block stays hidden
+           for a learner or a parent (they get the list above). -->
+      <div class="card" id="prep-teacher-card" style="margin-bottom:16px;display:none">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+          <div>
+            <h3 style="margin:0 0 4px">🧑‍🏫 Prep sittings by tutor</h3>
+            <p style="color:var(--gray-700);line-height:1.6;margin:0;font-size:.92rem">
+              Every prep paper with the tutor who set it, the class, the day, the
+              <b>time it runs</b> and the <b>length the database enforces</b>. Switch to
+              <b>All tutors</b> to see the whole school's prep diary — a clash, a
+              five-minute paper or a sitting that closes before it opens is flagged
+              in plain words, on the row it belongs to.
+            </p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm btn-primary" id="pt-mine" onclick="EXT.prepScope('mine')">My sittings</button>
+            <button type="button" class="btn btn-sm btn-outline" id="pt-all" onclick="EXT.prepScope('all')">All tutors</button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="EXT.loadPrepTutors()" title="Read the list again">↻ Refresh</button>
+            <a class="btn btn-sm btn-outline" href="cbt.html" title="Fix an exam's time or length">✏️ Fix in CBT</a>
+          </div>
+        </div>
+        <div id="prep-tutor-summary" style="margin:10px 0 0"></div>
+        <div id="prep-tutor-list" style="margin-top:10px"></div>
+      </div>
       <div class="card" style="margin-bottom:16px"><div id="ex-actions" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
-        <div class="form-group"><label>Class</label><select class="form-select" id="ex-class" onchange="EXT.load()"><option value="">All classes</option></select></div>
+        <div class="form-group"><label>Class</label><select class="form-select" id="ex-class" onchange="EXT.load();try{EXT.loadPrepTutors()}catch(_){}"><option value="">All classes</option></select></div>
         <div class="form-group"><label>Term</label><select class="form-select" id="ex-term"><option>First Term</option><option>Second Term</option><option>Third Term</option></select></div>
         <div class="form-group"><label>Session</label><input class="form-input" id="ex-session" placeholder="e.g. 2026/2027" style="width:130px"></div>
         <button class="btn btn-outline" onclick="EXT.load()">Refresh</button>
@@ -522,6 +548,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -601,9 +628,136 @@ const EXT={
       box.innerHTML='<p style="color:var(--gray-500);font-size:.9rem;margin:0">💤 Prep sittings appear here after a one-time database update (admin: run database/complete-schema.sql).</p>';
     }
   },
+  /* ---------------------------------------------------------------------------
+     V12.82 — PREP SITTINGS BY TUTOR
+     One call to sc_prep_teacher_timetable() returns every prep sitting with the
+     tutor's name, the class, the school-time clock, the enforced length and the
+     list of faults the row carries. Nothing here is computed in the browser, so
+     what a tutor reads is exactly what the database will enforce.
+
+     Scope default is 'mine' — a tutor's first question is about their own diary.
+     'all' is one click away because the school asked for the other tutors' as
+     well, and because a clash is only visible when both halves are on the page.
+     --------------------------------------------------------------------------- */
+  prepScopeVal: 'mine',
+  prepIssueText(v){
+    return ({
+      no_start_time: 'no time typed',
+      no_duration: 'no length set',
+      closes_before_it_opens: 'closes before it opens',
+      closing_time_vs_length: 'closing time disagrees with the length',
+      under_10_minutes: 'under 10 minutes',
+      over_3_hours: 'over 3 hours',
+      open_all_day: 'open more than 8 hours',
+      outside_school_hours: 'outside school hours',
+      no_class: 'no class set',
+      not_on_timetable: 'not on the timetable learners read',
+      clashes_with_another_paper: 'clashes with another paper'
+    })[v] || String(v).replace(/_/g, ' ');
+  },
+  prepScope(scope){
+    this.prepScopeVal = scope === 'all' ? 'all' : 'mine';
+    const m=document.getElementById('pt-mine'), a=document.getElementById('pt-all');
+    if(m){ m.className='btn btn-sm '+(this.prepScopeVal==='mine'?'btn-primary':'btn-outline'); }
+    if(a){ a.className='btn btn-sm '+(this.prepScopeVal==='all'?'btn-primary':'btn-outline'); }
+    this.loadPrepTutors();
+  },
+  async loadPrepTutors(){
+    const card=document.getElementById('prep-teacher-card');
+    const box=document.getElementById('prep-tutor-list');
+    const sum=document.getElementById('prep-tutor-summary');
+    if(!card||!box||!window.sb) return;
+    /* staff only — a learner and a parent must not see another tutor's diary */
+    let role='';
+    try{
+      for(let i=0;i<25&&!(window.SC_PROFILE&&SC_PROFILE.role);i++) await new Promise(r=>setTimeout(r,200));
+      role=String((window.SC_PROFILE||{}).role||'').toLowerCase();
+    }catch(_){}
+    if(!/super_admin|admin|principal|proprietor|head_teacher|bursar|staff|teacher/.test(role)){
+      card.style.display='none';
+      /* the shell resolves the role from the database a moment after the page
+         paints, so a tutor whose profile lands late must not lose the card */
+      if(!this._prepTried){ this._prepTried=true; setTimeout(()=>this.loadPrepTutors(), 3500); }
+      return;
+    }
+    card.style.display='';
+    const cls=(document.getElementById('ex-class')||{}).value||'';
+    box.innerHTML='<span class="pulse">Reading prep sittings…</span>';
+    try{
+      let data=null, error=null;
+      try{
+        const r=await sb.rpc('sc_prep_teacher_timetable',{p_scope:this.prepScopeVal,p_class:cls});
+        data=r.data; error=r.error;
+      }catch(_){ error={message:'rpc unavailable'}; }
+      if(error) throw error;
+      const rows=Array.isArray(data)?data:[];
+      if(!rows.length){
+        box.innerHTML='<p style="color:var(--gray-500);font-size:.9rem;margin:0">📭 No prep sitting '+
+          (this.prepScopeVal==='mine'?'is assigned to you':'is set for '+(cls?esc(cls)+' yet':'any class yet'))+
+          '. Create one in the CBT manager and it appears here, with its class, its time and its length, the moment it is saved.</p>';
+        if(sum) sum.innerHTML='';
+        return;
+      }
+      /* group by tutor, in the order the database returned (already by name) */
+      const groups=[];
+      rows.forEach(r=>{
+        const name=r.teacher_name||'(no tutor assigned)';
+        let g=groups.find(x=>x.name===name);
+        if(!g){ g={name,phone:r.teacher_phone||'',rows:[],issues:0}; groups.push(g); }
+        g.rows.push(r);
+        g.issues += (r.issues||[]).length ? 1 : 0;
+      });
+      const flagged=rows.filter(r=>(r.issues||[]).length).length;
+      if(sum){
+        sum.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:.88rem">'+
+          '<span class="badge" style="background:#e0e7ff;color:#3730a3">'+rows.length+' sitting'+(rows.length===1?'':'s')+'</span>'+
+          (this.prepScopeVal==='mine'?'':'<span class="badge" style="background:#f1f5f9;color:#334155">'+groups.length+' tutor'+(groups.length===1?'':'s')+'</span>')+
+          (flagged
+            ? '<span class="badge" style="background:#fef2f2;color:#b91c1c">⚠️ '+flagged+' to check</span>'
+            : '<span class="badge" style="background:#dcfce7;color:#166534">✓ every time and length looks right</span>')+
+          '<span style="color:var(--gray-500)">school time · the length shown is the length the database enforces</span></div>';
+      }
+      const stat=r=>r.status==='open'?'<span class="badge" style="background:#dcfce7;color:#166534">🟢 Open</span>'
+        :r.status==='closed'?'<span class="badge" style="background:#f3f4f6;color:#4b5563">🔒 Closed</span>'
+        :r.status==='upcoming'?'<span class="badge" style="background:#dbeafe;color:#1e40af">🕒 Upcoming</span>'
+        :'<span class="badge" style="background:#fef3c7;color:#92400e">⏳ No time</span>';
+      let h='';
+      groups.forEach(g=>{
+        h+='<div style="border:1.5px solid var(--gray-200);border-radius:12px;padding:10px 12px;margin:0 0 10px">'+
+          '<h4 style="margin:0 0 6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+            '<span>'+esc(g.name)+'</span>'+
+            (g.phone?'<small style="color:var(--gray-500);font-weight:400">'+esc(g.phone)+'</small>':'')+
+            (g.issues?'<span class="badge" style="background:#fef2f2;color:#b91c1c">⚠️ '+g.issues+'</span>':'').toString()+
+          '</h4>'+
+          '<div class="table-wrap"><table><thead><tr><th>Day</th><th>Runs</th><th>Length</th><th>Class</th><th>Paper</th><th>Venue</th><th>Status</th><th></th></tr></thead><tbody>';
+        g.rows.forEach(r=>{
+          const flags=(r.issues||[]);
+          h+='<tr'+(flags.length?' style="background:#fffbeb"':'')+'>'+
+            '<td style="white-space:nowrap"><b>'+esc(String(r.exam_date||'').slice(0,10))+'</b></td>'+
+            '<td style="white-space:nowrap">'+(r.start_time?('<b>'+esc(r.start_time)+'–'+esc(r.end_time)+'</b>'):'<span style="color:#b91c1c">no time</span>')+'</td>'+
+            '<td style="white-space:nowrap">'+(Number(r.duration_min)>0?(Number(r.duration_min)+' min'):'—')+
+              (Number(r.window_min)>0&&Number(r.window_min)!==Number(r.duration_min)?'<br><small style="color:#b45309">open '+Number(r.window_min)+' min</small>':'')+'</td>'+
+            '<td>'+esc(r.class||'—')+'</td>'+
+            '<td><b>'+esc(r.title||r.subject||'')+'</b><br><small style="color:var(--gray-500)">'+esc(r.subject||'')+' · '+(r.sat||0)+'/'+(r.expected||0)+' sat</small></td>'+
+            '<td>'+esc(r.venue||'—')+'</td>'+
+            '<td>'+stat(r)+'</td>'+
+            '<td>'+(flags.length?flags.map(f=>'<span class="badge" style="background:#fee2e2;color:#991b1b;margin:0 0 3px 0;display:inline-block">'+esc(this.prepIssueText(f))+'</span> ').join(''):'')+
+              (flags.length||r.mine?'<a class="btn btn-sm btn-outline" href="cbt.html">Fix</a>':'')+'</td>'+
+          '</tr>';
+        });
+        h+='</tbody></table></div></div>';
+      });
+      box.innerHTML=h+'<p style="font-size:.78rem;color:var(--gray-500);margin:6px 0 0">'+
+        (this.prepScopeVal==='mine'?'Your own prep sittings.':'Every tutor\'s prep sittings.')+
+        ' A paper is only ever sat inside the window shown here — the learner\'s list, the timetable and the exam page all read the same clock.</p>';
+    }catch(e){
+      box.innerHTML='<p style="color:var(--gray-500);font-size:.9rem;margin:0">💤 Tutor prep sittings appear here after a one-time database update (admin: run database/complete-schema.sql).</p>';
+    }
+  },
   async init(){
     this.resolveEdit();
     this.loadPrep();
+    this.loadPrepTutors();
     try{const {data}=await sb.from('classes').select('name').order('name');const sel=document.getElementById('ex-class');(function(){var seen=new Set();(data||[]).forEach(c=>{var v=String(c.name==null?'':c.name).trim(),k=v.toLowerCase();if(!v||seen.has(k))return;seen.add(k);var o=document.createElement('option');o.value=v;o.textContent=v;sel.appendChild(o);});})();}catch(e){}
     try{const cp=await sb.from('academic_periods').select('term,session').eq('is_current',true).maybeSingle();if(cp.data){if(cp.data.term)document.getElementById('ex-term').value=cp.data.term;if(cp.data.session)document.getElementById('ex-session').value=cp.data.session;}}catch(e){}
     /* students/parents land on their own class */
@@ -793,10 +947,10 @@ const EXT={
       let dayNo=1,si=0;let d0=mode==='date'?new Date(start+'T12:00:00'):null;
       if(d0)while(isSkippedDay(d0))d0.setDate(d0.getDate()+1);
       const advance=()=>{si++;if(si>=slots.length){si=0;dayNo++;if(d0){d0.setDate(d0.getDate()+1);while(isSkippedDay(d0))d0.setDate(d0.getDate()+1);}}};
-      const rows=[];const todaySubjects=()=>new Set(rows.filter(r=>d0?(r.exam_date===d0.toISOString().slice(0,10)):(r.day_no===dayNo)).map(r=>r.subject));
+      const rows=[];const todaySubjects=()=>new Set(rows.filter(r=>d0?(r.exam_date===scDay(d0)):(r.day_no===dayNo)).map(r=>r.subject));
       const push=(x)=>{rows.push({class:cls,subject:x.subject,start_time:slots[si][0],end_time:slots[si][1],
           venue:nextVenue(),invigilator:nextInv(),paper:x.paper,paper_kind:x.paper,term:c.term,session:c.session,notes:'',
-          exam_date:d0?d0.toISOString().slice(0,10):new Date(Date.now()+dayNo*86400000).toISOString().slice(0,10),
+          exam_date:d0?scDay(d0):scDay(new Date(Date.now()+dayNo*86400000)),
           day_no:d0?null:dayNo});advance();};
       while(sittings.length){
         const seen=todaySubjects();
@@ -819,10 +973,10 @@ const EXT={
           if(mode==='date'&&d0){/* Day N pin in date mode → count N scheduling days from start */
             const dd=new Date(start+'T12:00:00');let n=1;while(isSkippedDay(dd))dd.setDate(dd.getDate()+1);
             while(n<pin.day){dd.setDate(dd.getDate()+1);while(isSkippedDay(dd))dd.setDate(dd.getDate()+1);n++;}
-            row.exam_date=dd.toISOString().slice(0,10);}
-          else if(mode==='day')row.exam_date=new Date(Date.now()+pin.day*86400000).toISOString().slice(0,10);
+            row.exam_date=scDay(dd);}
+          else if(mode==='day')row.exam_date=scDay(new Date(Date.now()+pin.day*86400000));
         }
-        if(!row.exam_date)row.exam_date=new Date(Date.now()+(pin.day||1)*86400000).toISOString().slice(0,10);
+        if(!row.exam_date)row.exam_date=scDay(new Date(Date.now()+(pin.day||1)*86400000));
         rows.push(row);});
       /* insert with graceful fallback for pre-v9.4 databases (no day_no/paper_kind) */
       let r=await sb.from('exam_timetable').insert(rows);
@@ -841,7 +995,7 @@ const EXT={
     if(!this.canEdit){toast('Only the admin or an authorized timetable editor can shift the schedule.','warning');return;}
     openModal('↔️ Shift exam days',
       '<p style="font-size:.85rem;color:var(--gray-600)">School closed unexpectedly? Every paper ON or AFTER the cut-off moves forward by the chosen number of days (Sundays'+((this._satOK)?'':' and Saturdays')+' skipped). Day-number rows shift their Day N instead.</p>'+
-      '<div class="grid grid-2"><div class="form-group"><label>From date (papers on/after this move)</label><input class="form-input" id="exs-from" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div>'+
+      '<div class="grid grid-2"><div class="form-group"><label>From date (papers on/after this move)</label><input class="form-input" id="exs-from" type="date" value="'+scDay(new Date())+'"></div>'+
       '<div class="form-group"><label>Shift by (days)</label><input class="form-input" id="exs-by" type="number" value="1" min="1" max="30"></div></div>',
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="EXT.shiftRun()">↔️ Shift now</button>');},
   async shiftRun(){
@@ -859,7 +1013,7 @@ const EXT={
         if(!u.error)moved++;continue;}
       const dt=new Date(row.exam_date+'T12:00:00');let n=0;
       while(n<by){dt.setDate(dt.getDate()+1);if(dt.getDay()!==0&&dt.getDay()!==6)n++;}
-      const u=await sb.from('exam_timetable').update({exam_date:dt.toISOString().slice(0,10)}).eq('id',row.id);
+      const u=await sb.from('exam_timetable').update({exam_date:scDay(dt)}).eq('id',row.id);
       if(!u.error)moved++;}
     toast('↔️ '+moved+' paper(s) shifted by '+by+' day(s).','success',8000);
     if(window.App&&App.logActivity)App.logActivity('shift','exam_timetable',from+'+'+by);this.load();},

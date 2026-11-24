@@ -305,7 +305,75 @@ A single school of 1,000 learners fits comfortably inside the free tiers.
 
 ---
 
-## 15. What is new in V12.81, and the five checks that prove it installed
+## 15. What is new in V12.83 (upload only — no database step)
+
+V12.83 fixes four things that were never reported as bugs because each one looked
+like something else. **There is no SQL to run this round**: `complete-schema.sql` is
+byte-identical to V12.82.
+
+| The school says… | What it was | Check it yourself |
+|---|---|---|
+| "last night's register went in under yesterday" | the calendar day was computed in **UTC** in 103 places | mark a register between 00:00 and 01:00 — the date is the school's day |
+| "it signs us out for no reason" | every tab refreshed the **same** token; the second spent one already rotated | open two tabs, watch one refresh in the network panel, stay signed in |
+| "my classes are empty, it says I am offline" | a failed "who am I" call **invented the role `student`** | drop the network for 5 s while a page loads — a teacher still sees their classes |
+| "the page reloads while I type" / "somebody else's dashboard opened here" | first-visit reload, and a sign-out that left cached pages behind | sign out in one tab — the other leaves too, and the cached pages are gone |
+
+Design notes and the full evidence: [`RELEASE-v12.83.md`](RELEASE-v12.83.md).
+After the upload, hard-reload once (the service worker cache name changed to
+`v12.83`), and confirm on a phone at home — not only inside the school — that two tabs
+stay signed in together.
+
+---
+
+## 15b. What is new in V12.82, and the six checks that prove it installed
+
+If you are upgrading from V12.81 the procedure is the same four steps as §4 —
+back up, run `database/complete-schema.sql` once, upload the files, hard-reload.
+Then do the **five-minute dashboard checklist** in
+[`EXAM-WEEK-LOAD-PLAYBOOK.md`](EXAM-WEEK-LOAD-PLAYBOOK.md) §3 — *raise the two Auth
+rate limits first*; that is the change that stops "some students cannot log in" on
+home data.
+
+After the pack has run you should see this line among the results:
+
+```
+V12.82 installed — every tutor sees every prep timetable, the bell costs one count instead of three queries, and the disk-IO doctor names the table that is doing the writing
+```
+
+Then confirm each of these on the live site:
+
+1. **A tutor reads their own prep diary.** Exam Timetable → **🧑‍🏫 Prep sittings by
+   tutor** (staff only). It lists the signed-in tutor's prep papers with class, day,
+   `10:00–10:45`, **45 min**, venue and how many learners have sat.
+2. **And everybody else's, in one click.** Press **All tutors** — the same list opens
+   grouped by tutor name, in date order, across every tutor in the school.
+3. **The faults are named.** Create a prep exam with a closing time that disagrees with
+   its length (45 minutes, but closes three hours later) and reload the card: its row is
+   tinted amber and says *"closing time disagrees with the length"*. Two prep papers on
+   the same class at the same time say *"clashes with another paper"* on **both** rows.
+4. **The bell is one query, not three.** Open Platform Health, then any portal page: the
+   network panel shows one `POST /rest/v1/rpc/sc_poll_bundle` about every two minutes per
+   tab, instead of a 50-row `GET /notifications` plus `/auth/v1/user` plus
+   `sc_message_unread` every 30 seconds. Hidden tabs send nothing.
+5. **A bad line no longer signs anybody out.** Throttle a phone to offline in DevTools
+   while signed in: you stay signed in, a banner says the work is saved on the device,
+   and when you go back online the queued traffic is sent without a reload.
+6. **The disk-IO doctor.** Platform Health → **🩺 Load & Disk IO → ↻ Read the report**:
+   database size, top-written tables, tables read without an index, bloat, and the
+   **🧹 Prune old notices** button with it.
+
+**Rolling back.** Restore the backup taken in step 1 and redeploy the previous ZIP.
+V12.82 adds four functions (`sc_poll_bundle`, `sc_prep_teacher_timetable`,
+`sc_io_report`, `sc_prune_noise`), one index, and drops **two duplicate** indexes on
+`cbt_results`; no table and no column changes, so a file-only rollback is safe for readers.
+
+> **Schema budget: 998,213 B of 1,000,000 (1,787 B of room).** Headroom had fallen to
+> 1,462 B. `tools/build-complete-schema.py` gained four proven reclaim rules this round
+> (one install-marker row per key, repeated `enable row level security`, the reload
+> signal written two ways, and grants already covered by a later grant). The verifier
+> still proves the built file is **object-identical** to `complete-schema.raw.sql`.
+
+## 15c. What was new in V12.81
 
 If you are upgrading from V12.79 the procedure is the same four steps as §4 —
 back up, run `database/complete-schema.sql` once, upload the files, hard-reload.
@@ -350,12 +418,7 @@ ZIP. V12.81 adds one column (`school_settings.school_timezone`, defaulted), two
 functions and one trigger, and changes the bodies of six others; nothing is
 dropped, so a file-only rollback is safe for readers.
 
-> **Note for the next release (schema budget).** The pack is 998,626 bytes
-> against Supabase's 1,000,000-byte limit for a pasted script — about 1.3 KB of
-> room. The next round must reclaim space from older, superseded narrative
-> before adding objects.
-
-## 15b. What was new in V12.79
+## 15d. What was new in V12.79
 
 If you are upgrading from V12.77 the procedure is the same four steps as §4 —
 back up, run `database/complete-schema.sql` once, upload the files, hard-reload.
@@ -409,3 +472,76 @@ The whole release costs nothing to run: no AI API is called anywhere (the
 client-hardening audit prints `No paid AI API dependency introduced`), the
 database pack stays inside the Supabase free-tier 500 MB allowance, and the only
 network calls the browser makes are to your own Supabase project.
+
+---
+
+## Section 15 — V12.84 upgrade (the right bill, and the paper you keep)
+
+**Database change: yes.** This round changes the fee resolver and the payloads the
+fee screens read. The client files change with it; deploy both together or the
+Fees page will keep describing the old verdicts.
+
+### 1. What you must do (in order)
+
+1. **Back up** — Supabase → *Database* → *Backups*, or
+   `pg_dump "$DATABASE_URL" > backup-before-v12.84.sql`.
+2. Paste **`database/complete-schema.sql`** (968,321 B) into the Supabase SQL
+   editor and run it. It is idempotent: running it twice is safe, and the pack
+   has been proven object-identical to the raw cumulative schema
+   (`node tools/verify-complete-schema.mjs` → `ALL PASS`).
+3. Upload the client files as usual — `sw.js` carries the new cache name
+   `sc-builder-v12.84-20261130-1`, so phones pick the new shell on their next
+   visit. No "clear site data" is required.
+4. **Nothing else.** No new table, no new cron, no new API key, no paid service.
+   The round *shrank* the schema (superseded function bodies dropped) before it
+   added to it.
+
+### 2. What the bursar will notice (and should be told)
+
+| Situation | Before V12.84 | From V12.84 |
+|---|---|---|
+| Price list published **per arm**, learner has **no arm** | charged *another arm's* figure, silently | **"Arm not set — choose the arm"**, both priced arms listed, **nothing charged** |
+| Arm written **into the class name** (`JSS 1A`) | charged **₦0**, reported as "no structure" | matched to JSS 1 · arm A, and the note says the arm came from the class name |
+| **This term** never published, an older term exists | charged the **older term's** figure | **"No bill for <term>"**, nothing charged; the older figure is offered as an *option* that must be confirmed, then recorded as a hand-set total |
+| A figure was **set by hand** | reported as if it came from the price list | reported as **override**, with the note saying who decided it |
+
+Nothing above changes a figure that was already correct. Run the Fees page for
+one class before and after if you want to see it: the numbers that agree today
+will still agree, and the ones that disagreed will now say why.
+
+### 3. What the exam officer will notice
+
+* A candidate whose **phone rings** during a home paper keeps their paper: the
+  clock pauses, the time is handed back, and the interruption is recorded on the
+  attempt (`interruptions`, `interruption_ms`, `interruption_log`, `paused_clock`).
+* When time is up the candidate sees **"Time is up — send my answers"** and presses
+  Send (two-minute grace on an attended page). **Being on a call never sends it.**
+* A second tab of the same paper is refused, with an explicit **"Continue in this
+  tab"** button — no more two attempts in one sitting.
+* A paper is timed by the **school's clock**; a phone with a wrong clock no longer
+  closes early.
+
+### 4. Verify the deployment
+
+```bash
+node tools/verification/t62-class-fee-truth.mjs               # 43/0
+node tools/verification/t63-interruption-not-submission.mjs   # 23/0
+node tools/verification/t64-sitting-guards.mjs                # 14/0
+node tools/verify-complete-schema.mjs                         # ALL PASS
+```
+
+Then, on the live site: **💳 Class Fee Structure** → confirm every per-arm class
+has the arm set on its learners (or publish one whole-class bill with the arm
+blank). That single check removes the only remaining way to see an "Arm not set"
+warning.
+
+**Rolling back.** Restore the backup from step 1 and redeploy the previous ZIP.
+V12.84 replaces function bodies and adds payload keys only — it changes no column
+type and drops no data — so a file-only rollback is safe for readers; the
+database rollback needs the backup.
+
+### Free-tier notes (unchanged)
+
+No AI API, no paid service, no extra cron. The schema stays inside Supabase's
+1,000,000-byte pasted-script limit with ~31 KB of headroom, and the fee resolver
+answers from tables the platform already reads.

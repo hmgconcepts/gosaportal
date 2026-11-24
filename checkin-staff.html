@@ -479,6 +479,7 @@ video{width:100%;height:100%;object-fit:cover}
 
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/jsqr.min.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -720,7 +721,7 @@ const CK = {
       const { error: clErr } = await supabase.from('staff_clock').insert({
         staff_id: staffId,
         clock_in: now.toISOString(),
-        date: now.toISOString().slice(0, 10),
+        date: scDay(now),
         note: 'Checked in as ' + status.toUpperCase()
       });
       if (clErr) { alert('Error logging clock-in: ' + clErr.message); return; }
@@ -739,7 +740,7 @@ const CK = {
       alert('✅ Clock-In Successful! Checked in as ' + status.toUpperCase() + ' at ' + now.toLocaleTimeString());
     } else {
       // 1. Log Clock-Out in staff_clock table
-      const todayStr = now.toISOString().slice(0, 10);
+      const todayStr = scDay(now);
       const { data: todayClock } = await supabase.from('staff_clock').select('*').eq('staff_id', staffId).eq('date', todayStr).maybeSingle();
       if (todayClock) {
         await supabase.from('staff_clock').update({ clock_out: now.toISOString(), note: 'Clocked out at ' + now.toLocaleTimeString() }).eq('id', todayClock.id);

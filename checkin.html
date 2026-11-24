@@ -532,6 +532,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -664,7 +665,7 @@ const CK={ done:[], stream:null, scanning:false, last:'', lastAt:0,
       const { error: clErr } = await supabase.from('student_clock').insert({
         student_id: studentId,
         clock_in: now.toISOString(),
-        date: now.toISOString().slice(0, 10),
+        date: scDay(now),
         note: 'Clocked in successfully'
       });
       if (clErr) { toast('Error logging clock-in: ' + clErr.message, 'danger'); return; }
@@ -677,7 +678,7 @@ const CK={ done:[], stream:null, scanning:false, last:'', lastAt:0,
       toast('✅ Student Clock-In Successful!', 'success');
     } else {
       // 1. Log Clock-Out in student_clock table
-      const todayStr = now.toISOString().slice(0, 10);
+      const todayStr = scDay(now);
       const { data: todayClock } = await supabase.from('student_clock').select('*').eq('student_id', studentId).eq('date', todayStr).maybeSingle();
       if (todayClock) {
         await supabase.from('student_clock').update({ clock_out: now.toISOString(), note: 'Clocked out at ' + now.toLocaleTimeString() }).eq('id', todayClock.id);

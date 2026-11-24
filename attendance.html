@@ -495,6 +495,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -576,7 +577,7 @@ const AT={
       '<div class="form-group"><label>Term</label><input class="form-input" id="atp-term" value="'+(cp.term||'')+'" readonly style="background:var(--gray-100)"></div>'+
       '<div class="form-group"><label>Session</label><input class="form-input" id="atp-session" value="'+(cp.session||'')+'" readonly style="background:var(--gray-100)"></div>'+
       '<div class="form-group"><label>Term start date</label><input class="form-input" id="atp-start" type="date" value="'+(cp.starts_on||'')+'"></div>'+
-      '<div class="form-group"><label>Term end date (or today)</label><input class="form-input" id="atp-end" type="date" value="'+new Date().toISOString().slice(0,10)+'"></div></div>',
+      '<div class="form-group"><label>Term end date (or today)</label><input class="form-input" id="atp-end" type="date" value="'+scDay(new Date())+'"></div></div>',
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="AT.pushRun(\''+cls.replace(/'/g,"\\'")+'\')">🚀 Push now</button>');
   },
   async pushRun(cls){
@@ -592,7 +593,7 @@ const AT={
   },
   students:[], 
   async init(){
-    document.getElementById('at-date').value=new Date().toISOString().slice(0,10);
+    document.getElementById('at-date').value=scDay(new Date());
     const role = (window.SC_PROFILE && SC_PROFILE.role) || (window.SCHOOL_USER && SCHOOL_USER.role) || '';
     const isParentOrStudent = role === 'parent' || role === 'student';
     
@@ -722,7 +723,7 @@ const AT={
     /* V7.6 #1: HISTORY-AWARE REGISTER — the register now loads the marks
        ALREADY SAVED for the chosen date (any past date), so staff can review,
        correct or reprint any previous day instead of always starting blank. */
-    const date=document.getElementById('at-date').value||new Date().toISOString().slice(0,10);
+    const date=document.getElementById('at-date').value||scDay(new Date());
     let saved={};
     try{ const r=await sb.from('attendance').select('student_id,status').eq('class',cls).eq('date',date).limit(500);
       (r.data||[]).forEach(a=>{saved[a.student_id]=String(a.status||'').toLowerCase();}); }catch(_){ }
@@ -733,7 +734,7 @@ const AT={
   }, 
   async saveAll(){ 
     if(!this.students.length){toast('Load a class first','warning');return;} 
-    const date=document.getElementById('at-date').value||new Date().toISOString().slice(0,10); 
+    const date=document.getElementById('at-date').value||scDay(new Date()); 
     const rows=this.students.map(s=>({student_id:s.id,student_name:s.full_name,class:s.class,date:date,status:document.getElementById('ats-'+s.id).value,recorded_by:(window.SC_PROFILE&&SC_PROFILE.id)||null})); 
     const {error}=await sb.from('attendance').upsert(rows,{onConflict:'student_id,date'}); 
     if(error){toast(error.message,'danger');return;} 

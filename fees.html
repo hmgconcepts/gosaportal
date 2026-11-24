@@ -708,6 +708,7 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
 </div>
 <script src="assets/vendor/supabase-js-2.58.0.js"></script>
 <script src="assets/vendor/chart.umd.js"></script>
+<script src="assets/js/net-resilience.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/license.js"></script>
 <script src="assets/js/demo.js"></script>
@@ -825,10 +826,13 @@ const FAM={
           const mk_=String(f.match_status||''), mb_=String(f.matched_by||''), rb_=String(f.resolved_by||'');
           const UNK_={no_structures_at_all:'No class fee structure exists on this platform yet — the school must enter it once on 💳 Class Fee Structure.',
             no_structure_this_term:'This class has a fee structure, but none for '+(f.term||'this term')+'. The bill is unknown, not zero.',
+            ambiguous_arm:'This class is priced per arm and this learner\'s arm is not set, so no arm\'s figure is being claimed.',
             no_structure:'No fee structure has ever been published for this class.'};
           if(f.bill_known===false){
             h+='<div style="border-left:4px solid #f59e0b;background:#fffbeb;padding:8px 11px;border-radius:8px;font-size:.82rem;color:#78350f">'
-              +'<b>⚠️ '+(UNK_[mk_]||'The bill for this term has not been published yet.')+'</b> The figures below are your payment record, not a statement that nothing is owed.</div>';
+              +'<b>⚠️ '+(UNK_[mk_]||'The bill for this term has not been published yet.')+'</b> The figures below are your payment record, not a statement that nothing is owed.'
+              +((mk_==='ambiguous_arm'&&Array.isArray(f.candidates)&&f.candidates.length)?' <span style="color:#78350f">Priced options: '+f.candidates.map(c=>this.money(cur,c.total)+(c.arm?' ('+this.esc(c.arm)+')':'')).join(' · ')+'.</span>':'')
+              +'</div>';
           } else if(mb_ && mb_!=='invoice'){
             const soft_=(mb_==='session_other_term'||mb_==='latest_structure');
             const rung_={exact_term:'the fee published for this exact term',current_term_label:'the fee saved as “Current Term”',session_other_term:'another term of the same session',latest_structure:'the most recent published class fee',override:'a personal total set by the bursar'}[mb_]||'';
@@ -1040,7 +1044,7 @@ const FeeStatement={
     const csv=lines.map(r=>r.map(q).join(',')).join('\n');
     const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='fee-collection-statement-'+(this.ctx.cls||'whole-school').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+new Date().toISOString().slice(0,10)+'.csv';
+    a.download='fee-collection-statement-'+(this.ctx.cls||'whole-school').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+scDay(new Date())+'.csv';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href),8000);
     toast('CSV exported — '+this.rows.length+' students.','success',6000);
@@ -1942,7 +1946,7 @@ const FeeReports = {
       .join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([body], {type:'text/csv'}));
-    a.download = 'aged-arrears-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.download = 'aged-arrears-' + scDay(new Date()) + '.csv';
     a.click();
   }
 };
