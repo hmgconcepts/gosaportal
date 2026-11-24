@@ -1,30 +1,35 @@
 {
  "_meta": {
-  "built_bytes": 997532,
-  "built_from_bytes": 1479320,
+  "built_bytes": 967343,
+  "built_from_bytes": 1497957,
   "removed": {
-   "banner-rule": 457,
-   "banner-trimmed": 128,
+   "banner-rule": 433,
+   "banner-trimmed": 113,
    "blank-squeezed": 1,
-   "deindented": 40216,
+   "covered-grant": 31,
+   "covered-revoke": 16,
+   "deindented": 38205,
+   "duplicate-enable-rls": 28,
    "duplicate-grant": 10,
-   "inline-prose-shortened": 155,
+   "duplicate-install-marker": 28,
+   "inline-prose-shortened": 149,
    "notify-moved-last": 1,
-   "outer-comment-bytes": 10842,
-   "progress-select": 164,
+   "outer-comment-bytes": 10555,
+   "progress-select": 165,
    "redundant-add-column": 149,
    "redundant-drop-index": 15,
-   "redundant-notify": 99,
    "release-essay-lines": 0,
+   "reload-signal": 199,
    "repeated-statement": 16,
    "rule-lines-shortened": 1,
    "superseded-function": 22,
+   "superseded-function-body": 10,
    "superseded-index": 29,
    "superseded-policy": 72,
    "superseded-table": 21,
    "superseded-trigger": 3,
    "superseded-view": 1,
-   "upgrade-prelude-functions": 7
+   "upgrade-prelude-functions": 8
   }
  },
  "columns": [
@@ -980,6 +985,9 @@
   "sc_installed_packs": [
    ""
   ],
+  "sc_io_report": [
+   ""
+  ],
   "sc_is_locked_out": [
    "p_uid uuid"
   ],
@@ -1074,6 +1082,9 @@
   "sc_photo_sync_status": [
    ""
   ],
+  "sc_poll_bundle": [
+   ""
+  ],
   "sc_poll_results": [
    "p_poll uuid"
   ],
@@ -1101,8 +1112,14 @@
   "sc_prep_sync_exam": [
    "p_exam_id uuid, p_tz text default null"
   ],
+  "sc_prep_teacher_timetable": [
+   "p_scope text default 'mine', p_class text default '', p_tz text default null"
+  ],
   "sc_prevent_embedded_media": [
    ""
+  ],
+  "sc_prune_noise": [
+   "p_days int default 120"
   ],
   "sc_publish_all_midterm_reports": [
    "p_term text, p_session text, p_publish boolean default true, p_generate boolean default true"
@@ -1329,6 +1346,7 @@
   "public.cbt_results_client_ref_uidx",
   "public.cbt_results_exam_id_idx",
   "public.cbt_results_exam_idx",
+  "public.cbt_results_exam_student",
   "public.cbt_results_exam_student_id_idx",
   "public.cbt_results_exam_student_ref_idx",
   "public.cbt_results_exam_time_idx",
@@ -1366,6 +1384,7 @@
   "public.midterm_rc_lookup_idx",
   "public.midterm_rc_student_idx",
   "public.module_records_module_idx",
+  "public.notifications_created_desc",
   "public.poll_votes_poll_voter_idx",
   "public.polls_status_created_idx",
   "public.prep_report_class",
