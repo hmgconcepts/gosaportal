@@ -981,20 +981,83 @@ window.CBTUI = {
     if(typeof App!=='undefined' && App.logActivity) App.logActivity('create','cbt_exam', data && data.code);
     closeModal(); toast('✅ Exam created. Code: '+(data&&data.code),'success',6000); CBTUI.refresh();
   },
-  /* V12.78: one click rebuilds the prep sittings after a bulk import, a term
-     rollover or any moment when the timetable and the exams drifted apart. The
-     database does the work (sc_prep_sync_all) and reports what it did. */
+  /* V12.78 → V12.85 (round 30, item 6) — RESCHEDULE, BUT SHOW ME FIRST.
+     ---------------------------------------------------------------------
+     This button used to fire blind: one call, one toast ("3 written, 1
+     cleared"), and the timetable had been rewritten. A tutor whose paper moved
+     on Monday and was back where it started on Tuesday could not tell whether a
+     colleague had moved it or this button had.
+
+     It is now two steps. Step 1 is a DRY RUN — sc_prep_sync_all(true) — which
+     changes nothing and returns, for every prep paper, what it would do
+     (create / update / in sync / remove / nothing), the row as it stands today
+     and the row as it would stand afterwards. Step 2 is the same call with
+     the dry run switched off, and it only happens when the human says yes.
+     The plan is computed by the database, so the preview cannot disagree with
+     the write. */
   async resyncPrep(){
     if(!sb){ toast('Database not configured.','warning'); return; }
+    const esc2=(v)=>String(v==null?'':v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const clock=(r)=>r?(esc2(r.exam_date||'—')+' '+esc2(r.start_time||'')+(r.end_time?'–'+esc2(r.end_time):'')):'(not on the timetable)';
+    let plan;
     try{
-      const {data,error}=await sb.rpc('sc_prep_sync_all');
+      const {data,error}=await sb.rpc('sc_prep_sync_all',{p_dry_run:true});
+      if(error) throw error;
+      plan=data||{};
+      if(plan.ok===false){ toast(plan.error||'Could not work out the reschedule.','warning',9000); return; }
+    }catch(e){
+      /* an older database without the dry run: say so plainly rather than
+         silently writing. */
+      toast('This screen needs the v12.85 database update to preview a reschedule. Open database/complete-schema.sql and run it — nothing has been changed.','warning',14000);
+      return;
+    }
+    const acts=Array.isArray(plan.actions)?plan.actions:[];
+    if(!acts.length){ toast('There is no prep exam to reschedule yet. Create one in the CBT manager with an assessment type of “Prep exam”, a class and a start time — it schedules itself.','info',11000); return; }
+    const n=act=>({create:acts.filter(a=>a.action==='create').length,update:acts.filter(a=>a.action==='update').length,remove:acts.filter(a=>a.action==='remove').length,in_sync:acts.filter(a=>a.action==='in_sync').length,nothing:acts.filter(a=>a.action==='nothing').length}[act]);
+    const changing=acts.filter(a=>['create','update','remove'].includes(a.action));
+    const label={create:'➕ will be added to the timetable',update:'✏️ will be rewritten',remove:'🗑️ will be removed from the timetable',in_sync:'✅ already in sync — untouched',nothing:'💤 nothing to do'};
+    let h='<p style="font-size:.85rem;margin:0 0 8px">The database has worked out what a reschedule would do to the <b>Exam Timetable</b>. '
+      +'<b>Nothing has been changed yet.</b> A prep paper’s timetable row is a copy of its CBT record: the date, the start, the end and the venue are re-derived from the exam, so if you moved the exam, the row follows it — and if you did not, the row should already be right.</p>'
+      +'<p style="font-size:.85rem;margin:0 0 10px">'+n('create')+' to add · '+n('update')+' to rewrite · '+n('remove')+' to remove · '+n('in_sync')+' already in sync · '+n('nothing')+' with nothing to do.</p>';
+    if(!changing.length){
+      h+='<p style="color:#166534;font-size:.85rem;margin:0">✅ Everything is already in sync. There is nothing to write, so the button below would change nothing.</p>';
+    } else {
+      h+='<div class="table-wrap"><table><thead><tr><th>Paper</th><th>Class</th><th>Action</th><th>Now</th><th>After</th><th>What changes</th></tr></thead><tbody>';
+      acts.forEach(a=>{
+        const warn=['update','remove','create'].includes(a.action);
+        h+='<tr'+(warn?' style="background:#fffbeb"':'')+'><td><b>'+esc2(a.title||'Prep exam')+'</b>'+(a.code?'<br><small>code '+esc2(a.code)+'</small>':'')+'</td>'
+          +'<td>'+esc2(a.class||'—')+'</td>'
+          +'<td style="font-size:.8rem">'+(label[a.action]||esc2(a.action))+(a.reason?'<br><small>('+esc2(String(a.reason).replace(/_/g,' '))+')</small>':'')+'</td>'
+          +'<td>'+clock(a.before)+'</td><td>'+clock(a.after)+'</td>'
+          +'<td style="font-size:.78rem">'+((Array.isArray(a.changes)&&a.changes.length)?a.changes.map(c=>'• '+esc2(c)).join('<br>'):(a.action==='update'?'venue or class detail':'—'))+'</td></tr>';
+      });
+      h+='</tbody></table></div>';
+    }
+    h+='<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+      +'<button class="btn btn-primary btn-sm" id="prep-resync-go"'+(changing.length?'':' disabled style="opacity:.5"')+' onclick="CBTUI.resyncPrepApply()">✅ Yes, apply this plan</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="closeModal()">✖ Cancel — change nothing</button></div>'
+      +'<p style="font-size:.75rem;color:var(--gray-500);margin:8px 0 0">Applying writes exactly the rows shown above and nothing else. The plan is recomputed at the moment you confirm, so if a colleague changed a paper in the last few seconds you will see the new plan, not a stale one.</p>';
+    if(typeof openModal==='function'){ openModal('🔁 Reschedule prep exams — preview', h, '<button class="btn btn-outline" onclick="closeModal()">Close without changing anything</button>'); }
+    else {
+      /* no modal helper on this build: fall back to a confirm, never to a silent write */
+      toast('Preview: '+n('create')+' to add, '+n('update')+' to rewrite, '+n('remove')+' to remove.', 'info', 12000);
+      if(window.confirm('Reschedule prep exams?\n\n'+n('create')+' added, '+n('update')+' rewritten, '+n('remove')+' removed, '+n('in_sync')+' already in sync.')) this.resyncPrepApply();
+    }
+  },
+  async resyncPrepApply(){
+    if(!sb) return;
+    const btn=document.getElementById('prep-resync-go');
+    if(btn){ btn.disabled=true; btn.textContent='Applying…'; }
+    try{
+      const {data,error}=await sb.rpc('sc_prep_sync_all',{p_dry_run:false});
       if(error) throw error;
       const r=data||{};
-      if(r.ok===false){ toast(r.error||'Could not reschedule.','warning',9000); return; }
+      if(r.ok===false){ toast(r.error||'Could not reschedule.','warning',9000); if(btn){btn.disabled=false;btn.textContent='✅ Yes, apply this plan';} return; }
       toast('✅ Prep exams rescheduled — '+(r.scheduled||0)+' sitting(s) written, '+(r.cleared||0)+' cleared'+(r.failed?', '+r.failed+' failed':'')+'. '+(r.note||''),'success',9000);
       if(typeof App!=='undefined'&&App.logActivity) App.logActivity('sync','cbt_prep_timetable',String(r.scheduled||0));
+      if(typeof closeModal==='function') closeModal();
       CBTUI.refresh();
-    }catch(e){ toast('Could not reschedule prep exams: '+(e.message||e)+' — run database/complete-schema.sql if this is a new install.','danger',12000); }
+    }catch(e){ toast('Could not reschedule prep exams: '+(e.message||e)+' — run database/complete-schema.sql if this is a new install.','danger',12000); if(btn){btn.disabled=false;btn.textContent='✅ Yes, apply this plan';} }
   },
   /* V12.81 — THE PREP TIME DOCTOR.
      A sitting that was written an hour late is impossible to spot on a list

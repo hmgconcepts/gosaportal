@@ -545,3 +545,88 @@ database rollback needs the backup.
 No AI API, no paid service, no extra cron. The schema stays inside Supabase's
 1,000,000-byte pasted-script limit with ~31 KB of headroom, and the fee resolver
 answers from tables the platform already reads.
+
+---
+
+## Section 16 — V12.85 upgrade (the bill that cannot move by itself, and the button that shows its plan)
+
+**Database change: yes — and this one is important enough to read before you run it.**
+**Client change: yes** (dashboard card, CBT manager preview, exam page network handling).
+
+### 1. What you must do, in order
+
+1. **Back up first.**
+   * Supabase → *Database* → *Backups* is **not available on the free plan**; use
+     `pg_dump "$DATABASE_URL" > backup-before-v12.85.sql`, or
+     *Database → Data* → download each table, or the app's own **Data export** page.
+2. Paste **`database/complete-schema.sql`** (982,250 B) into the Supabase SQL editor and run it.
+   It is idempotent — running it twice is safe — and has been proven object-identical to the raw
+   cumulative schema (`node tools/verify-complete-schema.mjs` → `ALL PASS`).
+3. Upload the client files, including `sw.js` (cache name **`sc-builder-v12.85-20261108-1`**).
+4. **One check, once — please do not skip it.** Open **💳 Class Fee Structure** and look down the
+   **Total** column. On any upgrade before this one, a total you had typed could have been replaced
+   by the sum of its components (for example ₦35,100 → ₦27,000). From V12.85 that can no longer
+   happen, but a figure already overwritten stays overwritten until you type it back. Every class
+   whose Total does not match what you published should be corrected here, once.
+5. Tell the bursars and the exam officer what is new (§2 and §3 below).
+
+Nothing else: no new table, no new cron, no new API key, no paid service, no AI API.
+
+### 2. What the bursar will notice (and should be told)
+
+| Situation | Before V12.85 | From V12.85 |
+|---|---|---|
+| An invoice (or a hand-set total) recorded **before** the current price list | it won, silently — the screen quoted ₦17,100 while the class price list said ₦35,100 | the **newest price list is the bill**; the older figure is shown as **"superseded"** with its amount, date and source, on the same line as the bill |
+| A price list published **after** a hand-set total | same problem | price list wins, and the note says so |
+| A hand-set total that is genuinely newer than the price list | reported as `override` | unchanged — it still wins, because it is newer |
+| A receipt that was healed to the published bill | labelled *"✏️ Personal total set by the bursar"* | labelled as the **class price list**, because it no longer differs from it |
+| You publish a total while the components add up to something else | the total was **replaced by the component sum on the next schema run** | your total is kept exactly as typed; the components keep their own figures; editing a component still recomputes the total |
+
+### 3. What the exam officer and the tutors will notice
+
+* **Each tutor's dashboard now carries his own prep timetable**, class by class, with a
+  `🙋 My prep timetable` / `👥 All tutors' prep exams` switch, and a **Timing check** column that names
+  the problem in words — *closing time disagrees with the paper length*, *not on the Exam Timetable yet*,
+  *overlaps another paper in the same class*. Nothing to set up: it reads the same source as the
+  Exam Timetable page.
+* **"Reschedule prep exams" now opens a preview.** It shows, per prep paper, what it *would* do
+  (add / rewrite / remove / already in sync), the row today and the row afterwards, and exactly which
+  fields change (`start 19:30 → 08:00`, `venue Main Hall → Hall B`). **Nothing is written until the
+  confirm button is pressed**, and the plan is recomputed at that moment.
+* **A dropped connection no longer threatens a paper.** The candidate sees *"You are offline — your
+  answers are being saved on this device"*; on reconnect the page asks the **database** for the school
+  clock and the time left, and corrects the countdown. If the paper closed while the signal was away,
+  the candidate is given the same **"Time is up — send my answers"** door — it is never submitted for them.
+
+### 4. Verify the deployment
+
+```bash
+node tools/verification/t65-bill-newer-than-history.mjs         # 19/0
+node tools/verification/t66-reschedule-preview.mjs              # 27/0
+node tools/verification/t67-network-resume.mjs                  # 23/0
+node tools/verification/tmp-rerun-live.mjs                      # 17/0  (35,100 → 35,100 across re-runs)
+node tools/verification/tmp-cbt-remap.mjs                       #  9/0
+node tools/verify-complete-schema.mjs                           # ALL PASS
+```
+
+Then on the live site, three clicks:
+
+1. **💳 Class Fee Structure** → every class's **Total** is the figure the school publishes.
+2. **Dashboard, signed in as a tutor** → the *Prep exam timetable* card lists your papers by class and
+   says whether each one is consistent.
+3. **CBT Manager → Reschedule prep exams** → a preview appears and the timetable does **not** change
+   until you confirm.
+
+### 5. Rolling back
+
+Restore the backup from step 1 and redeploy the previous ZIP. V12.85 replaces function bodies, adds two
+payload keys (`superseded`, `structure_updated_at`) and adds one defaulted parameter
+(`sc_prep_sync_all(p_dry_run boolean default false)`); it changes no column type and drops no data, so a
+file-only rollback is safe for readers — the database rollback needs the backup.
+
+### 6. Free-tier notes (unchanged, and now written down in figures)
+
+No AI API, no paid service, no extra cron, no Edge Function. The pasted schema is **982,250 B** of
+Supabase's 1,000,000-byte limit (~17 KB of headroom, and the builder still removes superseded function
+bodies before it adds). The full arithmetic — 500 MB database, 5 GB egress, 1 GB storage, the 7-day pause,
+and the honest note that **Vercel Hobby is for non-commercial use** — is in **`FREE-TIER-BUDGET.md`**.

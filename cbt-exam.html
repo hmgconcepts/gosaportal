@@ -1310,6 +1310,123 @@ textarea.form-input{min-height:80px;resize:vertical}
   window.addEventListener('pageshow', (e)=>{ try { if (Exam.data && !Exam._done && Exam.pausedAt) Exam.resumeFromInterruption(); } catch(_) {} });
   window.addEventListener('focus', ()=>{ try { if (!document.hidden && Exam.pausedAt) Exam.resumeFromInterruption(); } catch(_) {} });
 
+  /* ===================================================================
+     V12.85 (round 30, item 4) — THE SIGNAL DROPS IN THE MIDDLE OF THE PAPER.
+     -------------------------------------------------------------------
+     A learner sitting a prep paper at home on mobile data does not lose their
+     answers when the network goes — the draft is written to the device on every
+     change — but until now nothing on the screen told them that, and the clock
+     kept counting from a `serverSkew` measured when the paper loaded. Two
+     minutes of a dead connection could therefore leave the countdown quietly
+     wrong, and a learner who reconnected was never told the paper had closed
+     while they were away.
+
+     This adds the missing half of the story:
+       · an OFFLINE banner, spoken in plain words, that says the answers are
+         safe on this device and nothing has been lost;
+       · an ONLINE recovery path that asks the DATABASE for the truth
+         (sc_cbt_window_state: server time, seconds left, open/expired) and
+         re-bases the countdown on it — the phone's clock is never trusted;
+       · a re-flush of anything queued for sending (SCNet), so a submission
+         that failed on a dead connection goes out by itself;
+       · an honest ending: if the paper closed while the connection was down,
+         the learner is shown the same "time is up — send my answers" door they
+         would have seen had they been connected. Nothing is submitted silently.
+     =================================================================== */
+  Exam.netBanner = function (state, msg) {
+    let el = document.getElementById('sc-net-banner');
+    if (state === 'ok') { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sc-net-banner';
+      el.style.cssText = 'position:sticky;top:0;z-index:70;padding:10px 14px;font-size:.9rem;'
+        + 'border-left:5px solid ' + (state === 'off' ? '#b91c1c' : '#0369a1') + ';'
+        + 'background:' + (state === 'off' ? '#fef2f2' : '#eff6ff') + ';margin-bottom:8px';
+      const host = (this.root && this.root()) || document.body;
+      try { host.insertBefore(el, host.firstChild); } catch (_) { document.body.insertBefore(el, document.body.firstChild); }
+    }
+    el.textContent = msg;
+  };
+  Exam.netState = function () {
+    const nav = (typeof navigator !== 'undefined') ? navigator : {};
+    const c = nav.connection || nav.mozConnection || nav.webkitConnection || null;
+    /* navigator.onLine === false is trustworthy; === true only means "there is an
+       interface", so it is never used to promise the server is reachable. */
+    return { online: nav.onLine !== false, type: c && c.effectiveType ? String(c.effectiveType) : '', down: c && c.downlink ? Number(c.downlink) : null };
+  };
+  Exam.resyncClock = async function () {
+    if (!this.data || this._done || !this.data.id) return null;
+    const st = this.netState();
+    if (!st.online) return null;
+    let state = null;
+    try {
+      const r = await window.sb.rpc('sc_cbt_window_state', { p_exam_id: this.data.id });
+      if (r && !r.error && r.data) state = r.data;
+    } catch (_) { return null; }
+    if (!state) return null;
+    /* re-base the clock on the database's own instant */
+    if (state.server_now) {
+      this.serverSkew = new Date(state.server_now).getTime() - Date.now();
+      try { localStorage.setItem(this.deadlineKey() + '-skew', String(this.serverSkew)); } catch (_) {}
+    }
+    if (state.state === 'expired' || state.state === 'closed' || state.state === 'archived') {
+      this.netBanner('off', '⛔ This paper closed while your connection was down ('
+        + (state.message || 'the school closed it') + '). Your answers are still on this device — send them now and your tutor will see them.');
+      if (typeof this.timeUp === 'function') { try { this.timeUp(); } catch (_) {} }
+      return state;
+    }
+    /* still open: the countdown is re-based, and a queued submission is retried */
+    try { if (this.deadline) { this.deadline = this.now() + Math.max(0, Number(state.seconds_left || 0)) * 1000; this.tick(); } } catch (_) {}
+    try {
+      if (window.SCNet && SCNet.flush) {
+        SCNet.flush(window.sb, async function (item, sb) {
+          let r = null;
+          try { r = await sb.rpc('cbt_submit_with_wal', { p_payload: item.payload }); if (r.error) throw r.error; }
+          catch (_) { r = await sb.rpc('cbt_submit_v6', { p_payload: item.payload }); if (r.error) throw r.error; }
+          return (r && r.data) || null;
+        });
+      }
+    } catch (_) {}
+    this.netBanner('ok');
+    return state;
+  };
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('offline', () => {
+      try {
+        if (!Exam.data || Exam._done) return;
+        Exam.netBanner('off', '📴 You are offline. Your answers are being saved on THIS device after every question, '
+          + 'so nothing is lost. The clock shown is school time and will be corrected the moment you reconnect — '
+          + 'do not close this tab.');
+      } catch (_) {}
+    });
+    window.addEventListener('online', () => {
+      try {
+        if (!Exam.data || Exam._done) return;
+        Exam.netBanner('on', '📶 Back online — checking the school clock and sending anything that was waiting…');
+        Exam.resyncClock();
+      } catch (_) {}
+    });
+    /* a connection that changes shape (4G → 2G → no service) without ever going
+       "offline" is the common case on a phone; watch the hint too */
+    try {
+      const nav = navigator;
+      const c = nav.connection || nav.mozConnection || nav.webkitConnection;
+      if (c && c.addEventListener) c.addEventListener('change', () => {
+        try { if (Exam.data && !Exam._done && Exam.netState().online) Exam.resyncClock(); } catch (_) {}
+        try {
+          if (Exam.data && !Exam._done && String(c.effectiveType || '').indexOf('2g') === 0) {
+            Exam.netBanner('on', '🐢 The network is slow (' + c.effectiveType + '). Your answers are saved on this device as you type — '
+              + 'send as soon as you can, and keep this tab open.');
+          }
+        } catch (_) {}
+      });
+    } catch (_) {}
+    /* and one silent re-check when the learner comes back to the tab */
+    document.addEventListener('visibilitychange', () => {
+      try { if (!document.hidden && Exam.data && !Exam._done) Exam.resyncClock(); } catch (_) {}
+    });
+  }
+
   // Exposed for accessibility tooling, automated regression tests and the
   // manager's safe preview—not for grading (grading remains server-authoritative).
   window.Exam = Exam;
