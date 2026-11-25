@@ -1938,7 +1938,8 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
               const already = Number(ACC.paid) || 0;
               if (already > 0 || extra > 0) parts.push('− paid ' + money(already + extra));
               const closing = Math.max(0, oa + Number(ACC.charges || 0) + Number(ACC.arrears || 0) - already - extra);
-              glanceEl.value = parts.join('  ·  ') + '  =  ' + money(closing) + ' outstanding';
+              glanceEl.value = parts.join('  ·  ') + '  =  ' + money(closing) + ' outstanding'
+                + (ACC.superseded_note || '');
             };
             /* live preview ONLY — the database decides */
             const recompute = () => { if (balEl) { balEl.value = ''; } paintGlance(); };
@@ -2008,13 +2009,33 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
               totEl.value = termBill.toFixed(2);
               totEl.dataset.scTermBill = String(termBill);
               totEl.dataset.scTotalDue = String(due);
+              /* V12.85 (round 30, item 5) — SAY IT OUT LOUD WHEN AN OLDER FIGURE
+                 WAS SUPERSEDED. The database arbitrates: the price list the school
+                 published most recently is the bill; an invoice or a bursar's total
+                 recorded before it is history. That used to happen silently, so a
+                 bursar looking at ₦17,100 on a printed invoice and ₦35,100 on the
+                 screen had no way to know which one the school stood behind. Now
+                 the older figure, its date and its source are named, on the same
+                 line as the bill. */
+              let supNote = '';
+              const sup = (f.superseded && typeof f.superseded === 'object') ? f.superseded : null;
+              if (sup && Number(sup.amount) > 0 && Math.abs(Number(sup.amount) - termBill) > 0.5) {
+                const when = sup.recorded_at ? new Date(sup.recorded_at).toLocaleDateString() : '';
+                const pub = f.structure_updated_at ? new Date(f.structure_updated_at).toLocaleDateString() : '';
+                supNote = '  ·  superseded: ' + cur + Number(sup.amount).toLocaleString()
+                  + (when ? ' (' + when + ')' : '') + ' from ' + (sup.source || 'an earlier record')
+                  + (pub ? ' — the price list published ' + pub + ' is now the bill' : '');
+              }
+              if (supNote) ACC.superseded_note = supNote;
               const bits = ['term bill ' + cur + termBill.toLocaleString()];
               if (Number(f.opening_balance||0) > 0) bits.push('opening balance ' + cur + Number(f.opening_balance).toLocaleString());
               if (Number(f.arrears||0) > 0) bits.push('earlier terms owing ' + cur + Number(f.arrears).toLocaleString());
               if (Number(f.paid||0) > 0) bits.push('already paid ' + cur + Number(f.paid).toLocaleString());
-              if (typeof toast === 'function') toast('💰 ' + bits.join(' · ')
+              if (typeof toast === 'function') toast('💰 ' + bits.join(' · ') + (supNote ? '' : '')
                 + '. Outstanding now: ' + cur + due.toLocaleString()
-                + ' — this is the same figure the dashboard and the e-receipt show. Double-click the bill to override it for this learner.', 'info', 11000);
+                + ' — this is the same figure the dashboard and the e-receipt show. Double-click the bill to override it for this learner.'
+                + (supNote ? '\n\n' + supNote.replace(/^\s*·\s*/, '⚠️ ') : ''), 'info', supNote ? 16000 : 11000);
+              if (supNote) paintGlance();
               const tEl = document.getElementById('cf-' + CRUD.fid('term')), sEl = document.getElementById('cf-' + CRUD.fid('session'));
               if (tEl && !tEl.value && f.term) tEl.value = f.term;
               if (sEl && !sEl.value && f.session) sEl.value = f.session;

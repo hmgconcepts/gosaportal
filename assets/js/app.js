@@ -2158,6 +2158,102 @@ const App = {
       esc(row.start_local || '') + ' <span class="prep-countdown">· opens in ' + this.prepLeft(at - Date.now()) + '</span></span>';
   },
 
+  /* ==================================================================
+     V12.85 (round 30, item 1) — THE TUTOR'S OWN PREP TIMETABLE, ON THE
+     TUTOR'S OWN SCREEN, CLASS BY CLASS, WITH THE ERRORS NAMED.
+     ------------------------------------------------------------------
+     The school asked for one thing: a teacher must be able to look at his
+     homepage and see, for every class he has set a prep exam for, the date, the
+     time and the length — so that a wrong duration or a wrong hour is caught by
+     him before forty learners sit a paper that closes early. He must also be
+     able to see OTHER tutors' sittings, to spot two papers in one class at the
+     same time.
+
+     The database already answers this honestly (sc_prep_teacher_timetable):
+     one call, scope 'mine' or 'all', with an `issues` array per paper. It was
+     simply never shown to the tutor — it lived on the Exam Timetable page only.
+     Nothing here invents a figure: every cell comes from that one call.
+     ================================================================== */
+  prepTTScope: 'mine',
+  prepTTIssueLabel(t) {
+    return {
+      closes_before_it_opens: 'closes before it opens',
+      closing_time_vs_length: 'closing time disagrees with the paper length',
+      under_10_minutes: 'shorter than 10 minutes',
+      over_3_hours: 'longer than 3 hours',
+      open_all_day: 'window longer than 8 hours',
+      outside_school_hours: 'starts outside school hours',
+      no_class: 'no class set',
+      not_on_timetable: 'not on the Exam Timetable yet — run “Reschedule prep exams”',
+      clashes_with_another_paper: 'overlaps another paper in the same class'
+    }[String(t)] || String(t || '').replace(/_/g, ' ');
+  },
+  async loadDashPrepTimetable(scope) {
+    const box = document.getElementById('dash-prep-timetable');
+    if (!box || !window.sb) return;
+    if (scope) this.prepTTScope = scope;
+    const mine = this.prepTTScope !== 'all';
+    const btnMine = document.getElementById('prep-tt-mine'), btnAll = document.getElementById('prep-tt-all');
+    if (btnMine) btnMine.className = 'btn btn-sm ' + (mine ? 'btn-primary' : 'btn-outline');
+    if (btnAll) btnAll.className = 'btn btn-sm ' + (mine ? 'btn-outline' : 'btn-primary');
+    box.innerHTML = '<span class="pulse">Loading your prep timetable…</span>';
+    try {
+      const r = await sb.rpc('sc_prep_teacher_timetable', { p_scope: mine ? 'mine' : 'all', p_class: '' });
+      if (r.error) {
+        box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">Prep timetables appear after the database update (admin: run database/complete-schema.sql). '
+          + '<button class="btn btn-sm btn-outline" onclick="App.loadDashPrepTimetable(null)">🔄 Retry</button></p>';
+        return;
+      }
+      const rows = Array.isArray(r.data) ? r.data : [];
+      if (!rows.length) {
+        box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">'
+          + (mine ? 'You have not set a prep exam yet. ' : 'No tutor has set a prep exam yet. ')
+          + 'Create one in the <a href="cbt.html">CBT Manager</a> — pick the assessment type <b>Prep exam</b>, a class, a start time and a length — and it appears here with its time and any timing problem named.</p>';
+        return;
+      }
+      const statusBadge = (s) => s === 'open'
+        ? '<span class="badge" style="background:#dcfce7;color:#166534">🟢 open</span>'
+        : s === 'closed' ? '<span class="badge" style="background:#f3f4f6;color:#4b5563">🔒 closed</span>'
+          : '<span class="badge" style="background:#dbeafe;color:#1e40af">🕒 upcoming</span>';
+      const byClass = {};
+      rows.forEach(x => { const k = String(x.class || '(no class)'); (byClass[k] = byClass[k] || []).push(x); });
+      const classes = Object.keys(byClass).sort();
+      let h = '<p style="font-size:.8rem;color:var(--gray-600);margin:0 0 8px">'
+        + (mine ? '👀 Showing <b>your</b> prep sittings' : "👀 Showing <b>every tutor's</b> prep sittings")
+        + ' · ' + rows.length + ' paper(s) · ' + classes.length + ' class(es) · times are school time'
+        + ' · <span style="color:#b45309">amber rows need a look</span>.</p>';
+      classes.forEach(cls => {
+        h += '<h4 style="margin:12px 0 6px">🏫 ' + esc(cls) + ' <small style="color:var(--gray-500);font-weight:500">· ' + byClass[cls].length + ' paper(s)</small></h4>';
+        h += '<div class="table-wrap"><table><thead><tr><th>Date</th><th>Start – End</th><th>Length</th><th>Paper</th>'
+          + (mine ? '' : '<th>Tutor</th>') + '<th>Venue</th><th>Status</th><th>Timing check</th><th></th></tr></thead><tbody>';
+        byClass[cls].forEach(x => {
+          const issues = Array.isArray(x.issues) ? x.issues : [];
+          const warn = issues.length > 0;
+          h += '<tr' + (warn ? ' style="background:#fffbeb"' : '') + '>'
+            + '<td><b>' + esc(x.exam_date || '—') + '</b></td>'
+            + '<td>' + (x.start_time ? '<b>' + esc(x.start_time) + '</b>–' + esc(x.end_time || '') : '<span style="color:#b91c1c">no time set</span>') + '</td>'
+            + '<td>' + (Number(x.duration_min || 0) || '—') + ' min</td>'
+            + '<td><b>' + esc(x.title || x.subject || 'Prep exam') + '</b><br><small>' + esc(x.subject || '') + (x.code ? ' · code ' + esc(x.code) : '') + '</small></td>'
+            + (mine ? '' : '<td>' + esc(x.teacher_name || '—') + (x.mine ? ' <small style="color:#7c3aed">(you)</small>' : '') + '</td>')
+            + '<td>' + esc(x.venue || '—') + '</td>'
+            + '<td>' + statusBadge(x.status) + '</td>'
+            + '<td>' + (warn
+              ? issues.map(t => '<div style="color:#b45309;font-size:.78rem">⚠ ' + esc(this.prepTTIssueLabel(t)) + '</div>').join('')
+              : '<span style="color:#15803d;font-size:.78rem">✅ consistent</span>') + '</td>'
+            + '<td>' + (x.code ? '<a class="btn btn-sm btn-outline" href="cbt.html" title="Open the CBT Manager to correct it">Fix</a>' : '') + '</td>'
+            + '</tr>';
+        });
+        h += '</tbody></table></div>';
+      });
+      h += '<p style="font-size:.78rem;color:var(--gray-500);margin:8px 0 0">Every row is one call to the database '
+        + '(<code>sc_prep_teacher_timetable</code>), so this card cannot disagree with the Exam Timetable page. '
+        + 'A paper that opens on the learner\'s phone at a different time than it is shown here will say so under “Timing check”.</p>';
+      box.innerHTML = h;
+    } catch (e) {
+      box.innerHTML = '<p style="color:var(--gray-500);font-size:.85rem">Could not load the prep timetable. '
+        + '<button class="btn btn-sm btn-outline" onclick="App.loadDashPrepTimetable(null)">🔄 Retry</button></p>';
+    }
+  },
   async loadDashPrepExams() {
     const boxes = [...document.querySelectorAll('[id="dash-prep-exams"],[id="dash-prep-exams-student"]')];
     const paint = (html) => boxes.forEach(b => { b.innerHTML = html; });
@@ -2405,6 +2501,11 @@ const App = {
           try { App.loadDashPrepExams(); } catch (e) {}
           try { App.loadDashFees(); } catch (e) {}
           try { App.loadDashMyPay(); } catch (e) {}
+          /* V12.85 (round 30, item 1): the tutor's own prep timetable, class by
+             class, with every timing problem named — and a one-click switch to
+             every tutor's sittings. The container is staff-only, so this call is
+             a no-op for learners and parents. */
+          try { App.loadDashPrepTimetable(null); } catch (e) {}
           try { App.loadDashProducts(); } catch (e) {}
           /* V7.8 #3 EDUCATOR DIGEST: "Action needed today" strip — pending
              account approvals, unresolved complaints, pending leave requests,
