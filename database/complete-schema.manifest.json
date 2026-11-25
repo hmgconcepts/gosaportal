@@ -1,20 +1,20 @@
 {
  "_meta": {
-  "built_bytes": 967343,
-  "built_from_bytes": 1497957,
+  "built_bytes": 981244,
+  "built_from_bytes": 1508814,
   "removed": {
-   "banner-rule": 433,
+   "banner-rule": 435,
    "banner-trimmed": 113,
    "blank-squeezed": 1,
    "covered-grant": 31,
    "covered-revoke": 16,
-   "deindented": 38205,
+   "deindented": 35160,
    "duplicate-enable-rls": 28,
    "duplicate-grant": 10,
    "duplicate-install-marker": 28,
    "inline-prose-shortened": 149,
    "notify-moved-last": 1,
-   "outer-comment-bytes": 10555,
+   "outer-comment-bytes": 10394,
    "progress-select": 165,
    "redundant-add-column": 149,
    "redundant-drop-index": 15,
@@ -1107,7 +1107,7 @@
    "p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text"
   ],
   "sc_prep_sync_all": [
-   ""
+   "p_dry_run boolean default false"
   ],
   "sc_prep_sync_exam": [
    "p_exam_id uuid, p_tz text default null"

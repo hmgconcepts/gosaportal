@@ -7,7 +7,7 @@
 -- platform needs. Safe on a new or an existing project, and safe to
 -- run more than once.
 --
--- Size: 968,321 bytes - inside the Supabase SQL Editor 1 MB request cap.
+-- Size: 982,250 bytes - inside the Supabase SQL Editor 1 MB request cap.
 -- Paste the whole file into SQL Editor and press Run once.
 -- Each section is independently re-runnable.
 --
@@ -4172,7 +4172,36 @@ begin
 comp := coalesce(new.tuition,0)+coalesce(new.exam_fee,0)+coalesce(new.development,0)
 + coalesce(new.transport,0)+coalesce(new.boarding,0)+coalesce(new.other_fee,0)
 - coalesce(new.discount,0);
-if comp <> 0 then new.total := greatest(comp, 0); end if;
+/* V12.85 (round 30) — THIS TRIGGER WAS REWRITING THE SCHOOL'S OWN PRICE LIST.
+     The rule used to be "wherever components exist, the total is their sum",
+     applied on every INSERT and every UPDATE. So a bursar who published
+     N35,100 for a class while only N27,000 had been entered under tuition got
+     N27,000 back the next time the schema ran — this file's own one-time
+backfill ("update class_fee_structure set tuition = tuition") fires the
+trigger, the trigger recomputed the total from the components, and a
+hand-published total silently vanished. That is one way two screens end up
+quoting two different current-term fees for the same class.
+
+The rule now: the components are summed only when the human has not given
+a total. A total that was typed is a decision and is left exactly as
+typed. On UPDATE the sum is applied only when a component actually changed
+AND the total itself was not touched, so a no-op backfill cannot move a
+single naira. */
+if tg_op = 'INSERT' then
+if coalesce(new.total,0) = 0 and comp <> 0 then new.total := greatest(comp, 0); end if;
+elsif tg_op = 'UPDATE' then
+if coalesce(new.total,0) = coalesce(old.total,0)
+and (coalesce(new.tuition,-1), coalesce(new.exam_fee,-1), coalesce(new.development,-1),
+coalesce(new.transport,-1), coalesce(new.boarding,-1), coalesce(new.other_fee,-1),
+coalesce(new.discount,-1))
+is distinct from
+(coalesce(old.tuition,-1), coalesce(old.exam_fee,-1), coalesce(old.development,-1),
+coalesce(old.transport,-1), coalesce(old.boarding,-1), coalesce(old.other_fee,-1),
+coalesce(old.discount,-1))
+and comp <> 0 then
+new.total := greatest(comp, 0);
+end if;
+end if;
 if coalesce(new.amount,0) = 0 then new.amount := coalesce(new.total,0); end if;
 return new;
 end $$;
@@ -4180,8 +4209,13 @@ drop trigger if exists trg_compute_class_fee_total on public.class_fee_structure
 create trigger trg_compute_class_fee_total
 before insert or update on public.class_fee_structure
 for each row execute function public.compute_class_fee_total();
--- one-time backfill
-update public.class_fee_structure set tuition = tuition;
+/* V12.85 — the backfill only ever fills a BLANK total. It used to re-write every
+row through the trigger above, which is what silently replaced published
+totals with the sum of the components on every schema run. */
+update public.class_fee_structure
+set total = greatest(coalesce(tuition,0)+coalesce(exam_fee,0)+coalesce(development,0)
++ coalesce(transport,0)+coalesce(boarding,0)+coalesce(other_fee,0)-coalesce(discount,0), 0)
+where coalesce(total,0) = 0;
 -- 2. Exam timetable flexibility
 alter table public.exam_timetable add column if not exists day_no int;
 alter table public.exam_timetable add column if not exists paper_kind text default '';
@@ -12110,6 +12144,11 @@ opening owing   (opening balance − payments filed under it)
     'match_status', coalesce(b->>'match_status', case when bill_known then 'structure' else 'no_structure' end),
     'matched_by', nullif(b->>'matched_by',''),
     'match_note', coalesce(b->>'match_note', b->>'working', ''),
+    /* V12.85: if an older invoice or bursar's total was superseded by the newest
+published price list, the screen must be able to SAY SO (the family paid
+nothing wrong — the school's earlier figure was simply out of date). */
+    'superseded', coalesce(b->'superseded', 'null'::jsonb),
+    'structure_updated_at', coalesce(b->'structure_updated_at', 'null'::jsonb),
     'candidates', coalesce(b->'candidates','[]'::jsonb),
     'fallback', b->'fallback',
     'structure_bill', coalesce(nullif(b->>'structure_bill','')::numeric, charges),
@@ -12678,14 +12717,14 @@ create or replace function public.sc_fee_bill_v2(p_student uuid,
 p_term text default null,
 p_session text default null)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
-declare st record; tr jsonb; b jsonb; ovr numeric; has_ovr boolean := false;
+declare st record; tr jsonb; b jsonb; ovr numeric; has_ovr boolean := false; ovr_at timestamptz;
 begin
 select * into st from public.students where id = p_student;
 if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
 tr := public.sc_term_resolve(p_term, p_session);
 /* the recorded per-learner total, if the bursar set one for this term */
 begin
-select fee_total into ovr
+select fee_total, coalesce(created_at, now()) into ovr, ovr_at
 from public.fee_payments
 where student_id = p_student
 and coalesce(total_overridden,false) = true
@@ -12696,7 +12735,33 @@ order by created_at desc nulls last limit 1;
 has_ovr := ovr is not null;
 exception when undefined_column then has_ovr := false;
 end;
+/* V12.85 — THE PRICE LIST THE SCHOOL PUBLISHED MOST RECENTLY WINS.
+A personal total recorded on a receipt months ago is history; if the class
+bill for THIS term was published after it, that bill is the truth and the
+old figure is reported as superseded instead of silently outranking the
+list (this is how one SSS 2 learner showed 17,100 against a published
+35,100). */
+b := public.sc_fee_bill_v2_structure(p_student, p_term, p_session);
 if has_ovr then
+if coalesce(b->>'match_status','') = 'structure'
+and coalesce(nullif(b->>'structure_updated_at',''),'') <> ''
+and ovr_at is not null
+and ovr_at < (b->>'structure_updated_at')::timestamptz
+and coalesce((b->>'bill')::numeric,0) <> coalesce(ovr,0) then
+return b || jsonb_build_object('match_note',
+coalesce(b->>'match_note','')||' A personal total of '
+||to_char(coalesce(ovr,0),'FM999,999,990.00')||' recorded on '
+||to_char(ovr_at at time zone public.sc_school_tz(),'DD Mon YYYY')
+||' was set before this price list was published, so the published bill applies.',
+'superseded', jsonb_build_object('amount', coalesce(ovr,0), 'source','bursar total','recorded_at', ovr_at));
+end if;
+/* the recorded total has been healed to the published bill (the platform
+re-syncs receipts when a price list is published): report the price list,
+not a "personal total" that no longer differs from it. */
+if coalesce(b->>'match_status','') = 'structure'
+and coalesce((b->>'bill')::numeric,-1) = coalesce(ovr,-2) then
+return b;
+end if;
 return jsonb_build_object('ok',true,
 'student_id', st.id, 'class', st.class, 'arm', st.arm, 'department', st.department,
 'term', tr->>'term', 'session', tr->>'session', 'resolved_by', tr->>'resolved_by',
@@ -12709,7 +12774,6 @@ return jsonb_build_object('ok',true,
 'currency', public.sc_currency(), 'due_date', null, 'note', '',
 'working','Personal total recorded by the bursar on a receipt for this learner.');
 end if;
-b := public.sc_fee_bill_v2_structure(p_student, p_term, p_session);
 return b;
 end $$;
 revoke all on function public.sc_fee_bill_v2(uuid,text,text) from public, anon;
@@ -12735,7 +12799,7 @@ n_any int := 0; n_platform int := 0;
 bill numeric := 0; aid numeric := 0; aid_rows jsonb := '[]'::jsonb;
 bd jsonb := '[]'::jsonb; eff numeric := 0;
 status text := ''; note text := ''; mby text := ''; fb jsonb := null; cand jsonb := '[]'::jsonb;
-matched boolean := false;
+matched boolean := false; superseded jsonb := null;
 begin
 select * into st from public.students where id = p_student;
 if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
@@ -12744,23 +12808,6 @@ t_term := coalesce(tr->>'term',''); t_session := coalesce(tr->>'session','');
 select * into inv from public.sc_fee_invoice i
 where i.student_id = p_student and lower(btrim(i.term)) = lower(btrim(t_term))
 and lower(btrim(i.session)) = lower(btrim(t_session)) limit 1;
-if inv.id is not null then
-return jsonb_build_object('ok',true,'student_id',st.id,'class',st.class,'arm',st.arm,'department',st.department,
-'term',t_term,'session',t_session,'resolved_by',tr->>'resolved_by','bill',coalesce(inv.net_amount,0),
-'structure_bill',coalesce(inv.amount,0)+coalesce(inv.aid,0),'aid',coalesce(inv.aid,0),'aid_rows','[]'::jsonb,
-'breakdown',jsonb_build_array(jsonb_build_object('item','Invoice for '||t_term,'amount',coalesce(inv.net_amount,0))),
-'override',(coalesce(inv.source,'') in ('override','manual')),
-'match_status', case when coalesce(inv.source,'') in ('override','manual') then 'override' else 'invoice' end,
-'matched',true,'bill_known',true,
-'matched_by', case when coalesce(inv.source,'') in ('override','manual') then 'override' else 'invoice' end,
-'match_note', coalesce(nullif(btrim(coalesce(inv.note,'')),''),
-case when coalesce(inv.source,'') in ('override','manual')
-then 'A figure was set by hand for this learner this term; the class price list does not replace it.'
-else 'The bill recorded on this learner''s invoice.' end),
-'fallback',null,'candidates','[]'::jsonb,'currency',public.sc_currency(),'due_date',null,
-'note',coalesce(inv.note,''),'working','Invoice raised for '||t_term||' '||coalesce(t_session,'')||' = '
-||to_char(coalesce(inv.net_amount,0),'FM999,999,990.00'));
-end if;
 c := lower(regexp_replace(coalesce(st.class,''),'[^a-zA-Z0-9]','','g'));
 a := lower(regexp_replace(coalesce(st.arm,''),'[^a-zA-Z0-9]','','g'));
 d := lower(regexp_replace(coalesce(st.department,''),'[^a-zA-Z0-9]','','g'));
@@ -12865,28 +12912,68 @@ note := case when n_platform = 0 then 'No class fee structure has been published
 else 'No fee structure has ever been published for class "'||coalesce(st.class,'(unset)')||'".' end;
 end if;
 end if;
-begin
-for fs in select mr.title, mr.amount from public.module_records mr
-where mr.module = 'financial_aid' and coalesce(mr.status,'applied') in ('approved','renewed')
-and coalesce(mr.amount,0) > 0
-and ( mr.data->>'student' = st.id::text or lower(coalesce(mr.data->>'student','')) = lower(coalesce(st.full_name,''))
-or mr.data->>'student_id' = st.id::text )
-loop
-aid := aid + fs.amount;
-aid_rows := aid_rows || jsonb_build_array(jsonb_build_object('scheme',coalesce(fs.title,'Scholarship/Aid'),'amount',fs.amount));
-bd := bd || jsonb_build_array(jsonb_build_object('item','🎓 '||coalesce(fs.title,'Scholarship/Aid'),'amount',-fs.amount));
-end loop;
-exception when undefined_table or undefined_column then null;
-end;
-eff := greatest(coalesce(bill,0) - aid, 0);
-return jsonb_build_object('ok',true,'student_id',st.id,'class',st.class,'arm',st.arm,'department',st.department,
-'term',t_term,'session',t_session,'resolved_by',tr->>'resolved_by','bill',eff,'structure_bill',bill,
-'aid',aid,'aid_rows',aid_rows,'breakdown',bd,'override',false,
-'match_status',status,'matched_by',nullif(mby,''),'matched',(status='structure'),
-'bill_known',(status='structure'),'match_note',note,'fallback',fb,'candidates',cand,
-'currency',coalesce((select cf.currency from public.class_fee_structure cf where cf.id = pid), public.sc_currency()),
-'due_date',(select cf.due_date from public.class_fee_structure cf where cf.id = pid),
-'note',coalesce((select cf.note from public.class_fee_structure cf where cf.id = pid),''),'working',note);
+/* V12.85 — WHEN A RECORDED FIGURE AND THE PUBLISHED BILL DISAGREE.
+A receipt or invoice carries whatever figure the platform believed on the
+day it was raised (and the platform, once, believed wrong figures — one
+SSS 2 learner was left carrying 17,100 against a published class bill of
+35,100). If the school has since published this term's price list, that
+     older figure is HISTORY, not the bill: the published list wins, and the
+     difference is reported so the bursar can see what was superseded and when.
+     A figure set by hand AFTER the list was published is a deliberate decision
+     and still wins. */
+  if inv.id is not null then
+    if matched and coalesce(inv.net_amount,0) <> coalesce(bill,0)
+       and coalesce(pick.updated, '-infinity'::timestamptz) > coalesce(inv.updated_at, '-infinity'::timestamptz) then
+      superseded := jsonb_build_object('amount', coalesce(inv.net_amount,0),
+        'source', coalesce(nullif(inv.source,''),'invoice'), 'recorded_at', inv.updated_at);
+      note := 'The class price list ('||to_char(coalesce(bill,0),'FM999,999,990.00')||', published '
+        ||to_char(coalesce(pick.updated, now()) at time zone public.sc_school_tz(),'DD Mon YYYY')
+        ||') is newer than the '||to_char(coalesce(inv.net_amount,0),'FM999,999,990.00')
+        ||' recorded for this learner ('||coalesce(nullif(inv.source,''),'invoice')||', '
+        ||to_char(coalesce(inv.updated_at, now()) at time zone public.sc_school_tz(),'DD Mon YYYY')
+        ||'). The published bill applies; the older figure stays on file as history and is not charged.'
+        ||case when coalesce(note,'')<>'' then ' '||note else '' end;
+    else
+      return jsonb_build_object('ok',true,'student_id',st.id,'class',st.class,'arm',st.arm,'department',st.department,
+        'term',t_term,'session',t_session,'resolved_by',tr->>'resolved_by','bill',coalesce(inv.net_amount,0),
+        'structure_bill',coalesce(inv.amount,0)+coalesce(inv.aid,0),'aid',coalesce(inv.aid,0),'aid_rows','[]'::jsonb,
+        'breakdown',jsonb_build_array(jsonb_build_object('item','Invoice for '||t_term,'amount',coalesce(inv.net_amount,0))),
+        'override',(coalesce(inv.source,'') in ('override','manual')),
+        'match_status', case when coalesce(inv.source,'') in ('override','manual') then 'override' else 'invoice' end,
+        'matched',true,'bill_known',true,
+        'matched_by', case when coalesce(inv.source,'') in ('override','manual') then 'override' else 'invoice' end,
+        'match_note', coalesce(nullif(btrim(coalesce(inv.note,'')),''),
+          case when coalesce(inv.source,'') in ('override','manual')
+               then 'A figure was set by hand for this learner this term; the class price list does not replace it.'
+               else 'The bill recorded on this learner''s invoice.' end),
+        'fallback',null,'candidates','[]'::jsonb,'currency',public.sc_currency(),'due_date',null,
+        'note',coalesce(inv.note,''),'working','Invoice raised for '||t_term||' '||coalesce(t_session,'')||' = '
+          ||to_char(coalesce(inv.net_amount,0),'FM999,999,990.00'),'superseded',null);
+    end if;
+  end if;
+  begin
+    for fs in select mr.title, mr.amount from public.module_records mr
+      where mr.module = 'financial_aid' and coalesce(mr.status,'applied') in ('approved','renewed')
+        and coalesce(mr.amount,0) > 0
+        and ( mr.data->>'student' = st.id::text or lower(coalesce(mr.data->>'student','')) = lower(coalesce(st.full_name,''))
+           or mr.data->>'student_id' = st.id::text )
+    loop
+      aid := aid + fs.amount;
+      aid_rows := aid_rows || jsonb_build_array(jsonb_build_object('scheme',coalesce(fs.title,'Scholarship/Aid'),'amount',fs.amount));
+      bd := bd || jsonb_build_array(jsonb_build_object('item','🎓 '||coalesce(fs.title,'Scholarship/Aid'),'amount',-fs.amount));
+    end loop;
+  exception when undefined_table or undefined_column then null;
+  end;
+  eff := greatest(coalesce(bill,0) - aid, 0);
+  return jsonb_build_object('ok',true,'student_id',st.id,'class',st.class,'arm',st.arm,'department',st.department,
+    'term',t_term,'session',t_session,'resolved_by',tr->>'resolved_by','bill',eff,'structure_bill',bill,
+    'aid',aid,'aid_rows',aid_rows,'breakdown',bd,'override',false,
+    'match_status',status,'matched_by',nullif(mby,''),'matched',(status='structure'),
+    'bill_known',(status='structure'),'match_note',note,'fallback',fb,'candidates',cand,
+  'superseded',superseded,'structure_updated_at',case when matched then pick.updated else null end,
+    'currency',coalesce((select cf.currency from public.class_fee_structure cf where cf.id = pid), public.sc_currency()),
+    'due_date',(select cf.due_date from public.class_fee_structure cf where cf.id = pid),
+    'note',coalesce((select cf.note from public.class_fee_structure cf where cf.id = pid),''),'working',note);
 end $$;
 revoke all on function public.sc_fee_bill_v2_structure(uuid,text,text) from public, anon;
 grant execute on function public.sc_fee_bill_v2_structure(uuid,text,text) to authenticated;
@@ -12894,80 +12981,80 @@ grant execute on function public.sc_fee_bill_v2_structure(uuid,text,text) to aut
 create or replace function public.sc_fee_truth_sheet(p_student uuid)
 returns jsonb language plpgsql stable security definer set search_path=public as $$
 declare me uuid := auth.uid(); st record; led jsonb; ex jsonb;
-rows jsonb := '[]'::jsonb; r record;
+        rows jsonb := '[]'::jsonb; r record;
 begin
-select * into st from public.students where id = p_student;
-if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
-if me is null or not (coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)
-or coalesce(st.user_id = me,false) or coalesce(public.is_parent_of(me, st.id),false)) then
-return jsonb_build_object('ok',false,'error','Not authorised for this student.');
-end if;
-/* the ledger settles the term; the explanation is asked ABOUT THAT TERM */
-led := public.sc_fee_ledger_for(p_student, null, null);
-if coalesce((led->>'ok')::boolean,false) = false then return led; end if;
-ex  := public.sc_fee_explain(p_student, led->>'term', led->>'session');
-/* Asking "explain THIS term" always answers resolved_by = 'explicit',
-because the caller named it. That is true of the question, not of the
-learner: the interesting fact is how the ledger came to that term in the
-first place. One document, so it must carry the original answer. */
-ex := jsonb_set(coalesce(ex,'{}'::jsonb), '{term_resolved_by}',
-to_jsonb(coalesce(led->>'term_resolved_by','')), true);
-for r in select fp.payment_date, fp.created_at, fp.amount_paid, fp.method, fp.reference,
-fp.term, fp.session, fp.received_by_name
-from public.fee_payments fp
-where fp.student_id = p_student
-order by coalesce(fp.payment_date, fp.created_at::date), fp.created_at
-loop
-rows := rows || jsonb_build_array(jsonb_build_object(
-'date', coalesce(r.payment_date::text, r.created_at::text),
-'amount', r.amount_paid, 'method', coalesce(r.method,''),
-'reference', coalesce(r.reference,''),
-'term', coalesce(r.term,''), 'session', coalesce(r.session,''),
-'received_by', coalesce(r.received_by_name,''),
-'for_this_term', (lower(coalesce(r.term,'')) = lower(coalesce(led->>'term',''))
-and lower(coalesce(r.session,'')) = lower(coalesce(led->>'session','')))));
-end loop;
-return jsonb_build_object('ok',true,
-'student', jsonb_build_object('id',st.id,'name',st.full_name,'admission_no',st.admission_no,
-'class',st.class,'arm',st.arm,'department',st.department),
-'period', jsonb_build_object('term',led->>'term','session',led->>'session',
-'resolved_by', coalesce(led->>'term_resolved_by','')),
-'headline', jsonb_build_object(
-'net_bill', led->'bill', 'aid', led->'aid', 'paid_this_term', led->'paid',
-'balance_this_term', led->'balance', 'arrears', led->'arrears',
-'opening_arrears', led->'opening_arrears',
-'total_outstanding', led->'total_due', 'status', led->>'status',
-'bill_known', coalesce((ex->>'bill_known')::boolean, true),
-'matched_by', coalesce(ex->>'matched_by','')),
-'provenance', ex,
-'arithmetic', led->'explain',
-'arrears_detail', led->'arrears_rows',
-'bill_breakdown', led->'bill_breakdown',
-'checks', led->'checks',
-'receipts', rows,
-'generated_at', now());
+  select * into st from public.students where id = p_student;
+  if st is null then return jsonb_build_object('ok',false,'error','Student not found.'); end if;
+  if me is null or not (coalesce(public.is_staff(me),false) or coalesce(public.is_admin(me),false)
+                        or coalesce(st.user_id = me,false) or coalesce(public.is_parent_of(me, st.id),false)) then
+    return jsonb_build_object('ok',false,'error','Not authorised for this student.');
+  end if;
+  /* the ledger settles the term; the explanation is asked ABOUT THAT TERM */
+  led := public.sc_fee_ledger_for(p_student, null, null);
+  if coalesce((led->>'ok')::boolean,false) = false then return led; end if;
+  ex  := public.sc_fee_explain(p_student, led->>'term', led->>'session');
+  /* Asking "explain THIS term" always answers resolved_by = 'explicit',
+     because the caller named it. That is true of the question, not of the
+     learner: the interesting fact is how the ledger came to that term in the
+     first place. One document, so it must carry the original answer. */
+  ex := jsonb_set(coalesce(ex,'{}'::jsonb), '{term_resolved_by}',
+                  to_jsonb(coalesce(led->>'term_resolved_by','')), true);
+  for r in select fp.payment_date, fp.created_at, fp.amount_paid, fp.method, fp.reference,
+                  fp.term, fp.session, fp.received_by_name
+             from public.fee_payments fp
+            where fp.student_id = p_student
+            order by coalesce(fp.payment_date, fp.created_at::date), fp.created_at
+  loop
+    rows := rows || jsonb_build_array(jsonb_build_object(
+      'date', coalesce(r.payment_date::text, r.created_at::text),
+      'amount', r.amount_paid, 'method', coalesce(r.method,''),
+      'reference', coalesce(r.reference,''),
+      'term', coalesce(r.term,''), 'session', coalesce(r.session,''),
+      'received_by', coalesce(r.received_by_name,''),
+      'for_this_term', (lower(coalesce(r.term,'')) = lower(coalesce(led->>'term',''))
+                        and lower(coalesce(r.session,'')) = lower(coalesce(led->>'session','')))));
+  end loop;
+  return jsonb_build_object('ok',true,
+    'student', jsonb_build_object('id',st.id,'name',st.full_name,'admission_no',st.admission_no,
+      'class',st.class,'arm',st.arm,'department',st.department),
+    'period', jsonb_build_object('term',led->>'term','session',led->>'session',
+                                 'resolved_by', coalesce(led->>'term_resolved_by','')),
+    'headline', jsonb_build_object(
+      'net_bill', led->'bill', 'aid', led->'aid', 'paid_this_term', led->'paid',
+      'balance_this_term', led->'balance', 'arrears', led->'arrears',
+      'opening_arrears', led->'opening_arrears',
+      'total_outstanding', led->'total_due', 'status', led->>'status',
+      'bill_known', coalesce((ex->>'bill_known')::boolean, true),
+      'matched_by', coalesce(ex->>'matched_by','')),
+    'provenance', ex,
+    'arithmetic', led->'explain',
+    'arrears_detail', led->'arrears_rows',
+    'bill_breakdown', led->'bill_breakdown',
+    'checks', led->'checks',
+    'receipts', rows,
+    'generated_at', now());
 end $$;
 revoke all on function public.sc_fee_truth_sheet(uuid) from public, anon;
 grant execute on function public.sc_fee_truth_sheet(uuid) to authenticated;
 -- =============== V12.70 MARK-INTEGRITY GUARDS (auto-installed) ===============
 do $$ begin
-if not exists (select 1 from pg_constraint where conname = 'report_scores_score_not_negative') then
-alter table public.report_scores
-add constraint report_scores_score_not_negative check (score >= 0) not valid;
-end if;
-if not exists (select 1 from pg_constraint where conname = 'assessment_columns_max_positive') then
-alter table public.assessment_columns
-add constraint assessment_columns_max_positive check (max_mark > 0) not valid;
-end if;
+  if not exists (select 1 from pg_constraint where conname = 'report_scores_score_not_negative') then
+    alter table public.report_scores
+      add constraint report_scores_score_not_negative check (score >= 0) not valid;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'assessment_columns_max_positive') then
+    alter table public.assessment_columns
+      add constraint assessment_columns_max_positive check (max_mark > 0) not valid;
+  end if;
 end $$;
 -- `not valid` above means: enforced on every NEW row from now on, while any
 create index if not exists idx_report_scores_over_max
-on public.report_scores(column_id) where score > 0;
+  on public.report_scores(column_id) where score > 0;
 /* ---- one place that answers: are any marks impossible?
-Returns a count, a readable list of the offenders, and a plain verdict, so
-the same answer can be printed on the report page and quoted by support. */
+   Returns a count, a readable list of the offenders, and a plain verdict, so
+   the same answer can be printed on the report page and quoted by support. */
 create or replace function public.sc_report_mark_audit(
-p_class text default null, p_term text default null, p_session text default null)
+  p_class text default null, p_term text default null, p_session text default null)
 returns jsonb
 language plpgsql
 security definer
@@ -12975,166 +13062,166 @@ set search_path = public
 as $$
 declare v_over jsonb; v_neg int; v_bad_max int; v_n int := 0;
 begin
-with bad as (
-select rs.id, rs.student_name, rs.class, rs.subject, rs.term, rs.session,
-rs.score, ac.max_mark, ac.name as column_name,
-case when ac.max_mark > 0 then round(rs.score / ac.max_mark * 100, 1) else null end as percent_of_max
-from public.report_scores rs
-join public.assessment_columns ac on ac.id = rs.column_id
-where rs.score > ac.max_mark
-and (p_class   is null or rs.class   = p_class)
-and (p_term    is null or rs.term    = p_term)
-and (p_session is null or rs.session = p_session)
-order by rs.class, rs.student_name, rs.subject
-limit 200
-)
-select coalesce(jsonb_agg(to_jsonb(bad)), '[]'::jsonb) into v_over from bad;
-select count(*) into v_neg from public.report_scores
-where score < 0
-and (p_class is null or class = p_class)
-and (p_term  is null or term  = p_term)
-and (p_session is null or session = p_session);
-select count(*) into v_bad_max from public.assessment_columns
-where max_mark <= 0
-and (p_class   is null or class   = p_class)
-and (p_term    is null or term    = p_term)
-and (p_session is null or session = p_session);
-v_n := jsonb_array_length(v_over) + v_neg + v_bad_max;
-return jsonb_build_object(
-'ok', v_n = 0,
-'checked', jsonb_build_object('class', p_class, 'term', p_term, 'session', p_session),
-'above_maximum', v_over,
-'counts', jsonb_build_object('above_maximum', jsonb_array_length(v_over),
-'negative_marks', v_neg,
-'impossible_maxima', v_bad_max,
-'defects', v_n),
-'verdict', case when v_n = 0
-then 'Every mark is within its maximum. Nothing to correct.'
-else format('%s mark(s) are above the maximum their assessment allows. Reports that include them are inflated; correct the marks, then repair percentages and positions.', v_n)
-end);
+  with bad as (
+    select rs.id, rs.student_name, rs.class, rs.subject, rs.term, rs.session,
+           rs.score, ac.max_mark, ac.name as column_name,
+           case when ac.max_mark > 0 then round(rs.score / ac.max_mark * 100, 1) else null end as percent_of_max
+      from public.report_scores rs
+      join public.assessment_columns ac on ac.id = rs.column_id
+     where rs.score > ac.max_mark
+       and (p_class   is null or rs.class   = p_class)
+       and (p_term    is null or rs.term    = p_term)
+       and (p_session is null or rs.session = p_session)
+     order by rs.class, rs.student_name, rs.subject
+     limit 200
+  )
+  select coalesce(jsonb_agg(to_jsonb(bad)), '[]'::jsonb) into v_over from bad;
+  select count(*) into v_neg from public.report_scores
+   where score < 0
+     and (p_class is null or class = p_class)
+     and (p_term  is null or term  = p_term)
+     and (p_session is null or session = p_session);
+  select count(*) into v_bad_max from public.assessment_columns
+   where max_mark <= 0
+     and (p_class   is null or class   = p_class)
+     and (p_term    is null or term    = p_term)
+     and (p_session is null or session = p_session);
+  v_n := jsonb_array_length(v_over) + v_neg + v_bad_max;
+  return jsonb_build_object(
+    'ok', v_n = 0,
+    'checked', jsonb_build_object('class', p_class, 'term', p_term, 'session', p_session),
+    'above_maximum', v_over,
+    'counts', jsonb_build_object('above_maximum', jsonb_array_length(v_over),
+                                 'negative_marks', v_neg,
+                                 'impossible_maxima', v_bad_max,
+                                 'defects', v_n),
+    'verdict', case when v_n = 0
+                    then 'Every mark is within its maximum. Nothing to correct.'
+                    else format('%s mark(s) are above the maximum their assessment allows. Reports that include them are inflated; correct the marks, then repair percentages and positions.', v_n)
+               end);
 end $$;
 revoke all on function public.sc_report_mark_audit(text,text,text) from public, anon;
 grant execute on function public.sc_report_mark_audit(text,text,text) to authenticated;
 -- A11. ROUND-15 ITEM 6 — OPEN A NEW TERM IN ONE CLICK.
 create or replace function public.sc_term_open(
-p_new_term    text,
-p_new_session text,
-p_from_term   text default null,
-p_from_session text default null,
-p_dry_run     boolean default true
+  p_new_term    text,
+  p_new_session text,
+  p_from_term   text default null,
+  p_from_session text default null,
+  p_dry_run     boolean default true
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare
-me uuid := auth.uid();
-cur jsonb; src_term text; src_session text;
-n_src int := 0; n_made int := 0; n_had int := 0;
-made jsonb := '[]'::jsonb; already jsonb := '[]'::jsonb; empty_classes jsonb := '[]'::jsonb;
-c record;
+  me uuid := auth.uid();
+  cur jsonb; src_term text; src_session text;
+  n_src int := 0; n_made int := 0; n_had int := 0;
+  made jsonb := '[]'::jsonb; already jsonb := '[]'::jsonb; empty_classes jsonb := '[]'::jsonb;
+  c record;
 begin
-if me is null or not coalesce(public.is_admin(me), false) then
-return jsonb_build_object('ok',false,'error','Only an administrator can open a new term.');
-end if;
-if coalesce(btrim(p_new_term),'') = '' or coalesce(btrim(p_new_session),'') = '' then
-return jsonb_build_object('ok',false,'error','Name both the new term and the new session.');
-end if;
-/* where the structure comes from: explicitly, else the current term */
-if nullif(btrim(coalesce(p_from_term,'')),'') is not null
-and nullif(btrim(coalesce(p_from_session,'')),'') is not null then
-src_term := btrim(p_from_term); src_session := btrim(p_from_session);
-else
-cur := public.sc_term_resolve(null, null);
-src_term := coalesce(cur->>'term',''); src_session := coalesce(cur->>'session','');
-end if;
-if src_term = '' or src_session = '' then
-return jsonb_build_object('ok',false,
-'error','No previous term is known, so there is no structure to carry. Create the assessment columns for the new term by hand.');
-end if;
-if lower(btrim(src_term)) = lower(btrim(p_new_term))
-and lower(btrim(src_session)) = lower(btrim(p_new_session)) then
-return jsonb_build_object('ok',false,
-'error','The source and the destination are the same term. Nothing to open.');
-end if;
-select count(*) into n_src from public.assessment_columns
-where lower(btrim(term)) = lower(btrim(src_term))
-and lower(btrim(session)) = lower(btrim(src_session));
-if n_src = 0 then
-return jsonb_build_object('ok',false,
-'error','The term being left has no assessment columns to carry. Add them to that term first, then open the new one.');
-end if;
-/* one row per distinct class that has structure in the source term */
-for c in select distinct ac.class, ac.subject, ac.term, ac.session
-from public.assessment_columns ac
-where lower(btrim(ac.term)) = lower(btrim(src_term))
-and lower(btrim(ac.session)) = lower(btrim(src_session))
-order by ac.class
-loop
-declare
-v_have int := 0; v_add int := 0;
-begin
-select count(*) into v_have from public.assessment_columns
-where lower(btrim(class)) = lower(btrim(c.class))
-and lower(btrim(term))  = lower(btrim(p_new_term))
-and lower(btrim(session)) = lower(btrim(p_new_session));
-if v_have > 0 then
-already := already || jsonb_build_array(c.class);
-n_had := n_had + 1;
-continue;
-end if;
-if not coalesce(p_dry_run, true) then
-insert into public.assessment_columns
-(class, subject, term, session, name, max_mark, weight, position, source, cbt_assessment_type, created_by)
-select ac.class, ac.subject, btrim(p_new_term), btrim(p_new_session),
-ac.name, ac.max_mark, ac.weight, ac.position,
-coalesce(nullif(ac.source,''),'carried'), ac.cbt_assessment_type, me
-from public.assessment_columns ac
-where lower(btrim(ac.term)) = lower(btrim(src_term))
-and lower(btrim(ac.session)) = lower(btrim(src_session))
-and lower(btrim(ac.class)) = lower(btrim(c.class))
-order by ac.position nulls last, ac.name
-on conflict (class, subject, term, session, name) do nothing;
-get diagnostics v_add = row_count;
-n_made := n_made + v_add;
-else
-/* dry run: count what would be created, write nothing */
-select count(*) into v_add from public.assessment_columns ac
-where lower(btrim(ac.term)) = lower(btrim(src_term))
-and lower(btrim(ac.session)) = lower(btrim(src_session))
-and lower(btrim(ac.class)) = lower(btrim(c.class));
-n_made := n_made + v_add;
-end if;
-made := made || jsonb_build_array(c.class);
-end;
-end loop;
-/* a class the school teaches but never assessed in the source term */
-select coalesce(jsonb_agg(distinct s.class), '[]'::jsonb) into empty_classes
-from public.students s
-where coalesce(s.status,'active') not in ('inactive','left','withdrawn','graduated','deleted')
-and not exists (
-select 1 from public.assessment_columns ac
-where lower(btrim(ac.class)) = lower(btrim(s.class))
-and lower(btrim(ac.term))  = lower(btrim(p_new_term))
-and lower(btrim(ac.session)) = lower(btrim(p_new_session)));
-return jsonb_build_object(
-'ok', true,
-'dry_run', coalesce(p_dry_run,true),
-'from', jsonb_build_object('term',src_term,'session',src_session),
-'to',   jsonb_build_object('term',btrim(p_new_term),'session',btrim(p_new_session)),
-'source_columns', n_src,
-'columns_created', n_made,
-'classes_opened', made,
-'classes_already_ready', already,
-'classes_without_structure', empty_classes,
-'marks_copied', 0,
-'message',
-case when coalesce(p_dry_run,true)
-then 'Preview only — nothing written. '||n_made||' column(s) would be created for '||jsonb_array_length(made)
-||' class(es), carrying the SAME names, maxima and weights as '||src_term||' '||src_session||'. No marks move.'
-else n_made||' column(s) created for '||jsonb_array_length(made)||' class(es) in '||btrim(p_new_term)||' '||btrim(p_new_session)||'. '
-||'Every mark recorded in '||src_term||' stays exactly where it was earned — this only prepares the sheet to be filled.'
-end,
-'next_step', case when jsonb_array_length(empty_classes) > 0
-then 'These classes have no assessment structure yet: '||(select string_agg(x,' , ') from jsonb_array_elements_text(empty_classes) x)
-||'. Copy a sibling class''s columns or create them by hand before results are entered.'
-else 'Open Results, pick the new term, and enter marks. The report card will build itself.' end);
+  if me is null or not coalesce(public.is_admin(me), false) then
+    return jsonb_build_object('ok',false,'error','Only an administrator can open a new term.');
+  end if;
+  if coalesce(btrim(p_new_term),'') = '' or coalesce(btrim(p_new_session),'') = '' then
+    return jsonb_build_object('ok',false,'error','Name both the new term and the new session.');
+  end if;
+  /* where the structure comes from: explicitly, else the current term */
+  if nullif(btrim(coalesce(p_from_term,'')),'') is not null
+     and nullif(btrim(coalesce(p_from_session,'')),'') is not null then
+    src_term := btrim(p_from_term); src_session := btrim(p_from_session);
+  else
+    cur := public.sc_term_resolve(null, null);
+    src_term := coalesce(cur->>'term',''); src_session := coalesce(cur->>'session','');
+  end if;
+  if src_term = '' or src_session = '' then
+    return jsonb_build_object('ok',false,
+      'error','No previous term is known, so there is no structure to carry. Create the assessment columns for the new term by hand.');
+  end if;
+  if lower(btrim(src_term)) = lower(btrim(p_new_term))
+     and lower(btrim(src_session)) = lower(btrim(p_new_session)) then
+    return jsonb_build_object('ok',false,
+      'error','The source and the destination are the same term. Nothing to open.');
+  end if;
+  select count(*) into n_src from public.assessment_columns
+   where lower(btrim(term)) = lower(btrim(src_term))
+     and lower(btrim(session)) = lower(btrim(src_session));
+  if n_src = 0 then
+    return jsonb_build_object('ok',false,
+      'error','The term being left has no assessment columns to carry. Add them to that term first, then open the new one.');
+  end if;
+  /* one row per distinct class that has structure in the source term */
+  for c in select distinct ac.class, ac.subject, ac.term, ac.session
+             from public.assessment_columns ac
+            where lower(btrim(ac.term)) = lower(btrim(src_term))
+              and lower(btrim(ac.session)) = lower(btrim(src_session))
+            order by ac.class
+  loop
+    declare
+      v_have int := 0; v_add int := 0;
+    begin
+      select count(*) into v_have from public.assessment_columns
+       where lower(btrim(class)) = lower(btrim(c.class))
+         and lower(btrim(term))  = lower(btrim(p_new_term))
+         and lower(btrim(session)) = lower(btrim(p_new_session));
+      if v_have > 0 then
+        already := already || jsonb_build_array(c.class);
+        n_had := n_had + 1;
+        continue;
+      end if;
+      if not coalesce(p_dry_run, true) then
+        insert into public.assessment_columns
+          (class, subject, term, session, name, max_mark, weight, position, source, cbt_assessment_type, created_by)
+        select ac.class, ac.subject, btrim(p_new_term), btrim(p_new_session),
+               ac.name, ac.max_mark, ac.weight, ac.position,
+               coalesce(nullif(ac.source,''),'carried'), ac.cbt_assessment_type, me
+          from public.assessment_columns ac
+         where lower(btrim(ac.term)) = lower(btrim(src_term))
+           and lower(btrim(ac.session)) = lower(btrim(src_session))
+           and lower(btrim(ac.class)) = lower(btrim(c.class))
+         order by ac.position nulls last, ac.name
+        on conflict (class, subject, term, session, name) do nothing;
+        get diagnostics v_add = row_count;
+        n_made := n_made + v_add;
+      else
+        /* dry run: count what would be created, write nothing */
+        select count(*) into v_add from public.assessment_columns ac
+         where lower(btrim(ac.term)) = lower(btrim(src_term))
+           and lower(btrim(ac.session)) = lower(btrim(src_session))
+           and lower(btrim(ac.class)) = lower(btrim(c.class));
+        n_made := n_made + v_add;
+      end if;
+      made := made || jsonb_build_array(c.class);
+    end;
+  end loop;
+  /* a class the school teaches but never assessed in the source term */
+  select coalesce(jsonb_agg(distinct s.class), '[]'::jsonb) into empty_classes
+    from public.students s
+   where coalesce(s.status,'active') not in ('inactive','left','withdrawn','graduated','deleted')
+     and not exists (
+       select 1 from public.assessment_columns ac
+        where lower(btrim(ac.class)) = lower(btrim(s.class))
+          and lower(btrim(ac.term))  = lower(btrim(p_new_term))
+          and lower(btrim(ac.session)) = lower(btrim(p_new_session)));
+  return jsonb_build_object(
+    'ok', true,
+    'dry_run', coalesce(p_dry_run,true),
+    'from', jsonb_build_object('term',src_term,'session',src_session),
+    'to',   jsonb_build_object('term',btrim(p_new_term),'session',btrim(p_new_session)),
+    'source_columns', n_src,
+    'columns_created', n_made,
+    'classes_opened', made,
+    'classes_already_ready', already,
+    'classes_without_structure', empty_classes,
+    'marks_copied', 0,
+    'message',
+      case when coalesce(p_dry_run,true)
+        then 'Preview only — nothing written. '||n_made||' column(s) would be created for '||jsonb_array_length(made)
+             ||' class(es), carrying the SAME names, maxima and weights as '||src_term||' '||src_session||'. No marks move.'
+        else n_made||' column(s) created for '||jsonb_array_length(made)||' class(es) in '||btrim(p_new_term)||' '||btrim(p_new_session)||'. '
+             ||'Every mark recorded in '||src_term||' stays exactly where it was earned — this only prepares the sheet to be filled.'
+      end,
+    'next_step', case when jsonb_array_length(empty_classes) > 0
+        then 'These classes have no assessment structure yet: '||(select string_agg(x,' , ') from jsonb_array_elements_text(empty_classes) x)
+             ||'. Copy a sibling class''s columns or create them by hand before results are entered.'
+        else 'Open Results, pick the new term, and enter marks. The report card will build itself.' end);
 end $$;
 revoke all on function public.sc_term_open(text,text,text,text,boolean) from public, anon;
 grant execute on function public.sc_term_open(text,text,text,text,boolean) to authenticated;
@@ -13143,239 +13230,239 @@ insert into public.sc_install_state(key,details) values ('v12.71-term-open.sql',
 alter table public.sc_fee_invoice add column if not exists due_on date;
 create or replace function public.sc_fee_due_date(p_term text, p_session text)
 returns date language sql stable as $$
-select coalesce(
-(select ap.ends_on from public.academic_periods ap
-where lower(btrim(ap.term))    = lower(btrim(coalesce(p_term,'')))
-and lower(btrim(ap.session)) = lower(btrim(coalesce(p_session,'')))
-order by ap.starts_on nulls last limit 1),
-(current_date + interval '70 days')::date)
+  select coalesce(
+    (select ap.ends_on from public.academic_periods ap
+      where lower(btrim(ap.term))    = lower(btrim(coalesce(p_term,'')))
+        and lower(btrim(ap.session)) = lower(btrim(coalesce(p_session,'')))
+      order by ap.starts_on nulls last limit 1),
+    (current_date + interval '70 days')::date)
 $$;
 create or replace function public.sc_fee_invoice_set_due()
 returns trigger language plpgsql as $$
 begin
-if new.due_on is null then new.due_on := public.sc_fee_due_date(new.term, new.session); end if;
-return new;
+  if new.due_on is null then new.due_on := public.sc_fee_due_date(new.term, new.session); end if;
+  return new;
 end $$;
 drop trigger if exists sc_fee_invoice_due on public.sc_fee_invoice;
 create trigger sc_fee_invoice_due before insert on public.sc_fee_invoice
-for each row execute function public.sc_fee_invoice_set_due();
+  for each row execute function public.sc_fee_invoice_set_due();
 create or replace function public.sc_fee_aged_arrears(
-p_as_of date default current_date, p_class text default null,
-p_term text default null, p_session text default null
+  p_as_of date default current_date, p_class text default null,
+  p_term text default null, p_session text default null
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid := auth.uid(); out_rows jsonb; tot jsonb;
 begin
-if me is null or not public.is_staff(me) then
-return jsonb_build_object('ok',false,'error','Only the bursary and leadership can read arrears.'); end if;
-with billed as (
-select i.student_id, lower(btrim(coalesce(i.term,''))) term, lower(btrim(coalesce(i.session,''))) session,
-sum(coalesce(i.net_amount, i.amount, 0)) net,
-min(coalesce(i.due_on, public.sc_fee_due_date(i.term, i.session))) oldest_due
-from public.sc_fee_invoice i
-where (p_term is null or lower(btrim(coalesce(i.term,''))) = lower(btrim(p_term)))
-and (p_session is null or lower(btrim(coalesce(i.session,''))) = lower(btrim(p_session)))
-group by i.student_id, lower(btrim(coalesce(i.term,''))), lower(btrim(coalesce(i.session,'')))
-), paid as (
-select p.student_id, lower(btrim(coalesce(p.term,''))) term,
-lower(btrim(coalesce(p.session,''))) session, sum(coalesce(p.amount_paid,0)) paid
-from public.fee_payments p
-group by p.student_id, lower(btrim(coalesce(p.term,''))), lower(btrim(coalesce(p.session,'')))
-), aged as (
-select b.student_id, s.full_name, s.admission_no, s.class,
-round(b.net - coalesce(pa.paid,0), 2) owing,
-greatest(0, (p_as_of - b.oldest_due))::int days_overdue,
-case when (p_as_of - b.oldest_due) <= 0  then 'not_due'
-when (p_as_of - b.oldest_due) <= 30 then '0_30'
-when (p_as_of - b.oldest_due) <= 60 then '31_60'
-when (p_as_of - b.oldest_due) <= 90 then '61_90'
-else 'over_90' end band
-from billed b left join paid pa on pa.student_id=b.student_id and pa.term=b.term and pa.session=b.session
-join public.students s on s.id = b.student_id
-where b.net - coalesce(pa.paid,0) > 0.005
-and (p_class is null or lower(btrim(coalesce(s.class,''))) = lower(btrim(p_class)))
-)
-select coalesce(jsonb_agg(jsonb_build_object('student_id',student_id,'student',full_name,
-'admission_no',admission_no,'class',class,'outstanding',owing,
-'days_overdue',days_overdue,'band',band) order by days_overdue desc, owing desc),'[]'::jsonb),
-jsonb_build_object('not_due',coalesce(sum(case when band='not_due' then owing end),0),
-'0_30',coalesce(sum(case when band='0_30' then owing end),0),
-'31_60',coalesce(sum(case when band='31_60' then owing end),0),
-'61_90',coalesce(sum(case when band='61_90' then owing end),0),
-'over_90',coalesce(sum(case when band='over_90' then owing end),0),
-'total',coalesce(sum(owing),0),'learners',count(*))
-into out_rows, tot from aged;
-return jsonb_build_object('ok',true,'as_of',p_as_of,'rows',out_rows,'totals',tot,
-'meaning','not_due is billed but not yet payable; the other bands are money the school can already chase — '
-||'31-60 is a reminder, 61-90 is a meeting, over 90 needs a written plan or a write-off decision.',
-'engine','v12.71');
+  if me is null or not public.is_staff(me) then
+    return jsonb_build_object('ok',false,'error','Only the bursary and leadership can read arrears.'); end if;
+  with billed as (
+    select i.student_id, lower(btrim(coalesce(i.term,''))) term, lower(btrim(coalesce(i.session,''))) session,
+           sum(coalesce(i.net_amount, i.amount, 0)) net,
+           min(coalesce(i.due_on, public.sc_fee_due_date(i.term, i.session))) oldest_due
+      from public.sc_fee_invoice i
+     where (p_term is null or lower(btrim(coalesce(i.term,''))) = lower(btrim(p_term)))
+       and (p_session is null or lower(btrim(coalesce(i.session,''))) = lower(btrim(p_session)))
+     group by i.student_id, lower(btrim(coalesce(i.term,''))), lower(btrim(coalesce(i.session,'')))
+  ), paid as (
+    select p.student_id, lower(btrim(coalesce(p.term,''))) term,
+           lower(btrim(coalesce(p.session,''))) session, sum(coalesce(p.amount_paid,0)) paid
+      from public.fee_payments p
+     group by p.student_id, lower(btrim(coalesce(p.term,''))), lower(btrim(coalesce(p.session,'')))
+  ), aged as (
+    select b.student_id, s.full_name, s.admission_no, s.class,
+           round(b.net - coalesce(pa.paid,0), 2) owing,
+           greatest(0, (p_as_of - b.oldest_due))::int days_overdue,
+           case when (p_as_of - b.oldest_due) <= 0  then 'not_due'
+                when (p_as_of - b.oldest_due) <= 30 then '0_30'
+                when (p_as_of - b.oldest_due) <= 60 then '31_60'
+                when (p_as_of - b.oldest_due) <= 90 then '61_90'
+                else 'over_90' end band
+      from billed b left join paid pa on pa.student_id=b.student_id and pa.term=b.term and pa.session=b.session
+      join public.students s on s.id = b.student_id
+     where b.net - coalesce(pa.paid,0) > 0.005
+       and (p_class is null or lower(btrim(coalesce(s.class,''))) = lower(btrim(p_class)))
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('student_id',student_id,'student',full_name,
+           'admission_no',admission_no,'class',class,'outstanding',owing,
+           'days_overdue',days_overdue,'band',band) order by days_overdue desc, owing desc),'[]'::jsonb),
+         jsonb_build_object('not_due',coalesce(sum(case when band='not_due' then owing end),0),
+           '0_30',coalesce(sum(case when band='0_30' then owing end),0),
+           '31_60',coalesce(sum(case when band='31_60' then owing end),0),
+           '61_90',coalesce(sum(case when band='61_90' then owing end),0),
+           'over_90',coalesce(sum(case when band='over_90' then owing end),0),
+           'total',coalesce(sum(owing),0),'learners',count(*))
+    into out_rows, tot from aged;
+  return jsonb_build_object('ok',true,'as_of',p_as_of,'rows',out_rows,'totals',tot,
+    'meaning','not_due is billed but not yet payable; the other bands are money the school can already chase — '
+           ||'31-60 is a reminder, 61-90 is a meeting, over 90 needs a written plan or a write-off decision.',
+    'engine','v12.71');
 end $$;
 revoke all on function public.sc_fee_aged_arrears(date,text,text,text) from public, anon;
 grant execute on function public.sc_fee_aged_arrears(date,text,text,text) to authenticated;
 create or replace function public.sc_fee_collection_summary(
-p_term text default null, p_session text default null
+  p_term text default null, p_session text default null
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid := auth.uid(); rows_ jsonb; grand jsonb;
 begin
-if me is null or not public.is_staff(me) then
-return jsonb_build_object('ok',false,'error','Only the bursary and leadership can read the collection summary.'); end if;
-with inv as (
-select lower(btrim(coalesce(class,''))) cls, sum(coalesce(net_amount, amount, 0)) billed, count(*) n
-from public.sc_fee_invoice
-where (p_term is null or lower(btrim(coalesce(term,''))) = lower(btrim(p_term)))
-and (p_session is null or lower(btrim(coalesce(session,''))) = lower(btrim(p_session)))
-group by lower(btrim(coalesce(class,'')))
-), pay as (
-select lower(btrim(coalesce(s.class,''))) cls, sum(coalesce(p.amount_paid,0)) collected
-from public.fee_payments p left join public.students s on s.id = p.student_id
-where (p_term is null or lower(btrim(coalesce(p.term,''))) = lower(btrim(p_term)))
-and (p_session is null or lower(btrim(coalesce(p.session,''))) = lower(btrim(p_session)))
-group by lower(btrim(coalesce(s.class,'')))
-), combined as (
-select coalesce(i.cls, pa.cls) cls, coalesce(i.billed,0) billed,
-coalesce(i.n,0) invoices, coalesce(pa.collected,0) collected
-from inv i full join pay pa on pa.cls = i.cls
-)
-select coalesce(jsonb_agg(jsonb_build_object('class',cls,'invoices',invoices,
-'billed',round(billed,2),'collected',round(collected,2),
-'outstanding',round(billed-collected,2),
-'rate',case when billed>0 then round(collected/billed*100,1) end) order by cls),'[]'::jsonb),
-jsonb_build_object('billed',coalesce(sum(billed),0),'collected',coalesce(sum(collected),0),
-'outstanding',coalesce(sum(billed-collected),0),
-'rate',case when sum(billed)>0 then round(sum(collected)/sum(billed)*100,1) end)
-into rows_, grand from combined;
-return jsonb_build_object('ok',true,'rows',rows_,'totals',grand,
-'meaning','collected/billed is the collection rate. Below 70% at mid-term usually means invoices went out late or a class has no fee structure published.',
-'engine','v12.71');
+  if me is null or not public.is_staff(me) then
+    return jsonb_build_object('ok',false,'error','Only the bursary and leadership can read the collection summary.'); end if;
+  with inv as (
+    select lower(btrim(coalesce(class,''))) cls, sum(coalesce(net_amount, amount, 0)) billed, count(*) n
+      from public.sc_fee_invoice
+     where (p_term is null or lower(btrim(coalesce(term,''))) = lower(btrim(p_term)))
+       and (p_session is null or lower(btrim(coalesce(session,''))) = lower(btrim(p_session)))
+     group by lower(btrim(coalesce(class,'')))
+  ), pay as (
+    select lower(btrim(coalesce(s.class,''))) cls, sum(coalesce(p.amount_paid,0)) collected
+      from public.fee_payments p left join public.students s on s.id = p.student_id
+     where (p_term is null or lower(btrim(coalesce(p.term,''))) = lower(btrim(p_term)))
+       and (p_session is null or lower(btrim(coalesce(p.session,''))) = lower(btrim(p_session)))
+     group by lower(btrim(coalesce(s.class,'')))
+  ), combined as (
+    select coalesce(i.cls, pa.cls) cls, coalesce(i.billed,0) billed,
+           coalesce(i.n,0) invoices, coalesce(pa.collected,0) collected
+      from inv i full join pay pa on pa.cls = i.cls
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('class',cls,'invoices',invoices,
+           'billed',round(billed,2),'collected',round(collected,2),
+           'outstanding',round(billed-collected,2),
+           'rate',case when billed>0 then round(collected/billed*100,1) end) order by cls),'[]'::jsonb),
+         jsonb_build_object('billed',coalesce(sum(billed),0),'collected',coalesce(sum(collected),0),
+           'outstanding',coalesce(sum(billed-collected),0),
+           'rate',case when sum(billed)>0 then round(sum(collected)/sum(billed)*100,1) end)
+    into rows_, grand from combined;
+  return jsonb_build_object('ok',true,'rows',rows_,'totals',grand,
+    'meaning','collected/billed is the collection rate. Below 70% at mid-term usually means invoices went out late or a class has no fee structure published.',
+    'engine','v12.71');
 end $$;
 revoke all on function public.sc_fee_collection_summary(text,text) from public, anon;
 grant execute on function public.sc_fee_collection_summary(text,text) to authenticated;
 create table if not exists public.sc_fee_adjustment (
-id uuid primary key default gen_random_uuid(),
-student_id uuid references public.students(id) on delete cascade,
-student_id_ref text not null default '', term text not null default '', session text not null default '',
-kind text not null default 'credit', amount numeric not null default 0,
-reason text not null default '', created_by uuid,
-created_at timestamptz not null default now());
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid references public.students(id) on delete cascade,
+  student_id_ref text not null default '', term text not null default '', session text not null default '',
+  kind text not null default 'credit', amount numeric not null default 0,
+  reason text not null default '', created_by uuid,
+  created_at timestamptz not null default now());
 create index if not exists sc_fee_adjustment_student on public.sc_fee_adjustment(student_id);
 alter table public.sc_fee_adjustment enable row level security;
 drop policy if exists sc_fee_adjustment_read on public.sc_fee_adjustment;
 create policy sc_fee_adjustment_read on public.sc_fee_adjustment for select to authenticated using (true);
 drop policy if exists sc_fee_adjustment_admin on public.sc_fee_adjustment;
 create policy sc_fee_adjustment_admin on public.sc_fee_adjustment for all to authenticated
-using (coalesce(public.is_admin(auth.uid()),false)) with check (coalesce(public.is_admin(auth.uid()),false));
+  using (coalesce(public.is_admin(auth.uid()),false)) with check (coalesce(public.is_admin(auth.uid()),false));
 create or replace function public.sc_fee_adjust(
-p_student uuid, p_kind text, p_amount numeric, p_reason text,
-p_term text default null, p_session text default null
+  p_student uuid, p_kind text, p_amount numeric, p_reason text,
+  p_term text default null, p_session text default null
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid := auth.uid(); cur jsonb; nm text; ref text; t text; s text;
 begin
-if me is null or not coalesce(public.is_admin(me),false) then
-return jsonb_build_object('ok',false,'error','Only an administrator can credit, waive or write off a fee.'); end if;
-if coalesce(p_amount,0) <= 0 then
-return jsonb_build_object('ok',false,'error','An adjustment must be a positive amount of money.'); end if;
-if coalesce(btrim(p_reason),'') = '' then
-return jsonb_build_object('ok',false,'error','Say why. The reason is what a board reads when it questions the total.'); end if;
-if lower(btrim(coalesce(p_kind,''))) not in ('credit','waiver','write_off','correction') then
-return jsonb_build_object('ok',false,'error','Kind must be credit, waiver, write_off or correction.'); end if;
-select full_name, admission_no into nm, ref from public.students where id = p_student;
-if nm is null then return jsonb_build_object('ok',false,'error','That learner does not exist.'); end if;
-cur := public.sc_term_resolve(p_term, p_session);
-t := coalesce(cur->>'term',''); s := coalesce(cur->>'session','');
-insert into public.sc_fee_adjustment(student_id,student_id_ref,term,session,kind,amount,reason,created_by)
-values (p_student, coalesce(ref,''), t, s, lower(btrim(p_kind)), p_amount, btrim(p_reason), me);
-return jsonb_build_object('ok',true,'student',nm,'kind',lower(btrim(p_kind)),'amount',p_amount,
-'term',t,'session',s,
-'note','Recorded. The invoice itself is unchanged — this is an audit entry beside the ledger.');
+  if me is null or not coalesce(public.is_admin(me),false) then
+    return jsonb_build_object('ok',false,'error','Only an administrator can credit, waive or write off a fee.'); end if;
+  if coalesce(p_amount,0) <= 0 then
+    return jsonb_build_object('ok',false,'error','An adjustment must be a positive amount of money.'); end if;
+  if coalesce(btrim(p_reason),'') = '' then
+    return jsonb_build_object('ok',false,'error','Say why. The reason is what a board reads when it questions the total.'); end if;
+  if lower(btrim(coalesce(p_kind,''))) not in ('credit','waiver','write_off','correction') then
+    return jsonb_build_object('ok',false,'error','Kind must be credit, waiver, write_off or correction.'); end if;
+  select full_name, admission_no into nm, ref from public.students where id = p_student;
+  if nm is null then return jsonb_build_object('ok',false,'error','That learner does not exist.'); end if;
+  cur := public.sc_term_resolve(p_term, p_session);
+  t := coalesce(cur->>'term',''); s := coalesce(cur->>'session','');
+  insert into public.sc_fee_adjustment(student_id,student_id_ref,term,session,kind,amount,reason,created_by)
+  values (p_student, coalesce(ref,''), t, s, lower(btrim(p_kind)), p_amount, btrim(p_reason), me);
+  return jsonb_build_object('ok',true,'student',nm,'kind',lower(btrim(p_kind)),'amount',p_amount,
+    'term',t,'session',s,
+    'note','Recorded. The invoice itself is unchanged — this is an audit entry beside the ledger.');
 end $$;
 revoke all on function public.sc_fee_adjust(uuid,text,numeric,text,text,text) from public, anon;
 grant execute on function public.sc_fee_adjust(uuid,text,numeric,text,text,text) to authenticated;
 create or replace function public.sc_fee_adjustments(
-p_term text default null, p_session text default null
+  p_term text default null, p_session text default null
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid := auth.uid(); rows_ jsonb;
 begin
-if me is null or not public.is_staff(me) then
-return jsonb_build_object('ok',false,'error','Only the bursary and leadership can read the adjustments register.'); end if;
-select coalesce(jsonb_agg(jsonb_build_object('id',a.id,'student',s.full_name,'admission_no',s.admission_no,
-'class',s.class,'kind',a.kind,'amount',a.amount,'reason',a.reason,'term',a.term,'session',a.session,
-'by',coalesce(p.full_name,'(removed user)'),'at',to_char(a.created_at,'DD Mon YYYY HH24:MI'))
-order by a.created_at desc),'[]'::jsonb)
-into rows_ from public.sc_fee_adjustment a
-left join public.students s on s.id = a.student_id
-left join public.profiles p on p.id = a.created_by
-where (p_term is null or lower(btrim(coalesce(a.term,''))) = lower(btrim(p_term)))
-and (p_session is null or lower(btrim(coalesce(a.session,''))) = lower(btrim(p_session)));
-return jsonb_build_object('ok',true,'rows',rows_,
-'meaning','Every credit, waiver, write-off and correction with the reason given. Nothing is ever deleted from this register.',
-'engine','v12.71');
+  if me is null or not public.is_staff(me) then
+    return jsonb_build_object('ok',false,'error','Only the bursary and leadership can read the adjustments register.'); end if;
+  select coalesce(jsonb_agg(jsonb_build_object('id',a.id,'student',s.full_name,'admission_no',s.admission_no,
+           'class',s.class,'kind',a.kind,'amount',a.amount,'reason',a.reason,'term',a.term,'session',a.session,
+           'by',coalesce(p.full_name,'(removed user)'),'at',to_char(a.created_at,'DD Mon YYYY HH24:MI'))
+         order by a.created_at desc),'[]'::jsonb)
+    into rows_ from public.sc_fee_adjustment a
+    left join public.students s on s.id = a.student_id
+    left join public.profiles p on p.id = a.created_by
+   where (p_term is null or lower(btrim(coalesce(a.term,''))) = lower(btrim(p_term)))
+     and (p_session is null or lower(btrim(coalesce(a.session,''))) = lower(btrim(p_session)));
+  return jsonb_build_object('ok',true,'rows',rows_,
+    'meaning','Every credit, waiver, write-off and correction with the reason given. Nothing is ever deleted from this register.',
+    'engine','v12.71');
 end $$;
 revoke all on function public.sc_fee_adjustments(text,text) from public, anon;
 grant execute on function public.sc_fee_adjustments(text,text) to authenticated;
 insert into public.sc_install_state(key,details) values ('v12.71-financial-reports.sql','{"self":true}') on conflict (key) do nothing;
 -- A12b. ROUND-15 ITEM 5 — BANK & CASH RECONCILIATION.
 create or replace function public.sc_fee_cash_reconciliation(
-p_from date default null, p_to date default null
+  p_from date default null, p_to date default null
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid := auth.uid(); rows_ jsonb; tot jsonb; f date; t date;
 begin
-if me is null or not public.is_staff(me) then
-return jsonb_build_object('ok',false,'error','Only the bursary and leadership can reconcile cash and bank.');
-end if;
-f := coalesce(p_from, date_trunc('month', current_date)::date);
-t := coalesce(p_to,   current_date);
-if t < f then return jsonb_build_object('ok',false,'error','The end date is before the start date.'); end if;
-with p as (
-select lower(btrim(coalesce(method,'unspecified'))) method,
-coalesce(nullif(btrim(coalesce(received_by_name,'')),''),'(not recorded)') collector,
-coalesce(amount_paid,0) amt,
-coalesce(payment_date, created_at::date) d
-from public.fee_payments
-where coalesce(payment_date, created_at::date) between f and t
-), by_method as (
-select method, count(*) n, sum(amt) amount from p group by method
-), by_collector as (
-select collector, count(*) n, sum(amt) amount from p group by collector
-)
-select coalesce((select jsonb_agg(jsonb_build_object('method',method,'receipts',n,'amount',round(amount,2)) order by amount desc)
-from by_method),'[]'::jsonb),
-jsonb_build_object(
-'receipts', (select count(*) from p),
-'total',    (select coalesce(round(sum(amt),2),0) from p),
-'cash',     coalesce((select round(sum(amount),2) from by_method where method='cash'),0),
-'bank',     coalesce((select round(sum(amount),2) from by_method where method<>'cash'),0),
-'by_collector', coalesce((select jsonb_agg(jsonb_build_object('collector',collector,'receipts',n,'amount',round(amount,2)) order by amount desc)
-from by_collector),'[]'::jsonb),
-'unallocated', coalesce((select count(*) from public.fee_payments
-where coalesce(payment_date, created_at::date) between f and t
-and student_id is null),0),
-'no_reference', coalesce((select count(*) from public.fee_payments
-where coalesce(payment_date, created_at::date) between f and t
-and coalesce(btrim(reference),'')=''),0),
-'zero_or_negative', coalesce((select count(*) from public.fee_payments
-where coalesce(payment_date, created_at::date) between f and t
-and coalesce(amount_paid,0) <= 0),0))
-into rows_, tot;
-return jsonb_build_object('ok',true,'from',f,'to',t,'by_method',rows_,'totals',tot,
-'how_to_use','Count the physical cash in the box and read the bank statement for the same dates. Each method line here must equal what you counted. A receipt with no reference, or no learner, is money you cannot defend in an audit — fix those before you sign.',
-'engine','v12.71');
+  if me is null or not public.is_staff(me) then
+    return jsonb_build_object('ok',false,'error','Only the bursary and leadership can reconcile cash and bank.');
+  end if;
+  f := coalesce(p_from, date_trunc('month', current_date)::date);
+  t := coalesce(p_to,   current_date);
+  if t < f then return jsonb_build_object('ok',false,'error','The end date is before the start date.'); end if;
+  with p as (
+    select lower(btrim(coalesce(method,'unspecified'))) method,
+           coalesce(nullif(btrim(coalesce(received_by_name,'')),''),'(not recorded)') collector,
+           coalesce(amount_paid,0) amt,
+           coalesce(payment_date, created_at::date) d
+      from public.fee_payments
+     where coalesce(payment_date, created_at::date) between f and t
+  ), by_method as (
+    select method, count(*) n, sum(amt) amount from p group by method
+  ), by_collector as (
+    select collector, count(*) n, sum(amt) amount from p group by collector
+  )
+  select coalesce((select jsonb_agg(jsonb_build_object('method',method,'receipts',n,'amount',round(amount,2)) order by amount desc)
+                     from by_method),'[]'::jsonb),
+         jsonb_build_object(
+           'receipts', (select count(*) from p),
+           'total',    (select coalesce(round(sum(amt),2),0) from p),
+           'cash',     coalesce((select round(sum(amount),2) from by_method where method='cash'),0),
+           'bank',     coalesce((select round(sum(amount),2) from by_method where method<>'cash'),0),
+           'by_collector', coalesce((select jsonb_agg(jsonb_build_object('collector',collector,'receipts',n,'amount',round(amount,2)) order by amount desc)
+                                       from by_collector),'[]'::jsonb),
+           'unallocated', coalesce((select count(*) from public.fee_payments
+                                     where coalesce(payment_date, created_at::date) between f and t
+                                       and student_id is null),0),
+           'no_reference', coalesce((select count(*) from public.fee_payments
+                                      where coalesce(payment_date, created_at::date) between f and t
+                                        and coalesce(btrim(reference),'')=''),0),
+           'zero_or_negative', coalesce((select count(*) from public.fee_payments
+                                          where coalesce(payment_date, created_at::date) between f and t
+                                            and coalesce(amount_paid,0) <= 0),0))
+    into rows_, tot;
+  return jsonb_build_object('ok',true,'from',f,'to',t,'by_method',rows_,'totals',tot,
+    'how_to_use','Count the physical cash in the box and read the bank statement for the same dates. Each method line here must equal what you counted. A receipt with no reference, or no learner, is money you cannot defend in an audit — fix those before you sign.',
+    'engine','v12.71');
 end $$;
 revoke all on function public.sc_fee_cash_reconciliation(date,date) from public, anon;
 grant execute on function public.sc_fee_cash_reconciliation(date,date) to authenticated;
 -- A13. ROUND-16 — PREP EXAMS, CUSTOM ASSESSMENT PURPOSES, TEACHER
 create table if not exists public.sc_assessment_purpose (
-id uuid primary key default gen_random_uuid(),
-slug text not null unique,                 -- what is stored on the exam
-label text not null,                       -- what a teacher reads
-emoji text not null default '⚪',
--- THE GOVERNING RULE: can a score here ever reach a report card?
-report_eligible boolean not null default false,
--- which report engine reads it: midterm | prep | none
-feeds_report text not null default 'none',
-is_builtin boolean not null default false, -- built-ins cannot be deleted
-sort_order int not null default 100,
-description text not null default '',
-created_by uuid references public.profiles(id) on delete set null,
-created_at timestamptz not null default now()
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,                 -- what is stored on the exam
+  label text not null,                       -- what a teacher reads
+  emoji text not null default '⚪',
+  -- THE GOVERNING RULE: can a score here ever reach a report card?
+  report_eligible boolean not null default false,
+  -- which report engine reads it: midterm | prep | none
+  feeds_report text not null default 'none',
+  is_builtin boolean not null default false, -- built-ins cannot be deleted
+  sort_order int not null default 100,
+  description text not null default '',
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
 );
 create index if not exists sc_assessment_purpose_sort on public.sc_assessment_purpose(sort_order, label);
 alter table public.sc_assessment_purpose enable row level security;
@@ -13383,230 +13470,230 @@ drop policy if exists sc_assessment_purpose_read on public.sc_assessment_purpose
 create policy sc_assessment_purpose_read on public.sc_assessment_purpose for select to authenticated using (true);
 drop policy if exists sc_assessment_purpose_write on public.sc_assessment_purpose;
 create policy sc_assessment_purpose_write on public.sc_assessment_purpose for all to authenticated
-using (coalesce(public.is_staff(auth.uid()),false))
-with check (coalesce(public.is_staff(auth.uid()),false));
+  using (coalesce(public.is_staff(auth.uid()),false))
+  with check (coalesce(public.is_staff(auth.uid()),false));
 -- the six purposes that already existed, plus the two the platform needs
 insert into public.sc_assessment_purpose(slug,label,emoji,report_eligible,feeds_report,is_builtin,sort_order,description) values
-('exam',       'Terminal Exam',        '🔴', true,  'terminal', true, 10, 'The school examination. Feeds the Terminal report card only.'),
-('midterm',    'Mid-term Assessment',  '🔵', true,  'midterm',  true, 20, 'A mid-term test or CA. Feeds the Mid-term report.'),
-('assignment', 'Assignment / Homework','🟢', true,  'none',     true, 30, 'Multiple per term, cumulative. Feeds the Assignment column when mapped.'),
-('project',    'Project',              '🟣', true,  'none',     true, 40, 'Project work. Can be mapped to a report column.'),
-('quiz',       'Quiz',                 '🟡', true,  'none',     true, 50, 'Short quiz. Can be mapped to a report column.'),
-('practical',  'Practical',            '🟠', true,  'none',     true, 60, 'Practical / laboratory work. Can be mapped to a report column.'),
-('prep',       'Prep Exam (rehearsal)', '🧪', false, 'prep',    true, 15, 'A rehearsal of the school exam to test readiness. NEVER reaches the report card.'),
-('other',      'Other purpose',        '⚪', true,  'none',     true, 90, 'Anything else. Can be mapped to a report column.')
+ ('exam',       'Terminal Exam',        '🔴', true,  'terminal', true, 10, 'The school examination. Feeds the Terminal report card only.'),
+ ('midterm',    'Mid-term Assessment',  '🔵', true,  'midterm',  true, 20, 'A mid-term test or CA. Feeds the Mid-term report.'),
+ ('assignment', 'Assignment / Homework','🟢', true,  'none',     true, 30, 'Multiple per term, cumulative. Feeds the Assignment column when mapped.'),
+ ('project',    'Project',              '🟣', true,  'none',     true, 40, 'Project work. Can be mapped to a report column.'),
+ ('quiz',       'Quiz',                 '🟡', true,  'none',     true, 50, 'Short quiz. Can be mapped to a report column.'),
+ ('practical',  'Practical',            '🟠', true,  'none',     true, 60, 'Practical / laboratory work. Can be mapped to a report column.'),
+ ('prep',       'Prep Exam (rehearsal)', '🧪', false, 'prep',    true, 15, 'A rehearsal of the school exam to test readiness. NEVER reaches the report card.'),
+ ('other',      'Other purpose',        '⚪', true,  'none',     true, 90, 'Anything else. Can be mapped to a report column.')
 on conflict (slug) do update set
-label=excluded.label, emoji=excluded.emoji, feeds_report=excluded.feeds_report,
-description=excluded.description, sort_order=excluded.sort_order;
+  label=excluded.label, emoji=excluded.emoji, feeds_report=excluded.feeds_report,
+  description=excluded.description, sort_order=excluded.sort_order;
 create or replace function public.sc_purposes()
 returns jsonb language sql stable security definer set search_path=public as $$
-select coalesce(jsonb_agg(jsonb_build_object(
-'slug',slug,'label',label,'emoji',emoji,
-'report_eligible',report_eligible,'feeds_report',feeds_report,
-'is_builtin',is_builtin,'description',description
-) order by sort_order, label),'[]'::jsonb)
-from public.sc_assessment_purpose
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'slug',slug,'label',label,'emoji',emoji,
+           'report_eligible',report_eligible,'feeds_report',feeds_report,
+           'is_builtin',is_builtin,'description',description
+         ) order by sort_order, label),'[]'::jsonb)
+  from public.sc_assessment_purpose
 $$;
 revoke all on function public.sc_purposes() from public, anon;
 grant execute on function public.sc_purposes() to authenticated;
 -- a teacher invents a purpose; it defaults to report-ELIGIBLE because most
 create or replace function public.sc_purpose_create(
-p_label text, p_emoji text default '⚪',
-p_report_eligible boolean default true, p_feeds_report text default 'none'
+  p_label text, p_emoji text default '⚪',
+  p_report_eligible boolean default true, p_feeds_report text default 'none'
 ) returns jsonb language plpgsql security definer set search_path=public as $$
 declare me uuid:=auth.uid(); v_slug text; v_feeds text;
 begin
-if me is null or not coalesce(public.is_staff(me),false) then
-return jsonb_build_object('ok',false,'error','Only staff can add an assessment purpose.'); end if;
-if coalesce(btrim(p_label),'')='' then
-return jsonb_build_object('ok',false,'error','Give the purpose a name a teacher would recognise.'); end if;
-v_slug := regexp_replace(lower(btrim(p_label)),'[^a-z0-9]+','_','g');
-v_slug := regexp_replace(v_slug,'^_|_$','','g');
-if v_slug='' then return jsonb_build_object('ok',false,'error','That name has no letters or numbers in it.'); end if;
-if exists(select 1 from public.sc_assessment_purpose where sc_assessment_purpose.slug = v_slug) then
-return jsonb_build_object('ok',false,'error','A purpose called "'||p_label||'" already exists.',
-'slug',v_slug,'existing',true); end if;
-v_feeds := case when coalesce(p_feeds_report,'none') in ('midterm','terminal','prep') then p_feeds_report else 'none' end;
-insert into public.sc_assessment_purpose(slug,label,emoji,report_eligible,feeds_report,is_builtin,sort_order,description,created_by)
-values (v_slug,btrim(p_label),coalesce(nullif(btrim(p_emoji),''),'⚪'),coalesce(p_report_eligible,true),v_feeds,false,80,
-case when coalesce(p_report_eligible,true) then 'Custom purpose. Can be mapped to a report column.'
-else 'Custom purpose. Never reaches the report card.' end, me);
-return jsonb_build_object('ok',true,'slug',v_slug,'label',btrim(p_label),
-'report_eligible',coalesce(p_report_eligible,true),'feeds_report',v_feeds,
-'note',case when coalesce(p_report_eligible,true)
-then 'Added. Teachers can now choose it when setting a CBT.'
-else 'Added as a REHEARSAL purpose — its scores will never reach a report card.' end);
+  if me is null or not coalesce(public.is_staff(me),false) then
+    return jsonb_build_object('ok',false,'error','Only staff can add an assessment purpose.'); end if;
+  if coalesce(btrim(p_label),'')='' then
+    return jsonb_build_object('ok',false,'error','Give the purpose a name a teacher would recognise.'); end if;
+  v_slug := regexp_replace(lower(btrim(p_label)),'[^a-z0-9]+','_','g');
+  v_slug := regexp_replace(v_slug,'^_|_$','','g');
+  if v_slug='' then return jsonb_build_object('ok',false,'error','That name has no letters or numbers in it.'); end if;
+  if exists(select 1 from public.sc_assessment_purpose where sc_assessment_purpose.slug = v_slug) then
+    return jsonb_build_object('ok',false,'error','A purpose called "'||p_label||'" already exists.',
+      'slug',v_slug,'existing',true); end if;
+  v_feeds := case when coalesce(p_feeds_report,'none') in ('midterm','terminal','prep') then p_feeds_report else 'none' end;
+  insert into public.sc_assessment_purpose(slug,label,emoji,report_eligible,feeds_report,is_builtin,sort_order,description,created_by)
+  values (v_slug,btrim(p_label),coalesce(nullif(btrim(p_emoji),''),'⚪'),coalesce(p_report_eligible,true),v_feeds,false,80,
+    case when coalesce(p_report_eligible,true) then 'Custom purpose. Can be mapped to a report column.'
+         else 'Custom purpose. Never reaches the report card.' end, me);
+  return jsonb_build_object('ok',true,'slug',v_slug,'label',btrim(p_label),
+    'report_eligible',coalesce(p_report_eligible,true),'feeds_report',v_feeds,
+    'note',case when coalesce(p_report_eligible,true)
+      then 'Added. Teachers can now choose it when setting a CBT.'
+      else 'Added as a REHEARSAL purpose — its scores will never reach a report card.' end);
 end $$;
 revoke all on function public.sc_purpose_create(text,text,boolean,text) from public, anon;
 grant execute on function public.sc_purpose_create(text,text,boolean,text) to authenticated;
 -- 2. THE ONE QUESTION EVERY SCREEN ASKS: may this score reach a report card?
 create or replace function public.sc_purpose_of(p_type text)
 returns text language sql stable set search_path=public as $$
-select coalesce(
-(select slug from public.sc_assessment_purpose
-where slug = regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]+','_','g') limit 1),
-/* legacy spellings that predate the registry */
-case
-when regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]','','g')
-in ('ca','test','midtermtest','midtermca','midtermassessment','midtermcolumn','midtermtst') then 'midterm'
-when regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]','','g')='' then 'exam'
-else regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]+','_','g')
-end)
+  select coalesce(
+    (select slug from public.sc_assessment_purpose
+      where slug = regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]+','_','g') limit 1),
+    /* legacy spellings that predate the registry */
+    case
+      when regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]','','g')
+           in ('ca','test','midtermtest','midtermca','midtermassessment','midtermcolumn','midtermtst') then 'midterm'
+      when regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]','','g')='' then 'exam'
+      else regexp_replace(lower(trim(coalesce(p_type,''))),'[^a-z0-9]+','_','g')
+    end)
 $$;
 create or replace function public.sc_purpose_report_eligible(p_type text)
 returns boolean language sql stable set search_path=public as $$
-/* Unknown purposes default to ELIGIBLE — a school must never lose a score
-to a field we did not anticipate. Rehearsal must be declared. */
-select coalesce((select report_eligible from public.sc_assessment_purpose where slug = public.sc_purpose_of(p_type)), true)
+  /* Unknown purposes default to ELIGIBLE — a school must never lose a score
+     to a field we did not anticipate. Rehearsal must be declared. */
+  select coalesce((select report_eligible from public.sc_assessment_purpose where slug = public.sc_purpose_of(p_type)), true)
 $$;
 create or replace function public.sc_is_prep_assessment(p_type text)
 returns boolean language sql stable set search_path=public as $$
-select public.sc_purpose_of(p_type) = 'prep'
-or coalesce((select feeds_report from public.sc_assessment_purpose where slug = public.sc_purpose_of(p_type)),'') = 'prep'
+  select public.sc_purpose_of(p_type) = 'prep'
+      or coalesce((select feeds_report from public.sc_assessment_purpose where slug = public.sc_purpose_of(p_type)),'') = 'prep'
 $$;
 -- a midterm column may never be a rehearsal
 create or replace function public.sc_is_midterm_column(p_name text,p_assessment_type text default '')
 returns boolean language sql immutable parallel safe set search_path=public as $$
-select case when public.sc_is_prep_assessment(p_assessment_type) then false else
-public.sc_is_midterm_assessment(p_assessment_type)
-or regexp_replace(lower(trim(coalesce(p_name,''))),'[^a-z0-9]','','g') like 'midterm%'
-or regexp_replace(lower(trim(coalesce(p_name,''))),'[^a-z0-9]','','g') like 'ca1%'
-or regexp_replace(lower(trim(coalesce(p_name,''))),'[^a-z0-9]','','g') like 'ca2%'
-end;
+ select case when public.sc_is_prep_assessment(p_assessment_type) then false else
+   public.sc_is_midterm_assessment(p_assessment_type)
+   or regexp_replace(lower(trim(coalesce(p_name,''))),'[^a-z0-9]','','g') like 'midterm%'
+   or regexp_replace(lower(trim(coalesce(p_name,''))),'[^a-z0-9]','','g') like 'ca1%'
+   or regexp_replace(lower(trim(coalesce(p_name,''))),'[^a-z0-9]','','g') like 'ca2%'
+ end;
 $$;
 -- 3. THE PREP LEDGER — a mirror of report_scores that physically cannot be
 create table if not exists public.prep_scores (
-id uuid primary key default gen_random_uuid(),
-column_id uuid references public.assessment_columns(id) on delete set null,
-exam_id uuid references public.cbt_exams(id) on delete set null,
-student_id uuid references public.students(id) on delete set null,
-student_id_ref text not null default '', student_name text not null default '',
-class text not null default '', subject text not null default '',
-term text not null default '', session text not null default '',
-score numeric not null default 0, max_mark numeric not null default 100,
-source text not null default 'cbt',
-updated_by uuid references public.profiles(id) on delete set null,
-updated_at timestamptz not null default now(), created_at timestamptz not null default now(),
-unique(student_id_ref, class, subject, term, session, column_id)
+  id uuid primary key default gen_random_uuid(),
+  column_id uuid references public.assessment_columns(id) on delete set null,
+  exam_id uuid references public.cbt_exams(id) on delete set null,
+  student_id uuid references public.students(id) on delete set null,
+  student_id_ref text not null default '', student_name text not null default '',
+  class text not null default '', subject text not null default '',
+  term text not null default '', session text not null default '',
+  score numeric not null default 0, max_mark numeric not null default 100,
+  source text not null default 'cbt',
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(), created_at timestamptz not null default now(),
+  unique(student_id_ref, class, subject, term, session, column_id)
 );
 create index if not exists prep_scores_student on public.prep_scores(student_id);
 create index if not exists prep_scores_cohort on public.prep_scores(class, term, session);
 alter table public.prep_scores enable row level security;
 drop policy if exists prep_scores_read on public.prep_scores;
 create policy prep_scores_read on public.prep_scores for select to authenticated
-using (coalesce(public.is_staff(auth.uid()),false) or public.is_parent_of(auth.uid(), student_id));
+  using (coalesce(public.is_staff(auth.uid()),false) or public.is_parent_of(auth.uid(), student_id));
 drop policy if exists prep_scores_write on public.prep_scores;
 create policy prep_scores_write on public.prep_scores for all to authenticated
-using (coalesce(public.is_staff(auth.uid()),false))
-with check (coalesce(public.is_staff(auth.uid()),false));
+  using (coalesce(public.is_staff(auth.uid()),false))
+  with check (coalesce(public.is_staff(auth.uid()),false));
 create table if not exists public.prep_report_cards (
-id uuid primary key default gen_random_uuid(),
-student_id uuid references public.students(id) on delete set null,
-student_id_ref text not null default '', student_name text not null default '',
-class text not null default '', term text not null default '', session text not null default '',
-scores jsonb not null default '{}'::jsonb,
-score_details jsonb not null default '[]'::jsonb,
-total numeric not null default 0, max_total numeric not null default 0,
-average numeric not null default 0, expected_total numeric not null default 0,
-subjects_expected int not null default 0, subjects_sat int not null default 0,
-assessments_expected int not null default 0, assessments_sat int not null default 0,
-percentage numeric not null default 0,
-complete boolean not null default false, rankable boolean not null default false,
-grade text not null default '', has_scores boolean not null default false,
--- readiness: a prep sheet answers "are we ready?", so it carries a verdict
-readiness_band text not null default '',
-readiness_note text not null default '',
-published boolean not null default false,
-created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
-unique(student_id_ref, class, term, session)
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid references public.students(id) on delete set null,
+  student_id_ref text not null default '', student_name text not null default '',
+  class text not null default '', term text not null default '', session text not null default '',
+  scores jsonb not null default '{}'::jsonb,
+  score_details jsonb not null default '[]'::jsonb,
+  total numeric not null default 0, max_total numeric not null default 0,
+  average numeric not null default 0, expected_total numeric not null default 0,
+  subjects_expected int not null default 0, subjects_sat int not null default 0,
+  assessments_expected int not null default 0, assessments_sat int not null default 0,
+  percentage numeric not null default 0,
+  complete boolean not null default false, rankable boolean not null default false,
+  grade text not null default '', has_scores boolean not null default false,
+  -- readiness: a prep sheet answers "are we ready?", so it carries a verdict
+  readiness_band text not null default '',
+  readiness_note text not null default '',
+  published boolean not null default false,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  unique(student_id_ref, class, term, session)
 );
 create index if not exists prep_report_class on public.prep_report_cards(class, term, session);
 alter table public.prep_report_cards enable row level security;
 drop policy if exists prep_report_read on public.prep_report_cards;
 create policy prep_report_read on public.prep_report_cards for select to authenticated
-using (coalesce(public.is_staff(auth.uid()),false) or public.is_parent_of(auth.uid(), student_id));
+  using (coalesce(public.is_staff(auth.uid()),false) or public.is_parent_of(auth.uid(), student_id));
 drop policy if exists prep_report_write on public.prep_report_cards;
 create policy prep_report_write on public.prep_report_cards for all to authenticated
-using (coalesce(public.is_admin(auth.uid()),false))
-with check (coalesce(public.is_admin(auth.uid()),false));
+  using (coalesce(public.is_admin(auth.uid()),false))
+  with check (coalesce(public.is_admin(auth.uid()),false));
 -- 4. BUILDING A PREP SHEET — the twin of sc_midterm_rebuild_one.
 create or replace function public.sc_prep_rebuild_one(
-p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text
+  p_sid uuid, p_sid_ref text, p_name text, p_class text, p_term text, p_session text
 ) returns void language plpgsql security definer set search_path=public as $$
 declare
-v_scores jsonb; v_details jsonb; v_total numeric; v_max numeric; v_pct numeric;
-v_exp_txt numeric; v_sub_exp int; v_sub_sat int; v_as_exp int; v_as_sat int;
-v_complete boolean; v_rankable boolean; v_band text; v_note text;
+  v_scores jsonb; v_details jsonb; v_total numeric; v_max numeric; v_pct numeric;
+  v_exp_txt numeric; v_sub_exp int; v_sub_sat int; v_as_exp int; v_as_sat int;
+  v_complete boolean; v_rankable boolean; v_band text; v_note text;
 begin
-with candidates as (
-select coalesce(nullif(trim(ps.subject),''),'Unspecified subject') as subject,
-coalesce(nullif(trim(ac.name),''),'Prep') as assessment,
-sum(coalesce(ps.score,0))::numeric as score,
-coalesce(sum(coalesce(nullif(ps.max_mark,0),nullif(ac.max_mark,0),100)),100)::numeric as max_mark
-from public.prep_scores ps
-left join public.assessment_columns ac on ac.id = ps.column_id
-where ((nullif(trim(coalesce(p_sid_ref,'')),'') is not null and ps.student_id_ref = p_sid_ref)
-or (p_sid is not null and ps.student_id = p_sid))
-and regexp_replace(lower(trim(coalesce(ps.class,''))),'[^a-z0-9]','','g')
-= regexp_replace(lower(trim(coalesce(p_class,''))),'[^a-z0-9]','','g')
-and lower(trim(coalesce(ps.term,'')))=lower(trim(coalesce(p_term,'')))
-and lower(trim(coalesce(ps.session,'')))=lower(trim(coalesce(p_session,'')))
-group by 1,2
-)
-select coalesce(jsonb_object_agg(subject||' — '||assessment, score order by subject, assessment),'{}'::jsonb),
-coalesce(jsonb_agg(jsonb_build_object('subject',subject,'assessment',assessment,
-'score',score,'max_mark',max_mark) order by subject, assessment),'[]'::jsonb),
-coalesce(sum(score),0), coalesce(sum(max_mark),0),
-count(distinct subject), count(*)
-into v_scores, v_details, v_total, v_max, v_sub_sat, v_as_sat
-from candidates;
-/* the honest denominator is the same expected load the midterm sheet uses,
-so a prep percentage can be read against the real exam of the same class */
-select coalesce((public.sc_expected_load(p_class,p_term,p_session,true)->>'max_total')::numeric,0),
-coalesce((public.sc_expected_load(p_class,p_term,p_session,true)->>'subject_count')::int,0),
-coalesce((public.sc_expected_load(p_class,p_term,p_session,true)->>'assessment_count')::int,0)
-into v_exp_txt, v_sub_exp, v_as_exp;
-if v_exp_txt <= 0 then v_exp_txt := v_max; v_sub_exp := v_sub_sat; v_as_exp := v_as_sat; end if;
-v_pct := case when v_exp_txt > 0 then round((v_total / v_exp_txt) * 100.0, 2) else 0 end;
-v_complete := (v_exp_txt > 0 and v_total > 0 and v_sub_exp > 0 and v_sub_sat >= v_sub_exp);
-v_rankable := (v_exp_txt > 0 and v_as_exp > 0
-and (v_as_sat::numeric / v_as_exp::numeric) >= public.sc_report_min_participation());
-/* readiness verdict — the whole point of a rehearsal */
-v_band := case
-when coalesce(v_as_sat,0)=0 then 'not_sat'
-when v_pct >= 75 then 'ready'
-when v_pct >= 60 then 'nearly'
-when v_pct >= 45 then 'needs_work'
-else 'at_risk' end;
-v_note := case v_band
-when 'not_sat'    then 'This learner did not sit the rehearsal, so readiness cannot be judged.'
-when 'ready'      then 'On this evidence the learner is ready for the school examination.'
-when 'nearly'     then 'Close to ready. Target the weakest subjects before the school examination.'
-when 'needs_work' then 'Not yet ready. A focused revision plan is needed before the examination.'
-else                   'At risk. Arrange support now; the school examination is likely to be failed on current evidence.'
-end;
-insert into public.prep_report_cards(
-student_id,student_id_ref,student_name,class,term,session,
-scores,score_details,total,max_total,average,expected_total,
-subjects_expected,subjects_sat,assessments_expected,assessments_sat,
-percentage,complete,rankable,grade,has_scores,readiness_band,readiness_note,published,updated_at)
-values(p_sid,p_sid_ref,coalesce(p_name,''),coalesce(p_class,''),coalesce(p_term,''),coalesce(p_session,''),
-coalesce(v_scores,'{}'::jsonb),coalesce(v_details,'[]'::jsonb),
-coalesce(v_total,0),coalesce(v_max,0),v_pct,coalesce(v_exp_txt,0),
-coalesce(v_sub_exp,0),coalesce(v_sub_sat,0),coalesce(v_as_exp,0),coalesce(v_as_sat,0),
-v_pct,v_complete,v_rankable,
-case when coalesce(v_as_sat,0)=0 then '' else public.sc_report_grade(v_pct) end,
-coalesce(v_scores,'{}'::jsonb) <> '{}'::jsonb, v_band, v_note, false, now())
-on conflict(student_id_ref,class,term,session) do update set
-student_id=coalesce(excluded.student_id,prep_report_cards.student_id),
-student_name=excluded.student_name, scores=excluded.scores, score_details=excluded.score_details,
-total=excluded.total,max_total=excluded.max_total,average=excluded.average,
-expected_total=excluded.expected_total,
-subjects_expected=excluded.subjects_expected,subjects_sat=excluded.subjects_sat,
-assessments_expected=excluded.assessments_expected,assessments_sat=excluded.assessments_sat,
-percentage=excluded.percentage,complete=excluded.complete,rankable=excluded.rankable,
-grade=excluded.grade,has_scores=excluded.has_scores,
-readiness_band=excluded.readiness_band,readiness_note=excluded.readiness_note,updated_at=now();
+  with candidates as (
+    select coalesce(nullif(trim(ps.subject),''),'Unspecified subject') as subject,
+           coalesce(nullif(trim(ac.name),''),'Prep') as assessment,
+           sum(coalesce(ps.score,0))::numeric as score,
+           coalesce(sum(coalesce(nullif(ps.max_mark,0),nullif(ac.max_mark,0),100)),100)::numeric as max_mark
+      from public.prep_scores ps
+      left join public.assessment_columns ac on ac.id = ps.column_id
+     where ((nullif(trim(coalesce(p_sid_ref,'')),'') is not null and ps.student_id_ref = p_sid_ref)
+            or (p_sid is not null and ps.student_id = p_sid))
+       and regexp_replace(lower(trim(coalesce(ps.class,''))),'[^a-z0-9]','','g')
+           = regexp_replace(lower(trim(coalesce(p_class,''))),'[^a-z0-9]','','g')
+       and lower(trim(coalesce(ps.term,'')))=lower(trim(coalesce(p_term,'')))
+       and lower(trim(coalesce(ps.session,'')))=lower(trim(coalesce(p_session,'')))
+     group by 1,2
+  )
+  select coalesce(jsonb_object_agg(subject||' — '||assessment, score order by subject, assessment),'{}'::jsonb),
+         coalesce(jsonb_agg(jsonb_build_object('subject',subject,'assessment',assessment,
+                    'score',score,'max_mark',max_mark) order by subject, assessment),'[]'::jsonb),
+         coalesce(sum(score),0), coalesce(sum(max_mark),0),
+         count(distinct subject), count(*)
+    into v_scores, v_details, v_total, v_max, v_sub_sat, v_as_sat
+  from candidates;
+  /* the honest denominator is the same expected load the midterm sheet uses,
+     so a prep percentage can be read against the real exam of the same class */
+  select coalesce((public.sc_expected_load(p_class,p_term,p_session,true)->>'max_total')::numeric,0),
+         coalesce((public.sc_expected_load(p_class,p_term,p_session,true)->>'subject_count')::int,0),
+         coalesce((public.sc_expected_load(p_class,p_term,p_session,true)->>'assessment_count')::int,0)
+    into v_exp_txt, v_sub_exp, v_as_exp;
+  if v_exp_txt <= 0 then v_exp_txt := v_max; v_sub_exp := v_sub_sat; v_as_exp := v_as_sat; end if;
+  v_pct := case when v_exp_txt > 0 then round((v_total / v_exp_txt) * 100.0, 2) else 0 end;
+  v_complete := (v_exp_txt > 0 and v_total > 0 and v_sub_exp > 0 and v_sub_sat >= v_sub_exp);
+  v_rankable := (v_exp_txt > 0 and v_as_exp > 0
+                 and (v_as_sat::numeric / v_as_exp::numeric) >= public.sc_report_min_participation());
+  /* readiness verdict — the whole point of a rehearsal */
+  v_band := case
+    when coalesce(v_as_sat,0)=0 then 'not_sat'
+    when v_pct >= 75 then 'ready'
+    when v_pct >= 60 then 'nearly'
+    when v_pct >= 45 then 'needs_work'
+    else 'at_risk' end;
+  v_note := case v_band
+    when 'not_sat'    then 'This learner did not sit the rehearsal, so readiness cannot be judged.'
+    when 'ready'      then 'On this evidence the learner is ready for the school examination.'
+    when 'nearly'     then 'Close to ready. Target the weakest subjects before the school examination.'
+    when 'needs_work' then 'Not yet ready. A focused revision plan is needed before the examination.'
+    else                   'At risk. Arrange support now; the school examination is likely to be failed on current evidence.'
+  end;
+  insert into public.prep_report_cards(
+    student_id,student_id_ref,student_name,class,term,session,
+    scores,score_details,total,max_total,average,expected_total,
+    subjects_expected,subjects_sat,assessments_expected,assessments_sat,
+    percentage,complete,rankable,grade,has_scores,readiness_band,readiness_note,published,updated_at)
+  values(p_sid,p_sid_ref,coalesce(p_name,''),coalesce(p_class,''),coalesce(p_term,''),coalesce(p_session,''),
+    coalesce(v_scores,'{}'::jsonb),coalesce(v_details,'[]'::jsonb),
+    coalesce(v_total,0),coalesce(v_max,0),v_pct,coalesce(v_exp_txt,0),
+    coalesce(v_sub_exp,0),coalesce(v_sub_sat,0),coalesce(v_as_exp,0),coalesce(v_as_sat,0),
+    v_pct,v_complete,v_rankable,
+    case when coalesce(v_as_sat,0)=0 then '' else public.sc_report_grade(v_pct) end,
+    coalesce(v_scores,'{}'::jsonb) <> '{}'::jsonb, v_band, v_note, false, now())
+  on conflict(student_id_ref,class,term,session) do update set
+    student_id=coalesce(excluded.student_id,prep_report_cards.student_id),
+    student_name=excluded.student_name, scores=excluded.scores, score_details=excluded.score_details,
+    total=excluded.total,max_total=excluded.max_total,average=excluded.average,
+    expected_total=excluded.expected_total,
+    subjects_expected=excluded.subjects_expected,subjects_sat=excluded.subjects_sat,
+    assessments_expected=excluded.assessments_expected,assessments_sat=excluded.assessments_sat,
+    percentage=excluded.percentage,complete=excluded.complete,rankable=excluded.rankable,
+    grade=excluded.grade,has_scores=excluded.has_scores,
+    readiness_band=excluded.readiness_band,readiness_note=excluded.readiness_note,updated_at=now();
 end $$;
 revoke all on function public.sc_prep_rebuild_one(uuid,text,text,text,text,text) from public, anon;
 -- generate (or regenerate) a whole class's prep sheet
@@ -14632,25 +14719,113 @@ create trigger cbt_exams_prep_schedule
 after insert or update of class, subject, title, term, session, start_at, close_at, duration,
 duration_min, assessment_type, is_archived, venue, code
 on public.cbt_exams for each row execute function public.sc_trg_cbt_prep_schedule();
-create or replace function public.sc_prep_sync_all() returns jsonb
+/* V12.85 (round 30, item 6) — "RESCHEDULE PREP EXAMS" NOW SHOWS WHAT IT WILL DO
+BEFORE IT DOES IT.
+The button used to fire a write with no preview: it re-derived one timetable
+row per prep exam from the CBT record, silently creating, rewriting or
+deleting rows, and then reported a single number ("3 scheduled, 1 cleared").
+A tutor who had moved a paper on Monday and found it back on Tuesday had no
+way to see that the reschedule — not a colleague — had moved it.
+
+sc_prep_sync_all(true) is now a DRY RUN: it returns, per prep paper, the
+action it would take (create / update / in_sync / remove / nothing), the row
+as it stands today and the row as it would stand afterwards, and a
+plain-English list of exactly which fields change. The CBT manager prints that
+table and asks for confirmation; only then does it call the same function with
+p_dry_run = false, which performs the identical plan. The write path is
+unchanged, so the preview cannot drift from what happens. */
+drop function if exists public.sc_prep_sync_all();
+create or replace function public.sc_prep_sync_all(p_dry_run boolean default false) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare r record; v jsonb; n int := 0; c int := 0; f int := 0;
+v_tz text := public.sc_school_tz(); v_actions jsonb := '[]'::jsonb;
 begin
 if not coalesce(public.is_staff(auth.uid()), false) then
 return jsonb_build_object('ok', false, 'error', 'Only staff can reschedule prep exams.');
 end if;
+/* ---- the plan: one row per prep paper, what it is, what it would be ---- */
+with p as (
+select e.id, e.code, e.class, e.subject, e.venue,
+coalesce(nullif(e.duration_min, 0), nullif(e.duration, 0), 45) as dur,
+e.start_at,
+public.sc_cbt_close(e.start_at, e.close_at, e.duration_min, e.duration) as cend,
+coalesce(public.sc_is_prep_assessment(e.assessment_type)
+and not coalesce(e.is_archived, false)
+and e.start_at is not null
+and coalesce(btrim(coalesce(e.class, '')), '') <> '', false) as keep,
+case when not public.sc_is_prep_assessment(e.assessment_type) then 'not_a_prep_exam'
+when coalesce(e.is_archived, false) then 'archived'
+when e.start_at is null then 'no_start_time'
+when coalesce(btrim(coalesce(e.class, '')), '') = '' then 'no_class' end as reason,
+t.id as row_id, t.exam_date as old_date, t.start_time as old_start, t.end_time as old_end,
+t.venue as old_venue, t.class as old_class, t.subject as old_subject
+from public.cbt_exams e
+left join public.exam_timetable t on t.exam_id = e.id and t.source = 'prep'
+where public.sc_is_prep_assessment(e.assessment_type)
+), q as (
+select p.*,
+case when p.keep then (p.start_at at time zone v_tz)::date end as new_date,
+case when p.keep then to_char(p.start_at at time zone v_tz, 'HH24:MI') end as new_start,
+case when p.keep then to_char(p.cend at time zone v_tz, 'HH24:MI') end as new_end
+from p
+)
+select coalesce(jsonb_agg(jsonb_build_object(
+'exam_id', q.id,
+'code', coalesce(q.code, ''),
+'title', coalesce(nullif(btrim(q.subject), ''), 'Prep Exam'),
+'class', coalesce(q.class, ''),
+'tutor', coalesce((select nullif(btrim(pr.full_name), '') from public.profiles pr where pr.id = q.id), ''),
+'action', case
+when q.keep and q.row_id is null then 'create'
+when q.keep and (q.new_date is distinct from q.old_date
+or q.new_start is distinct from q.old_start
+or q.new_end is distinct from q.old_end
+or coalesce(q.old_venue, '') <> coalesce(q.venue, '')
+or coalesce(q.old_class, '') <> btrim(coalesce(q.class, ''))
+or coalesce(q.old_subject, '') <> coalesce(nullif(btrim(q.subject), ''), 'Prep Exam')) then 'update'
+when q.keep then 'in_sync'
+when q.row_id is not null then 'remove'
+else 'nothing' end,
+'reason', q.reason,
+'before', case when q.row_id is null then null else jsonb_build_object(
+'exam_date', q.old_date, 'start_time', q.old_start, 'end_time', q.old_end,
+'venue', coalesce(q.old_venue, ''), 'class', coalesce(q.old_class, '')) end,
+'after', case when q.keep then jsonb_build_object(
+'exam_date', q.new_date, 'start_time', q.new_start, 'end_time', q.new_end,
+'venue', coalesce(q.venue, ''), 'class', btrim(coalesce(q.class, ''))) end,
+'changes', to_jsonb(array_remove(array[
+case when q.new_date is distinct from q.old_date
+then 'date ' || coalesce(q.old_date::text, '(not on the timetable)') || ' → '
+|| coalesce(q.new_date::text, '(removed)') end,
+case when q.new_start is distinct from q.old_start
+then 'start ' || coalesce(q.old_start, '(none)') || ' → ' || coalesce(q.new_start, '(removed)') end,
+case when q.new_end is distinct from q.old_end
+then 'end ' || coalesce(q.old_end, '(none)') || ' → ' || coalesce(q.new_end, '(removed)') end,
+case when coalesce(q.old_venue, '') <> coalesce(q.venue, '')
+then 'venue ' || coalesce(nullif(q.old_venue, ''), '(none)') || ' → ' || coalesce(nullif(q.venue, ''), '(none)') end
+], null))
+) order by coalesce(q.class, ''), q.new_date nulls last, q.new_start nulls last), '[]'::jsonb)
+into v_actions
+from q;
+if coalesce(p_dry_run, false) then
+return jsonb_build_object('ok', true, 'dry_run', true, 'actions', v_actions,
+'note', 'Nothing has been changed yet. Every row below is a proposal worked out from the CBT record; '
+|| 'the timetable only changes when you confirm.');
+end if;
+/* ---- apply: exactly the same plan, one paper at a time ---- */
 for r in select id from public.cbt_exams where public.sc_is_prep_assessment(assessment_type) loop
 begin
 v := public.sc_prep_sync_exam(r.id);
 if (v->>'scheduled')::boolean then n := n + 1; else c := c + 1; end if;
 exception when others then f := f + 1; end;
 end loop;
-return jsonb_build_object('ok', true, 'scheduled', n, 'cleared', c, 'failed', f,
+return jsonb_build_object('ok', true, 'dry_run', false, 'scheduled', n, 'cleared', c, 'failed', f,
+'actions', v_actions,
 'note', case when n + c = 0 then 'No prep exams exist yet — create one from the CBT manager and it schedules itself.'
 else 'Every prep exam now matches its timetable row.' end);
 end $$;
-revoke all on function public.sc_prep_sync_all() from public, anon;
-grant execute on function public.sc_prep_sync_all() to authenticated;
+revoke all on function public.sc_prep_sync_all(boolean) from public, anon;
+grant execute on function public.sc_prep_sync_all(boolean) to authenticated;
 /* V12.79 — one spelling of a class name, so "SSS 1", "SSS1", "SSS 1A" and
 "SSS 1 A" can be compared on purpose instead of by luck. */
 create or replace function public.sc_class_key(p text) returns text
