@@ -465,6 +465,41 @@ body{font-family:var(--font)!important}
         <p style="margin:10px 0 0;font-size:.85rem;color:var(--gray-500)">Tip: click the <strong>ℹ️ Help</strong> button in the top bar, or the 💬 assistant, for the full explanation of any page.</p>
       </div></div>
       
+      <!-- ===================================================================
+           V12.86 (items 2 & 9) — NEW AND RETURNING LEARNERS
+           A school bills two different learners differently for the same class
+           and the same term: a returning learner owes the term bill, a learner
+           joining this session owes that bill PLUS the one-off costs of joining
+           (admission, uniform, books, registration). Every school that does this
+           on paper keeps two columns; School Connect now keeps two price lists.
+           This panel is where the admin builds both, for one class and term,
+           and sees what each group will be billed before a single invoice is
+           raised.
+           =================================================================== -->
+      <div class="card" style="margin-bottom:16px;border:2px solid #0d9488;background:#f0fdfa" data-admin-only>
+        <h2 style="margin-top:0">🆕 New and returning learners — two price lists for one class and term</h2>
+        <p style="color:var(--gray-700);font-size:.9rem;margin-top:0">
+          A <b>returning</b> learner owes the class fee structure for the term — nothing more.
+          A <b>new</b> learner owes that same structure <b>plus</b> the fees only a new learner pays:
+          admission/registration, uniform, textbooks, ID card, first-term levies. This page holds both.
+          The bill a learner actually receives is built as:
+          <b>class structure for their type + every “new learner” extra that applies</b> — never the other way round.
+          A learner is <i>new</i> when the first session they were ever billed for is the session being billed;
+          anybody with an earlier session on record is <i>returning</i>. You can override that on the learner's
+          record (Students → New or returning learner) when a learner joined mid-session.
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:10px">
+          <div class="form-group" style="margin:0;min-width:180px"><label>Class</label>
+            <select class="form-select" id="ftype-class"><option value="">— select a class —</option></select></div>
+          <div class="form-group" style="margin:0;min-width:150px"><label>Term</label>
+            <select class="form-select" id="ftype-term"></select></div>
+          <div class="form-group" style="margin:0;min-width:150px"><label>Session</label>
+            <select class="form-select" id="ftype-session"></select></div>
+          <button class="btn btn-primary" style="background:#0d9488;border-color:#0f766e" onclick="FeeTypes.load()">Show this class</button>
+        </div>
+        <div id="ftype-out"><p style="color:var(--gray-500);font-size:.88rem">Pick a class, term and session to see both price lists and the learners in each group.</p></div>
+      </div>
+
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <button class="btn btn-primary" onclick="CRUD.openForm('school_fees')" data-staff-only>+ Add new</button>
         <button class="btn btn-outline" onclick="CRUD.renderList('school_fees')">↻ Refresh</button>
@@ -501,6 +536,7 @@ body{font-family:var(--font)!important}
         if (window.CRUD) {
           CRUD.renderList('school_fees');
         }
+        try { FeeTypes.init(); } catch (_) { }
 
         // FIX v9: For parents, load child-specific data for fees/results/attendance
         if (isParent && (window.sb || null)) {
@@ -592,5 +628,139 @@ body{font-family:var(--font)!important}
   if (window.Super) Super.init(window.sb || null, window.SCHOOL);
   if (window.Enterprise) Enterprise.init(window.sb || null);
   if (window.CRUD) CRUD.init(window.sb || null);
+</script>
+t>
+/* V12.86 — FeeTypes: build and inspect the two price lists (new / returning)
+   for one class, term and session, plus the extra fees only new learners pay.
+   Everything here writes to ordinary tables (class_fee_structure.student_type
+   and class_fee_extra), so it works on any device and can be exported. */
+const FeeTypes = {
+  esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); },
+  money(n){ return ((window.SCHOOL && SCHOOL.currency) || '₦') + Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); },
+  val(id){ return ((document.getElementById(id)||{}).value||'').trim(); },
+  async init(){
+    if (!window.sb) return;
+    try {
+      const { data: cls } = await sb.from('classes').select('name').order('name');
+      const sel = document.getElementById('ftype-class');
+      if (sel) (cls||[]).forEach(c => { const o=document.createElement('option'); o.value=c.name; o.textContent=c.name; sel.appendChild(o); });
+    } catch (_) {}
+    try {
+      const { data: ap } = await sb.from('academic_periods').select('term,session,is_current').order('session',{ascending:false}).limit(200);
+      const rows = ap || [];
+      const terms = [...new Set(rows.map(x=>x.term).filter(Boolean))];
+      const sess  = [...new Set(rows.map(x=>x.session).filter(Boolean))];
+      const cur = rows.find(x=>x.is_current) || {};
+      const fill = (id, list, current) => {
+        const el = document.getElementById(id); if (!el) return;
+        el.innerHTML = '';
+        (list.length ? list : ['First Term','Second Term','Third Term']).forEach(v => {
+          const o=document.createElement('option'); o.value=v; o.textContent=v; if (v===current) o.selected=true; el.appendChild(o);
+        });
+      };
+      fill('ftype-term', terms, cur.term);
+      fill('ftype-session', sess, cur.session);
+    } catch (_) {}
+  },
+  async load(){
+    const box = document.getElementById('ftype-out'); if (!box || !window.sb) return;
+    const cls = this.val('ftype-class'), term = this.val('ftype-term'), session = this.val('ftype-session');
+    if (!cls) { box.innerHTML = '<div class="notice notice-warning">Choose a class first.</div>'; return; }
+    box.innerHTML = '<span class="pulse">Reading the price lists…</span>';
+    let structs = [], extras = [], studs = [];
+    try {
+      const r = await sb.from('class_fee_structure').select('id,class,arm,department,term,session,student_type,total,active,updated_at')
+        .ilike('class', cls).limit(500);
+      structs = (r.data||[]).filter(x =>
+        (!term || !x.term || String(x.term).toLowerCase() === term.toLowerCase() || /current term/i.test(x.term)) &&
+        (!session || !x.session || String(x.session) === session));
+    } catch (_) {}
+    try {
+      const r = await sb.from('class_fee_extra').select('id,class,arm,term,session,name,amount,applies_to,active').ilike('class', cls).limit(500);
+      extras = (r.data||[]).filter(x => (!term || !x.term || String(x.term) === term) && (!session || !x.session || String(x.session) === session));
+    } catch (e) {
+      box.innerHTML = '<div class="notice notice-error">The new-learner extras table is not on this database yet — run <code>database/complete-schema.sql</code> (V12.86), then reload.</div>';
+      return;
+    }
+    try {
+      const r = await sb.from('students').select('id,full_name,student_type,first_session').ilike('class', cls).limit(5000);
+      studs = r.data || [];
+    } catch (_) {}
+
+    const byType = t => structs.filter(x => (x.student_type||'all') === t && x.active !== false);
+    const list = t => byType(t).length ? byType(t) : byType('all');
+    const sum = arr => arr.reduce((a,x)=>a+Number(x.total||0),0);
+    const extrasFor = t => extras.filter(x => x.active !== false && (!x.applies_to || x.applies_to === 'all' || x.applies_to === t));
+    const returningBill = sum(list('returning'));
+    const newBill = sum(list('new')) + extrasFor('new').reduce((a,x)=>a+Number(x.amount||0),0);
+    const counted = { new:0, returning:0, unknown:0 };
+    studs.forEach(s => { const t = String(s.student_type||'').toLowerCase(); if (t==='new'||t==='returning') counted[t]++; else counted.unknown++; });
+
+    let h = '<div class="notice notice-info" style="font-size:.87rem"><b>' + this.esc(cls) + ' · ' + this.esc(term||'current term') + ' ' + this.esc(session||'') + '</b><br>'
+      + 'Returning learner bill: <b>' + this.money(returningBill) + '</b> · New learner bill: <b>' + this.money(newBill) + '</b>'
+      + ' <span style="color:var(--gray-600)">(the class structure for the new learner, plus the new-learner extras below)</span></div>';
+
+    h += '<h3 style="font-size:1rem;margin:14px 0 6px">1 · The class bill for each group</h3>'
+      + '<div class="table-wrap"><table style="font-size:.85rem"><thead><tr><th>Who it is for</th><th>Arm</th><th>Department</th><th>Total</th><th>State</th><th></th></tr></thead><tbody>';
+    if (!structs.length) {
+      h += '<tr><td colspan="6" style="color:#b91c1c">No price list exists for this class in this term yet — press <b>+ Add new</b> above and choose “returning” (and then “new” if your new learners pay a different class bill).</td></tr>';
+    } else {
+      structs.forEach(x => {
+        const t = x.student_type || 'all';
+        const badge = t==='new' ? ['#0d9488','new learner'] : t==='returning' ? ['#2563eb','returning learner'] : ['#475569','everybody'];
+        h += '<tr' + (x.active===false?' style="opacity:.55"':'') + '><td><span class="badge" style="background:'+badge[0]+';color:#fff">'+badge[1]+'</span></td>'
+          + '<td>' + this.esc(x.arm||'—') + '</td><td>' + this.esc(x.department||'—') + '</td>'
+          + '<td><b>' + this.money(x.total) + '</b></td>'
+          + '<td>' + (x.active===false ? '<span style="color:#b45309">switched off</span>' : '<span style="color:#166534">active</span>') + '</td>'
+          + '<td><button class="btn btn-sm btn-outline" onclick="CRUD.openForm(\'school_fees\',\'' + this.esc(x.id) + '\')">Edit</button></td></tr>';
+      });
+    }
+    h += '</tbody></table></div>';
+
+    h += '<h3 style="font-size:1rem;margin:16px 0 6px">2 · Fees only a NEW learner pays</h3>'
+      + '<p style="font-size:.84rem;color:var(--gray-600);margin:0 0 8px">These are added on top of the class bill above. They are itemised on the bill and on the receipt, so a parent can see exactly what they are paying for. Leave the class bill for new learners empty if a new learner pays exactly the same class bill as a returning learner — the extras are still added.</p>'
+      + '<div class="table-wrap"><table style="font-size:.85rem"><thead><tr><th>Item</th><th>Applies to</th><th>Amount</th><th></th></tr></thead><tbody>';
+    if (!extras.length) h += '<tr><td colspan="4" style="color:var(--gray-500)">No extra fees recorded for this class and term.</td></tr>';
+    extras.forEach(x => {
+      h += '<tr><td><b>' + this.esc(x.name) + '</b></td><td>' + this.esc(x.applies_to||'new') + '</td>'
+        + '<td>' + this.money(x.amount) + '</td>'
+        + '<td><button class="btn btn-sm btn-outline" style="color:#b91c1c" onclick="FeeTypes.remove(\'' + this.esc(x.id) + '\')">Remove</button></td></tr>';
+    });
+    h += '</tbody></table></div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:10px">'
+      + '<div class="form-group" style="margin:0;min-width:200px"><label>Extra item</label><input class="form-input" id="fx-name" placeholder="Admission fee, uniform, books…"></div>'
+      + '<div class="form-group" style="margin:0;min-width:130px"><label>Amount</label><input class="form-input" id="fx-amount" type="number" step="0.01" min="0" placeholder="0.00"></div>'
+      + '<div class="form-group" style="margin:0;min-width:160px"><label>Who pays it</label><select class="form-select" id="fx-applies"><option value="new">New learners only</option><option value="returning">Returning learners only</option><option value="all">Every learner</option></select></div>'
+      + '<button class="btn btn-primary" onclick="FeeTypes.add()">➕ Add this fee</button></div>'
+      + '<p style="font-size:.8rem;color:var(--gray-500);margin-top:6px">These rows are also the answer to the Fee Doctor’s “paid beyond the bill” finding: when new learners were billed without them, every one of them looked like an overpayment.</p>';
+
+    h += '<h3 style="font-size:1rem;margin:16px 0 6px">3 · Who is in this class</h3>'
+      + '<p style="font-size:.85rem">' + studs.length + ' learner(s): <b style="color:#0d9488">' + counted.new + ' new</b>, '
+      + '<b style="color:#2563eb">' + counted.returning + ' returning</b>'
+      + (counted.unknown ? ', <span style="color:var(--gray-600)">' + counted.unknown + ' decided automatically from their first billed session</span>' : '')
+      + '. Only learners who are marked here by hand show in the first two counts; the rest are worked out when their bill is built.</p>';
+
+    box.innerHTML = h;
+  },
+  async add(){
+    const cls = this.val('ftype-class'), term = this.val('ftype-term'), session = this.val('ftype-session');
+    const name = this.val('fx-name'), amount = Number(this.val('fx-amount')||0), applies = this.val('fx-applies') || 'new';
+    if (!cls) { alert('Choose a class first.'); return; }
+    if (!name) { alert('Give the fee a name — e.g. “Admission fee”.'); return; }
+    if (!(amount > 0)) { alert('Enter an amount above zero.'); return; }
+    const row = { class: cls, arm: '', term, session, name, amount, applies_to: applies, active: true };
+    const { error } = await sb.from('class_fee_extra').insert(row);
+    if (error) { alert(/duplicate|unique/i.test(error.message) ? 'That fee already exists for this class and term — edit the existing row instead.' : error.message); return; }
+    if (window.App && App.logActivity) App.logActivity('fee-extra-add','class_fee_extra', name + ' ' + amount);
+    this.load();
+  },
+  async remove(id){
+    if (!confirm('Remove this extra fee? Learners billed from it will be re-billed on their next invoice.')) return;
+    const { error } = await sb.from('class_fee_extra').delete().eq('id', id);
+    if (error) { alert(error.message); return; }
+    this.load();
+  }
+};
+window.FeeTypes = FeeTypes;
 </script>
 </body></html>
