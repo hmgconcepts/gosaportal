@@ -1,31 +1,32 @@
 {
  "_meta": {
-  "built_bytes": 981244,
-  "built_from_bytes": 1508814,
+  "built_bytes": 998918,
+  "built_from_bytes": 1532512,
   "removed": {
-   "banner-rule": 435,
+   "banner-rule": 433,
    "banner-trimmed": 113,
    "blank-squeezed": 1,
-   "covered-grant": 31,
-   "covered-revoke": 16,
-   "deindented": 35160,
+   "comment-fitted": 277,
+   "covered-grant": 32,
+   "covered-revoke": 17,
+   "deindented": 36206,
    "duplicate-enable-rls": 28,
    "duplicate-grant": 10,
    "duplicate-install-marker": 28,
    "inline-prose-shortened": 149,
    "notify-moved-last": 1,
-   "outer-comment-bytes": 10394,
-   "progress-select": 165,
-   "redundant-add-column": 149,
+   "outer-comment-bytes": 10340,
+   "progress-select": 166,
+   "redundant-add-column": 153,
    "redundant-drop-index": 15,
    "release-essay-lines": 0,
    "reload-signal": 199,
    "repeated-statement": 16,
    "rule-lines-shortened": 1,
    "superseded-function": 22,
-   "superseded-function-body": 10,
+   "superseded-function-body": 11,
    "superseded-index": 29,
-   "superseded-policy": 72,
+   "superseded-policy": 74,
    "superseded-table": 21,
    "superseded-trigger": 3,
    "superseded-view": 1,
@@ -128,6 +129,7 @@
   "column public.class_fee_structure.other_fee",
   "column public.class_fee_structure.school_id",
   "column public.class_fee_structure.session",
+  "column public.class_fee_structure.student_type",
   "column public.class_fee_structure.term",
   "column public.class_fee_structure.total",
   "column public.complaints.assigned_to",
@@ -444,7 +446,9 @@
   "column public.students.admission_no",
   "column public.students.admission_year",
   "column public.students.arm",
+  "column public.students.credit_balance",
   "column public.students.department",
+  "column public.students.first_session",
   "column public.students.guardian_email",
   "column public.students.locked_at",
   "column public.students.locked_by",
@@ -454,6 +458,7 @@
   "column public.students.portal_locked",
   "column public.students.report_lock_message",
   "column public.students.report_locked",
+  "column public.students.student_type",
   "column public.students.user_id",
   "column public.subjects.classes",
   "column public.subjects.teacher",
@@ -892,11 +897,17 @@
   "sc_fee_doctor_v3": [
    "p_class text default null, p_dry_run boolean default true"
   ],
+  "sc_fee_doctor_v4": [
+   "p_apply boolean default false, p_only text default null"
+  ],
   "sc_fee_due_date": [
    "p_term text, p_session text"
   ],
   "sc_fee_explain": [
    "p_student uuid, p_term text default null, p_session text default null"
+  ],
+  "sc_fee_extras": [
+   "p_class text, p_arm text, p_term text, p_session text, p_type text"
   ],
   "sc_fee_invoice_set_due": [
    ""
@@ -1250,6 +1261,9 @@
   "sc_student_fee_state": [
    "p_student uuid"
   ],
+  "sc_student_type": [
+   "p_student uuid, p_term text default null, p_session text default null"
+  ],
   "sc_sweep_report_ghosts": [
    "p_class text default '', p_term text default '', p_session text default ''"
   ],
@@ -1356,6 +1370,7 @@
   "public.class_fee_structure_lookup_idx",
   "public.class_fee_structure_school_idx",
   "public.class_fee_structure_school_idx_v7",
+  "public.class_fee_structure_uq_v1286",
   "public.diary_ack_diary_idx",
   "public.diary_class_date_idx",
   "public.diary_date_idx",
@@ -1500,6 +1515,8 @@
   "public.certificate_designs.cd_read",
   "public.certificates.read_certificates",
   "public.certificates.write_certificates",
+  "public.class_fee_extra.class_fee_extra_read",
+  "public.class_fee_extra.class_fee_extra_write",
   "public.class_fee_structure.class_fee_structure_read",
   "public.class_fee_structure.class_fee_structure_write",
   "public.class_fee_structure.v7_fee_structure_read",
@@ -1690,6 +1707,7 @@
   "public.sc_module_access.sma_write",
   "public.sc_module_editors.sme_read",
   "public.sc_module_editors.sme_write",
+  "public.sc_repair_log.sc_repair_log_read",
   "public.sc_report_position_hold.sc_report_hold_read",
   "public.sc_report_position_hold.sc_report_hold_write",
   "public.sc_report_settings.sc_report_settings_read",
@@ -1790,6 +1808,7 @@
   "cbt_spaced_practice": [],
   "certificate_designs": [],
   "certificates": [],
+  "class_fee_extra": [],
   "class_fee_structure": [],
   "classes": [],
   "complaints": [],
@@ -1862,6 +1881,7 @@
   "sc_keepalive_sources": [],
   "sc_module_access": [],
   "sc_module_editors": [],
+  "sc_repair_log": [],
   "sc_report_position_hold": [],
   "sc_report_settings": [],
   "scheme_of_work": [],
