@@ -623,6 +623,8 @@ textarea.form-input{min-height:80px;resize:vertical}
       /* V12.84 — a full or blocked device store used to fail in silence, and the
          learner discovered it only when a call cost them their answers. */
       this._draftSavedAt = Date.now();
+      /* V12.86 — the heartbeat that lets a rebooted page know how long it was gone. */
+      try { localStorage.setItem(this.deadlineKey() + '-hb', String(Date.now())); } catch(_) {}
     } catch(e) {
       if (!this._storageWarned) {
         this._storageWarned = true;
@@ -880,6 +882,33 @@ textarea.form-input{min-height:80px;resize:vertical}
       try{ localStorage.setItem(_deadlineKey, String(this.deadline)); }catch(_){}
     }
     this.remaining = Math.max(0, Math.ceil((this.deadline - this.now()) / 1000));
+    /* V12.86 (item 4) — A CALL KILLS THE PAGE, NOT JUST THE CLOCK.
+       A page that is merely hidden is handled by pauseForInterruption. But a
+       phone under memory pressure closes the tab outright: no visibilitychange,
+       no pagehide, nothing. The learner comes back, the page reboots, and the
+       countdown has charged them for every minute the phone was in their pocket
+       — and if the paper was near its end, the next tick submits with the
+       answers they had not reached. The heartbeat below is written every ten
+       seconds while the paper runs; on boot the gap between the last heartbeat
+       and now is handed back (capped at 30 minutes over the whole sitting, and
+       written into the interruption log that travels with the attempt). */
+    try {
+      const hb = Number(localStorage.getItem(this.deadlineKey() + '-hb') || 0);
+      const gap = hb ? (Date.now() - hb) : 0;
+      const already = this.interruptTotalMs || 0;
+      const capTotal = 30 * 60 * 1000;
+      if (gap > 45000) {
+        const credit = Math.max(0, Math.min(gap, capTotal - already));
+        if (credit > 0) {
+          this.deadline += credit;
+          this.interruptTotalMs = already + credit;
+          (this.interruptLog = this.interruptLog || []).push({ away_ms: gap, credited_ms: credit, at: new Date().toISOString(), why: 'page_closed' });
+          try { localStorage.setItem(_deadlineKey, String(this.deadline)); } catch(_) {}
+          try { toast('⏸ This paper was closed while you were away — ' + Math.round(credit/1000) + ' second(s) handed back to you. Your answers are still here.', 'info', 12000); } catch(_) {}
+        }
+      }
+    } catch(_) {}
+    this.remaining = Math.max(0, Math.ceil((this.deadline - this.now()) / 1000));
     this.tick();
     this.render();
   };
@@ -1066,7 +1095,22 @@ textarea.form-input{min-height:80px;resize:vertical}
     const el = document.getElementById('sc-timeup-send'); if (el) el.addEventListener('click', send);
     /* a visible, attended page submits itself after a grace period; a page that
        is hidden waits — being on a call must never send the paper for you */
-    setTimeout(() => { if (this._done || !this._timeUpShown) return; if (document.hidden) return; send(); }, 120000);
+    /* V12.86 (item 4) — a single 120-second timer fired once and gave up: if the
+       candidate happened to be on a call at that exact moment the paper was
+       never sent, and if they were in front of the screen the send happened
+       while they were reading. It now re-arms every 20 seconds and only sends
+       when the page is visible AND the candidate has been idle for two minutes,
+       so being interrupted can neither steal the paper nor send it unseen. */
+    clearInterval(this._timeUpTimer);
+    this._timeUpIdleSince = Date.now();
+    const bump = () => { this._timeUpIdleSince = Date.now(); };
+    ['click','keydown','touchstart','scroll'].forEach(ev => document.addEventListener(ev, bump, { passive: true }));
+    this._timeUpTimer = setInterval(() => {
+      if (this._done || !this._timeUpShown) { clearInterval(this._timeUpTimer); return; }
+      if (document.hidden || !navigator.onLine) return;                    /* never while away or offline */
+      if (Date.now() - this._timeUpIdleSince < 120000) return;             /* let them re-read */
+      send();
+    }, 20000);
   };
 
   Exam.tick = function(){

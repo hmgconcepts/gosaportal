@@ -596,10 +596,17 @@ body:not([data-role-ready="1"]) .app-nav a[data-role-allow]{visibility:visible!i
           conflicting class fee structures. Each finding names the student, says what it means, and tells you what to do.
           Fixable problems are repaired; money records are <b>never</b> deleted by a tool.
         </p>
+        <div class="notice notice-info" style="font-size:.86rem">
+          <b>V12.86 — every finding now has a one-click fix.</b> Each row below carries its own
+          <b>Fix this one</b> button, and <b>Fix everything fixable</b> runs all of them in order. The counts you see are
+          re-read <i>after</i> the repairs, so pressing the button a second time reports <b>0</b> for everything it just
+          fixed — a finding that keeps coming back is a real bug, not a message you have to live with.
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <select class="form-select" id="fdx-class" data-class-picker style="max-width:220px"><option value="">ALL classes</option></select>
           <button class="btn btn-outline" onclick="FeeDoctor.run(false)">🔍 Check only (changes nothing)</button>
-          <button class="btn btn-primary" style="background:#6d28d9;border-color:#5b21b6" onclick="FeeDoctor.run(true)">🩹 Fix everything fixable</button>
+          <button class="btn btn-primary" style="background:#6d28d9;border-color:#5b21b6" onclick="FeeDoctor.fixEverything()">🩹 Fix everything fixable</button>
+          <button class="btn btn-outline" onclick="FeeDoctor.history()">🧾 Repair history</button>
         </div>
         <div id="fee-doctor-out" style="margin-top:12px"></div>
       </div>
@@ -1512,35 +1519,159 @@ document.addEventListener('DOMContentLoaded', () => { try { FeeClassPickers.fill
 
 const FeeDoctor={
   esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));},
-  /* V12.66 — prefer the 14-check doctor; fall back to the 7-check one on a
-     database that has not been updated yet, so the button never dies. */
-  async run(heal){
+  money(n){ return ((window.SCHOOL&&SCHOOL.currency)||'₦')+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); },
+
+  /* V12.86 (items 7 & 8) — the checks the doctor can act on.
+     Every entry has: what it found, what it means for the money, exactly what
+     the fix does, and the label on the button. The wording lives here so the
+     database only has to return counts. */
+  CHECKS:{
+    unlinked_receipts:{icon:'🔗',label:'Receipts attached to no learner',fixable:true,
+      means:'Money was received but the row names nobody, so it counts for no balance.',
+      how:'Links the receipt to the one learner whose name matches exactly. It refuses when two learners share the name — that is left for you.',
+      btn:'Link to the learner'},
+    duplicate_receipts:{icon:'👯',label:'The same receipt entered twice',fixable:true,
+      means:'Same learner, same amount, same date and same reference — the balance is understated by the copy.',
+      how:'Keeps the earliest row and removes the exact copies only. A receipt with any difference is never touched.',
+      btn:'Remove the exact copies'},
+    nonpositive_amounts:{icon:'0️⃣',label:'Zero or negative amounts',fixable:true,
+      means:'Phantom rows that distort counts, averages and the day book.',
+      how:'Removes rows whose amount is zero or below. No money can be lost this way — such a row records no money.',
+      btn:'Remove phantom rows'},
+    missing_period:{icon:'🗓',label:'Receipts with no term or session',fixable:true,
+      means:'They are counted in NO total, so a paid parent still looks in arrears.',
+      how:'Stamps the current term and session on them, exactly as the bursar would by hand.',
+      btn:'Stamp the current period'},
+    overpayments:{icon:'💸',label:'Paid beyond the bill',fixable:true,
+      means:'The learner has paid more than the term bill. This is very often a NEW learner billed without their new-student fees, not a real overpayment.',
+      how:'Records the excess as a credit balance on the learner — no receipt is edited or deleted. Check the price list first: if the new-student fees are missing, add them and re-run.',
+      btn:'Hold the excess as credit'},
+    cbt_two_columns:{icon:'🧮',label:'CBT scores in two report columns',fixable:true,
+      means:'One CBT score was written into two different report columns, so the report total counts it twice.',
+      how:'Keeps the column that the exam itself names as its report column (falling back to the earliest row) and removes the duplicate. The score is not altered.',
+      btn:'Keep the exam’s own column'},
+    conflicting_structures:{icon:'🏷',label:'Two active price lists for one class and term',fixable:true,
+      means:'Two bills exist for the same class, arm, term and learner type — which one a particular page reads is a coin toss.',
+      how:'Keeps the most recently updated list for each learner type and deactivates the older ones. Nothing is deleted; deactivated lists stay for the record.',
+      btn:'Keep the newest list'},
+    aid_naming_nobody:{icon:'🎁',label:'Aid naming nobody',fixable:true,
+      means:'An approved bursary or scholarship is applied to no learner, so nobody receives it.',
+      how:'Marks the orphan award as void so it stops skewing the aid total. Re-create it against the right learner if it was real.',
+      btn:'Void the orphan award'}
+  },
+  /* informational rows — the doctor still reports them, they need a human */
+  INFO:{
+    periods_no_dates:{icon:'📅',label:'Academic periods with no dates',
+      means:'Arrears for those terms cannot be proven, so they are not charged.',how:'Open Academic Setup and give the period a start and end date.'},
+    class_bills_zero:{icon:'🈳',label:'Class fees that bill zero',
+      means:'Every learner in that class looks fully paid.',how:'Fill the class price list (Fee Structure) for the current term.'},
+    opening_balances:{icon:'📗',label:'Opening balances carried from paper',
+      means:'Old debt brought forward from before School Connect.',how:'Convert them to invoices once, if the debt is real.'}
+  },
+
+  /* the entry point: v4 first, then the older doctors so the button never dies */
+  async run(heal, only){
     const box=document.getElementById('fee-doctor-out'); if(!box||!window.sb)return;
-    const wantFix=!!heal;
-    if(wantFix && !confirm('Repair everything that can be repaired safely?\n\nThis stamps missing terms on receipts and rebuilds the affected ledgers. No money record is ever deleted, and it is safe to run more than once.')) return;
-    box.innerHTML='<span class="pulse">Scanning the whole ledger…</span>';
+    box.innerHTML='<span class="pulse">'+(heal?'Repairing':'Scanning')+' the whole ledger…</span>';
+    const r=await sb.rpc('sc_fee_doctor_v4',{p_apply:!!heal,p_only:only||null});
+    if(!r.error && r.data && r.data.ok!==false){ return this.renderV4(r.data,box); }
+    if(/function|schema cache|does not exist/i.test(String((r.error&&r.error.message)||''))){
+      return this.runLegacy(heal,box);
+    }
+    box.innerHTML='<div class="notice notice-error">'+this.esc((r.data&&r.data.error)||(r.error&&r.error.message)||'Scan failed')+'</div>';
+  },
+
+  renderV4(d, box){
+    const checks=(d.checks||[]);
+    const fixable=checks.filter(c=>c.fixable);
+    const broken=fixable.filter(c=>Number(c.found)>0);
+    const infoOnly=checks.filter(c=>!c.fixable && Number(c.found)>0);
+    let h='<div class="notice '+(broken.length?(d.applied?'notice-warning':'notice-info'):'notice-success')+'"><b>'
+      + (d.applied?'Repairs applied — these are the counts that are LEFT.':'Read-only check — nothing was changed.')+'</b><br>'
+      + 'Term <b>'+this.esc(d.term||'')+' '+this.esc(d.session||'')+'</b> · '
+      + fixable.length+' fixable check(s) · <b>'+(broken.length?broken.length+' still open':'none open')+'</b>'
+      + '</div>';
+    h+='<div class="table-wrap"><table style="font-size:.86rem"><thead><tr><th style="text-align:left">Check</th>'
+      + '<th>Found</th><th style="text-align:left">What it means for the money</th>'
+      + '<th style="text-align:left">What the fix does</th><th></th></tr></thead><tbody>';
+    checks.forEach(c=>{
+      const meta=this.CHECKS[c.key]||this.INFO[c.key]||{icon:'❓',label:c.key,means:'',how:''};
+      const n=Number(c.found||0);
+      h+='<tr'+(n>0?(c.fixable?' style="background:#fffbeb"':' style="background:#f8fafc"'):'')+'>'
+        + '<td style="text-align:left">'+meta.icon+' '+this.esc(meta.label)+'</td>'
+        + '<td><b style="color:'+(n>0?(c.fixable?'#b45309':'#475569'):'#166534')+'">'+n+'</b></td>'
+        + '<td style="text-align:left;color:var(--gray-600)">'+this.esc(meta.means||'')+'</td>'
+        + '<td style="text-align:left;color:var(--gray-600)">'+this.esc(meta.how||'')+'</td>'
+        + '<td>'+(c.fixable
+            ? (n>0?'<button class="btn btn-sm btn-primary" onclick="FeeDoctor.run(true,\''+this.esc(c.key)+'\')">🩹 '+this.esc(meta.btn||'Fix this one')+'</button>'
+                   :'<span style="color:#166534;font-weight:700">✔ clear</span>')
+            : (n>0?'<span class="badge" style="background:#e2e8f0;color:#334155">needs you</span>':''))+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+    if(!broken.length) h+='<p style="color:#166534;font-weight:700;margin-top:10px">✅ Every fixable finding is at zero. Pressing the button again will report zero as well — nothing is re-raised.</p>';
+    if(infoOnly.length) h+='<p style="font-size:.82rem;color:var(--gray-500);margin-top:8px">The greyed rows cannot be fixed by a tool: they need a decision from you (a price list to fill, a period to date, a paper debt to confirm).</p>';
+    h+='<p style="font-size:.82rem;color:var(--gray-500);margin-top:8px">Every repair is written to the repair log with who ran it, what it changed and how many rows it touched — see <b>🧾 Repair history</b>.</p>';
+    box.innerHTML=h;
+    if(window.App&&App.logActivity)App.logActivity(d.applied?'fee-doctor-v4-fix':'fee-doctor-v4-scan','fee_payments',broken.length+' open');
+  },
+
+  /* item 8 — one press fixes everything that can be fixed, then re-reads */
+  async fixEverything(){
+    const box=document.getElementById('fee-doctor-out'); if(!box||!window.sb)return;
+    if(!confirm('Repair everything that can be repaired safely?\n\nEach fix is described on the page before you press it. No money record is ever deleted: duplicates are exact copies, phantom rows hold no money, and an overpayment is held as credit. It is safe to run this any number of times.')) return;
+    box.innerHTML='<span class="pulse">Repairing every fixable finding…</span>';
+    const keys=Object.keys(this.CHECKS);
+    const done=[];
+    for(const k of keys){
+      const r=await sb.rpc('sc_fee_doctor_v4',{p_apply:true,p_only:k});
+      const c=(r.data&&r.data.checks||[]).find(x=>x.key===k);
+      done.push({key:k,left:c?Number(c.found):null,error:r.error?String(r.error.message||r.error):null});
+    }
+    const r2=await sb.rpc('sc_fee_doctor_v4',{p_apply:false,p_only:null});
+    if(r2.error||!r2.data||r2.data.ok===false){ box.innerHTML='<div class="notice notice-error">'+this.esc((r2.error&&r2.error.message)||'Re-scan failed')+'</div>'; return; }
+    this.renderV4(r2.data,box);
+    const stuck=done.filter(x=>x.error||Number(x.left)>0);
+    const note=document.createElement('div');
+    note.className='notice '+(stuck.length?'notice-warning':'notice-success');
+    note.style.marginTop='10px';
+    note.innerHTML=stuck.length
+      ? '<b>'+stuck.length+' check(s) still report something after their fix.</b> '+
+        stuck.map(x=>'<br>· '+this.esc((this.CHECKS[x.key]||{}).label||x.key)+(x.error?' — '+this.esc(x.error):' — '+x.left+' left')).join('')
+      : '<b>✅ Everything fixable is now zero.</b> Press the button again: it reports the same zeros, so nothing is re-raised.';
+    box.prepend(note);
+  },
+
+  async history(){
+    const box=document.getElementById('fee-doctor-out'); if(!box||!window.sb)return;
+    box.innerHTML='<span class="pulse">Reading the repair log…</span>';
+    const {data,error}=await sb.from('sc_repair_log').select('ran_at,actor,check_key,action,rows_affected').order('ran_at',{ascending:false}).limit(60);
+    if(error){ box.innerHTML='<div class="notice notice-error">'+this.esc(error.message)+'</div>'; return; }
+    if(!(data||[]).length){ box.innerHTML='<div class="notice">No repair has been recorded yet on this database.</div>'; return; }
+    box.innerHTML='<div class="table-wrap"><table style="font-size:.84rem"><thead><tr><th>When</th><th>Check</th><th>What was done</th><th>Rows</th></tr></thead><tbody>'
+      + data.map(x=>'<tr><td>'+this.esc(String(x.ran_at||'').slice(0,16).replace('T',' '))+'</td><td>'+this.esc(x.check_key)+'</td><td>'+this.esc(String(x.action||'').replace(/_/g,' '))+'</td><td>'+Number(x.rows_affected||0)+'</td></tr>').join('')
+      + '</tbody></table></div>';
+  },
+
+  /* the pre-V12.86 doctors, kept so an older database still answers */
+  async runLegacy(heal, box){
     const cls=(document.getElementById('fdx-class')||{}).value||'';
     const v2=await sb.rpc('sc_fee_doctor_v2',{p_class:cls||null,p_student:null,p_dry_run:!heal});
     if(!v2.error && v2.data && v2.data.ok!==false){ return this.renderV2(v2.data,heal,box); }
-    const r=await sb.rpc('sc_fee_ledger_doctor',{p_heal:wantFix});
+    const r=await sb.rpc('sc_fee_ledger_doctor',{p_heal:!!heal});
     if(r.error||!r.data||r.data.ok===false){
       const msg=(r.data&&r.data.error)||(r.error&&r.error.message)||'Scan failed';
-      box.innerHTML='<p style="color:#b91c1c">'+(/sc_fee_ledger_doctor|schema cache|function/i.test(String(msg))?'The Fee Doctor needs a one-time database update — run database/complete-schema.sql (or the latest complete-schema.sql) in Supabase.':this.esc(msg))+'</p>';
+      box.innerHTML='<p style="color:#b91c1c">'+(/sc_fee_ledger_doctor|schema cache|function/i.test(String(msg))?'The Fee Doctor needs a one-time database update — run database/complete-schema.sql in Supabase.':this.esc(msg))+'</p>';
       return;
     }
-    const d=r.data, issues=d.issues||[];
-    const KINDS=FeeDoctor.KINDS;
-    if(!issues.length){box.innerHTML='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;color:#166534;font-weight:700">✅ Ledger clean — no duplicates, no unlinked rows, no overpayments, no stale totals.'+(heal?' Snapshots re-verified for '+(d.healed_terms||0)+' student-term(s).':'')+'</div>';return;}
+    const d=r.data, issues=d.issues||[], KINDS=this.KINDS;
+    if(!issues.length){box.innerHTML='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;color:#166534;font-weight:700">✅ Ledger clean.</div>';return;}
     const groups={};issues.forEach(i=>{(groups[i.kind]=groups[i.kind]||[]).push(i);});
-    box.innerHTML=(heal?'<p style="color:#166534;font-weight:700">🧮 Healed snapshots across '+(d.healed_terms||0)+' student-term(s). Remaining findings need a human decision:</p>':'')+
-      Object.keys(groups).map(k=>{
-        const meta=KINDS[k]||['❓ '+k,'#f8fafc','#334155'];
-        return '<div style="background:'+meta[1]+';border:1px solid '+meta[2]+'33;border-left:5px solid '+meta[2]+';border-radius:10px;padding:10px 14px;margin-bottom:10px">'+
-          '<b style="color:'+meta[2]+'">'+meta[0]+' · '+groups[k].length+'</b>'+
-          '<ul style="margin:6px 0 0 18px;font-size:.86rem;line-height:1.6">'+groups[k].slice(0,12).map(i=>'<li><b>'+this.esc(i.student||'')+'</b>'+(i.amount!=null?' · '+Number(i.amount).toLocaleString():'')+(i.term?' · '+this.esc(i.term):'')+(i.excess!=null?' · excess '+Number(i.excess).toLocaleString():'')+'<br><span style="color:var(--gray-600)">'+this.esc(i.advice||'')+'</span></li>').join('')+(groups[k].length>12?'<li>… and '+(groups[k].length-12)+' more</li>':'')+'</ul></div>';
-      }).join('')+
-      '<p style="font-size:.82rem;color:var(--gray-500)">Fix rows in the table below (Edit/Delete) — every change recomputes the student\'s whole term automatically. Re-scan afterwards.</p>';
-    if(window.App&&App.logActivity)App.logActivity(heal?'fee-doctor-heal':'fee-doctor-scan','fee_payments',String(issues.length)+' finding(s)');
+    box.innerHTML=Object.keys(groups).map(k=>{
+      const meta=KINDS[k]||['❓ '+k,'#f8fafc','#334155'];
+      return '<div style="background:'+meta[1]+';border:1px solid '+meta[2]+'33;border-left:5px solid '+meta[2]+';border-radius:10px;padding:10px 14px;margin-bottom:10px">'
+        +'<b style="color:'+meta[2]+'">'+meta[0]+' · '+groups[k].length+'</b>'
+        +'<ul style="margin:6px 0 0 18px;font-size:.86rem;line-height:1.6">'+groups[k].slice(0,12).map(i=>'<li><b>'+this.esc(i.student||'')+'</b>'+(i.amount!=null?' · '+Number(i.amount).toLocaleString():'')+'<br><span style="color:var(--gray-600)">'+this.esc(i.advice||'')+'</span></li>').join('')+'</ul></div>';
+    }).join('');
   }
 };
 
@@ -1671,24 +1802,51 @@ const FeeInvoice={
     }
   },
   async migrate(dry){
+    /* V12.86 (item 6) — “stored” and “should be” were both showing up as wrong
+       in the same table, because the old repair rewrote EVERY receipt with one
+       inferred figure. It now compares, classifies and only touches what it can
+       prove. The table below says, row by row, which of the two numbers is the
+       record — and leaves anything unexplained exactly as it is. */
     this.out('<span class="pulse">Reading every stored receipt total…</span>');
     try{
       const r=await sb.rpc('sc_fee_truth_migrate',{p_dry_run:!!dry});
       if(r.error) throw r.error;
       const d=r.data||{}; if(d.ok===false) throw new Error(d.error||'Failed');
-      let h='<div class="notice '+(Number(d.would_fix||0)>0?'notice-warning':'notice-success')+'"><b>'+this.esc(d.message||'')+'</b><br>'
-        + Number(d.scanned||0)+' receipt row(s) examined.</div>';
+      const fix=Number(d.fixed||0), keep=Number(d.kept_correct||0), rev=Number(d.needs_review||0);
+      let h='<div class="notice '+(fix>0&&!dry?'notice-success':'notice-info')+'"><b>'
+        + (dry?'Check only — nothing has been changed.':'Repair finished.')+'</b><br>'
+        + Number(d.scanned||0)+' receipt row(s) examined · <b>'+keep+'</b> already correct · <b>'+fix+'</b> '
+        + (dry?'repairable safely':'repaired') + ' · <b>'+rev+'</b> left for a human decision.'
+        + '</div>';
+      h+='<div class="notice" style="font-size:.85rem"><b>Which number is the record?</b> '
+        + 'A receipt stores the term bill that was in force when it was issued, so the two columns can legitimately differ: '
+        + '<b>Stored</b> is what the school recorded on that day; <b>Should be</b> is the bill the school publishes today. '
+        + 'The verdict column says what happened: <span class="badge">correct</span> the two agree; '
+        + '<span class="badge">fix</span> the stored figure is provably a running total, an older bill or a mis-typed figure — it is rewritten; '
+        + '<span class="badge">keep</span> the difference cannot be explained from the records, so <b>it is left alone</b>; '
+        + '<span class="badge">review</span> there is no bill on record at all — raise invoices for that term first.</div>';
       const s2=d.samples||[];
       if(s2.length){
-        h+='<div class="table-wrap" style="margin-top:10px"><table style="font-size:.85rem"><thead><tr><th>Student</th><th>Term</th><th>Stored</th><th>Should be</th><th>Overstated by</th></tr></thead><tbody>'
-          + s2.map(x=>'<tr><td>'+this.esc(x.student||'')+'</td><td>'+this.esc((x.term||'')+' '+(x.session||''))+'</td>'
-            +'<td style="color:#b91c1c">'+this.money(x.stored)+'</td><td><b style="color:#15803d">'+this.money(x.correct)+'</b></td>'
-            +'<td>'+this.money(x.difference)+'</td></tr>').join('')
-          + '</tbody></table></div>'
-          + '<p style="font-size:.82rem;color:var(--gray-600);margin-top:8px">This is the compounding fault: each receipt stored the running total instead of the term bill. Repair rewrites each receipt with the bill for its term.</p>';
+        const badge=v=>({correct:'#166534',fix:'#b45309',keep:'#475569',review:'#7c3aed'}[v]||'#475569');
+        const why={invoice_is_the_recorded_bill:'the invoice for that term is the record — the receipt stored something else',
+          running_balance:'the receipt stored the running total, not the bill',
+          bill_increased:'the price list went up after this receipt was issued',
+          unexplained:'the difference cannot be explained from the records — for example a new learner billed without their new-student fees',
+          no_bill_on_record:'no invoice or price list says what was billed that term'};
+        h+='<div class="table-wrap" style="margin-top:10px"><table style="font-size:.85rem"><thead><tr><th>Student</th><th>Term</th>'
+          +'<th>Stored</th><th>Should be</th><th>Difference</th><th style="text-align:left">Verdict</th></tr></thead><tbody>'
+          + s2.map(x=>'<tr><td><b>'+this.esc(x.student||'')+'</b></td><td>'+this.esc((x.term||'')+' '+(x.session||''))+'</td>'
+            +'<td>'+this.money(x.stored)+'</td><td><b>'+this.money(x.correct)+'</b></td>'
+            +'<td'+(Number(x.difference)>0?' style="color:#b91c1c"':'')+'>'+(x.difference==null?'—':this.money(x.difference))+'</td>'
+            +'<td style="text-align:left"><b style="color:'+badge(x.verdict)+'">'+this.esc(x.verdict||'')+'</b><br>'
+            +'<small style="color:var(--gray-600)">'+this.esc(why[x.why]||x.why||'')+'</small></td></tr>').join('')
+          +'</tbody></table></div>';
+        if(!dry && fix>0) h+='<p style="font-size:.83rem;color:var(--gray-600);margin-top:8px">The rows marked <b>keep</b> were not touched. Most of them are new learners whose bill includes new-student-only fees: fix the price list for that class and term, then check again.</p>';
+      } else {
+        h+='<p style="color:#166534;font-weight:700;margin-top:10px">✅ Every stored receipt total already matches its bill.</p>';
       }
       this.out(h);
-      if(!dry){ try{ FeeSegment.load(); }catch(_){} }
+      if(!dry){ try{ FeeSegment.load(); }catch(_){} try{ if(window.App&&App.loadDashFees) App.loadDashFees(); }catch(_){} }
     }catch(e){
       this.out('<div class="notice notice-error">'+this.esc(e.message||e)+'</div>');
     }

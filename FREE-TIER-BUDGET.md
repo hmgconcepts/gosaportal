@@ -1,6 +1,6 @@
 # Free-tier budget — what the school gets for ₦0, and where the edges are
 
-**Version:** V12.85 · **Date:** 8 November 2026 · **Plan:** Supabase **Free** (no Pro), hosting on a
+**Version:** V12.86 · **Date:** 8 November 2026 · **Plan:** Supabase **Free** (no Pro), hosting on a
 free static host (Vercel Hobby or any static host — see §6).
 
 This is the arithmetic behind the instruction *"every tool must remain free-tier; no AI APIs."*
@@ -15,7 +15,7 @@ discovering a limit from an error page.
 
 | Resource | Free-plan limit | What the platform does about it |
 |---|---|---|
-| **Database size** | **500 MB** per project | The whole schema is **982,250 B** (≈0.98 MB) — **0.2 %**. The rest is the school's own rows; §3 gives the per-learner cost |
+| **Database size** | **500 MB** per project | The whole schema is **999,951 B** (≈1.0 MB) — **0.2 %**. The rest is the school's own rows; §3 gives the per-learner cost |
 | **File storage** | **1 GB** | Photos, ID-card PDFs, receipts. Compressed on upload; §4 gives the rules |
 | **Egress (data transfer out)** | **5 GB / month** (+5 GB cached) | The heaviest actions are report cards and CBT papers; §3 counts them |
 | **Monthly active users (Auth)** | **50,000** | A school of 2,000 learners + parents + staff peaks near 6,000. Not a real limit here |
@@ -153,6 +153,56 @@ Supabase's free tier has no such restriction, and nothing here needs Supabase Pr
 | Needs 2+ custom environments | 2 active free projects | use the demo project as staging, or pause the demo while not in use |
 
 Only the last two are genuinely plan-shaped problems, and both are solved in settings, not by upgrading.
+
+---
+
+## 7b. The Supabase email, answered without paying (V12.86)
+
+The school received Supabase's **"exhausting Disk IO Budget"** notice for project **God of Seed Academy
+Portal** (ref `auptmhagbksebetbxkvn`, region `eu-west-1`, compute **NANO**), and the usage panel shows:
+
+| Resource | Used | Limit | State |
+|---|---|---|---|
+| Egress | 1.33 GB | 5 GB | fine |
+| Database size | 118 MB | 500 MB | fine |
+| Monthly active users | 180 | 50,000 | fine |
+| File storage | 0.13 GB | 1 GB | fine |
+| **Log Ingestion** | **1.01 GB** | **1 GB** | **over — this is the actual breach** |
+| Log Query | 0 GB | 100 GB | fine |
+
+Two separate things are being reported in one email, and neither needs Pro ($25/month) or a compute upgrade.
+
+**(a) Disk IO Budget.** Supabase warns when sustained read/write IO on a Nano instance outruns its budget; the
+usual cause on this platform is *polling* — a page asking the database the same question on a timer, and
+per-row functions that re-read whole tables. What V12.86 does about it, all free:
+
+1. **Nothing polls per second.** The exam clock is display-only; the database is asked once per reconnect
+   (`sc_cbt_window_state`), not once per tick.
+2. **Repairs are set-based.** Each Fee Doctor check is one statement over the whole table, not a loop over
+   learners — a 148-learner scan is a handful of reads, not hundreds.
+3. **The heaviest read (the bill) is unchanged in cost but no longer repeated**: `sc_fee_bill_v2_structure`
+   is one call per learner per screen, and the new extras lookup is a single indexed query against
+   `class_fee_extra` rather than a scan.
+4. **Write amortisation**: draft answers go to the device, not the database; the receipt snapshot is
+   recomputed by a statement-level trigger, not a row-level one.
+5. **Do not run the doctor on a timer.** It is an administrator action; running it every 15 minutes is the
+   one thing that would genuinely burn IO.
+
+**(b) Log Ingestion over 1 GB.** This is a *plan meter*, not a hard stop, and it is the only number actually
+over. Free remedies, in order of effect:
+
+1. **Turn down what is logged**: Supabase → *Project Settings → Logs* — keep only `postgres` error logs and
+   drop the verbose `edge_logs`/`postgrest` request logs the platform does not read. (Saves the bulk.)
+2. **Stop the noisy source**: `pg_stat_statements`-style noise usually comes from repeated failing calls. The
+   V12.78 schema doctor (`platform-health.html`) names the table and function doing the writing — run it,
+   fix that one thing, and the log volume stops being generated.
+3. **Keep the 1-day retention** (free plan) and export anything you need to keep to the school's own Drive
+   with the routine in §5.
+4. **Trim the activity log** with the archive routine in §5 — `activity_log` grows with use and is the most
+   common source of both log volume and disk-IO churn.
+
+**What the school should NOT do:** upgrade compute, buy Pro, or turn off Row-Level Security to "reduce load".
+None of those is needed for either message, and the first two cost money.
 
 ---
 

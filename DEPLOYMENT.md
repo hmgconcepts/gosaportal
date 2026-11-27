@@ -1,6 +1,6 @@
 # School Connect — Deployment Guide
 
-**Version 12.81 · 20 November 2026**
+**Version 12.86 · 8 November 2026**
 
 This guide takes a school from "nothing" to "a live, branded school platform with its own data" using **only free tools**. Follow it in order. Every step states exactly what to click or paste, what you should see when it worked, and what to do when it did not.
 
@@ -302,6 +302,46 @@ A single school of 1,000 learners fits comfortably inside the free tiers.
 - [ ] `sc_report_mark_audit()` clean
 - [ ] Backup taken
 - [ ] Two staff members shown the **Update now** bar and the *Feature Guide* page
+
+---
+
+## 15a. V12.86 — two price lists, an honest repair, a paper nothing can take away
+
+**This round changes the database.** Do §2 (paste the whole `database/complete-schema.sql` once) and then
+upload the ZIP. Nothing else changes: no new key, no new hosting setting, no new paid service.
+
+### The four things to do after the paste, in this order
+
+1. **Wait for the confirmation row.** The last result of the script must read `V12.86 inserted`. If you see a
+   red error instead, stop and read `RELEASE-v12.86.md` §11 — the file is 999,951 bytes of a 1,000,000-byte
+   limit and a truncated paste is the usual cause.
+2. **Publish both prices for a class.** *Fees → Class Fee Structure → + Add new*: choose the class, the arm,
+   the term, then **Who this price is for = returning**, and enter the term bill. Save. Press **+ Add new**
+   again with **new** if your new intake pays a different class bill.
+3. **Add the new-learner fees.** *Fees → **New and returning learners*** → pick the class → add each item
+   (Admission, Uniform, Books, ID card …) with **Who pays it = New learners only**. The panel immediately
+   shows the returning bill and the new bill side by side. *This step is what ends the false "overpayment"
+   reports — do it before you repair anything.*
+4. **Repair, then check.** *Fees → Raise invoices for this term* → **🩹 Repair stored receipt totals** →
+   **🩺 Fee Doctor → 🔍 Check only** → read every row → **🩹 Fix everything fixable** → press it a second
+   time. The second press must report **zero** for every fixable row.
+
+### What you should see when each step worked
+
+| Step | Success looks like | If it does not |
+|---|---|---|
+| 1 | `V12.86 inserted` in the results grid | the paste was cut short — re-copy the whole file |
+| 2 | two rows for the same class/term, one badged *returning*, one *new* | the database was not updated (the old key allows one row only) |
+| 3 | *Returning learner bill: ₦28,100 · New learner bill: ₦38,100* | the extra was saved with the wrong class/term — delete and re-add |
+| 4 | the Fee Doctor banner says *Everything fixable is now zero* | leave the row open, send us the screenshot: it is a real finding, not a message to live with |
+
+### What changed for the people who use it
+
+* **New vs returning** is now a real billing distinction, not a note in a register.
+* **The affective domain remembers.** A tutor fills it once, saves, reopens, and sees the same numbers.
+* **A phone call cannot take a paper away** — the clock pauses, the minutes are handed back, and nothing is
+  ever submitted while the candidate is not in front of the screen.
+* **Every Fee Doctor finding has a button**, and pressing it twice cannot re-raise what it fixed.
 
 ---
 
