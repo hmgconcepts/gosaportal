@@ -63,6 +63,12 @@ const CRUD = {
       {key:'photo_url',label:'Student photo (Google Drive link)',type:'text',help:'V12.3: paste a Drive share link — no upload (saves storage). Shows on the lifetime ID card on EVERY portal; the student can also set it themselves on My Profile (both entry points stay in sync automatically).'},
       {key:'address',label:'Address',type:'textarea'},
       {key:'campus',label:'Campus',type:'text'},
+      {key:'student_type',label:'New or returning learner (V12.86)',type:'select',options:['','new','returning'],
+       help:'Leave blank and School Connect works it out: a learner whose FIRST recorded session is the session being billed is new; anybody billed in an earlier session is returning. Set it by hand only to override a wrong guess — e.g. a learner who joined mid-session.'},
+      {key:'first_session',label:'First session billed',type:'text',placeholder:'2025/2026',
+       help:'The earliest session this learner was ever billed for. Filled automatically from the receipts on install; it is what the new/returning decision is based on.'},
+      {key:'credit_balance',label:'Credit balance (overpayment held on account)',type:'number',readonly:true,
+       help:'Money received beyond the bill. It is NEVER deleted — it sits here and the Fee Doctor records it when it repairs an overpayment.'},
       {key:'status',label:'Status',type:'select',options:['active','inactive','graduated']}
     ]},
     staff: { table:'staff', title:'Staff', cols:[
@@ -592,6 +598,8 @@ const CRUD = {
       {key:'department',label:'Department / Section',type:'ref',refTable:'departments',refValue:'name',refStore:'value',help:'Optional: Nursery, Primary, Junior Secondary, Science, Arts, Boarding, etc.'},
       {key:'term',label:'Term scope',type:'select',options:['Current Term','Next Term'],default:'Current Term',required:true,help:'V10: "Current Term" = the bill students owe NOW (drives Total-due auto-fill on Fees & Payments and the dashboards). "Next Term" = the advance bill printed on report cards. New schools: just enter Current Term — Next Term is optional and can come later.'},
       {key:'session',label:'Session',type:'lookup',lookupKind:'session'},
+      {key:'student_type',label:'Who this price is for (V12.86)',type:'select',options:['all','returning','new'],default:'all',
+       help:'“returning” = the term bill for learners already in the school. “new” = the same class bill for learners joining this session. “all” = one price for everybody. You can now publish all three side by side for the same class and term; before V12.86 the database allowed only one price per class per term, which is why new learners were mis-billed.'},
       {key:'tuition',label:'Tuition fee',type:'number'},
       {key:'exam_fee',label:'Exam / assessment fee',type:'number'},
       {key:'development',label:'Development / PTA levy',type:'number'},
@@ -3292,45 +3300,114 @@ if(['class','student_class','candidate_class','last_class'].includes(k))Object.a
     const title = kind === 'affective' ? '⭐ Bulk Fill Affective Domain' : '🏃 Bulk Fill Psychomotor Domain';
     openModal(title,
       '<div class="grid grid-2"><div class="form-group"><label>Class</label><select id="bf-class" class="form-select" onchange="CRUD._bfLoad(\''+kind+'\')"><option value="">— select —</option>' + opts + '</select></div>' +
-      '<div class="form-group"><label>Term</label><select id="bf-term" class="form-select">'+termOpts+'</select></div><div class="form-group"><label>Session</label><select id="bf-session" class="form-select">'+sessionOpts+'</select></div></div>' +
+      '<div class="form-group"><label>Term</label><select id="bf-term" class="form-select" onchange="CRUD._bfLoad(\''+kind+'\')">'+termOpts+'</select></div><div class="form-group"><label>Session</label><select id="bf-session" class="form-select" onchange="CRUD._bfLoad(\''+kind+'\')">'+sessionOpts+'</select></div></div>' +
       '<div id="bf-list" style="max-height:400px;overflow:auto;margin-top:10px"><p style="color:var(--gray-500)">Pick a class to load students...</p></div>',
       '<button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="CRUD._bfSave(\''+kind+'\')">Save All</button>');
+    /* V12.86 — open on the CURRENT period, so what the teacher saves is what the
+       report will ask for later. The dropdowns stay editable for a late entry. */
+    setTimeout(async () => { try {
+      const cp = await CRUD.currentPeriod();
+      const se = document.getElementById('bf-session'); const te = document.getElementById('bf-term');
+      if (se && cp.session) { if (![...se.options].some(o => o.value === cp.session)) se.add(new Option(cp.session, cp.session)); se.value = cp.session; }
+      if (te && cp.term) { if (![...te.options].some(o => o.value === cp.term)) te.add(new Option(cp.term, cp.term)); te.value = cp.term; }
+    } catch (_) { } }, 200);
   },
 
   async _bfLoad(kind) {
-    const cls = document.getElementById('bf-class').value;
+    const clsEl = document.getElementById('bf-class');
     const box = document.getElementById('bf-list');
+    if (!clsEl || !box) return;
+    const cls = clsEl.value;
     if (!cls) return;
-    const { data: studs } = await this.sb.from('students').select('id,full_name').eq('class', cls).order('full_name');
-    if (!studs || !studs.length) { box.innerHTML = '<p>No students found.</p>'; return; }
-    
-    const traits = kind === 'affective' 
+    const term = ((document.getElementById('bf-term')||{}).value || '').trim();
+    const session = ((document.getElementById('bf-session')||{}).value || '').trim();
+    const table = kind === 'affective' ? 'affective_traits' : 'psychomotor_traits';
+    box.innerHTML = '<p class="pulse">Reading ' + esc(cls) + ' — ' + esc(term || 'current term') + ' ' + esc(session || 'current session') + '…</p>';
+    const { data: studs } = await this.sb.from('students').select('id,full_name,class')
+      .ilike('class', cls).order('full_name');
+    if (!studs || !studs.length) { box.innerHTML = '<p>No students found in ' + esc(cls) + '.</p>'; return; }
+
+    /* V12.86 (item 5) — THE FAULT: the grid was rebuilt from the defaults on
+       every load, so a teacher who saved every field reopened the form and saw
+       a wall of 3s. It now reads back what is stored for THIS class, THIS term
+       and THIS session, and marks each learner whose ratings are already on
+       record. Nothing is invented: a learner with no saved ratings still opens
+       at 3, but the header says so. */
+    let saved = {};
+    let lastSaved = '';
+    if (term && session) {
+      try {
+        const { data: rows } = await this.sb.from(table)
+          .select('student_id,ratings,term,session,created_at')
+          .ilike('term', term).ilike('session', session).limit(5000);
+        (rows || []).forEach(r => {
+          const k = String(r.student_id || '').toLowerCase();
+          if (!k) return;
+          saved[k] = Object.assign({}, saved[k] || {}, r.ratings || {});
+          if (r.created_at && r.created_at > lastSaved) lastSaved = r.created_at;
+        });
+      } catch (_) { /* a database without the V12.86 pack still loads the grid */ }
+    }
+
+    const traits = kind === 'affective'
       ? ['Punctuality','Neatness','Politeness','Honesty','Leadership','Cooperation','Attentiveness']
       : ['Handwriting','Verbal Fluency','Sports','Crafts','Drawing','Music'];
+    const optsFor = (cur) => ['5','4','3','2','1'].map(v =>
+      '<option value="' + v + '"' + (String(cur == null ? '3' : cur) === v ? ' selected' : '') + '>' + v + '</option>').join('');
 
-    let html = '<table class="form-table"><thead><tr><th>Student</th>' + traits.map(t => '<th>'+t+'</th>').join('') + '</tr></thead><tbody>';
+    const onRecord = studs.filter(x => saved[String(x.id).toLowerCase()]).length;
+    let html = '<div class="notice ' + (onRecord ? 'notice-success' : 'notice-info') + '" style="margin-bottom:8px;font-size:.84rem">'
+      + '<b>' + onRecord + ' of ' + studs.length + ' learner(s)</b> already have ' + (kind === 'affective' ? 'affective' : 'psychomotor')
+      + ' ratings on record for <b>' + esc(term || '(no term)') + ' ' + esc(session || '(no session)') + '</b>.'
+      + (lastSaved ? ' Last saved ' + esc(String(lastSaved).slice(0, 16).replace('T', ' ')) + '.' : '')
+      + (onRecord ? ' Their saved ratings are pre-selected below — change what you need and press Save All.'
+                  : ' Choose the term and session first; every learner opens at 3 until you save.')
+      + '</div>';
+
+    html += '<table class="form-table"><thead><tr><th>Student</th>' + traits.map(t => '<th>' + t + '</th>').join('') + '</tr></thead><tbody>';
     studs.forEach(s => {
-      html += '<tr data-student-id="'+s.id+'"><td><b>'+esc(s.full_name)+'</b></td>' + traits.map(t => '<td><select class="form-select bf-val" data-trait="'+t+'"><option value="5">5</option><option value="4">4</option><option value="3" selected>3</option><option value="2">2</option><option value="1">1</option></select></td>').join('') + '</tr>';
+      const have = saved[String(s.id).toLowerCase()] || {};
+      html += '<tr data-student-id="' + s.id + '"><td><b>' + esc(s.full_name) + '</b>'
+        + (Object.keys(have).length ? '<br><small style="color:#166534">✓ on record</small>' : '')
+        + '</td>' + traits.map(t => '<td><select class="form-select bf-val" data-trait="' + esc(t) + '">' + optsFor(have[t]) + '</select></td>').join('') + '</tr>';
     });
     html += '</tbody></table>';
     box.innerHTML = html;
   },
 
   async _bfSave(kind) {
-    const cls = document.getElementById('bf-class').value;
-    const term = document.getElementById('bf-term').value;
-    const session = (document.getElementById('bf-session')||{}).value || new Date().getFullYear() + '/' + (new Date().getFullYear()+1);
+    const cls = (document.getElementById('bf-class') || {}).value || '';
+    let term = ((document.getElementById('bf-term') || {}).value || '').trim();
+    let session = ((document.getElementById('bf-session') || {}).value || '').trim();
+    /* V12.86 (item 5) — THE SECOND FAULT: a blank term/session was written as
+       blank, and a report that asks for "First Term" then found nothing, so the
+       teacher's work looked lost. The period is now resolved before writing. */
+    if (!term || !session) {
+      try { const cp = await CRUD.currentPeriod(); term = term || cp.term || ''; session = session || cp.session || ''; } catch (_) {}
+    }
+    if (!term || !session) {
+      toast('Choose the term and the session first — ratings are stored per term.', 'warning', 7000);
+      return;
+    }
+    const selT = document.getElementById('bf-term'); if (selT && selT.value !== term) selT.value = term;
+    const selS = document.getElementById('bf-session'); if (selS && selS.value !== session) selS.value = session;
     const table = kind === 'affective' ? 'affective_traits' : 'psychomotor_traits';
     const rows = [];
     document.querySelectorAll('#bf-list tr[data-student-id]').forEach(tr => {
       const student_id = tr.dataset.studentId;
       const ratings = {};
-      tr.querySelectorAll('.bf-val').forEach(sel => { ratings[sel.dataset.trait] = sel.value; });
-      rows.push({ student_id, term, session, ratings, teacher_id: window.SC_PROFILE?.id });
+      tr.querySelectorAll('.bf-val').forEach(sel => { ratings[sel.dataset.trait] = Number(sel.value); });
+      rows.push({ student_id, term, session, ratings, teacher_id: (window.SC_PROFILE || {}).id || null });
     });
+    if (!rows.length) { toast('Pick a class to load the learners first.', 'warning'); return; }
     const { error } = await this.sb.from(table).upsert(rows, { onConflict: 'student_id,term,session' });
-    if (error) { toast(error.message, 'danger'); return; }
-    toast('✅ Saved traits for ' + rows.length + ' students.', 'success');
+    if (error) {
+      toast(/policy|permission/i.test(error.message)
+        ? 'The database refused the save: run database/complete-schema.sql (V12.86 adds the write policy for these tables), then try again.'
+        : error.message, 'danger', 9000);
+      return;
+    }
+    toast('✅ Saved ' + rows.length + ' learner(s) for ' + term + ' ' + session + '. Reopening this form now shows exactly what you saved.', 'success', 7000);
     closeModal();
   }
 };
